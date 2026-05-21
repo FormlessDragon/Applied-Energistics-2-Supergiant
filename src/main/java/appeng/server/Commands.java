@@ -3,6 +3,7 @@ package appeng.server;
 import appeng.server.services.compass.TestCompassCommand;
 import appeng.server.subcommands.ChannelModeCommand;
 import appeng.server.subcommands.ChunkLogger;
+import appeng.server.subcommands.DebugEnergyCommand;
 import appeng.server.subcommands.GridsCommand;
 import appeng.server.subcommands.SpatialStorageCommand;
 import appeng.server.subcommands.TestMeteoritesCommand;
@@ -15,6 +16,7 @@ public enum Commands {
     CHUNK_LOGGER("chunklogger", new ChunkLogger(), false),
     SPATIAL("spatial", new SpatialStorageCommand(), false),
     CHANNEL_MODE("channelmode", new ChannelModeCommand(), false),
+    DEBUG_ENERGY("debugenergy", new DebugEnergyCommand(), false),
     TICK_MONITORING("tickmonitor", new TickMonitoring(), false),
     GRIDS("grids", new GridsCommand(), false),
     COMPASS("compass", new TestCompassCommand(), true),

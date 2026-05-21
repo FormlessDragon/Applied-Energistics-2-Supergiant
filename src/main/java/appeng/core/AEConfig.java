@@ -38,6 +38,7 @@ public final class AEConfig {
     private boolean debugToolsEnabled;
     private boolean blockUpdateLog;
     private boolean chunkLoggerTrace;
+    private boolean debugEnergy;
     private boolean showDebugGuiOverlays;
     private boolean useLargeFonts;
     private boolean annihilationPlaneSkyDustGeneration = true;
@@ -119,6 +120,8 @@ public final class AEConfig {
             "Enable logging for block updates.");
         this.chunkLoggerTrace = this.configuration.getBoolean("chunkLoggerTrace", "debug", false,
             "Enable stack trace logging for the chunk loading debug command.");
+        this.debugEnergy = this.configuration.getBoolean("debugEnergy", "debug", false,
+            "Treat every energy grid as if it had a creative energy cell.");
         String channelModeName = this.configuration.getString("channels", "general", ChannelMode.DEFAULT.name(),
             "Changes the channel capacity that cables provide in AE2.");
         try {
@@ -303,6 +306,10 @@ public final class AEConfig {
         return this.chunkLoggerTrace;
     }
 
+    public boolean isDebugEnergyEnabled() {
+        return this.debugEnergy;
+    }
+
     public double getGridEnergyStoragePerNode() {
         return 25.0D;
     }
@@ -429,6 +436,14 @@ public final class AEConfig {
         this.channelMode = channelMode == null ? ChannelMode.DEFAULT : channelMode;
         this.configuration.get("general", "channels", ChannelMode.DEFAULT.name()).set(this.channelMode.name());
         this.configuration.save();
+    }
+
+    public void setDebugEnergyEnabled(boolean enabled) {
+        if (enabled != this.debugEnergy) {
+            this.debugEnergy = enabled;
+            this.configuration.get("debug", "debugEnergy", false).set(enabled);
+            this.configuration.save();
+        }
     }
 
     public double getSpatialPowerExponent() {

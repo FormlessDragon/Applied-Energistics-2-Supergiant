@@ -35,6 +35,7 @@ import appeng.api.networking.events.GridPowerIdleChange;
 import appeng.api.networking.events.GridPowerStatusChange;
 import appeng.api.networking.events.GridPowerStorageStateChanged;
 import appeng.api.networking.pathing.IPathingService;
+import appeng.core.AEConfig;
 import appeng.core.AELog;
 import appeng.me.Grid;
 import appeng.me.GridNode;
@@ -42,6 +43,7 @@ import appeng.me.energy.EnergyThreshold;
 import appeng.me.energy.EnergyWatcher;
 import appeng.me.energy.GridEnergyStorage;
 import appeng.me.energy.IEnergyOverlayGridConnection;
+import appeng.tile.networking.TileCreativeEnergyCell;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
@@ -57,7 +59,6 @@ import org.jetbrains.annotations.VisibleForTesting;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.List;
 import java.util.NavigableSet;
 import java.util.Objects;
 import java.util.SortedSet;
@@ -124,6 +125,7 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
     private boolean hasPower = true;
     private long ticksSinceHasPowerChange = 900;
     private double lastStoredPower = -1;
+    private int creativeEnergyCellCount;
 
     public EnergyService(IGrid g, IPathingService pgc) {
         this.grid = (Grid) g;
@@ -157,6 +159,15 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
 
     @Override
     public void onServerStartTick() {
+        if (isCreativePowerModeActive()) {
+            var overlay = getOverlayGrid();
+            overlay.setCurrentPassiveGenerator(null);
+            for (var passiveGenerator : passiveGenerators) {
+                passiveGenerator.setSuppressed(true);
+            }
+            return;
+        }
+
         for (var passiveGenerator : passiveGenerators) {
 // Inject the passive energy once per overlay grid and do it at the energy service that actually
             var currentGenerator = getOverlayGrid().getCurrentPassiveGenerator();
@@ -178,6 +189,39 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
 
     @Override
     public void onServerEndTick() {
+        if (isCreativePowerModeActive()) {
+            var overlay = getOverlayGrid();
+            overlay.setCurrentPassiveGenerator(null);
+            for (var passiveGenerator : passiveGenerators) {
+                passiveGenerator.setSuppressed(true);
+            }
+
+            if (!this.interests.isEmpty()) {
+                final double oldPower = this.lastStoredPower;
+                this.lastStoredPower = this.getStoredPower();
+
+                final EnergyThreshold low = new EnergyThreshold(Math.min(oldPower, this.lastStoredPower),
+                    Integer.MIN_VALUE);
+                final EnergyThreshold high = new EnergyThreshold(Math.max(oldPower, this.lastStoredPower),
+                    Integer.MAX_VALUE);
+
+                for (EnergyThreshold th : this.interests.subSet(low, true, high, true)) {
+                    ((EnergyWatcher) th.getEnergyWatcher()).post(this);
+                }
+            }
+
+            double averageLength = 40.0;
+            this.avgDrainPerTick *= (averageLength - 1) / averageLength;
+            this.avgInjectionPerTick *= (averageLength - 1) / averageLength;
+            this.tickDrainPerTick = 0;
+            this.tickInjectionPerTick = 0;
+            this.hasPower = true;
+            this.ticksSinceHasPowerChange = 900;
+            this.publicPowerState(true, this.grid);
+            this.availableTicksSinceUpdate++;
+            return;
+        }
+
         var currentPassiveGenerator = getOverlayGrid().getCurrentPassiveGenerator();
 // If the node came with buffered energy, add it to our internal storage
         if (currentPassiveGenerator != null && passiveGenerators.contains(currentPassiveGenerator)) {
@@ -236,6 +280,10 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
 
     @Override
     public double extractAEPower(double amt, Actionable mode, PowerMultiplier pm) {
+        if (isCreativePowerModeActive()) {
+            return amt;
+        }
+
         final double toExtract = pm.multiply(amt);
         double extracted = 0;
 
@@ -393,6 +441,10 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
 
     @Override
     public double injectPower(double amt, Actionable mode) {
+        if (isCreativePowerModeActive()) {
+            return amt;
+        }
+
         double leftover = amt;
 
         for (EnergyService service : getConnectedServices()) {
@@ -422,6 +474,10 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
 
     @Override
     public double getEnergyDemand(double maxRequired) {
+        if (isCreativePowerModeActive()) {
+            return 0;
+        }
+
         double required = 0;
 
         for (EnergyService service : getConnectedServices()) {
@@ -469,6 +525,10 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
                 removeProvider(ps);
                 removeRequester(ps);
             }
+        }
+
+        if (node.getOwner() instanceof TileCreativeEnergyCell) {
+            this.creativeEnergyCellCount--;
         }
 
         var watcher = this.watchers.remove(node);
@@ -538,6 +598,10 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
             }
         }
 
+        if (node.getOwner() instanceof TileCreativeEnergyCell) {
+            ++this.creativeEnergyCellCount;
+        }
+
         var ews = node.getService(IEnergyWatcherNode.class);
         if (ews != null) {
             var iw = new EnergyWatcher(this, ews);
@@ -576,7 +640,30 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
         }
     }
 
-    private List<EnergyService> getConnectedServices() {
+    public boolean isCreativePowerModeActive() {
+        return AEConfig.instance().isDebugEnergyEnabled() || getOverlayGrid().hasCreativePowerSource();
+    }
+
+    public void onCreativePowerModeChanged() {
+        if (this.overlayGrid != null) {
+            this.overlayGrid.setCurrentPassiveGenerator(null);
+        }
+
+        if (isCreativePowerModeActive()) {
+            this.hasPower = true;
+            this.ticksSinceHasPowerChange = 900;
+            this.publicPowerState(true, this.grid);
+        } else {
+            this.hasPower = false;
+            this.ticksSinceHasPowerChange = 0;
+        }
+    }
+
+    boolean hasCreativeEnergyCell() {
+        return this.creativeEnergyCellCount > 0;
+    }
+
+    private EnergyService[] getConnectedServices() {
         return getOverlayGrid().energyServices;
     }
 

@@ -63,7 +63,6 @@ public final class MeteoriteCompassBeaconRenderer {
             GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
             GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
 
-        renderCylinder(start, end, OUTER_RADIUS, 120, 190, 255, 72);
         renderCylinder(start, end, INNER_RADIUS, 196, 96, 255, 255);
 
         GlStateManager.depthMask(true);

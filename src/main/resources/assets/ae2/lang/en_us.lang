@@ -177,6 +177,7 @@ chat.ae2.isNowUnlocked=Monitor is now Unlocked.
 commands.ae2.ChunkLoggerOff=Chunk Logging is now off
 commands.ae2.ChunkLoggerOn=Chunk Logging is now on
 commands.ae2.channelmode=/ae2 channelmode <default|infinite>
+commands.ae2.debugenergy=/ae2 debugenergy <on|off>
 commands.ae2.chunklogger=/ae2 chunklogger
 commands.ae2.compass=/ae2 compass <start|stop>
 commands.ae2.grids=/ae2 grids <list|export>

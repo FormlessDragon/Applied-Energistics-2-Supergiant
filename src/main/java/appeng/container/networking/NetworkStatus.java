@@ -22,6 +22,7 @@ import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.energy.IEnergyService;
 import appeng.api.networking.energy.IPassiveEnergyGenerator;
+import appeng.me.service.EnergyService;
 import appeng.tile.misc.TileVibrationChamber;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -38,6 +39,10 @@ public class NetworkStatus {
     private double averagePowerUsage;
     private double storedPower;
     private double maxStoredPower;
+    private boolean infiniteAveragePowerInjection;
+    private boolean infiniteAveragePowerUsage;
+    private boolean infiniteStoredPower;
+    private boolean infiniteMaxStoredPower;
     private double channelPower;
     private int channelsUsed;
 
@@ -51,6 +56,12 @@ public class NetworkStatus {
         status.averagePowerUsage = energyService.getAvgPowerUsage();
         status.storedPower = energyService.getStoredPower();
         status.maxStoredPower = energyService.getMaxStoredPower();
+        if (energyService instanceof EnergyService aeEnergyService && aeEnergyService.isCreativePowerModeActive()) {
+            status.infiniteAveragePowerInjection = true;
+            status.infiniteAveragePowerUsage = true;
+            status.infiniteStoredPower = true;
+            status.infiniteMaxStoredPower = true;
+        }
         status.channelPower = energyService.getChannelPowerUsage();
         status.channelsUsed = grid.getPathingService().getUsedChannels();
 
@@ -99,6 +110,10 @@ public class NetworkStatus {
         status.averagePowerUsage = data.readDouble();
         status.storedPower = data.readDouble();
         status.maxStoredPower = data.readDouble();
+        status.infiniteAveragePowerInjection = data.readBoolean();
+        status.infiniteAveragePowerUsage = data.readBoolean();
+        status.infiniteStoredPower = data.readBoolean();
+        status.infiniteMaxStoredPower = data.readBoolean();
         status.channelPower = data.readDouble();
         status.channelsUsed = data.readVarInt();
 
@@ -117,6 +132,10 @@ public class NetworkStatus {
         data.writeDouble(averagePowerUsage);
         data.writeDouble(storedPower);
         data.writeDouble(maxStoredPower);
+        data.writeBoolean(infiniteAveragePowerInjection);
+        data.writeBoolean(infiniteAveragePowerUsage);
+        data.writeBoolean(infiniteStoredPower);
+        data.writeBoolean(infiniteMaxStoredPower);
         data.writeDouble(channelPower);
         data.writeVarInt(channelsUsed);
         data.writeVarInt(groupedMachines.size());
@@ -129,16 +148,32 @@ public class NetworkStatus {
         return averagePowerInjection;
     }
 
+    public boolean isInfiniteAveragePowerInjection() {
+        return infiniteAveragePowerInjection;
+    }
+
     public double getAveragePowerUsage() {
         return averagePowerUsage;
+    }
+
+    public boolean isInfiniteAveragePowerUsage() {
+        return infiniteAveragePowerUsage;
     }
 
     public double getStoredPower() {
         return storedPower;
     }
 
+    public boolean isInfiniteStoredPower() {
+        return infiniteStoredPower;
+    }
+
     public double getMaxStoredPower() {
         return maxStoredPower;
+    }
+
+    public boolean isInfiniteMaxStoredPower() {
+        return infiniteMaxStoredPower;
     }
 
     public double getChannelPower() {

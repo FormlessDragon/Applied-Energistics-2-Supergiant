@@ -24,8 +24,8 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.Comparator;
-import java.util.List;
 
 /**
  * This class caches all energy services that are part of the overlay energy grid. This overlay grid can span multiple
@@ -40,7 +40,7 @@ class EnergyOverlayGrid {
         .comparingDouble(EnergyService::getMaxStoredPower)
         .reversed();
 
-    final List<EnergyService> energyServices;
+    final EnergyService[] energyServices;
 
     /**
      * Which passive energy generator is currently active.
@@ -48,7 +48,7 @@ class EnergyOverlayGrid {
     @Nullable
     private IPassiveEnergyGenerator currentPassiveGenerator;
 
-    private EnergyOverlayGrid(List<EnergyService> energyServices) {
+    private EnergyOverlayGrid(EnergyService[] energyServices) {
         this.energyServices = energyServices;
     }
 
@@ -76,9 +76,9 @@ class EnergyOverlayGrid {
         }
 
         // Sort services by capacity
-        var sortedServices = new ObjectArrayList<>(connectedServices);
-        sortedServices.sort(SERVICE_COMPARATOR);
-        var overlayGrid = new EnergyOverlayGrid(List.copyOf(sortedServices));
+        EnergyService[] sortedServices = connectedServices.toArray(EnergyService[]::new);
+        Arrays.sort(sortedServices, SERVICE_COMPARATOR);
+        var overlayGrid = new EnergyOverlayGrid(sortedServices);
 
         // Associate all grids that are part of the overlay grid with this instance
         for (var service : sortedServices) {
@@ -105,5 +105,14 @@ class EnergyOverlayGrid {
 
     public void setCurrentPassiveGenerator(@Nullable IPassiveEnergyGenerator currentPassiveGenerator) {
         this.currentPassiveGenerator = currentPassiveGenerator;
+    }
+
+    public boolean hasCreativePowerSource() {
+        for (var service : energyServices) {
+            if (service.hasCreativeEnergyCell()) {
+                return true;
+            }
+        }
+        return false;
     }
 }

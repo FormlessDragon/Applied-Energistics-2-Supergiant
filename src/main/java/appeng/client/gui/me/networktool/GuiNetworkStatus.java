@@ -31,6 +31,7 @@ import appeng.client.gui.widgets.Scrollbar;
 import appeng.container.AEBaseContainer;
 import appeng.container.networking.INetworkStatusContainer;
 import appeng.container.networking.MachineGroup;
+import appeng.core.AEConfig;
 import appeng.core.localization.GuiText;
 import appeng.util.Platform;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -75,12 +76,16 @@ public class GuiNetworkStatus<T extends AEBaseContainer & INetworkStatusContaine
 
         var status = container.getStatus();
         setTextContent(TEXT_ID_DIALOG_TITLE, GuiText.NetworkDetails.text(status.getChannelsUsed()));
-        setTextContent("stored_power", GuiText.StoredPower.text(Platform.formatPower(status.getStoredPower(), false)));
-        setTextContent("max_power", GuiText.MaxPower.text(Platform.formatPower(status.getMaxStoredPower(), false)));
+        setTextContent("stored_power", GuiText.StoredPower.text(
+            formatPowerStatus(status.isInfiniteStoredPower(), status.getStoredPower(), false)));
+        setTextContent("max_power", GuiText.MaxPower.text(
+            formatPowerStatus(status.isInfiniteMaxStoredPower(), status.getMaxStoredPower(), false)));
         setTextContent("power_input_rate",
-            GuiText.PowerInputRate.text(Platform.formatPower(status.getAveragePowerInjection(), true)));
+            GuiText.PowerInputRate.text(
+                formatPowerStatus(status.isInfiniteAveragePowerInjection(), status.getAveragePowerInjection(), true)));
         setTextContent("power_usage_rate",
-            GuiText.PowerUsageRate.text(Platform.formatPower(status.getAveragePowerUsage(), true)));
+            GuiText.PowerUsageRate.text(
+                formatPowerStatus(status.isInfiniteAveragePowerUsage(), status.getAveragePowerUsage(), true)));
         setTextContent("channel_power_rate",
             GuiText.ChannelEnergyDrain.text(Platform.formatPower(status.getChannelPower(), true)));
 
@@ -184,6 +189,14 @@ public class GuiNetworkStatus<T extends AEBaseContainer & INetworkStatusContaine
             return hoveredMachine;
         }
         return super.getStackUnderMouse(mouseX, mouseY);
+    }
+
+    private String formatPowerStatus(boolean infinite, double value, boolean isRate) {
+        if (!infinite) {
+            return Platform.formatPower(value, isRate);
+        }
+
+        return "Infinity " + AEConfig.instance().getSelectedEnergyUnit().getSymbolName() + (isRate ? "/t" : "");
     }
 }
 
