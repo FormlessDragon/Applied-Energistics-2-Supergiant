@@ -51,7 +51,7 @@ public class ContainerInscriber extends UpgradeableContainer<TileInscriber> impl
     public InscriberInputCapacity bufferSize = InscriberInputCapacity.SIXTY_FOUR;
 
     public ContainerInscriber( InventoryPlayer ip, TileInscriber host) {
-        super(id, ip, host);
+        super(ip, host);
 
         var inv = host.getInternalInventory();
         this.top = this.addSlot(

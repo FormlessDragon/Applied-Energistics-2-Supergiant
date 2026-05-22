@@ -70,7 +70,7 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
     private int selectedCpuSerial = -1;
 
     public ContainerCraftingStatus( InventoryPlayer ip, ITerminalHost host) {
-        super(id, ip, host);
+        super(ip, host);
         this.host = host;
         registerClientAction(ACTION_SELECT_CPU, Integer.class, this::selectCpu);
         registerClientAction(ACTION_CYCLE_CPU_MODE, Integer.class, this::cycleCpuMode);

@@ -96,6 +96,8 @@ public final class Icon {
     public static final Icon FULLNESS_FULL = registerBuiltin("fullness_full", 16, 16);
     public static final Icon PATTERN_ACCESS_SHOW = registerBuiltin("pattern_access_show", 16, 16);
     public static final Icon PATTERN_ACCESS_HIDE = registerBuiltin("pattern_access_hide", 16, 16);
+    public static final Icon PATTERN_AUTO_FILL_OFF = registerBuiltin("pattern_auto_fill_off", 16, 16);
+    public static final Icon PATTERN_AUTO_FILL_ON = registerBuiltin("pattern_auto_fill_on", 16, 16);
     public static final Icon PATTERN_TERMINAL_VISIBLE = registerBuiltin("pattern_terminal_visible", 16, 16);
     public static final Icon PATTERN_TERMINAL_ALL = registerBuiltin("pattern_terminal_all", 16, 16);
     public static final Icon PATTERN_TERMINAL_NOT_FULL = registerBuiltin("pattern_terminal_not_full", 16, 16);

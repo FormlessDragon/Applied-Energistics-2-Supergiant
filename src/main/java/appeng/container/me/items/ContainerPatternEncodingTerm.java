@@ -1,10 +1,13 @@
 package appeng.container.me.items;
 
+import appeng.api.config.Settings;
+import appeng.api.config.YesNo;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
+import appeng.api.storage.StorageHelper;
 import appeng.client.gui.Icon;
 import appeng.container.GuiIds;
 import appeng.container.SlotSemantics;
@@ -69,6 +72,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage {
     public boolean substitute;
     @GuiSync(95)
     public boolean substituteFluids;
+    @GuiSync(94)
+    public YesNo autoFillPatterns = YesNo.NO;
     @Nullable
     private IRecipe currentRecipe;
 
@@ -121,6 +126,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage {
 
         updateSlotVisibility();
         getAndUpdateOutput();
+
+        tryAutoFillBlankPatterns();
     }
 
     @Override
@@ -130,6 +137,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage {
             this.mode = this.encodingLogic.getMode();
             this.substitute = this.encodingLogic.isSubstitution();
             this.substituteFluids = this.encodingLogic.isFluidSubstitution();
+            this.autoFillPatterns = getHost().getConfigManager().getSetting(Settings.PATTERN_AUTO_FILL);
         }
     }
 
@@ -260,6 +268,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage {
             return;
         }
 
+        tryAutoFillBlankPatterns();
         ItemStack encodedPattern = encodePattern();
         if (encodedPattern == null) {
             clearPattern();
@@ -283,6 +292,50 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage {
         }
 
         this.encodedPatternSlot.putStack(encodedPattern);
+    }
+
+    private void tryAutoFillBlankPatterns() {
+        if (!shouldAutoFillBlankPatterns()) {
+            return;
+        }
+
+        ItemStack currentStack = this.blankPatternSlot.getStack();
+        if (!currentStack.isEmpty() && !AEItems.BLANK_PATTERN.is(currentStack)) {
+            return;
+        }
+
+        ItemStack blankPatternPrototype = AEItems.BLANK_PATTERN.stack(1);
+        int maxStackSize = currentStack.isEmpty() ? blankPatternPrototype.getMaxStackSize()
+            : currentStack.getMaxStackSize();
+        int missing = maxStackSize - currentStack.getCount();
+        if (missing <= 0) {
+            return;
+        }
+
+        AEItemKey blankPatternKey = AEItemKey.of(blankPatternPrototype);
+        if (blankPatternKey == null) {
+            return;
+        }
+
+        long extracted = StorageHelper.poweredExtraction(this.energySource, this.storage, blankPatternKey, missing,
+            getActionSource());
+        if (extracted <= 0) {
+            return;
+        }
+
+        if (currentStack.isEmpty()) {
+            this.blankPatternSlot.putStack(AEItems.BLANK_PATTERN.stack((int) extracted));
+            return;
+        }
+
+        ItemStack updatedStack = currentStack.copy();
+        updatedStack.grow((int) extracted);
+        this.blankPatternSlot.putStack(updatedStack);
+    }
+
+    private boolean shouldAutoFillBlankPatterns() {
+        return isServerSide()
+            && getHost().getConfigManager().getSetting(Settings.PATTERN_AUTO_FILL) == YesNo.YES;
     }
 
     private void clearPattern() {
@@ -422,6 +475,10 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage {
 
     public boolean isSubstituteFluids() {
         return this.substituteFluids;
+    }
+
+    public YesNo getAutoFillPatterns() {
+        return this.autoFillPatterns;
     }
 
     public void setSubstituteFluids(boolean substituteFluids) {

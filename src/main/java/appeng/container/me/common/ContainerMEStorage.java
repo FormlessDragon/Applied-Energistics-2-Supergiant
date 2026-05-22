@@ -24,6 +24,7 @@ import appeng.api.config.Settings;
 import appeng.api.config.SortDir;
 import appeng.api.config.SortOrder;
 import appeng.api.config.ViewItems;
+import appeng.api.config.YesNo;
 import appeng.api.implementations.blockentities.IViewCellStorage;
 import appeng.api.inventories.InternalInventory;
 import appeng.api.networking.IGrid;
@@ -66,8 +67,8 @@ import appeng.me.helpers.ActionHostEnergySource;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSets;
 import it.unimi.dsi.fastutil.shorts.ShortSet;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -144,6 +145,7 @@ public class ContainerMEStorage extends AEBaseContainer
                                       .registerSetting(Settings.SORT_BY, SortOrder.NAME)
                                       .registerSetting(Settings.VIEW_MODE, ViewItems.ALL)
                                       .registerSetting(Settings.SORT_DIRECTION, SortDir.ASCENDING)
+                                      .registerSetting(Settings.PATTERN_AUTO_FILL, YesNo.NO)
                                       .build();
 
         if (isServerSide()) {
@@ -239,7 +241,7 @@ public class ContainerMEStorage extends AEBaseContainer
                 previousAvailableStacks.keySet().forEach(updateHelper::addChange);
 
                 if (updateHelper.hasChanges()) {
-                    MEInventoryUpdatePacket.Builder builder = MEInventoryUpdatePacket.builder(windowId, updateHelper.isFullUpdate());
+                    MEInventoryUpdatePacket.Builder builder = MEInventoryUpdatePacket.builder(updateHelper.isFullUpdate());
                     builder.setFilter(this::isKeyVisible);
                     builder.addChanges(updateHelper, availableStacks, craftables, requestables);
                     builder.buildAndSend(this::sendPacketToClient);

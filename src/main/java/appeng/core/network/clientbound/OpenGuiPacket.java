@@ -57,7 +57,6 @@ import java.util.Arrays;
 
 public class OpenGuiPacket extends ClientboundPacket {
     private GuiIds.GuiKey guiKey;
-    private int windowId;
     private GuiHostLocator locator;
     private boolean returnedFromSubScreen;
     @Nullable
@@ -67,10 +66,9 @@ public class OpenGuiPacket extends ClientboundPacket {
     public OpenGuiPacket() {
     }
 
-    public OpenGuiPacket(GuiIds.GuiKey guiKey, int windowId, GuiHostLocator locator,
+    public OpenGuiPacket(GuiIds.GuiKey guiKey, GuiHostLocator locator,
                          boolean returnedFromSubScreen, @Nullable ITextComponent guiTitle, byte[] initialData) {
         this.guiKey = guiKey;
-        this.windowId = windowId;
         this.locator = locator;
         this.returnedFromSubScreen = returnedFromSubScreen;
         this.guiTitle = guiTitle;
@@ -99,7 +97,6 @@ public class OpenGuiPacket extends ClientboundPacket {
     protected void read(ByteBuf buf) {
         PacketBuffer packetBuffer = new PacketBuffer(buf);
         this.guiKey = GuiIds.GuiKey.fromId(packetBuffer.readVarInt());
-        this.windowId = packetBuffer.readInt();
         this.locator = GuiHostLocators.readFromPacket(packetBuffer);
         this.returnedFromSubScreen = packetBuffer.readBoolean();
         this.guiTitle = TextComponents.readFromPacket(packetBuffer);
@@ -111,7 +108,6 @@ public class OpenGuiPacket extends ClientboundPacket {
     protected void write(ByteBuf buf) {
         PacketBuffer packetBuffer = new PacketBuffer(buf);
         packetBuffer.writeVarInt(this.guiKey.getGuiId());
-        packetBuffer.writeInt(this.windowId);
         GuiHostLocators.writeToPacket(packetBuffer, this.locator);
         packetBuffer.writeBoolean(this.returnedFromSubScreen);
         TextComponents.writeToPacket(packetBuffer, this.guiTitle);
@@ -138,7 +134,6 @@ public class OpenGuiPacket extends ClientboundPacket {
             return;
         }
 
-        container.windowId = this.windowId;
         GuiScreen screen = createScreen(container, minecraft.player.inventory);
         if (screen == null) {
             AELog.warn("Cannot create screen for gui {} on client", this.guiKey);
@@ -180,19 +175,19 @@ public class OpenGuiPacket extends ClientboundPacket {
     @Nullable
     private AEBaseContainer createContainer(InventoryPlayer inventory, Object host) {
         if (this.guiKey == GuiIds.GuiKey.CRAFT_AMOUNT) {
-            return new ContainerCraftAmount(this.windowId, inventory, (ISubGuiHost) host);
+            return new ContainerCraftAmount(inventory, (ISubGuiHost) host);
         }
         if (this.guiKey == GuiIds.GuiKey.CRAFT_CONFIRM) {
-            return new ContainerCraftConfirm(this.windowId, inventory, (ISubGuiHost) host);
+            return new ContainerCraftConfirm(inventory, (ISubGuiHost) host);
         }
         if (this.guiKey == GuiIds.GuiKey.CRAFTING_STATUS) {
-            return new ContainerCraftingStatus(this.windowId, inventory, (ITerminalHost) host);
+            return new ContainerCraftingStatus(inventory, (ITerminalHost) host);
         }
         if (this.guiKey == GuiIds.GuiKey.SET_STOCK_AMOUNT) {
-            return new ContainerSetStockAmount(this.windowId, inventory, (InterfaceLogicHost) host);
+            return new ContainerSetStockAmount(inventory, (InterfaceLogicHost) host);
         }
         if (this.guiKey == GuiIds.GuiKey.PRIORITY) {
-            ContainerPriority priorityContainer = new ContainerPriority(this.windowId, inventory, (IPriorityHost) host);
+            ContainerPriority priorityContainer = new ContainerPriority(inventory, (IPriorityHost) host);
             if (this.initialData.length > 0) {
                 priorityContainer.setInitialPriority(new PacketBuffer(Unpooled.wrappedBuffer(this.initialData)).readVarInt());
             }
@@ -230,7 +225,7 @@ public class OpenGuiPacket extends ClientboundPacket {
     @SideOnly(Side.CLIENT)
     private void closeWindow(Minecraft minecraft) {
         if (minecraft.player.connection != null) {
-            minecraft.player.connection.sendPacket(new CPacketCloseWindow(this.windowId));
+            minecraft.player.connection.sendPacket(new CPacketCloseWindow());
         }
     }
 }

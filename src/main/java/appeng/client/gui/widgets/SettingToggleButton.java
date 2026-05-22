@@ -174,6 +174,11 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
                 ShowPatternProviders.NOT_FULL,
                 ButtonToolTips.InterfaceTerminalDisplayMode, ButtonToolTips.ShowNonFullProviders);
 
+            registerApp(Icon.PATTERN_AUTO_FILL_OFF, Settings.PATTERN_AUTO_FILL, YesNo.NO,
+                ButtonToolTips.PatternAutoFill, ButtonToolTips.PatternAutoFillOff);
+            registerApp(Icon.PATTERN_AUTO_FILL_ON, Settings.PATTERN_AUTO_FILL, YesNo.YES,
+                ButtonToolTips.PatternAutoFill, ButtonToolTips.PatternAutoFillOn);
+
             registerApp(Icon.FUZZY_PERCENT_25, Settings.FUZZY_MODE, FuzzyMode.PERCENT_25,
                 ButtonToolTips.FuzzyMode, ButtonToolTips.FZPercent_25);
             registerApp(Icon.FUZZY_PERCENT_50, Settings.FUZZY_MODE, FuzzyMode.PERCENT_50,

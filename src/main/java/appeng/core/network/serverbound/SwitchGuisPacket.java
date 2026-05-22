@@ -71,7 +71,7 @@ public class SwitchGuisPacket extends ServerboundPacket {
         serverPlayer.getNextWindowId();
         int windowId = serverPlayer.currentWindowId;
 
-        AEBaseContainer container = createContainer(guiKey, windowId, serverPlayer.inventory, host);
+        AEBaseContainer container = createContainer(guiKey, serverPlayer.inventory, host);
         if (container == null) {
             return false;
         }
@@ -81,7 +81,7 @@ public class SwitchGuisPacket extends ServerboundPacket {
         container.setGuiTitle(title);
         container.windowId = windowId;
 
-        InitNetwork.CHANNEL.sendTo(new OpenGuiPacket(guiKey, windowId, locator, false, title,
+        InitNetwork.CHANNEL.sendTo(new OpenGuiPacket(guiKey, locator, false, title,
             getInitialData(guiKey, host)), serverPlayer);
 
         serverPlayer.openContainer = container;
@@ -107,22 +107,22 @@ public class SwitchGuisPacket extends ServerboundPacket {
         return null;
     }
 
-    private static @Nullable AEBaseContainer createContainer(GuiIds.GuiKey guiKey, int windowId, InventoryPlayer inventory,
+    private static @Nullable AEBaseContainer createContainer(GuiIds.GuiKey guiKey, InventoryPlayer inventory,
                                                              Object host) {
         if (guiKey == GuiIds.GuiKey.CRAFT_AMOUNT) {
-            return new ContainerCraftAmount(windowId, inventory, (ISubGuiHost) host);
+            return new ContainerCraftAmount(inventory, (ISubGuiHost) host);
         }
         if (guiKey == GuiIds.GuiKey.CRAFT_CONFIRM) {
-            return new ContainerCraftConfirm(windowId, inventory, (ISubGuiHost) host);
+            return new ContainerCraftConfirm(inventory, (ISubGuiHost) host);
         }
         if (guiKey == GuiIds.GuiKey.CRAFTING_STATUS) {
-            return new ContainerCraftingStatus(windowId, inventory, (ITerminalHost) host);
+            return new ContainerCraftingStatus(inventory, (ITerminalHost) host);
         }
         if (guiKey == GuiIds.GuiKey.SET_STOCK_AMOUNT) {
-            return new ContainerSetStockAmount(windowId, inventory, (InterfaceLogicHost) host);
+            return new ContainerSetStockAmount(inventory, (InterfaceLogicHost) host);
         }
         if (guiKey == GuiIds.GuiKey.PRIORITY) {
-            return new ContainerPriority(windowId, inventory, (IPriorityHost) host);
+            return new ContainerPriority(inventory, (IPriorityHost) host);
         }
         return null;
     }

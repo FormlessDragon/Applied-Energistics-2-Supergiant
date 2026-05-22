@@ -88,7 +88,7 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
     private IRecipe currentRecipe;
 
     public ContainerCraftingTerm( InventoryPlayer ip, ITerminalHost host) {
-        this(GuiIds.GuiKey.CRAFTING_TERMINAL, id, ip, host, true);
+        this(GuiIds.GuiKey.CRAFTING_TERMINAL, ip, host, true);
     }
 
     protected ContainerCraftingTerm(GuiIds.GuiKey guiKey,  InventoryPlayer ip, ITerminalHost host,

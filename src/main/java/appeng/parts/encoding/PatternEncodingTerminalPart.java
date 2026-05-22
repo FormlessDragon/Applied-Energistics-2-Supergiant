@@ -1,7 +1,10 @@
 package appeng.parts.encoding;
 
+import appeng.api.config.Settings;
+import appeng.api.config.YesNo;
 import appeng.api.parts.IPartItem;
 import appeng.api.parts.IPartModel;
+import appeng.api.util.IConfigManagerBuilder;
 import appeng.container.GuiIds;
 import appeng.core.AppEng;
 import appeng.helpers.IPatternTerminalGuiHost;
@@ -31,6 +34,12 @@ public class PatternEncodingTerminalPart extends AbstractTerminalPart
 
     public PatternEncodingTerminalPart(IPartItem<?> partItem) {
         super(partItem);
+    }
+
+    @Override
+    protected void registerSettings(IConfigManagerBuilder builder) {
+        super.registerSettings(builder);
+        builder.registerSetting(Settings.PATTERN_AUTO_FILL, YesNo.NO);
     }
 
     @Override

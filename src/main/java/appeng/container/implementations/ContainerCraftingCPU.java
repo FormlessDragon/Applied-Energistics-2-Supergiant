@@ -65,12 +65,12 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
     private boolean cachedSuspend;
 
     public ContainerCraftingCPU( InventoryPlayer ip, TileCraftingUnit host) {
-        this(id, ip, (Object) host);
+        this(ip, (Object) host);
     }
 
     public ContainerCraftingCPU( InventoryPlayer ip, TileCraftingUnit host,
                                 @Nullable ITextComponent initialTitle) {
-        this(id, ip, host);
+        this(ip, host);
         setInitialTitle(initialTitle);
     }
 

@@ -3,12 +3,16 @@ package appeng.client.gui.me.items;
 import appeng.api.behaviors.ContainerItemStrategies;
 import appeng.api.behaviors.EmptyingAction;
 import appeng.api.config.ActionItems;
+import appeng.api.config.Settings;
+import appeng.api.config.YesNo;
 import appeng.api.stacks.GenericStack;
 import appeng.client.gui.Icon;
 import appeng.client.gui.me.common.GuiMEStorage;
 import appeng.client.gui.style.GuiStyle;
 import appeng.client.gui.widgets.ActionButton;
 import appeng.client.gui.widgets.IconButton;
+import appeng.client.gui.widgets.ServerSettingToggleButton;
+import appeng.client.gui.widgets.SettingToggleButton;
 import appeng.client.gui.widgets.TabButton;
 import appeng.container.me.items.ContainerPatternEncodingTerm;
 import appeng.core.AEConfig;
@@ -36,10 +40,13 @@ import java.util.Map;
 public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodingTerm> {
     private final Map<EncodingMode, EncodingModePanel> modePanels = new EnumMap<>(EncodingMode.class);
     private final Map<EncodingMode, TabButton> modeTabButtons = new EnumMap<>(EncodingMode.class);
+    private final SettingToggleButton<YesNo> autoFillPatternsButton;
 
     public GuiPatternEncodingTerm(ContainerPatternEncodingTerm container, InventoryPlayer playerInventory,
                                   @Nullable ITextComponent title, GuiStyle style) {
         super(container, playerInventory, resolveTitle(container, title), style);
+        this.autoFillPatternsButton = addToLeftToolbar(
+            new ServerSettingToggleButton<>(Settings.PATTERN_AUTO_FILL, YesNo.NO));
         addMode(EncodingMode.CRAFTING, new CraftingEncodingPanel(this, widgets), 0);
         addMode(EncodingMode.PROCESSING, new ProcessingEncodingPanel(this, widgets), 1);
         widgets.add("encodePattern", new ActionButton(ActionItems.ENCODE, container::encode));
@@ -83,6 +90,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
+        this.autoFillPatternsButton.set(this.container.getAutoFillPatterns());
         for (var mode : EncodingMode.values()) {
             boolean selected = this.container.getMode() == mode;
             var tabButton = this.modeTabButtons.get(mode);

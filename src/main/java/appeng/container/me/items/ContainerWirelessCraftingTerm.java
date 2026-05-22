@@ -10,7 +10,7 @@ public class ContainerWirelessCraftingTerm extends ContainerCraftingTerm {
     private final WirelessCraftingTerminalGuiHost<?> containerHost;
 
     public ContainerWirelessCraftingTerm( InventoryPlayer ip, WirelessCraftingTerminalGuiHost<?> monitorable) {
-        super(GuiIds.GuiKey.WIRELESS_CRAFTING_TERMINAL, id, ip, monitorable, false);
+        super(GuiIds.GuiKey.WIRELESS_CRAFTING_TERMINAL, ip, monitorable, false);
         this.addPlayerInventorySlots(0, 0);
         this.containerHost = monitorable;
     }

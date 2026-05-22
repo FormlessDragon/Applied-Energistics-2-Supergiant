@@ -40,7 +40,7 @@ public class ContainerIOPort extends UpgradeableContainer<TileIOPort> {
     public OperationMode opMode = OperationMode.EMPTY;
 
     public ContainerIOPort( InventoryPlayer ip, TileIOPort host) {
-        super(id, ip, host);
+        super(ip, host);
     }
 
     @Override

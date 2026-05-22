@@ -58,7 +58,7 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
     public CopyMode copyMode = CopyMode.CLEAR_ON_REMOVE;
 
     public ContainerCellWorkbench( InventoryPlayer ip, TileCellWorkbench host) {
-        super(id, ip, host);
+        super(ip, host);
 
         registerClientAction(ACTION_NEXT_COPYMODE, this::nextWorkBenchCopyMode);
         registerClientAction(ACTION_PARTITION, this::partition);

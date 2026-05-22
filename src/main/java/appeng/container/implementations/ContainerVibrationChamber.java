@@ -34,7 +34,7 @@ public class ContainerVibrationChamber extends UpgradeableContainer<TileVibratio
     public int remainingBurnTime = 0;
 
     public ContainerVibrationChamber( InventoryPlayer ip, TileVibrationChamber host) {
-        super(id, ip, host);
+        super(ip, host);
     }
 
     @Override

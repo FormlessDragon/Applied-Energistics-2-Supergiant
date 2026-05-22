@@ -40,7 +40,7 @@ public class ContainerStorageBus extends UpgradeableContainer<StorageBusPart> {
     public ITextComponent connectedTo;
 
     public ContainerStorageBus( InventoryPlayer ip, StorageBusPart te) {
-        super(id, ip, te);
+        super(ip, te);
 
         registerClientAction(ACTION_CLEAR, this::clear);
         registerClientAction(ACTION_PARTITION, this::partition);

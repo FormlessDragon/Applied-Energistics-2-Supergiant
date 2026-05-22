@@ -33,7 +33,7 @@ public class ContainerFormationPlane extends UpgradeableContainer<FormationPlane
     public YesNo placeMode;
 
     public ContainerFormationPlane( InventoryPlayer ip, FormationPlanePart host) {
-        super(id, ip, host);
+        super(ip, host);
     }
 
     @Override

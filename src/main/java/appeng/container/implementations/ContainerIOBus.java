@@ -34,7 +34,7 @@ public class ContainerIOBus extends UpgradeableContainer<IOBusPart> implements I
     public SyncedKeyTypes importKeyTypes = new SyncedKeyTypes();
 
     public ContainerIOBus( InventoryPlayer ip, IOBusPart host) {
-        super(id, ip, host);
+        super(ip, host);
         updateImportKeyTypes();
     }
 

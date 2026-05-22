@@ -11,12 +11,11 @@ import appeng.core.AELog;
 import appeng.core.network.ClientboundPacket;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.PacketBuffer;
 import org.jetbrains.annotations.Nullable;
-
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 
 import java.util.List;
 import java.util.Set;
@@ -27,7 +26,6 @@ public class MEInventoryUpdatePacket extends ClientboundPacket {
     private static final int INITIAL_BUFFER_CAPACITY = 2 * 1024;
 
     private boolean fullUpdate;
-    private int windowId;
     @Nullable
     private List<GridInventoryEntry> entries;
     private int encodedEntryCount;
@@ -36,17 +34,16 @@ public class MEInventoryUpdatePacket extends ClientboundPacket {
     public MEInventoryUpdatePacket() {
     }
 
-    public MEInventoryUpdatePacket(boolean fullUpdate, int windowId, @Nullable List<GridInventoryEntry> entries,
+    public MEInventoryUpdatePacket(boolean fullUpdate, @Nullable List<GridInventoryEntry> entries,
                                    int encodedEntryCount, byte[] encodedEntries) {
         this.fullUpdate = fullUpdate;
-        this.windowId = windowId;
         this.entries = entries;
         this.encodedEntryCount = encodedEntryCount;
         this.encodedEntries = encodedEntries;
     }
 
-    public static Builder builder(int windowId, boolean fullUpdate) {
-        return new Builder(windowId, fullUpdate);
+    public static Builder builder(boolean fullUpdate) {
+        return new Builder(fullUpdate);
     }
 
     public static GridInventoryEntry readEntry(PacketBuffer buffer) {
@@ -77,7 +74,6 @@ public class MEInventoryUpdatePacket extends ClientboundPacket {
     @Override
     protected void read(ByteBuf buf) {
         PacketBuffer data = new PacketBuffer(buf);
-        this.windowId = data.readVarInt();
         this.fullUpdate = data.readBoolean();
         this.encodedEntryCount = data.readVarInt();
         this.encodedEntries = new byte[data.readInt()];
@@ -89,7 +85,6 @@ public class MEInventoryUpdatePacket extends ClientboundPacket {
     @Override
     protected void write(ByteBuf buf) {
         PacketBuffer data = new PacketBuffer(buf);
-        data.writeVarInt(this.windowId);
         data.writeBoolean(this.fullUpdate);
 
         byte[] payload;
@@ -121,8 +116,7 @@ public class MEInventoryUpdatePacket extends ClientboundPacket {
         if (minecraft.player == null) {
             return;
         }
-        if (minecraft.player.openContainer.windowId != this.windowId
-            || !(minecraft.player.openContainer instanceof ContainerMEStorage meContainer)) {
+        if (!(minecraft.player.openContainer instanceof ContainerMEStorage meContainer)) {
             return;
         }
 
@@ -145,7 +139,6 @@ public class MEInventoryUpdatePacket extends ClientboundPacket {
 
     public static class Builder {
         private final List<MEInventoryUpdatePacket> packets = new ObjectArrayList<>();
-        private final int windowId;
         private boolean fullUpdate;
         @Nullable
         private PacketBuffer encodedEntries;
@@ -153,8 +146,7 @@ public class MEInventoryUpdatePacket extends ClientboundPacket {
         @Nullable
         private AEKeyFilter filter;
 
-        public Builder(int windowId, boolean fullUpdate) {
-            this.windowId = windowId;
+        public Builder(boolean fullUpdate) {
             this.fullUpdate = fullUpdate;
         }
 
@@ -244,7 +236,7 @@ public class MEInventoryUpdatePacket extends ClientboundPacket {
             if (this.encodedEntries != null) {
                 byte[] payload = new byte[this.encodedEntries.writerIndex()];
                 this.encodedEntries.getBytes(0, payload);
-                this.packets.add(new MEInventoryUpdatePacket(this.fullUpdate, this.windowId, null, this.entryCount,
+                this.packets.add(new MEInventoryUpdatePacket(this.fullUpdate, null, this.entryCount,
                     payload));
                 this.encodedEntries = null;
                 this.entryCount = 0;
