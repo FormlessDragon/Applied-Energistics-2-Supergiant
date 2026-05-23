@@ -32,14 +32,12 @@ jobs:
       with:
         path: build/libs
 
-    - name: Ensure dev release exists
+    - name: Update dev tag and ensure dev release exists
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        if ! git ls-remote --exit-code --tags origin refs/tags/dev >/dev/null 2>&1; then
-          git tag dev
-          git push origin refs/tags/dev
-        fi
+        git tag -f dev "${GITHUB_SHA}"
+        git push --force origin refs/tags/dev
         if ! gh release view dev >/dev/null 2>&1; then
           gh release create dev --title "dev" --notes "Latest development build artifacts"
         fi

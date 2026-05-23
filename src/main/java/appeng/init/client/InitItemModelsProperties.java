@@ -1,6 +1,7 @@
 package appeng.init.client;
 
 import appeng.core.definitions.AEItems;
+import appeng.items.storage.ViewCellItem;
 import appeng.items.tools.powered.ColorApplicatorItem;
 import net.minecraft.client.renderer.block.model.ModelResourceLocation;
 import net.minecraft.item.Item;
@@ -21,6 +22,16 @@ public final class InitItemModelsProperties {
             return colorApplicatorItem.getActiveColor(stack) != null
                 ? coloredModel
                 : plainModel;
+        });
+
+        Item viewCell = AEItems.VIEW_CELL.asItem();
+        ModelResourceLocation enabledViewCellModel = new ModelResourceLocation("ae2:view_cell", "inventory");
+        ModelResourceLocation disabledViewCellModel = new ModelResourceLocation("ae2:view_cell_disabled", "inventory");
+
+        ModelLoader.registerItemVariants(viewCell, enabledViewCellModel, disabledViewCellModel);
+        ModelLoader.setCustomMeshDefinition(viewCell, stack -> {
+            ViewCellItem viewCellItem = AEItems.VIEW_CELL.get();
+            return viewCellItem.isEnabled(stack) ? enabledViewCellModel : disabledViewCellModel;
         });
     }
 }

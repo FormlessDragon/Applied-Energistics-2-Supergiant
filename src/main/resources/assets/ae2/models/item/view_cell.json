@@ -2,5 +2,13 @@
   "parent": "minecraft:item/generated",
   "textures": {
     "layer0": "ae2:item/view_cell"
-  }
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "close": 1
+      },
+      "model": "ae2:item/view_cell_disabled"
+    }
+  ]
 }

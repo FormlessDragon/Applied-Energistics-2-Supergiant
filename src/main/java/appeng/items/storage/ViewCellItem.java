@@ -25,6 +25,9 @@ import appeng.api.storage.AEKeyFilter;
 import appeng.api.storage.cells.ICellWorkbenchItem;
 import appeng.api.upgrades.IUpgradeInventory;
 import appeng.api.upgrades.UpgradeInventories;
+import appeng.container.AEBaseContainer;
+import appeng.container.SlotSemantics;
+import appeng.container.slot.AppEngSlot;
 import appeng.core.definitions.AEItems;
 import appeng.items.AEBaseItem;
 import appeng.items.contents.CellConfig;
@@ -33,16 +36,29 @@ import appeng.util.prioritylist.FuzzyPriorityList;
 import appeng.util.prioritylist.IPartitionList;
 import appeng.util.prioritylist.MergedPriorityList;
 import appeng.util.prioritylist.PrecisePriorityList;
+import net.minecraft.client.resources.I18n;
+import net.minecraft.client.util.ITooltipFlag;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.TextFormatting;
+import net.minecraft.world.World;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 
 import java.util.Collection;
+import java.util.List;
 
 public class ViewCellItem extends AEBaseItem implements ICellWorkbenchItem {
     private static final String STORAGE_CELL_FUZZY_MODE = "storage_cell_fuzzy_mode";
+    private static final String ENABLED_TAG = "view_cell_enabled";
 
     public ViewCellItem() {
         this.setMaxStackSize(1);
+        if (FMLCommonHandler.instance().getSide().isClient()) {
+            this.addPropertyOverride(new ResourceLocation("close"), (item, world, player) -> isEnabled(item) ? 0 : 1);
+        }
     }
 
     public static IPartitionList createItemFilter(Collection<ItemStack> list) {
@@ -59,6 +75,10 @@ public class ViewCellItem extends AEBaseItem implements ICellWorkbenchItem {
             }
 
             if (currentViewCell.getItem() instanceof ViewCellItem vc) {
+                if (!vc.isEnabled(currentViewCell)) {
+                    continue;
+                }
+
                 KeyCounter priorityList = new KeyCounter();
 
                 ConfigInventory config = vc.getConfigInventory(currentViewCell);
@@ -86,6 +106,41 @@ public class ViewCellItem extends AEBaseItem implements ICellWorkbenchItem {
         }
 
         return partitionList;
+    }
+
+    public boolean isEnabled(ItemStack is) {
+        NBTTagCompound tag = is.getTagCompound();
+        return tag == null || !tag.hasKey(ENABLED_TAG) || tag.getBoolean(ENABLED_TAG);
+    }
+
+    public void setEnabled(ItemStack is, boolean enabled) {
+        NBTTagCompound tag = is.getTagCompound();
+        if (tag == null) {
+            tag = new NBTTagCompound();
+            is.setTagCompound(tag);
+        }
+        tag.setBoolean(ENABLED_TAG, enabled);
+    }
+
+    public void toggle(ItemStack is) {
+        setEnabled(is, !isEnabled(is));
+    }
+
+    @Override
+    public boolean onOtherStackedOnMe(ItemStack stack, ItemStack otherStack, Slot slot, EntityPlayer player) {
+        if (!otherStack.isEmpty() || !(slot instanceof AppEngSlot appEngSlot)) {
+            return false;
+        }
+        if (!(appEngSlot.getContainer() instanceof AEBaseContainer container)) {
+            return false;
+        }
+        if (container.getSlotSemantic(slot) != SlotSemantics.VIEW_CELL) {
+            return false;
+        }
+
+        toggle(stack);
+        slot.onSlotChanged();
+        return true;
     }
 
     @Override
@@ -118,5 +173,17 @@ public class ViewCellItem extends AEBaseItem implements ICellWorkbenchItem {
             is.setTagCompound(tag);
         }
         tag.setString(STORAGE_CELL_FUZZY_MODE, fzMode.name());
+    }
+
+    @Override
+    protected void addCheckedInformation(ItemStack stack, World world, List<String> lines,
+                                         ITooltipFlag advancedTooltips) {
+        super.addCheckedInformation(stack, world, lines, advancedTooltips);
+
+        String status = isEnabled(stack)
+            ? TextFormatting.GREEN + I18n.format("gui.ae2.Yes")
+            : TextFormatting.RED + I18n.format("gui.ae2.No");
+        lines.add(TextFormatting.GRAY + I18n.format("item.ae2.view_cell.tooltip.enabled", status));
+        lines.add(TextFormatting.DARK_GRAY + I18n.format("item.ae2.view_cell.tooltip.toggle_hint"));
     }
 }
