@@ -7,12 +7,10 @@
   ],
   "key": {
     "a": {
-      "type": "forge:ore_dict",
-      "ore": "ingotIron"
+      "item": "minecraft:redstone"
     },
     "b": {
-      "type": "forge:ore_dict",
-      "ore": "ingotIron"
+      "item": "minecraft:redstone"
     }
   },
   "result": {

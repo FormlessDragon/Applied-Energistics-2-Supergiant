@@ -17,8 +17,8 @@
       "item": "ae2:cell_component_1k"
     },
     "d": {
-      "type": "forge:ore_dict",
-      "ore": "ingotIron"
+      "item": "minecraft:dye",
+      "data": 4
     }
   },
   "result": {
