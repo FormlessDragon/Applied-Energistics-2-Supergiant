@@ -49,13 +49,6 @@ The build output is written to `build/libs`.
   * [![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%203.0-yellow.svg?style=flat-square)](https://creativecommons.org/licenses/by-nc-sa/3.0/)
 * Text and Translations
   * [![License](https://img.shields.io/badge/License-No%20Restriction-green.svg?style=flat-square)](https://creativecommons.org/publicdomain/zero/1.0/)
-* Integrated toggleable view cell portion
-  * Derived in part from [Lapis256/AE2ToggleableViewCell](https://github.com/Lapis256/AE2ToggleableViewCell/tree/1.21.1)
-  * [![License](https://img.shields.io/badge/License-MIT-red.svg?style=flat-square)](http://opensource.org/licenses/MIT)
-* Additional Sound Licenses
-  * Guidebook Click Sound
-    * [EminYILDIRIM](https://freesound.org/people/EminYILDIRIM/sounds/536108/)
-    * [![License](https://img.shields.io/badge/License-CC%20BY%204.0-yellow.svg?style=flat-square)](https://creativecommons.org/licenses/by/4.0/)
 
 ## Credits
 
