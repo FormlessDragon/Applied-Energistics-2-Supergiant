@@ -11,7 +11,6 @@ import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -25,7 +24,6 @@ public record GenericStack(AEKey what, long amount) {
     private static final String MISSING_CONTENT_ITEMSTACK_DATA = "missing_content_itemstack_data";
     private static final String MISSING_CONTENT_AEKEY_DATA = "missing_content_aekey_data";
     private static final String MISSING_CONTENT_ERROR = "missing_content_error";
-    public static final List<@Nullable GenericStack> EMPTY_LIST = Collections.emptyList();
 
     public GenericStack {
         Objects.requireNonNull(what, "what");
