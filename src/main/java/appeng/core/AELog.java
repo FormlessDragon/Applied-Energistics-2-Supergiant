@@ -290,6 +290,10 @@ public final class AELog {
         }
     }
 
+    public static void craftingPerformance(String message, Object... params) {
+        log(Level.INFO, "[AE2 Crafting Performance] " + message, params);
+    }
+
     /**
      * Use to check for an enabled grid log.
      * <p>

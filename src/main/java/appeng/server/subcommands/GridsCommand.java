@@ -139,7 +139,7 @@ public class GridsCommand implements ISubCommand {
 
         for (EnumFacing side : Platform.DIRECTIONS_WITH_NULL) {
             IGridNode node = targetGridHost.getGridNode(side);
-            if (node != null && node.getGrid() instanceof Grid grid && reachableGrids.add(grid)) {
+            if (node != null && node.grid() instanceof Grid grid && reachableGrids.add(grid)) {
                 openSet.add(grid);
             }
         }

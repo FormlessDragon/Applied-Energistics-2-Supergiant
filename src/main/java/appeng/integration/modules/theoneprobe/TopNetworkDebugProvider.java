@@ -46,7 +46,7 @@ public final class TopNetworkDebugProvider {
             return;
         }
 
-        var grid = context.node().getGrid();
+        var grid = context.node().grid();
         if (!(grid instanceof Grid concreteGrid)) {
             return;
         }
@@ -84,7 +84,7 @@ public final class TopNetworkDebugProvider {
             if (selected.part != null) {
                 IGridNode node = selected.part.getGridNode();
                 if (node != null) {
-                    return new ResolvedContext(node, isPivot(node.getGrid(), node));
+                    return new ResolvedContext(node, isPivot(node.grid(), node));
                 }
             }
         }
@@ -92,7 +92,7 @@ public final class TopNetworkDebugProvider {
         if (blockEntity instanceof IGridConnectedTile gridConnectedTile) {
             var node = gridConnectedTile.getActionableNode();
             if (node != null) {
-                return new ResolvedContext(node, isPivot(node.getGrid(), node));
+                return new ResolvedContext(node, isPivot(node.grid(), node));
             }
         }
 

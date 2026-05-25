@@ -25,7 +25,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Comparator;
 
 public record CraftingPlanSummaryEntry(AEKey what, long missingAmount, long storedAmount,
-                                       long craftAmount) implements Comparable<CraftingPlanSummaryEntry> {
+                                       long craftAmount, long inventoryAmount,
+                                       boolean finalOutput) implements Comparable<CraftingPlanSummaryEntry> {
     private static final Comparator<CraftingPlanSummaryEntry> COMPARATOR = Comparator
         .comparing(CraftingPlanSummaryEntry::missingAmount)
         .thenComparing(CraftingPlanSummaryEntry::craftAmount)
@@ -37,7 +38,10 @@ public record CraftingPlanSummaryEntry(AEKey what, long missingAmount, long stor
         long missingAmount = buffer.readVarLong();
         long storedAmount = buffer.readVarLong();
         long craftAmount = buffer.readVarLong();
-        return new CraftingPlanSummaryEntry(what, missingAmount, storedAmount, craftAmount);
+        long inventoryAmount = buffer.readVarLong();
+        boolean finalOutput = buffer.readBoolean();
+        return new CraftingPlanSummaryEntry(what, missingAmount, storedAmount, craftAmount, inventoryAmount,
+            finalOutput);
     }
 
     @Override
@@ -50,6 +54,15 @@ public record CraftingPlanSummaryEntry(AEKey what, long missingAmount, long stor
         buffer.writeVarLong(this.missingAmount);
         buffer.writeVarLong(this.storedAmount);
         buffer.writeVarLong(this.craftAmount);
+        buffer.writeVarLong(this.inventoryAmount);
+        buffer.writeBoolean(this.finalOutput);
+    }
+
+    public long inventoryUsageAmount() {
+        long amount = this.storedAmount + this.missingAmount;
+        if (amount < 0) {
+            return Long.MAX_VALUE;
+        }
+        return amount;
     }
 }
-

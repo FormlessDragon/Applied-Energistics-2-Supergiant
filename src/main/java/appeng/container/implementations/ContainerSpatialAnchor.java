@@ -64,7 +64,7 @@ public class ContainerSpatialAnchor extends AEBaseContainer {
                 IGridNode gridNode = anchor.getGridNode();
                 this.delay++;
                 if (this.delay > UPDATE_DELAY && gridNode != null) {
-                    IGrid grid = gridNode.getGrid();
+                    IGrid grid = gridNode.grid();
                     if (grid == null) {
                         super.broadcastChanges();
                         return;

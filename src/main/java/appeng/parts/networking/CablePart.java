@@ -293,7 +293,7 @@ public abstract class CablePart extends AEBasePart implements ICablePart {
             default -> 0;
         };
 
-        if (node.getGrid().getPathingService().getChannelMode() == ChannelMode.INFINITE) {
+        if (node.grid().getPathingService().getChannelMode() == ChannelMode.INFINITE) {
             return channels <= 0 ? 0 : visualMaxChannels;
         }
 

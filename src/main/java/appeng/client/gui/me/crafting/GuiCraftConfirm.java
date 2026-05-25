@@ -77,19 +77,6 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
         }
     }
 
-    private static boolean hasMissingEntries(@Nullable CraftingPlanSummary plan) {
-        if (plan == null) {
-            return false;
-        }
-
-        for (CraftingPlanSummaryEntry entry : plan.entries()) {
-            if (entry.missingAmount() > 0) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private ITextComponent getNextCpuButtonLabel() {
         if (this.container.hasNoCPU()) {
             return GuiText.NoCraftingCPUs.text();
@@ -127,9 +114,15 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
 
         CraftingPlanSummary plan = container.getPlan();
         boolean planIsStartable = plan != null && !plan.simulation();
-        this.start.enabled = !this.container.hasNoCPU() && planIsStartable;
+        boolean hasMissingEntries = plan != null && plan.hasMissingEntries();
+        boolean shiftDown = isShiftKeyDown();
+        var startButtonState = CraftConfirmStartButtonState.compute(this.container.hasNoCPU(), planIsStartable,
+            hasMissingEntries, shiftDown);
+        this.start.setMessage(startButtonState.label().text());
+        this.start.enabled = startButtonState.clickable();
+        this.start.setForceHighlighted(startButtonState.highlighted());
         this.selectCPU.enabled = planIsStartable;
-        boolean canBookmarkMissing = Integrations.hei().isEnabled() && hasMissingEntries(plan);
+        boolean canBookmarkMissing = Integrations.hei().isEnabled() && hasMissingEntries;
         this.bookmarkMissing.visible = canBookmarkMissing;
         this.bookmarkMissing.enabled = canBookmarkMissing;
 
@@ -181,7 +174,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
     }
 
     private void start() {
-        getContainer().startJob();
+        getContainer().startJob(isShiftKeyDown());
     }
 
     @Override
@@ -191,6 +184,13 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
         List<ITextComponent> hoveredTooltip = this.table.getHoveredTooltip();
         if (hoveredTooltip != null) {
             drawTooltipWithHeader(mouseX, mouseY, hoveredTooltip);
+        }
+
+        CraftingPlanSummary plan = container.getPlan();
+        if (plan != null && plan.hasMissingEntries() && this.start.visible
+            && mouseX >= this.start.x && mouseY >= this.start.y
+            && mouseX < this.start.x + this.start.width && mouseY < this.start.y + this.start.height) {
+            drawTooltipWithHeader(mouseX, mouseY, List.of(GuiText.ForceStartHoldShift.text()));
         }
 
     }

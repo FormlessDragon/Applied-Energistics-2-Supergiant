@@ -251,7 +251,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
     }
 
     @Override
-    public IGrid getGrid() {
+    public IGrid grid() {
         if (this.myGrid == null) {
             throw new IllegalStateException("A node is being used after it has been destroyed.");
         }

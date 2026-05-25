@@ -263,7 +263,7 @@ public class DebugCardItem extends AEBaseItem {
             if (gh != null) {
                 final IGridNode node = gh.getGridNode(side);
                 if (node != null) {
-                    final IEnergyService eg = node.getGrid().getEnergyService();
+                    final IEnergyService eg = node.grid().getEnergyService();
                     this.outputSecondaryMessage(player, PlayerMessages.DebugCardGridEnergy.text(),
                         eg.getStoredPower() + " : " + eg.getEnergyDemand(Double.MAX_VALUE));
                 }

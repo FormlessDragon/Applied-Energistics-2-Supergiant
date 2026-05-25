@@ -104,7 +104,7 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
 
         if (host instanceof IActionHost actionHost) {
             IGridNode node = actionHost.getActionableNode();
-            return node != null ? node.getGrid() : null;
+            return node != null ? node.grid() : null;
         }
 
         return null;

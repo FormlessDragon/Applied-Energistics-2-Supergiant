@@ -112,8 +112,9 @@ public abstract class AbstractTableRenderer<T> {
                 GlStateManager.pushMatrix();
                 GlStateManager.scale(TEXT_SCALE, TEXT_SCALE, 1.0f);
                 for (ITextComponent line : lines) {
-                    final int width = fontRenderer.getStringWidth(line.getFormattedText());
-                    fontRenderer.drawString(line.getFormattedText(),
+                    final String formattedText = line.getFormattedText();
+                    final int width = fontRenderer.getStringWidth(formattedText);
+                    fontRenderer.drawString(formattedText,
                         (itemX - 2 - width * TEXT_SCALE) * INV_TEXT_SCALE,
                         textY * INV_TEXT_SCALE, textColor, false);
                     textY += lineHeight + LINE_SPACING;

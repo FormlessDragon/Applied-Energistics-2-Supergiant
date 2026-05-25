@@ -141,7 +141,7 @@ public final class MEIngredientActions {
     private static boolean openWirelessCraftAmount(EntityPlayerMP player, GuiHostLocator locator, IGridNode node,
                                                    AEKey what, long initialAmount,
                                                    boolean preserveReturnToContainerOverride) {
-        if (!node.getGrid().getCraftingService().isCraftable(what)) {
+        if (!node.grid().getCraftingService().isCraftable(what)) {
             return false;
         }
 

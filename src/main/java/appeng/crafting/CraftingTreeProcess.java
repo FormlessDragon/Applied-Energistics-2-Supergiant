@@ -24,6 +24,7 @@ import appeng.api.networking.crafting.ICraftingService;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.crafting.inv.CraftingSimulationState;
+import appeng.crafting.inv.ChildCraftingSimulationState;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 
@@ -40,6 +41,7 @@ public class CraftingTreeProcess {
     private final Object2LongLinkedOpenHashMap<CraftingTreeNode> nodes = new Object2LongLinkedOpenHashMap<>();
     boolean possible = true;
     private boolean containerItems;
+    private Preview reusablePreview;
     /**
      * If true, we perform this pattern by 1 at the time. This ensures that container items or outputs get reused when
      * possible.
@@ -102,34 +104,97 @@ public class CraftingTreeProcess {
         return this.limitQty;
     }
 
+    boolean canReusePreview() {
+        return this.nodes.size() == 1 && !this.limitQty && !this.containerItems;
+    }
+
+    long getMaximumCraftableTimes(CraftingSimulationState inv, long maxTimes)
+        throws InterruptedException {
+        this.job.handlePausing();
+
+        long start = System.nanoTime();
+        var sharedInputs = new ChildCraftingSimulationState(inv);
+        try {
+            this.reusablePreview = null;
+            long craftableTimes = maxTimes;
+            if (canReusePreview()) {
+                var entry = this.nodes.object2LongEntrySet().iterator().next();
+                long requiredPerPattern = entry.getLongValue();
+                long availableInputs = entry.getKey().extractAvailableForCrafting(sharedInputs,
+                    requiredPerPattern * craftableTimes);
+                craftableTimes = availableInputs / requiredPerPattern;
+                if (craftableTimes > 0) {
+                    this.reusablePreview = new Preview(inv, sharedInputs, craftableTimes);
+                }
+                return craftableTimes;
+            }
+
+            for (Object2LongMap.Entry<CraftingTreeNode> entry : this.nodes.object2LongEntrySet()) {
+                long requiredPerPattern = entry.getLongValue();
+                long availableInputs = entry.getKey().extractAvailableForCrafting(sharedInputs,
+                    requiredPerPattern * craftableTimes);
+                craftableTimes = Math.min(craftableTimes, availableInputs / requiredPerPattern);
+                if (craftableTimes == 0) {
+                    return 0;
+                }
+            }
+            return craftableTimes;
+        } finally {
+            this.job.recordPerformanceStage("process-max-craftable inputs=" + this.nodes.size(),
+                System.nanoTime() - start);
+        }
+    }
+
+    boolean applyReusablePreview(CraftingSimulationState inv, long times) {
+        var preview = this.reusablePreview;
+        if (preview == null || preview.parent() != inv || preview.times() != times) {
+            return false;
+        }
+
+        for (var out : this.details.getOutputs()) {
+            preview.state().insert(out.what(), out.amount() * times, Actionable.MODULATE);
+        }
+
+        preview.state().addCrafting(details, times);
+        preview.state().addBytes(times);
+        preview.state().applyDiff(inv);
+        this.reusablePreview = null;
+        return true;
+    }
+
     void request(CraftingSimulationState inv, long times)
         throws CraftBranchFailure, InterruptedException {
         this.job.handlePausing();
 
-        var containerItems = this.containerItems ? new KeyCounter() : null;
+        this.job.pushProcess(this);
+        try {
+            var containerItems = this.containerItems ? new KeyCounter() : null;
 
-        // request and remove inputs...
-        for (Object2LongMap.Entry<CraftingTreeNode> entry : this.nodes.object2LongEntrySet()) {
-            entry.getKey().request(inv, entry.getLongValue() * times, containerItems);
-        }
-
-        // by now we must have succeeded, otherwise an exception would have been thrown by request() above
-
-        // add container items
-        if (containerItems != null) {
-            for (var stack : containerItems) {
-                inv.insert(stack.getKey(), stack.getLongValue(), Actionable.MODULATE);
-                inv.addStackBytes(stack.getKey(), stack.getLongValue(), 1);
+            // request and remove inputs...
+            for (Object2LongMap.Entry<CraftingTreeNode> entry : this.nodes.object2LongEntrySet()) {
+                entry.getKey().request(inv, entry.getLongValue() * times, containerItems);
             }
-        }
 
-        // add crafting results.
-        for (var out : this.details.getOutputs()) {
-            inv.insert(out.what(), out.amount() * times, Actionable.MODULATE);
-        }
+            // by now we must have succeeded, otherwise an exception would have been thrown by request() above
 
-        inv.addCrafting(details, times);
-        inv.addBytes(times);
+            // add container items
+            if (containerItems != null) {
+                for (var stack : containerItems) {
+                    inv.insert(stack.getKey(), stack.getLongValue(), Actionable.MODULATE);
+                    inv.addStackBytes(stack.getKey(), stack.getLongValue(), 1);
+                }
+            }
+
+            // add crafting results.
+            for (var out : this.details.getOutputs()) {
+                inv.insert(out.what(), out.amount() * times, Actionable.MODULATE);
+            }
+
+            inv.addCrafting(details, times);
+            inv.addBytes(times);
+        } finally {
+            this.job.popProcess();
+        }
     }
 
     long getNodeCount() {
@@ -140,6 +205,22 @@ public class CraftingTreeProcess {
         }
 
         return tot;
+    }
+
+    int getDepth() {
+        int depth = 1;
+        for (CraftingTreeNode node : this.nodes.keySet()) {
+            depth = Math.max(depth, 1 + node.getDepth());
+        }
+        return depth;
+    }
+
+    long getPatternNodeCount() {
+        long total = 0;
+        for (CraftingTreeNode node : this.nodes.keySet()) {
+            total += node.getPatternNodeCount();
+        }
+        return total;
     }
 
     long getOutputCount(AEKey what) {
@@ -154,6 +235,43 @@ public class CraftingTreeProcess {
         return tot;
     }
 
+    long getInputCount(AEKey what) {
+        long total = 0;
+
+        for (var input : this.details.getInputs()) {
+            for (var possibleInput : input.possibleInputs()) {
+                if (what.matches(possibleInput)) {
+                    total += possibleInput.amount() * input.getMultiplier();
+                    break;
+                }
+            }
+        }
+
+        return total;
+    }
+
+    AEKey getFirstInputKey() {
+        var inputs = this.details.getInputs();
+        if (inputs.length == 0) {
+            return null;
+        }
+        var possibleInputs = inputs[0].possibleInputs();
+        if (possibleInputs.length == 0) {
+            return null;
+        }
+        return possibleInputs[0].what();
+    }
+
+    void accumulateNet(KeyCounter netByKey) {
+        for (var output : this.details.getOutputs()) {
+            netByKey.add(output.what(), output.amount());
+        }
+        for (Object2LongMap.Entry<CraftingTreeNode> entry : this.nodes.object2LongEntrySet()) {
+            var node = entry.getKey();
+            netByKey.add(node.getWhat(), -node.getTemplateAmount() * entry.getLongValue());
+        }
+    }
+
     boolean hasMultiplePaths() {
         for (Object2LongMap.Entry<CraftingTreeNode> entry : nodes.object2LongEntrySet()) {
             if (entry.getKey().hasMultiplePaths()) {
@@ -161,5 +279,16 @@ public class CraftingTreeProcess {
             }
         }
         return false;
+    }
+
+    void resetPossible() {
+        this.possible = true;
+        this.reusablePreview = null;
+        for (CraftingTreeNode node : this.nodes.keySet()) {
+            node.resetPossible();
+        }
+    }
+
+    private record Preview(CraftingSimulationState parent, ChildCraftingSimulationState state, long times) {
     }
 }

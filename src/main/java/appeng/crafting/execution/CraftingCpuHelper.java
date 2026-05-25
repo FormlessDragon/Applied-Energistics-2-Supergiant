@@ -23,16 +23,18 @@ import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.crafting.ICraftingPlan;
 import appeng.api.networking.security.IActionSource;
+import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.crafting.inv.ICraftingInventory;
 import appeng.crafting.inv.ListCraftingInventory;
-import com.google.common.collect.Iterables;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 /**
@@ -43,13 +45,12 @@ public class CraftingCpuHelper {
     }
 
     /**
-     * Tries to extract all ingredients defined by the plan. Returns null on success and otherwise a
-     * {@link GenericStack} explaining what is missing.
+     * Extracts everything currently available for the plan and returns what is still missing at submission time.
      */
-    @Nullable
-    public static GenericStack tryExtractInitialItems(ICraftingPlan plan, IGrid grid,
-                                                      ListCraftingInventory cpuInventory, IActionSource src) {
+    public static KeyCounter extractInitialItems(ICraftingPlan plan, IGrid grid,
+                                                 ListCraftingInventory cpuInventory, IActionSource src) {
         var storage = grid.getStorageService().getInventory();
+        var remainingMissing = new KeyCounter();
 
         for (var entry : plan.usedItems()) {
             var what = entry.getKey();
@@ -58,18 +59,22 @@ public class CraftingCpuHelper {
             cpuInventory.insert(what, extracted, Actionable.MODULATE);
 
             if (extracted < toExtract) {
-                // Failed to extract everything, reinject and hope for the best.
-                // TODO: maybe voiding items that fail to re-insert is not the best thing to do?
-                for (var stored : cpuInventory.list) {
-                    storage.insert(stored.getKey(), stored.getLongValue(), Actionable.MODULATE, src);
-                }
-                cpuInventory.clear();
-
-                return new GenericStack(what, toExtract - extracted);
+                remainingMissing.add(what, toExtract - extracted);
             }
         }
 
-        return null;
+        for (var entry : plan.missingItems()) {
+            var what = entry.getKey();
+            var toExtract = entry.getLongValue();
+            var extracted = storage.extract(what, toExtract, Actionable.MODULATE, src);
+            cpuInventory.insert(what, extracted, Actionable.MODULATE);
+
+            if (extracted < toExtract) {
+                remainingMissing.add(what, toExtract - extracted);
+            }
+        }
+
+        return remainingMissing;
     }
 
     public static NBTTagCompound generateLinkData(UUID craftId, boolean standalone, boolean req) {
@@ -167,17 +172,71 @@ public class CraftingCpuHelper {
      */
     public static Iterable<InputTemplate> getValidItemTemplates(ICraftingInventory inv,
                                                                 IPatternDetails.IInput input, World level) {
-        var possibleInputs = input.possibleInputs();
+        return () -> new Iterator<>() {
+            private final GenericStack[] possibleInputs = input.possibleInputs();
+            private final HashSet<FuzzyInputKey> checkedInputs = new HashSet<>();
+            private int possibleInputIndex;
+            private Iterator<AEKey> fuzzyIterator;
+            private long fuzzyAmount;
+            private InputTemplate next;
 
-        var substitutes = new ObjectArrayList<InputTemplate>(possibleInputs.length);
+            @Override
+            public boolean hasNext() {
+                if (next != null) {
+                    return true;
+                }
 
-        for (var stack : possibleInputs) {
-            for (var fuzz : inv.findFuzzyTemplates(stack.what())) {
-                substitutes.add(new InputTemplate(fuzz, stack.amount()));
+                next = findNext();
+                return next != null;
             }
-        }
 
-        return Iterables.filter(substitutes, stack -> input.isValid(stack.key(), level));
+            @Override
+            public InputTemplate next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+
+                var result = next;
+                next = null;
+                return result;
+            }
+
+            private InputTemplate findNext() {
+                while (true) {
+                    while (fuzzyIterator != null && fuzzyIterator.hasNext()) {
+                        var fuzz = fuzzyIterator.next();
+                        if (input.isValid(fuzz, level)) {
+                            return new InputTemplate(fuzz, fuzzyAmount);
+                        }
+                    }
+
+                    fuzzyIterator = null;
+                    if (!advancePossibleInput()) {
+                        return null;
+                    }
+                }
+            }
+
+            private boolean advancePossibleInput() {
+                while (possibleInputIndex < possibleInputs.length) {
+                    var stack = possibleInputs[possibleInputIndex++];
+                    if (!checkedInputs.add(new FuzzyInputKey(stack.what(), stack.amount()))) {
+                        continue;
+                    }
+
+                    fuzzyAmount = stack.amount();
+                    fuzzyIterator = inv.findFuzzyTemplates(stack.what()).iterator();
+                    return true;
+                }
+                return false;
+            }
+        };
+    }
+
+    private record FuzzyInputKey(Object primaryKey, long amount) {
+        private FuzzyInputKey(AEKey key, long amount) {
+            this(key.getPrimaryKey(), amount);
+        }
     }
 
     /**

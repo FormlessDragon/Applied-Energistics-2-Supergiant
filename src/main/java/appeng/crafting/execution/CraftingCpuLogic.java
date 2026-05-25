@@ -94,10 +94,8 @@ public class CraftingCpuLogic {
         if (!inventory.list.isEmpty())
             AELog.warn("Crafting CPU inventory is not empty yet a job was submitted.");
 
-        // Try to extract required items.
-        var missingIngredient = CraftingCpuHelper.tryExtractInitialItems(plan, grid, inventory, src);
-        if (missingIngredient != null)
-            return CraftingSubmitResult.missingIngredient(missingIngredient);
+        // Extract everything available now; unresolved missing ingredients will be captured by the CPU later.
+        var remainingMissingItems = CraftingCpuHelper.extractInitialItems(plan, grid, inventory, src);
 
         // Set CPU link and job.
         var playerId = src.player()
@@ -105,7 +103,7 @@ public class CraftingCpuLogic {
                           .orElse(null);
         var craftId = UUID.randomUUID();
         var linkCpu = new CraftingLink(CraftingCpuHelper.generateLinkData(craftId, requester == null, false), cluster);
-        this.job = new ExecutingCraftingJob(plan, this::postChange, linkCpu, playerId);
+        this.job = new ExecutingCraftingJob(plan, this::postChange, linkCpu, playerId, remainingMissingItems);
         cluster.updateOutput(plan.finalOutput());
         cluster.markDirty();
 
@@ -287,6 +285,18 @@ public class CraftingCpuLogic {
 
         long inserted = amount;
         if (what.matches(job.finalOutput)) {
+            long intermediateAmount = Math.min(amount, job.remainingIntermediateFinalOutput);
+            if (intermediateAmount > 0) {
+                if (type == Actionable.MODULATE) {
+                    inventory.insert(what, intermediateAmount, Actionable.MODULATE);
+                    job.remainingIntermediateFinalOutput -= intermediateAmount;
+                }
+                amount -= intermediateAmount;
+                if (amount <= 0) {
+                    return inserted;
+                }
+            }
+
             // Final output is special: it goes directly into the requester
             inserted = job.link.insert(what, amount, type);
 

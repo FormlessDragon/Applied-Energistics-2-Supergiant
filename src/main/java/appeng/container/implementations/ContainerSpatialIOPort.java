@@ -61,7 +61,7 @@ public class ContainerSpatialIOPort extends AEBaseContainer {
             this.delay++;
             TileSpatialIOPort port = (TileSpatialIOPort) this.getTileEntity();
             appeng.api.networking.IGridNode gridNode = port != null ? port.getGridNode() : null;
-            appeng.api.networking.IGrid grid = gridNode != null ? gridNode.getGrid() : null;
+            appeng.api.networking.IGrid grid = gridNode != null ? gridNode.grid() : null;
             if (this.delay > 15 && grid != null) {
                 this.delay = 0;
                 appeng.api.networking.energy.IEnergyService energy = grid.getEnergyService();

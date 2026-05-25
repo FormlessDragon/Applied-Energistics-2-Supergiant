@@ -290,7 +290,7 @@ public class AnnihilationPlanePart extends AEBasePart implements IGridTickable {
             return TickRateModulation.SLEEP;
         }
 
-        appeng.api.networking.IGrid grid = node.getGrid();
+        appeng.api.networking.IGrid grid = node.grid();
 
         if (this.continuousGeneration != null) {
             this.continuousGenerationTicks += ticksSinceLastCall;

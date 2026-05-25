@@ -22,7 +22,6 @@ import appeng.api.config.Actionable;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.crafting.ICraftingService;
 import appeng.api.stacks.AEKey;
-import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.crafting.execution.CraftingCpuHelper;
 import appeng.crafting.execution.InputTemplate;
@@ -34,7 +33,6 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * A crafting tree node is what represents a single requested stack in the crafting process. It can either be the
@@ -81,7 +79,7 @@ public class CraftingTreeNode {
             return wat; // if we can emit for something, use that.
         }
 
-        var patterns = cc.getCraftingFor(wat);
+        var patterns = this.job.getCraftingFor(wat);
 
         if (patterns.isEmpty() && parentInput != null) {
             // No pattern for the exact encoded input. Try to find a pattern for a substitute ingredient. ;)
@@ -111,20 +109,20 @@ public class CraftingTreeNode {
         }
 
         if (this.nodes == null) {
+            long start = System.nanoTime();
             this.nodes = new ObjectArrayList<>();
 
             var gridNode = this.job.simRequester.getGridNode();
-
-            // If the node is null, we just skip patterns and let the request (likely) fail.
             if (gridNode != null) {
-                var craftingService = gridNode.getGrid().getCraftingService();
-
-                for (var details : craftingService.getCraftingFor(this.what)) {
+                var craftingService = gridNode.grid().getCraftingService();
+                for (var details : this.job.getCraftingFor(this.what)) {
                     if (this.parent == null || this.parent.notRecursive(details)) {
                         this.nodes.add(new CraftingTreeProcess(craftingService, job, details, this));
                     }
                 }
             }
+            this.job.recordPerformanceCount("patterns-for-" + this.what, this.nodes.size());
+            this.job.recordPerformanceStage("build-child-patterns " + this.what, System.nanoTime() - start);
         }
     }
 
@@ -132,23 +130,7 @@ public class CraftingTreeNode {
      * Return true if adding this pattern as a child would not cause recursion.
      */
     boolean notRecursive(IPatternDetails details) {
-        for (var output : details.getOutputs()) {
-            if (this.what.matches(output)) {
-                return false;
-            }
-        }
-
-        for (var input : details.getInputs()) {
-            if (this.what.matches(input.possibleInputs()[0])) {
-                return false;
-            }
-        }
-
-        if (this.parent == null) {
-            return true;
-        }
-
-        return this.parent.notRecursive(details);
+        return true;
     }
 
     /**
@@ -165,23 +147,50 @@ public class CraftingTreeNode {
         throws CraftBranchFailure, InterruptedException {
         this.job.handlePausing();
 
+        if (this.job.isRequesting(this.what)) {
+            if (this.job.resolveRecursiveRequest(this.what, inv, requestedAmount * this.amount)) {
+                if (this.what.equals(this.job.getOutput())) {
+                    this.job.addIntermediateFinalOutput(requestedAmount * this.amount);
+                }
+                return;
+            }
+            if (this.job.cycleHasNetOutput(this.what) && this.job.canUseMissingItems()) {
+                job.addMissing(this.what, requestedAmount * this.amount);
+                return;
+            }
+            throw new CraftBranchFailure(this.what, requestedAmount * this.amount);
+        }
+
+        this.job.pushRequest(this.what);
+        try {
+            requestInner(inv, requestedAmount, containerItems);
+        } finally {
+            this.job.popRequest();
+        }
+    }
+
+    private void requestInner(CraftingSimulationState inv, long requestedAmount,
+                              @Nullable KeyCounter containerItems)
+        throws CraftBranchFailure, InterruptedException {
         inv.addStackBytes(what, amount, requestedAmount);
 
         /*
          * 1) COLLECT ITEMS FROM THE INVENTORY
          */
-        // Templates: must copy before using!
-        for (var template : getValidItemTemplates(inv)) {
-            long extracted = CraftingCpuHelper.extractTemplates(inv, template, requestedAmount);
+        if (!isTopLevelRequestedOutput()) {
+            // Templates: must copy before using!
+            for (var template : getValidItemTemplates(inv)) {
+                long extracted = CraftingCpuHelper.extractTemplates(inv, template, requestedAmount);
 
-            if (extracted > 0) {
-                // TODO: we should keep track of which items we extracted to make sure the CPU uses exactly those when
-                // TODO: it processes the job.
-                requestedAmount -= extracted;
-                addContainerItems(template.key(), extracted, containerItems);
+                if (extracted > 0) {
+                    // TODO: we should keep track of which items we extracted to make sure the CPU uses exactly those when
+                    // TODO: it processes the job.
+                    requestedAmount -= extracted;
+                    addContainerItems(template.key(), extracted, containerItems);
 
-                if (requestedAmount == 0) {
-                    return;
+                    if (requestedAmount == 0) {
+                        return;
+                    }
                 }
             }
         }
@@ -202,12 +211,90 @@ public class CraftingTreeNode {
          */
         buildChildPatterns();
         long totalRequestedItems = requestedAmount * this.amount;
-        if (this.nodes.size() == 1) {
-            // Single branch: just query as much as we can and let it throw if that's not possible.
-            final CraftingTreeProcess pro = this.nodes.getFirst();
+        if (!this.nodes.isEmpty()) {
+            for (CraftingTreeProcess pro : this.nodes) {
+                totalRequestedItems = requestCraftingBranch(inv, pro, totalRequestedItems);
+                if (totalRequestedItems <= 0) {
+                    return;
+                }
+            }
+        }
+
+        if (totalRequestedItems > 0 && this.job.canUseMissingItems() && !this.nodes.isEmpty()) {
+            requestMissingBranch(inv, this.nodes.getFirst(), totalRequestedItems);
+            return;
+        }
+
+        if (this.job.canUseMissingItems()) {
+            job.addMissing(this.what, totalRequestedItems);
+        } else {
+            throw new CraftBranchFailure(this.what, totalRequestedItems);
+        }
+    }
+
+    private long requestCraftingBranch(CraftingSimulationState inv, CraftingTreeProcess pro, long totalRequestedItems)
+        throws InterruptedException {
+        if (!pro.possible || totalRequestedItems <= 0) {
+            return totalRequestedItems;
+        }
+
+        var craftedPerPattern = pro.getOutputCount(this.what);
+        while (totalRequestedItems > 0) {
+            long requestedTimes = pro.limitsQuantity() ? 1 : (totalRequestedItems + craftedPerPattern - 1) / craftedPerPattern;
+            long times = this.job.timed("max-craftable " + this.what, () -> pro.getMaximumCraftableTimes(inv, requestedTimes));
+            if (times <= 0) {
+                pro.possible = false;
+                return totalRequestedItems;
+            }
+
+            long available;
+            if (pro.applyReusablePreview(inv, times)) {
+                available = inv.extract(this.what, totalRequestedItems, Actionable.MODULATE);
+            } else {
+                final ChildCraftingSimulationState child = new ChildCraftingSimulationState(inv);
+                try {
+                    this.job.pushMissingSuppression();
+                    this.job.timedCrafting("request-branch " + this.what, () -> {
+                        pro.request(child, times);
+                        return null;
+                    });
+                } catch (CraftBranchFailure failure) {
+                    pro.possible = false;
+                    return totalRequestedItems;
+                } finally {
+                    this.job.popMissingSuppression();
+                }
+
+                available = child.extract(this.what, totalRequestedItems, Actionable.MODULATE);
+                if (available > 0) {
+                    child.applyDiff(inv);
+                }
+            }
+
+            if (available <= 0) {
+                pro.possible = false;
+                return totalRequestedItems;
+            }
+
+            totalRequestedItems -= available;
+
+            if (!pro.limitsQuantity()) {
+                return totalRequestedItems;
+            }
+        }
+        return totalRequestedItems;
+    }
+
+    private void requestMissingBranch(CraftingSimulationState inv, CraftingTreeProcess pro, long totalRequestedItems)
+        throws CraftBranchFailure, InterruptedException {
+            if (pro.getInputCount(this.what) >= pro.getOutputCount(this.what)) {
+                job.addMissing(this.what, totalRequestedItems);
+                return;
+            }
+
             var craftedPerPattern = pro.getOutputCount(this.what);
 
-            while (pro.possible && totalRequestedItems > 0) {
+            while (totalRequestedItems > 0) {
                 long times;
                 if (pro.limitsQuantity()) {
                     times = 1;
@@ -215,7 +302,10 @@ public class CraftingTreeNode {
                     // Craft all at once!
                     times = (totalRequestedItems + craftedPerPattern - 1) / craftedPerPattern;
                 }
-                pro.request(inv, times);
+                this.job.timedCrafting("request-missing-branch " + this.what, () -> {
+                    pro.request(inv, times);
+                    return null;
+                });
 
                 // by now we have succeeded, as request throws an exception in case of failure
                 // check how much was actually produced
@@ -227,58 +317,84 @@ public class CraftingTreeNode {
                         return;
                     }
                 } else {
-                    var pattern = pro.details.getDefinition();
-                    String outputs = pro.details.getOutputs()
-                                                .stream()
-                                                .map(GenericStack::toString)
-                                                .collect(Collectors.joining(", "));
-                    String errorMessage = """
-                        Unexpected error in the crafting calculation: can't find created items.
-                        This is an AE2 bug, please report it, with the following important information:
-                        
-                        - Found none of %s. Remaining request: %d of %d*%d.
-                        - Tried crafting %d times the pattern %s.
-                        - Pattern outputs: %s.
-                        """.formatted(what, totalRequestedItems, requestedAmount, amount, times, pattern, outputs);
-                    throw new UnsupportedOperationException(errorMessage);
+                    job.addMissing(this.what, totalRequestedItems);
+                    return;
                 }
             }
-        } else if (this.nodes.size() > 1) {
-            // Multiple branches: try as much as possible of one branch before moving to the next one.
-            for (CraftingTreeProcess pro : this.nodes) {
+    }
+
+    long extractAvailableForCrafting(CraftingSimulationState inv, long maxAmount)
+        throws InterruptedException {
+        this.job.handlePausing();
+
+        if (this.job.isCheckingAvailability(this.what)) {
+            return 0;
+        }
+
+        this.job.pushAvailabilityCheck(this.what);
+        try {
+            return extractAvailableForCraftingInner(inv, maxAmount);
+        } finally {
+            this.job.popAvailabilityCheck();
+        }
+    }
+
+    private long extractAvailableForCraftingInner(CraftingSimulationState inv, long maxAmount)
+        throws InterruptedException {
+        long available = 0;
+
+        if (!isTopLevelRequestedOutput()) {
+            for (var template : getValidItemTemplates(inv)) {
+                long extracted = CraftingCpuHelper.extractTemplates(inv, template, maxAmount - available);
+                available += extracted;
+                if (available >= maxAmount) {
+                    return maxAmount;
+                }
+            }
+        }
+
+        if (this.job.isRequesting(this.what)) {
+            return available;
+        }
+
+        if (this.canEmit) {
+            return maxAmount;
+        }
+
+        buildChildPatterns();
+        long totalRequestedItems = (maxAmount - available) * this.amount;
+        for (CraftingTreeProcess pro : this.nodes) {
+            if (!pro.possible || totalRequestedItems <= 0) {
+                continue;
+            }
+            long craftedPerPattern = pro.getOutputCount(this.what);
+            long requestedTimes = pro.limitsQuantity() ? 1 : (totalRequestedItems + craftedPerPattern - 1) / craftedPerPattern;
+            long times = this.job.timed("max-craftable-for-input " + this.what,
+                () -> pro.getMaximumCraftableTimes(inv, requestedTimes));
+            if (times <= 0) {
+                continue;
+            }
+            if (!pro.applyReusablePreview(inv, times)) {
                 try {
-                    while (pro.possible && totalRequestedItems > 0) {
-                        final ChildCraftingSimulationState child = new ChildCraftingSimulationState(inv);
-                        // craft one by one, using the sub inventory as target
-                        pro.request(child, 1);
-
-                        // by now we have succeeded, as request throws an exception in case of failure
-                        var available = child.extract(this.what, totalRequestedItems, Actionable.MODULATE);
-
-                        if (available != 0) {
-                            child.applyDiff(inv);
-
-                            totalRequestedItems -= available;
-
-                            if (totalRequestedItems <= 0) {
-                                return;
-                            }
-                        } else {
-                            pro.possible = false; // ;P
-                        }
-                    }
-                } catch (CraftBranchFailure fail) {
-                    // TODO: why try again after a failure? just in case we receive the right inputs by chance?
-                    pro.possible = true;
+                    this.job.pushMissingSuppression();
+                    this.job.timedCrafting("request-input-branch " + this.what, () -> {
+                        pro.request(inv, times);
+                        return null;
+                    });
+                } catch (CraftBranchFailure ignored) {
+                    continue;
+                } finally {
+                    this.job.popMissingSuppression();
                 }
+            }
+            long produced = inv.extract(this.what, totalRequestedItems, Actionable.MODULATE);
+            if (produced > 0) {
+                totalRequestedItems -= produced;
+                available += produced / this.amount;
             }
         }
 
-        if (this.job.isSimulation()) {
-            job.addMissing(this.what, totalRequestedItems);
-        } else {
-            throw new CraftBranchFailure(this.what, totalRequestedItems);
-        }
+        return Math.min(maxAmount, available);
     }
 
     // Only item stacks are supported.
@@ -300,7 +416,10 @@ public class CraftingTreeNode {
     private Iterable<InputTemplate> getValidItemTemplates(ICraftingInventory inv) {
         if (this.parentInput == null)
             return List.of(new InputTemplate(what, 1));
-        return CraftingCpuHelper.getValidItemTemplates(inv, this.parentInput, level);
+        long start = System.nanoTime();
+        var templates = CraftingCpuHelper.getValidItemTemplates(inv, this.parentInput, level);
+        this.job.recordPerformanceStage("fuzzy-templates " + this.what, System.nanoTime() - start);
+        return templates;
     }
 
     long getNodeCount() {
@@ -311,6 +430,26 @@ public class CraftingTreeNode {
             }
         }
         return tot;
+    }
+
+    int getDepth() {
+        int depth = 1;
+        if (this.nodes != null) {
+            for (CraftingTreeProcess pro : this.nodes) {
+                depth = Math.max(depth, 1 + pro.getDepth());
+            }
+        }
+        return depth;
+    }
+
+    long getPatternNodeCount() {
+        long total = this.nodes == null ? 0 : this.nodes.size();
+        if (this.nodes != null) {
+            for (CraftingTreeProcess pro : this.nodes) {
+                total += pro.getPatternNodeCount();
+            }
+        }
+        return total;
     }
 
     boolean hasMultiplePaths() {
@@ -326,5 +465,25 @@ public class CraftingTreeNode {
             }
         }
         return false;
+    }
+
+    void resetPossible() {
+        if (this.nodes != null) {
+            for (CraftingTreeProcess pro : this.nodes) {
+                pro.resetPossible();
+            }
+        }
+    }
+
+    AEKey getWhat() {
+        return this.what;
+    }
+
+    long getTemplateAmount() {
+        return this.amount;
+    }
+
+    private boolean isTopLevelRequestedOutput() {
+        return this.parent == null && this.parentInput == null && this.what.equals(this.job.getOutput());
     }
 }

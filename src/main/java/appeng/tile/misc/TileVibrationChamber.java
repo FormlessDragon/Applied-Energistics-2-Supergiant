@@ -197,7 +197,7 @@ public class TileVibrationChamber extends AENetworkedInvTile implements IGridTic
         }
 
         double speedStep = ticksSinceLastCall * this.getSpeedScalingPerTick();
-        var grid = node.getGrid();
+        var grid = node.grid();
         if (grid == null) {
             return TickRateModulation.IDLE;
         }

@@ -43,7 +43,7 @@ public class ContainerControllerStatus extends AEBaseContainer implements INetwo
         if (this.grid == null) {
             IGridNode node = host.getGridNode(side);
             if (node != null) {
-                this.grid = node.getGrid();
+                this.grid = node.grid();
             }
         }
     }

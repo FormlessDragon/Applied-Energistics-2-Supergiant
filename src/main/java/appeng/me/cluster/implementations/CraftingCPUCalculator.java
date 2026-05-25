@@ -82,7 +82,7 @@ public class CraftingCPUCalculator extends MBCalculator<TileCraftingUnit, Crafti
             var tile = i.next();
             var node = tile.getGridNode();
             if (node != null) {
-                final IGrid grid = node.getGrid();
+                final IGrid grid = node.grid();
                 grid.postEvent(new GridCraftingCpuChange(node));
                 return;
             }

@@ -33,7 +33,7 @@ public class CraftingLinkNexus {
             final boolean hasCpu = craftingService.hasCpu(this.cpu.getCpu());
             var requester = this.getRequest().getRequester();
             var actionableNode = requester == null ? null : requester.getActionableNode();
-            final boolean hasMachine = actionableNode != null && actionableNode.getGrid() == grid;
+            final boolean hasMachine = actionableNode != null && actionableNode.grid() == grid;
 
             if (hasCpu && hasMachine) {
                 this.tickOfDeath = 0;

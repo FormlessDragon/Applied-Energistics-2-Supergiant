@@ -76,7 +76,7 @@ public interface IGridNode {
      * @return The grid this node is a part of.
      * @throws IllegalStateException If the node is being used after being destroyed or before it's initialized.
      */
-    IGrid getGrid();
+    IGrid grid();
 
     /**
      * @return the level the node is located in

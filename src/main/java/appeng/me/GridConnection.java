@@ -225,7 +225,7 @@ public class GridConnection implements IGridConnection, IPathItem {
 
     @Override
     public int getMaxChannels() {
-        var mode = sideB.getGrid().getPathingService().getChannelMode();
+        var mode = sideB.grid().getPathingService().getChannelMode();
         if (mode == ChannelMode.INFINITE) {
             return Integer.MAX_VALUE;
         }

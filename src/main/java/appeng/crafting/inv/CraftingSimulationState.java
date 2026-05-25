@@ -76,6 +76,7 @@ public abstract class CraftingSimulationState implements ICraftingSimulationStat
             state.requiredExtract,
             state.emittedItems,
             calculation.getMissingItems(),
+            calculation.getIntermediateFinalOutputAmount(),
             state.crafts);
     }
 
@@ -144,7 +145,8 @@ public abstract class CraftingSimulationState implements ICraftingSimulationStat
             return Collections.emptyList();
         cacheFuzzy(input);
 
-        return Iterables.transform(modifiableCache.findFuzzy(input, FuzzyMode.IGNORE_ALL),
+        return Iterables.transform(
+            Iterables.filter(modifiableCache.findFuzzy(input, FuzzyMode.IGNORE_ALL), entry -> entry.getLongValue() > 0),
             it.unimi.dsi.fastutil.objects.Object2LongMap.Entry::getKey);
     }
 
@@ -161,6 +163,11 @@ public abstract class CraftingSimulationState implements ICraftingSimulationStat
     @Override
     public void addCrafting(IPatternDetails details, long crafts) {
         this.crafts.merge(details, crafts, Long::sum);
+    }
+
+    public long getOriginalAmount(AEKey what) {
+        cacheFuzzy(what);
+        return this.unmodifiedCache.get(what);
     }
 
     public void ignore(AEKey stack) {

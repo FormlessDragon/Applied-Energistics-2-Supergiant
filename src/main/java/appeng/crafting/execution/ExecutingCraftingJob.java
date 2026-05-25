@@ -26,6 +26,7 @@ import appeng.api.networking.crafting.ICraftingPlan;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
+import appeng.api.stacks.KeyCounter;
 import appeng.crafting.CraftingLink;
 import appeng.crafting.inv.ListCraftingInventory;
 import appeng.me.service.CraftingService;
@@ -45,6 +46,7 @@ public class ExecutingCraftingJob {
     private static final String NBT_WAITING_FOR = "waitingFor";
     private static final String NBT_TIME_TRACKER = "timeTracker";
     private static final String NBT_REMAINING_AMOUNT = "remainingAmount";
+    private static final String NBT_REMAINING_INTERMEDIATE_FINAL_OUTPUT = "remainingIntermediateFinalOutput";
     private static final String NBT_TASKS = "tasks";
     private static final String NBT_SUSPENDED = "suspended";
     private static final String NBT_CRAFTING_PROGRESS = "#craftingProgress";
@@ -58,17 +60,23 @@ public class ExecutingCraftingJob {
     final
     Integer playerId;
     long remainingAmount;
+    long remainingIntermediateFinalOutput;
     boolean suspended;
 
     ExecutingCraftingJob(ICraftingPlan plan, CraftingDifferenceListener postCraftingDifference, CraftingLink link,
-                         @Nullable Integer playerId) {
+                         @Nullable Integer playerId, KeyCounter remainingMissingItems) {
         this.finalOutput = plan.finalOutput();
         this.remainingAmount = this.finalOutput.amount();
+        this.remainingIntermediateFinalOutput = plan.intermediateFinalOutputAmount();
         this.waitingFor = new ListCraftingInventory(postCraftingDifference::onCraftingDifference);
 
         // Fill waiting for and tasks
         this.timeTracker = new ElapsedTimeTracker();
         for (var entry : plan.emittedItems()) {
+            waitingFor.insert(entry.getKey(), entry.getLongValue(), Actionable.MODULATE);
+            timeTracker.addMaxItems(entry.getLongValue(), entry.getKey().getType());
+        }
+        for (var entry : remainingMissingItems) {
             waitingFor.insert(entry.getKey(), entry.getLongValue(), Actionable.MODULATE);
             timeTracker.addMaxItems(entry.getLongValue(), entry.getKey().getType());
         }
@@ -94,6 +102,7 @@ public class ExecutingCraftingJob {
 
         this.finalOutput = GenericStack.readTag(data.getCompoundTag(NBT_FINAL_OUTPUT));
         this.remainingAmount = data.getLong(NBT_REMAINING_AMOUNT);
+        this.remainingIntermediateFinalOutput = data.getLong(NBT_REMAINING_INTERMEDIATE_FINAL_OUTPUT);
         this.waitingFor = new ListCraftingInventory(postCraftingDifference::onCraftingDifference);
         this.waitingFor.readFromNBT(data.getTagList(NBT_WAITING_FOR, Constants.NBT.TAG_COMPOUND));
         this.timeTracker = new ElapsedTimeTracker(data.getCompoundTag(NBT_TIME_TRACKER));
@@ -139,6 +148,7 @@ public class ExecutingCraftingJob {
         data.setTag(NBT_TASKS, list);
 
         data.setLong(NBT_REMAINING_AMOUNT, remainingAmount);
+        data.setLong(NBT_REMAINING_INTERMEDIATE_FINAL_OUTPUT, remainingIntermediateFinalOutput);
         if (this.playerId != null) {
             data.setInteger(NBT_PLAYER_ID, this.playerId);
         }

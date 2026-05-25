@@ -53,6 +53,7 @@ public class NetworkCraftingProviders {
     private final Set<AEKey> emittableKeys = Collections.unmodifiableSet(emitableItems.keySet());
 
     private long lastModifiedOnTick = TickHandler.instance().getCurrentTick();
+    private long nextProviderOrder = 0;
 
     public NetworkCraftingProviders() {
         this.emitableItems.defaultReturnValue(0);
@@ -64,7 +65,7 @@ public class NetworkCraftingProviders {
             if (craftingProviders.containsKey(node)) {
                 throw new IllegalArgumentException("Duplicate crafting provider registration for node " + node);
             }
-            var state = new ProviderState(provider);
+            var state = new ProviderState(provider, nextProviderOrder++);
             state.mount(this);
             craftingProviders.put(node, state);
             setLastModifiedOnTick();
@@ -78,7 +79,7 @@ public class NetworkCraftingProviders {
             }
         }
 
-        var state = new ProviderState(provider);
+        var state = new ProviderState(provider, nextProviderOrder++);
         state.mount(this);
         globalProviders.add(state);
         setLastModifiedOnTick();
@@ -202,12 +203,14 @@ public class NetworkCraftingProviders {
         private final ObjectSet<AEKey> emitableItems;
         private final ObjectList<IPatternDetails> patterns;
         private final int priority;
+        private final long order;
 
-        private ProviderState(ICraftingProvider provider) {
+        private ProviderState(ICraftingProvider provider, long order) {
             this.provider = provider;
             this.emitableItems = new ObjectOpenHashSet<>(provider.getEmitableItems());
             this.patterns = new ObjectArrayList<>(provider.getAvailablePatterns());
             this.priority = provider.getPatternPriority();
+            this.order = order;
         }
 
         private void mount(NetworkCraftingProviders methods) {
@@ -260,7 +263,9 @@ public class NetworkCraftingProviders {
 
         private void sortPatterns() {
             sortedPatterns = patterns.stream()
-                                     .sorted(Comparator.comparingInt((PatternInfo pi) -> pi.state().priority).reversed())
+                                     .sorted(Comparator
+                                         .comparingInt((PatternInfo pi) -> pi.state().priority).reversed()
+                                         .thenComparingLong(pi -> pi.state().order))
                                      .map(PatternInfo::pattern)
                                      .distinct()
                                      .toList();

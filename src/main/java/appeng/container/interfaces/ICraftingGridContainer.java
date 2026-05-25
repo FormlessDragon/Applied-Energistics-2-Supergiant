@@ -52,7 +52,7 @@ public interface ICraftingGridContainer {
         if (node == null) {
             return IEnergySource.empty();
         }
-        return node.getGrid().getEnergyService();
+        return node.grid().getEnergyService();
     }
 
     /**

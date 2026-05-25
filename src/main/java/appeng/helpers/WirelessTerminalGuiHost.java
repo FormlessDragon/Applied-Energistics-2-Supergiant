@@ -168,7 +168,7 @@ public class WirelessTerminalGuiHost<T extends WirelessTerminalItem> extends Ite
         updateConnectedAccessPoint();
         IGridNode node = getActionableNode();
         if (node != null && node.isActive()) {
-            return node.getGrid().getStorageService().getInventory();
+            return node.grid().getStorageService().getInventory();
         }
         return NullInventory.of();
     }
@@ -385,7 +385,7 @@ public class WirelessTerminalGuiHost<T extends WirelessTerminalItem> extends Ite
             return ILinkStatus.ofDisconnected(GuiText.WirelessTerminalBridgeMissing.text());
         }
 
-        IGrid quantumGrid = node.getGrid();
+        IGrid quantumGrid = node.grid();
         if (targetGrid != null && quantumGrid != targetGrid) {
             return ILinkStatus.ofDisconnected(GuiText.WirelessTerminalDifferentNetwork.text());
         }
@@ -442,7 +442,7 @@ public class WirelessTerminalGuiHost<T extends WirelessTerminalItem> extends Ite
             return;
         }
 
-        var energyService = node.getGrid().getEnergyService();
+        var energyService = node.grid().getEnergyService();
         double safePower = energyService.getStoredPower() - energyService.getMaxStoredPower() / 2;
         if (safePower <= 0) {
             return;

@@ -35,7 +35,7 @@ public final class ActionHostEnergySource implements IEnergySource {
         var node = actionHost.getActionableNode();
 
         if (node != null && node.isActive()) {
-            var energyService = node.getGrid().getEnergyService();
+            var energyService = node.grid().getEnergyService();
             return energyService.extractAEPower(amt, mode, usePowerMultiplier);
         }
         return 0.0;

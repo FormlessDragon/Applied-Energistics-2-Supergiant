@@ -41,6 +41,7 @@ public final class AEConfig {
     private boolean blockUpdateLog;
     private boolean chunkLoggerTrace;
     private boolean debugEnergy;
+    private boolean craftingPerformanceLog;
     private boolean showDebugGuiOverlays;
     private boolean useLargeFonts;
     private boolean annihilationPlaneSkyDustGeneration = true;
@@ -125,6 +126,8 @@ public final class AEConfig {
             "Enable stack trace logging for the chunk loading debug command.");
         this.debugEnergy = this.configuration.getBoolean("debugEnergy", "debug", false,
             "Treat every energy grid as if it had a creative energy cell.");
+        this.craftingPerformanceLog = this.configuration.getBoolean("craftingPerformanceLog", "debug", false,
+            "Enable server-side autocrafting performance timing logs.");
         String channelModeName = this.configuration.getString("channels", "general", ChannelMode.DEFAULT.name(),
             "Changes the channel capacity that cables provide in AE2.");
         try {
@@ -314,6 +317,10 @@ public final class AEConfig {
 
     public boolean isDebugEnergyEnabled() {
         return this.debugEnergy;
+    }
+
+    public boolean isCraftingPerformanceLogEnabled() {
+        return this.craftingPerformanceLog;
     }
 
     public double getGridEnergyStoragePerNode() {

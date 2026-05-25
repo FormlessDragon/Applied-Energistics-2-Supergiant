@@ -304,7 +304,7 @@ public class ContainerMEStorage extends AEBaseContainer
         }
 
         if (hostNode != null && hostNode.isActive()) {
-            return hostNode.getGrid().getCraftingService().getCraftables(this::isKeyVisible);
+            return hostNode.grid().getCraftingService().getCraftables(this::isKeyVisible);
         }
         return Collections.emptySet();
     }
@@ -313,7 +313,7 @@ public class ContainerMEStorage extends AEBaseContainer
         IGridNode hostNode = getGridNode();
         IGrid grid = null;
         if (hostNode != null) {
-            grid = hostNode.getGrid();
+            grid = hostNode.grid();
         }
 
         if (grid == null) {
@@ -533,7 +533,7 @@ public class ContainerMEStorage extends AEBaseContainer
         }
 
         IGridNode node = getGridNode();
-        if (node == null || !node.isActive() || !node.getGrid().getCraftingService().isCraftable(what)) {
+        if (node == null || !node.isActive() || !node.grid().getCraftingService().isCraftable(what)) {
             return false;
         }
 

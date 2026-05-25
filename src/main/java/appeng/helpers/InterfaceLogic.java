@@ -160,7 +160,7 @@ public class InterfaceLogic implements ICraftingRequester, IUpgradeableObject, I
     }
 
     protected final boolean isSameGrid(IActionSource src) {
-        var otherGrid = src.machine().map(IActionHost::getActionableNode).map(IGridNode::getGrid).orElse(null);
+        var otherGrid = src.machine().map(IActionHost::getActionableNode).map(IGridNode::grid).orElse(null);
         return otherGrid == mainNode.getGrid();
     }
 

@@ -144,7 +144,7 @@ public class MEP2PTunnelPart extends P2PTunnelPart<MEP2PTunnelPart> implements I
         this.pendingUpdate = ConnectionUpdate.NONE;
 
         IGridNode mainNode = getMainNode().getNode();
-        Object mainGrid = mainNode != null ? mainNode.getGrid() : null;
+        Object mainGrid = mainNode != null ? mainNode.grid() : null;
 
         if (isOutput()) {
             operation = ConnectionUpdate.DISCONNECT;

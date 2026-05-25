@@ -184,7 +184,7 @@ public final class DebugProvider {
         tag.setString(TAG_NODE_NAME, name);
 
         if (node.getService(IGridTickable.class) != null) {
-            var tickManager = (TickManagerService) node.getGrid().getTickManager();
+            var tickManager = (TickManagerService) node.grid().getTickManager();
             var avg = tickManager.getAverageTime(node);
             var max = tickManager.getMaximumTime(node);
             var sum = tickManager.getOverallTime(node);

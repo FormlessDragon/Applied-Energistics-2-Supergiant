@@ -42,6 +42,7 @@ public class AE2Button extends GuiButton {
     private final Runnable onPress;
     private final float alpha = 1.0F;
     private ITextComponent message;
+    private boolean forceHighlighted;
 
     public AE2Button(int x, int y, int width, int height, ITextComponent component, Runnable onPress) {
         super(0, x, y, width, height, "");
@@ -137,7 +138,7 @@ public class AE2Button extends GuiButton {
         if (!this.enabled) {
             color = applyAlpha(0x413f54);
             yOffset = -1;
-        } else if (this.hovered) {
+        } else if (this.hovered || this.forceHighlighted) {
             color = applyAlpha(0x517497);
             yOffset = 0;
         } else {
@@ -163,10 +164,16 @@ public class AE2Button extends GuiButton {
         this.displayString = getMessageComponent().getFormattedText();
     }
 
+    public void setForceHighlighted(boolean forceHighlighted) {
+        this.forceHighlighted = forceHighlighted;
+    }
+
     private Blitter getButtonBlitter() {
         if (!this.enabled) {
-            return Blitter.texture(BUTTON_DISABLED, 200, 20);
-        } else if (this.hovered) {
+            return this.forceHighlighted
+                ? Blitter.texture(BUTTON_HIGHLIGHTED, 200, 20)
+                : Blitter.texture(BUTTON_DISABLED, 200, 20);
+        } else if (this.hovered || this.forceHighlighted) {
             return Blitter.texture(BUTTON_HIGHLIGHTED, 200, 20);
         }
         return Blitter.texture(BUTTON, 200, 20);
@@ -213,4 +220,3 @@ public class AE2Button extends GuiButton {
         }
     }
 }
-

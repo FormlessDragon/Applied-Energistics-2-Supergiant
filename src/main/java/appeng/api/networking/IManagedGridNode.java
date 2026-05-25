@@ -86,7 +86,7 @@ public interface IManagedGridNode {
         if (node == null) {
             return;
         }
-        action.accept(node.getGrid());
+        action.accept(node.grid());
     }
 
     default void ifPresent(BiConsumer<IGrid, IGridNode> action) {
@@ -94,7 +94,7 @@ public interface IManagedGridNode {
         if (node == null) {
             return;
         }
-        action.accept(node.getGrid(), node);
+        action.accept(node.grid(), node);
     }
 
     /**
@@ -108,7 +108,7 @@ public interface IManagedGridNode {
         if (node == null) {
             return null;
         }
-        return node.getGrid();
+        return node.grid();
     }
 
     IManagedGridNode setFlags(GridFlags... flags);

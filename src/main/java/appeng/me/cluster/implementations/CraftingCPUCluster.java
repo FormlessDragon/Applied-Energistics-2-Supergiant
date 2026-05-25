@@ -112,7 +112,7 @@ public final class CraftingCPUCluster implements IAECluster, ICraftingCPU {
             for (TileCraftingUnit tile : this.blockEntities) {
                 final IGridNode node = tile.getActionableNode();
                 if (node != null && !posted) {
-                    node.getGrid().postEvent(new GridCraftingCpuChange(node));
+                    node.grid().postEvent(new GridCraftingCpuChange(node));
                     posted = true;
                 }
 
@@ -199,7 +199,7 @@ public final class CraftingCPUCluster implements IAECluster, ICraftingCPU {
     @Nullable
     public IGrid getGrid() {
         IGridNode node = getNode();
-        return node != null ? node.getGrid() : null;
+        return node != null ? node.grid() : null;
     }
 
     @Override

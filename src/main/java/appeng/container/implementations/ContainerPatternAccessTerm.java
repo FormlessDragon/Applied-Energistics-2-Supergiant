@@ -155,7 +155,7 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
     private IGrid getGrid() {
         appeng.api.networking.IGridNode node = this.host.getGridNode();
         if (node != null && node.isActive()) {
-            return node.getGrid();
+            return node.grid();
         }
         return null;
     }

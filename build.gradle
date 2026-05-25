@@ -244,6 +244,11 @@ sourceSets {
         }
     }
 
+    test {
+        compileClasspath += sourceSets.main.output + sourceSets.stubApi.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.stubApi.output + sourceSets.main.runtimeClasspath
+    }
+
 }
 
 configurations.named('stubApiImplementation').configure {
@@ -256,6 +261,12 @@ configurations.named('stubApiAnnotationProcessor').configure {
     extendsFrom(configurations.annotationProcessor)
 }
 configurations.named('stubApiRuntimeOnly').configure {
+    extendsFrom(configurations.runtimeOnly)
+}
+configurations.named('testCompileOnly').configure {
+    extendsFrom(configurations.compileOnly)
+}
+configurations.named('testRuntimeOnly').configure {
     extendsFrom(configurations.runtimeOnly)
 }
 

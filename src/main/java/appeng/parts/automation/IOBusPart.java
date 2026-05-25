@@ -223,7 +223,7 @@ public abstract class IOBusPart extends UpgradeablePart implements IGridTickable
         // Reset a potential redstone pulse trigger
         this.pendingPulse = false;
 
-        var hasDoneWork = this.doBusWork(node.getGrid());
+        var hasDoneWork = this.doBusWork(node.grid());
 
         // We may be back to sleep (i.e. in pulse mode)
         if (isSleeping()) {

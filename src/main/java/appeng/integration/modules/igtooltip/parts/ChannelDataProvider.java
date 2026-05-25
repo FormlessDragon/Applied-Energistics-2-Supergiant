@@ -49,7 +49,7 @@ public final class ChannelDataProvider
     public void provideServerData(EntityPlayer player, IUsedChannelProvider object, NBTTagCompound serverData) {
         var gridNode = object.getGridNode();
         if (gridNode != null) {
-            var pathingService = (PathingService) gridNode.getGrid().getPathingService();
+            var pathingService = (PathingService) gridNode.grid().getPathingService();
             if (pathingService.getControllerState() == ControllerState.NO_CONTROLLER) {
                 var adHocError = pathingService.getAdHocNetworkError();
                 if (adHocError != null) {

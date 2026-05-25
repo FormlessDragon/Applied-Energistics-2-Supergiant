@@ -18,7 +18,6 @@
 
 package appeng.container.me.crafting;
 
-import appeng.api.config.Actionable;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.crafting.ICraftingPlan;
 import appeng.api.networking.security.IActionSource;
@@ -54,7 +53,7 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
             mapping(plan, used.getKey()).stored += used.getLongValue();
         }
         for (var missing : job.missingItems()) {
-            mapping(plan, missing.getKey()).stored += missing.getLongValue();
+            mapping(plan, missing.getKey()).missing += missing.getLongValue();
         }
         for (var emitted : job.emittedItems()) {
             var entry = mapping(plan, emitted.getKey());
@@ -68,25 +67,29 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
         }
 
         List<CraftingPlanSummaryEntry> entries = new ObjectArrayList<>();
-        var storage = grid.getStorageService().getInventory();
-        var crafting = grid.getCraftingService();
-
+        var cachedInventory = grid.getStorageService().getCachedInventory();
+        var finalOutput = job.finalOutput().what();
         for (var out : plan.entrySet()) {
-            long missingAmount;
-            long storedAmount;
-            if (job.simulation() && !crafting.canEmitFor(out.getKey())) {
-                storedAmount = storage.extract(out.getKey(), out.getValue().stored, Actionable.SIMULATE, actionSource);
-                missingAmount = out.getValue().stored - storedAmount;
-            } else {
-                storedAmount = out.getValue().stored;
-                missingAmount = 0;
-            }
+            long missingAmount = out.getValue().missing;
+            long storedAmount = out.getValue().stored;
             long craftAmount = out.getValue().crafting;
-            entries.add(new CraftingPlanSummaryEntry(out.getKey(), missingAmount, storedAmount, craftAmount));
+            long inventoryAmount = cachedInventory.get(out.getKey());
+            boolean finalOutputEntry = out.getKey().equals(finalOutput);
+            entries.add(new CraftingPlanSummaryEntry(out.getKey(), missingAmount, storedAmount, craftAmount,
+                inventoryAmount, finalOutputEntry));
         }
 
         Collections.sort(entries);
         return new CraftingPlanSummary(job.bytes(), job.simulation(), List.copyOf(entries));
+    }
+
+    public boolean hasMissingEntries() {
+        for (var entry : this.entries) {
+            if (entry.missingAmount() > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static KeyStats mapping(Object2ObjectMap<AEKey, KeyStats> plan, AEKey key) {
@@ -105,6 +108,7 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
 
     private static class KeyStats {
         private long stored;
+        private long missing;
         private long crafting;
     }
 }

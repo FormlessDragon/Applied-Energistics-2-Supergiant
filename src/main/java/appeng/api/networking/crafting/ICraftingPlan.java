@@ -44,7 +44,7 @@ public interface ICraftingPlan {
     long bytes();
 
     /**
-     * True if some things were missing and this is just a simulation.
+     * True if this is a preview plan that cannot be submitted.
      */
     boolean simulation();
 
@@ -65,9 +65,14 @@ public interface ICraftingPlan {
     KeyCounter emittedItems();
 
     /**
-     * List of missing items if this is a simulation.
+     * List of missing items. A submit-capable plan may still carry missing items if it was calculated for forced start.
      */
     KeyCounter missingItems();
+
+    /**
+     * Amount of the final output that must first return to the CPU as an intermediate ingredient.
+     */
+    long intermediateFinalOutputAmount();
 
     /**
      * Map of each pattern to the number of times it needs to be crafted. Can be used to retrieve the crafted items:

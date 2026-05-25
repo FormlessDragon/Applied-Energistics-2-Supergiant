@@ -108,7 +108,7 @@ public class ReplicatorCardItem extends AEBaseItem {
                     IGridNode node = gridHost.getGridNode(sourceSide);
 
                     if (node != null) {
-                        IGrid grid = node.getGrid();
+                        IGrid grid = node.grid();
                         ISpatialService spatialService = grid.getSpatialService();
 
                         if (spatialService.isValidRegion()) {

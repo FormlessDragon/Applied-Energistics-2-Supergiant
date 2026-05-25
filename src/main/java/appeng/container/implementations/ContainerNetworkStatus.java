@@ -64,7 +64,7 @@ public class ContainerNetworkStatus extends AEBaseContainer implements INetworkS
         if (this.grid == null) {
             IGridNode node = host.getGridNode(side);
             if (node != null) {
-                this.grid = node.getGrid();
+                this.grid = node.grid();
             }
         }
     }

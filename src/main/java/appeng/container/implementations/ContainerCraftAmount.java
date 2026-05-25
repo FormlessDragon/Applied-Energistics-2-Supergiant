@@ -107,7 +107,7 @@ public class ContainerCraftAmount extends AEBaseContainer implements ISubGui {
             if (actionHost != null) {
                 IGridNode node = actionHost.getActionableNode();
                 if (node != null) {
-                    IStorageService storage = node.getGrid().getStorageService();
+                    IStorageService storage = node.grid().getStorageService();
                     int existingAmount = (int) Math.min(storage.getCachedInventory().get(this.whatToCraft),
                         Integer.MAX_VALUE);
                     if (existingAmount > amount) {

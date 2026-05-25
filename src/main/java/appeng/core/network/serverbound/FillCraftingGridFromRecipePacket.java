@@ -152,8 +152,8 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
 
         IGridNode node = container.getGridNode();
         if (node != null && container.getLinkStatus().connected()) {
-            craftingService = node.getGrid().getCraftingService();
-            storageService = node.getGrid().getStorageService();
+            craftingService = node.grid().getCraftingService();
+            storageService = node.grid().getStorageService();
             networkStorage = storageService.getInventory();
             cachedStorage = storageService.getCachedInventory();
         } else {

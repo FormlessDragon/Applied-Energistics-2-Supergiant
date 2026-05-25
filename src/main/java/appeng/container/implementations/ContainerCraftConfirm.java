@@ -109,7 +109,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
 
         registerClientAction(ACTION_BACK, this::goBack);
         registerClientAction(ACTION_CYCLE_CPU, Boolean.class, this::cycleSelectedCPU);
-        registerClientAction(ACTION_START_JOB, this::startJob);
+        registerClientAction(ACTION_START_JOB, Boolean.class, this::startJob);
         registerClientAction(ACTION_REPLAN, this::replan);
     }
 
@@ -192,10 +192,22 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         if (this.job != null && this.job.isDone()) {
             try {
                 this.result = this.job.get();
-
-                if (!this.result.simulation() && this.isAutoStart()) {
-                    this.startJob();
+                if (this.result == null) {
+                    this.getPlayerInventory().player.sendMessage(PlayerMessages.CraftingJobError.text(
+                        "Crafting calculation returned no plan."));
+                    AELog.warn("Crafting calculation returned no plan.");
+                    this.setValidContainer(false);
+                    this.job = null;
                     return;
+                }
+
+                if (shouldAutoStart(this.result, this.isAutoStart())) {
+                    this.startJob(false);
+                    return;
+                }
+
+                if (!this.result.missingItems().isEmpty()) {
+                    this.setAutoStart(false);
                 }
 
                 this.plan = CraftingPlanSummary.fromJob(this.getGrid(), this.getActionSrc(), this.result);
@@ -215,7 +227,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     private IGrid getGrid() {
         IActionHost actionHost = (IActionHost) this.getTarget();
         IGridNode node = actionHost.getActionableNode();
-        return node != null ? node.getGrid() : null;
+        return node != null ? node.grid() : null;
     }
 
     private boolean cpuMatches(ICraftingCPU cpu) {
@@ -226,14 +238,21 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     }
 
     public void startJob() {
+        startJob(false);
+    }
+
+    public void startJob(boolean forceStart) {
         clearError();
 
         if (isClientSide()) {
-            sendClientAction(ACTION_START_JOB);
+            sendClientAction(ACTION_START_JOB, forceStart);
             return;
         }
 
         if (this.result != null && !this.result.simulation()) {
+            if (!forceStart && !this.result.missingItems().isEmpty()) {
+                return;
+            }
             IGrid grid = getGrid();
             if (grid == null) {
                 this.setValidContainer(false);
@@ -266,6 +285,10 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
                 this.submitError = new SyncableSubmitResult(submitResult);
             }
         }
+    }
+
+    static boolean shouldAutoStart(ICraftingPlan result, boolean autoStart) {
+        return autoStart && !result.simulation() && result.missingItems().isEmpty();
     }
 
     private IActionSource getActionSrc() {

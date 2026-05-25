@@ -456,7 +456,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
                 IGridNode otherNode = entry.getValue().getOtherSide(node);
                 if (otherNode.getOwner() instanceof PatternProviderLogicHost
                     || (otherNode.getOwner() instanceof InterfaceLogicHost
-                    && otherNode.getGrid().equals(this.mainNode.getGrid()))) {
+                    && otherNode.grid().equals(this.mainNode.getGrid()))) {
                     sides.remove(entry.getKey());
                 }
             }

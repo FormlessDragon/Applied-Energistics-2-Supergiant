@@ -106,7 +106,7 @@ public class StorageLevelEmitterPart extends AbstractLevelEmitterPart
                     long currentTick = TickHandler.instance().getCurrentTick();
                     if (currentTick != lastUpdateTick) {
                         lastUpdateTick = currentTick;
-                        updateReportingValue(getGridNode().getGrid());
+                        updateReportingValue(getGridNode().grid());
                     }
                 }
             }
