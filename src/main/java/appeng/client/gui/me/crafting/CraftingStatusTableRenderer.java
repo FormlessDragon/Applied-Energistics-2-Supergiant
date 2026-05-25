@@ -24,9 +24,14 @@ import appeng.api.stacks.AmountFormat;
 import appeng.api.util.AEColor;
 import appeng.client.gui.AEBaseGui;
 import appeng.container.me.crafting.CraftingStatusEntry;
+import appeng.core.localization.ButtonToolTips;
 import appeng.core.localization.GuiText;
+import appeng.core.localization.Tooltips;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.util.text.Style;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 
 import java.util.List;
 import java.util.Objects;
@@ -77,6 +82,14 @@ public class CraftingStatusTableRenderer extends AbstractTableRenderer<CraftingS
         if (entry.pendingAmount() > 0) {
             lines.add(GuiText.Scheduled.text(
                 what.getType().formatAmount(entry.pendingAmount(), AmountFormat.FULL)));
+        }
+        if (entry.activeAmount() > 0 || entry.pendingAmount() > 0) {
+            lines.add(new TextComponentString("")
+                .appendSibling(Tooltips.of(new TextComponentString("Shift + ")
+                    .setStyle(new Style().setColor(TextFormatting.GRAY))))
+                .appendSibling(Tooltips.of(ButtonToolTips.LeftClick.text()))
+                .appendSibling(Tooltips.of(new TextComponentString(" 定位供应器")
+                    .setStyle(new Style().setColor(TextFormatting.GRAY)))));
         }
         return lines;
     }

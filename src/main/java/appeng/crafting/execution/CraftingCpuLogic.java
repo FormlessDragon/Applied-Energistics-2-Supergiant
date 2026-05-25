@@ -48,6 +48,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Set;
 import java.util.UUID;
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -499,6 +500,18 @@ public class CraftingCpuLogic {
             }
         }
         return count;
+    }
+
+    public List<CraftingSupplierLocation> findSupplierLocations(IGrid grid, AEKey target) {
+        if (this.job == null || target == null) {
+            return List.of();
+        }
+
+        return CraftingSupplierLocator.collectMatchingProviderLocations(
+            grid,
+            target,
+            this.job.tasks.keySet(),
+            details -> ((CraftingService) grid.getCraftingService()).getProviders(details));
     }
 
     /**

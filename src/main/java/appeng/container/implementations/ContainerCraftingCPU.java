@@ -31,7 +31,9 @@ import appeng.container.AEBaseContainer;
 import appeng.container.guisync.GuiSync;
 import appeng.container.me.common.IncrementalUpdateHelper;
 import appeng.container.me.crafting.CraftingStatus;
+import appeng.core.network.clientbound.CraftingSupplierLocationsPacket;
 import appeng.core.network.clientbound.CraftingStatusPacket;
+import appeng.crafting.execution.CraftingSupplierLocation;
 import appeng.me.cluster.implementations.CraftingCPUCluster;
 import appeng.tile.crafting.TileCraftingUnit;
 import appeng.util.NullConfigManager;
@@ -41,6 +43,7 @@ import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurableObject {
@@ -205,6 +208,35 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
     @Nullable
     IGrid getGrid() {
         return this.grid;
+    }
+
+    public void traceSupplierForSerial(long serial) {
+        if (!(this.getPlayer() instanceof net.minecraft.entity.player.EntityPlayerMP player)) {
+            return;
+        }
+        if (this.cpu == null || this.grid == null) {
+            return;
+        }
+
+        var key = this.incrementalUpdateHelper.getBySerial(serial);
+        if (key == null) {
+            return;
+        }
+
+        var logic = this.cpu.craftingLogic;
+        long activeAmount = logic.getWaitingFor(key);
+        long pendingAmount = logic.getPendingOutputs(key);
+        if (activeAmount <= 0 && pendingAmount <= 0) {
+            return;
+        }
+
+        List<CraftingSupplierLocation> locations = logic.findSupplierLocations(this.grid, key);
+        if (locations.isEmpty()) {
+            player.sendStatusMessage(new TextComponentString("未找到可定位供应器"), true);
+            return;
+        }
+
+        sendPacketToClient(new CraftingSupplierLocationsPacket(locations));
     }
 
     @Override

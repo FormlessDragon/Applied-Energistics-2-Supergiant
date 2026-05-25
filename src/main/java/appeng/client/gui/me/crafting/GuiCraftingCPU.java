@@ -31,6 +31,8 @@ import appeng.container.implementations.ContainerCraftingCPU;
 import appeng.container.me.crafting.CraftingStatus;
 import appeng.container.me.crafting.CraftingStatusEntry;
 import appeng.core.localization.GuiText;
+import appeng.core.network.InitNetwork;
+import appeng.core.network.serverbound.TraceCraftingSupplierPacket;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
@@ -40,6 +42,7 @@ import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
@@ -125,6 +128,20 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
             return hovered;
         }
         return super.getStackUnderMouse(mouseX, mouseY);
+    }
+
+    @Override
+    protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (mouseButton == 0 && isShiftKeyDown()) {
+            var hoveredEntry = this.table.getHoveredEntry();
+            if (hoveredEntry != null && (hoveredEntry.activeAmount() > 0 || hoveredEntry.pendingAmount() > 0)) {
+                InitNetwork.sendToServer(new TraceCraftingSupplierPacket(this.container.windowId, hoveredEntry.serial()));
+                this.mc.displayGuiScreen(null);
+                this.mc.setIngameFocus();
+                return;
+            }
+        }
+        super.mouseClicked(mouseX, mouseY, mouseButton);
     }
 
     public void postUpdate(CraftingStatus status) {

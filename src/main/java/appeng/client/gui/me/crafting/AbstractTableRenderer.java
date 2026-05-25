@@ -58,6 +58,8 @@ public abstract class AbstractTableRenderer<T> {
     private StackWithBounds hoveredStack;
     @Nullable
     private List<ITextComponent> hoveredTooltip;
+    @Nullable
+    private T hoveredEntry;
 
     public AbstractTableRenderer(AEBaseGui<?> screen, int x, int y, int rows) {
         this.screen = screen;
@@ -78,6 +80,7 @@ public abstract class AbstractTableRenderer<T> {
                                      .toARGB() & 0xFFFFFF;
         List<ITextComponent> tooltipLines = null;
         StackWithBounds hovered = null;
+        T hoveredTableEntry = null;
 
         for (int row = 0; row < this.rows; row++) {
             for (int col = 0; col < COLS; col++) {
@@ -130,6 +133,7 @@ public abstract class AbstractTableRenderer<T> {
                 if (mouseX >= cellX && mouseX <= cellX + CELL_WIDTH
                     && mouseY >= cellY && mouseY <= cellY + CELL_HEIGHT) {
                     tooltipLines = getEntryTooltip(entry);
+                    hoveredTableEntry = entry;
                     hovered = new StackWithBounds(
                         new GenericStack(entryStack, 0),
                         new Rectangle(screen.getGuiLeft() + cellX, screen.getGuiTop() + cellY, CELL_WIDTH,
@@ -138,8 +142,8 @@ public abstract class AbstractTableRenderer<T> {
             }
         }
         hoveredStack = hovered;
-
         hoveredTooltip = tooltipLines;
+        hoveredEntry = hoveredTableEntry;
     }
 
     @Nullable
@@ -150,6 +154,11 @@ public abstract class AbstractTableRenderer<T> {
     @Nullable
     public List<ITextComponent> getHoveredTooltip() {
         return hoveredTooltip;
+    }
+
+    @Nullable
+    public T getHoveredEntry() {
+        return hoveredEntry;
     }
 
     public int getScrollableRows(int size) {

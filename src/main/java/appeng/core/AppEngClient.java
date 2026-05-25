@@ -32,6 +32,7 @@ import appeng.client.render.effects.ParticleTypes;
 import appeng.client.render.model.UVLModelLoader;
 import appeng.client.render.overlay.MeteoriteCompassBeaconRenderer;
 import appeng.client.render.overlay.OverlayManager;
+import appeng.client.render.overlay.CraftingSupplierHighlightHandler;
 import appeng.client.render.tesr.ChargerTESR;
 import appeng.client.render.tesr.CrankRenderer;
 import appeng.client.render.tesr.DriveLedTESR;
@@ -139,6 +140,7 @@ public final class AppEngClient extends AppEngServer {
         MinecraftForge.EVENT_BUS.register(new WirelessUniversalTerminalClientHandler());
         MinecraftForge.EVENT_BUS.register(new MeteoriteCompassBeaconRenderer());
         MinecraftForge.EVENT_BUS.register(OverlayManager.getInstance());
+        MinecraftForge.EVENT_BUS.register(CraftingSupplierHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(StackTooltipRenderer.INSTANCE);
         Integrations.hei().registerClientFeatures();
     }
