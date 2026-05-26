@@ -77,7 +77,8 @@ public abstract class CraftingSimulationState implements ICraftingSimulationStat
             state.emittedItems,
             calculation.getMissingItems(),
             calculation.getIntermediateFinalOutputAmount(),
-            state.crafts);
+            state.crafts,
+            calculation.getTree());
     }
 
     protected abstract long simulateExtractParent(AEKey what);

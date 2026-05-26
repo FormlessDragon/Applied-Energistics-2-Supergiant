@@ -3,6 +3,8 @@ package appeng.core.gui;
 import appeng.api.implementations.guiobjects.IGuiItem;
 import appeng.api.implementations.guiobjects.IPortableTerminal;
 import appeng.api.implementations.guiobjects.ItemGuiHost;
+import appeng.api.storage.ITerminalHost;
+import appeng.client.ctl.gui.GuiCraftingTree;
 import appeng.client.gui.implementations.GuiCellWorkbench;
 import appeng.client.gui.implementations.GuiCondenser;
 import appeng.client.gui.implementations.GuiDrive;
@@ -37,7 +39,9 @@ import appeng.container.AEBaseContainer;
 import appeng.container.GuiIds;
 import appeng.container.implementations.ContainerCellWorkbench;
 import appeng.container.implementations.ContainerCondenser;
+import appeng.container.implementations.ContainerCraftConfirm;
 import appeng.container.implementations.ContainerCraftingCPU;
+import appeng.container.implementations.ContainerCraftingTree;
 import appeng.container.implementations.ContainerDrive;
 import appeng.container.implementations.ContainerEnergyLevelEmitter;
 import appeng.container.implementations.ContainerFormationPlane;
@@ -308,6 +312,14 @@ public class AEGuiHandler implements IGuiHandler {
                         te, ID);
                 }
             }
+            case CRAFTING_TREE -> {
+                if (player.openContainer instanceof ContainerCraftConfirm confirm
+                    && confirm.getTarget() instanceof ITerminalHost terminalHost) {
+                    ContainerCraftingTree container = new ContainerCraftingTree(player.inventory, terminalHost);
+                    container.setLocator(confirm.getLocator());
+                    return container;
+                }
+            }
             case IMPORT_BUS -> {
                 return createPartContainer(player, partLocator(x, y, z), ID, ImportBusPart.class,
                     host -> new ContainerIOBus(player.inventory, host));
@@ -555,6 +567,14 @@ public class AEGuiHandler implements IGuiHandler {
                         craftingUnit), te, ID);
                     return new GuiCraftingCPU<>(container, player.inventory, null,
                         GuiStyleManager.loadStyleDoc("/screens/crafting_cpu.json"));
+                }
+            }
+            case CRAFTING_TREE -> {
+                if (player.openContainer instanceof ContainerCraftConfirm confirm
+                    && confirm.getTarget() instanceof ITerminalHost terminalHost) {
+                    ContainerCraftingTree container = new ContainerCraftingTree(player.inventory, terminalHost);
+                    container.setLocator(confirm.getLocator());
+                    return new GuiCraftingTree(container, player.inventory);
                 }
             }
             case IMPORT_BUS -> {

@@ -28,9 +28,10 @@ public record CraftingPlan(GenericStack finalOutput,
                            long bytes,
                            boolean simulation,
                            boolean multiplePaths,
-                            KeyCounter usedItems,
-                            KeyCounter emittedItems,
-                            KeyCounter missingItems,
-                            long intermediateFinalOutputAmount,
-                            Object2LongMap<IPatternDetails> patternTimes) implements ICraftingPlan {
+                           KeyCounter usedItems,
+                           KeyCounter emittedItems,
+                           KeyCounter missingItems,
+                           long intermediateFinalOutputAmount,
+                           Object2LongMap<IPatternDetails> patternTimes,
+                           CraftingTreeNode tree) implements ICraftingPlan {
 }

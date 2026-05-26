@@ -35,6 +35,7 @@ The build output is written to `build/libs`.
 
 * [Lapis256/AE2ToggleableViewCell](https://github.com/Lapis256/AE2ToggleableViewCell/tree/1.21.1): integrated the toggleable view cell feature with partial code reuse under the MIT License.
 * [Mari023/AE2WirelessTerminalLibrary](https://github.com/Mari023/AE2WirelessTerminalLibrary): integrated AE2WTL wireless terminal behavior with partial code reuse under the MIT License; textures follow upstream notices.
+* [NovaEngineering-Source/AE2CT-Legacy](https://github.com/NovaEngineering-Source/AE2CT-Legacy): integrated AE2CT-Legacy under the LGPL-3.0 Licenses.
 
 ## License
 

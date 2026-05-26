@@ -3,6 +3,7 @@ package appeng.integration.modules.hei;
 import appeng.api.stacks.GenericStack;
 import mezz.jei.bookmarks.BookmarkGroup;
 import mezz.jei.bookmarks.BookmarkItem;
+import mezz.jei.config.Config;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.Color;
@@ -17,6 +18,10 @@ final class AEMissingBookmarkGroup extends BookmarkGroup {
             Object ingredient = GenericIngredientHelper.stackToIngredient(stack);
             if (ingredient == null) {
                 continue;
+            }
+
+            if (!Config.isBookmarkOverlayEnabled()) {
+                Config.toggleBookmarkEnabled();
             }
 
             BookmarkItem<Object> bookmarkItem = new BookmarkItem<>(ingredient);

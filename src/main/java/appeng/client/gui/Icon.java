@@ -187,6 +187,8 @@ public final class Icon {
     public static final Icon S_TERMINAL = registerBuiltin("s_terminal", 10, 10);
     public static final Icon S_MACHINE = registerBuiltin("s_machine", 10, 10);
 
+    public static final Icon CTL_CRAFT_TREE = registerBuiltin("craft_tree", 13, 14);
+
     public final int width;
     public final int height;
     private final ResourceLocation id;

@@ -327,4 +327,12 @@ public class CraftingTreeProcess {
     private record Preview(CraftingSimulationState parent, ChildCraftingSimulationState state, long times,
                            long intermediateFinalOutputAmount, KeyCounter recursiveMissingSeeds) {
     }
+
+    public IPatternDetails getDetails() {
+        return this.details;
+    }
+
+    public Object2LongLinkedOpenHashMap<CraftingTreeNode> getNodes() {
+        return nodes;
+    }
 }

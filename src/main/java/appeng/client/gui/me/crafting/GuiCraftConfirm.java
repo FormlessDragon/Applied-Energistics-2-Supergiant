@@ -20,14 +20,18 @@ package appeng.client.gui.me.crafting;
 
 import appeng.api.stacks.GenericStack;
 import appeng.client.gui.AEBaseGui;
+import appeng.client.gui.Icon;
 import appeng.client.gui.StackWithBounds;
 import appeng.client.gui.style.GuiStyle;
 import appeng.client.gui.widgets.AE2Button;
 import appeng.client.gui.widgets.Scrollbar;
+import appeng.client.gui.widgets.TabButton;
 import appeng.container.implementations.ContainerCraftConfirm;
 import appeng.container.me.crafting.CraftingPlanSummary;
 import appeng.container.me.crafting.CraftingPlanSummaryEntry;
 import appeng.core.localization.GuiText;
+import appeng.core.network.InitNetwork;
+import appeng.core.network.serverbound.SwitchCraftingTreePacket;
 import appeng.integration.Integrations;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -51,6 +55,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
     private final AE2Button bookmarkMissing;
     private final AE2Button selectCPU;
     private final AE2Button cancel;
+    private final TabButton craftTree;
     private final Scrollbar scrollbar;
 
     public GuiCraftConfirm(ContainerCraftConfirm container, InventoryPlayer playerInventory, ITextComponent title,
@@ -71,6 +76,9 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
         this.selectCPU.enabled = false;
 
         this.cancel = widgets.addButton("cancel", GuiText.Cancel.text(), container::goBack);
+
+        this.craftTree = new TabButton(Icon.CTL_CRAFT_TREE, GuiText.CraftTree.text(), this::showCraftingTree);
+        widgets.add("craftTree", this.craftTree);
 
         if (title != null) {
             setTextContent(TEXT_ID_DIALOG_TITLE, title);
@@ -209,5 +217,9 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
         }
 
         Integrations.hei().addBookmarkGroup(missingStacks);
+    }
+
+    private void showCraftingTree() {
+        InitNetwork.sendToServer(new SwitchCraftingTreePacket());
     }
 }

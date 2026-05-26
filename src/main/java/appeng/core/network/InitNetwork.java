@@ -11,6 +11,7 @@ import appeng.core.network.clientbound.CraftConfirmPlanPacket;
 import appeng.core.network.clientbound.CraftingJobStatusPacket;
 import appeng.core.network.clientbound.CraftingSupplierLocationsPacket;
 import appeng.core.network.clientbound.CraftingStatusPacket;
+import appeng.core.network.clientbound.CraftingTreeDataPacket;
 import appeng.core.network.clientbound.ExportedGridContent;
 import appeng.core.network.clientbound.GuiDataSyncPacket;
 import appeng.core.network.clientbound.ItemTransitionEffectPacket;
@@ -40,6 +41,7 @@ import appeng.core.network.serverbound.RequestClosestMeteoritePacket;
 import appeng.core.network.serverbound.SelectKeyTypePacket;
 import appeng.core.network.serverbound.SelectWirelessTerminalPacket;
 import appeng.core.network.serverbound.SwapSlotsPacket;
+import appeng.core.network.serverbound.SwitchCraftingTreePacket;
 import appeng.core.network.serverbound.SwitchGuisPacket;
 import appeng.core.network.serverbound.TraceCraftingSupplierPacket;
 import appeng.core.network.serverbound.UpdateHoldingCtrlPacket;
@@ -89,6 +91,7 @@ public final class InitNetwork {
         registerClientbound(AppEngPayloadHandler.Client.class, PatternAccessTerminalPacket.class);
         registerClientbound(AppEngPayloadHandler.Client.class, RestorePreviousGuiPacket.class);
         registerClientbound(AppEngPayloadHandler.Client.class, SetLinkStatusPacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, CraftingTreeDataPacket.class);
         CHANNEL.registerMessage(ConfigValuePacket.ClientHandler.class, ConfigValuePacket.class, nextPacketId++, Side.CLIENT);
         registerServerbound(AppEngPayloadHandler.Server.class, ColorApplicatorSelectColorPacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, CableBusPartLeftClickPacket.class);
@@ -112,6 +115,7 @@ public final class InitNetwork {
         registerServerbound(AppEngPayloadHandler.Server.class, UpdateHoldingCtrlPacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, WirelessTerminalPickBlockPacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, WirelessTerminalSettingsPacket.class);
+        registerServerbound(AppEngPayloadHandler.Server.class, SwitchCraftingTreePacket.class);
         CHANNEL.registerMessage(ConfigValuePacket.ServerHandler.class, ConfigValuePacket.class, nextPacketId++, Side.SERVER);
     }
 
