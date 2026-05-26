@@ -67,7 +67,8 @@ public final class GuiIds {
         CRAFTING_STATUS,
         SET_STOCK_AMOUNT,
         PRIORITY,
-        BASIC_CELL_CHEST;
+        BASIC_CELL_CHEST,
+        CRAFTING_TREE;
 
         public static @NotNull GuiKey fromId(int guiId) {
             int baseGuiId = getBaseGuiId(guiId);

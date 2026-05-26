@@ -531,8 +531,20 @@ public class CraftingTreeNode {
         }
     }
 
-    AEKey getWhat() {
+    public List<CraftingTreeProcess> getNodes() {
+        return this.nodes;
+    }
+
+    public AEKey getWhat() {
         return this.what;
+    }
+
+    public long getAmount() {
+        return this.amount;
+    }
+
+    public long getMissing() {
+        return job.getMissingItems().get(what);
     }
 
     long getTemplateAmount() {

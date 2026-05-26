@@ -479,4 +479,9 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         }
 
     }
+
+    @Nullable
+    public ICraftingPlan getResult() {
+        return this.result;
+    }
 }

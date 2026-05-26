@@ -602,6 +602,20 @@ gui.ae2.With=使用
 gui.ae2.Yellow=黄色
 gui.ae2.Yes=是
 
+# AE2CTL
+gui.ae2.CraftTree=查看合成树
+gui.crafting_tree.title=合成树预览
+gui.crafting_tree.sub_node_missing=§c材料不足。§f
+gui.crafting_tree.missing=§c缺失：§e%s§f
+gui.crafting_tree.screenshot=截图合成树§c（未实装）§f
+gui.crafting_tree.missing_only=单击只显示缺失材料的节点。
+gui.crafting_tree.default=单击返回默认视图。
+gui.crafting_tree.back=返回
+gui.crafting_tree.rendered_nodes=已渲染节点：%s / %s
+gui.crafting_tree.tip.0=单击节点以选中。
+gui.crafting_tree.tip.1=单击空白处取消选中，使用 ↑ ↓ ← → 键在选中的节点间移动。
+gui.crafting_tree.tip.2=按住 CTRL 时，只在缺失物品的节点间移动（仅限 ← → 键）。
+
 # GUI Tooltips
 gui.tooltips.ae2.ActiveOnPulse=遇红石脉冲时激活
 gui.tooltips.ae2.ActiveWithoutSignal=无红石信号时激活

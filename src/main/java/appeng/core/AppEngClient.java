@@ -22,6 +22,7 @@ import appeng.api.parts.CableRenderMode;
 import appeng.client.EffectType;
 import appeng.client.Hotkeys;
 import appeng.client.commands.ClientCommands;
+import appeng.client.ctl.handler.ClientTickHandler;
 import appeng.client.gui.StackTooltipRenderer;
 import appeng.client.gui.me.common.PendingCraftingJobs;
 import appeng.client.gui.me.common.PinnedKeys;
@@ -125,6 +126,7 @@ public final class AppEngClient extends AppEngServer {
         ClientRegistry.bindTileEntitySpecialRenderer(TileCrank.class, new CrankRenderer());
         ClientRegistry.bindTileEntitySpecialRenderer(TileMolecularAssembler.class, new MolecularAssemblerTESR());
         ClientRegistry.bindTileEntitySpecialRenderer(TileSkyStoneTank.class, new SkyStoneTankBlockEntityRenderer());
+        MinecraftForge.EVENT_BUS.register(ClientTickHandler.class);
         MinecraftForge.EVENT_BUS.register(this);
     }
 

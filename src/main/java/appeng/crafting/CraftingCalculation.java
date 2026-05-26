@@ -711,6 +711,10 @@ public class CraftingCalculation {
         return missing;
     }
 
+    public CraftingTreeNode getTree() {
+        return tree;
+    }
+
     public long getIntermediateFinalOutputAmount() {
         return intermediateFinalOutputAmount;
     }

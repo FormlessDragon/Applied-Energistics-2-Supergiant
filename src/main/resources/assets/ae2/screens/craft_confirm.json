@@ -49,6 +49,13 @@
       "bottom": 25,
       "width": 50,
       "height": 20
+    },
+    "craftTree": {
+      "left": 214,
+      "top": -5,
+      "hideEdge": false,
+      "width": 20,
+      "height": 20
     }
   }
 }

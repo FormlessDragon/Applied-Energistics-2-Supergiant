@@ -602,6 +602,20 @@ gui.ae2.With=with
 gui.ae2.Yellow=Yellow
 gui.ae2.Yes=Yes
 
+# AE2CTL
+gui.ae2.CraftTree=View Crafting Tree
+gui.crafting_tree.title=Crafting Tree Preview
+gui.crafting_tree.sub_node_missing=§cIngredients Insufficient.§f
+gui.crafting_tree.missing=§cMissing: §e%s§f
+gui.crafting_tree.screenshot=Screenshot Crafting Tree §c(Not Implemented)§f
+gui.crafting_tree.missing_only=Click to display only nodes with missing materials.
+gui.crafting_tree.default=Click to return to default view.
+gui.crafting_tree.back=Back
+gui.crafting_tree.rendered_nodes=Rendered Nodes: %s / %s
+gui.crafting_tree.tip.0=Click a node to select it.
+gui.crafting_tree.tip.1=Click empty space to deselect, use arrow keys to navigate.
+gui.crafting_tree.tip.2=Hold CTRL to move between missing items (← → Only).
+
 # GUI Tooltips
 gui.tooltips.ae2.ActiveOnPulse=Activate once per pulse
 gui.tooltips.ae2.ActiveWithoutSignal=Active without signal

@@ -205,7 +205,8 @@ public enum GuiText implements LocalizationEnum {
     TankBucketCapacity,
     With,
     IncompatibleWithCell,
-    CantFitInsideStorageCell;
+    CantFitInsideStorageCell,
+    CraftTree;
 
     private final String translationKey;
 
