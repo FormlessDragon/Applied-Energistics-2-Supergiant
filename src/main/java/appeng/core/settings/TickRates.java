@@ -23,6 +23,7 @@ public enum TickRates {
     Interface(5, 120),
     ImportBus(5, 40),
     ExportBus(5, 60),
+    FormationPlane(5, 60),
     AnnihilationPlane(2, 120),
     METunnel(5, 20),
     Inscriber(1, 20),

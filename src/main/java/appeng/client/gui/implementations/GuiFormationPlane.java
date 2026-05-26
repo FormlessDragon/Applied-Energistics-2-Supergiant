@@ -19,6 +19,7 @@
 package appeng.client.gui.implementations;
 
 import appeng.api.config.FuzzyMode;
+import appeng.api.config.FormationPlaneMode;
 import appeng.api.config.Settings;
 import appeng.api.config.YesNo;
 import appeng.client.gui.style.GuiStyle;
@@ -31,12 +32,15 @@ import net.minecraft.util.text.ITextComponent;
 public class GuiFormationPlane extends GuiUpgradeable<ContainerFormationPlane> {
 
     private final SettingToggleButton<FuzzyMode> fuzzyMode;
+    private final SettingToggleButton<FormationPlaneMode> formationPlaneMode;
     private final SettingToggleButton<YesNo> placeMode;
 
     public GuiFormationPlane(ContainerFormationPlane container, InventoryPlayer playerInventory, ITextComponent title,
                              GuiStyle style) {
         super(container, playerInventory, title, style);
 
+        this.formationPlaneMode = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.FORMATION_PLANE_MODE,
+            FormationPlaneMode.PASSIVE));
         this.placeMode = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.PLACE_BLOCK, YesNo.YES));
         this.fuzzyMode = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.FUZZY_MODE, FuzzyMode.IGNORE_ALL));
 
@@ -49,6 +53,7 @@ public class GuiFormationPlane extends GuiUpgradeable<ContainerFormationPlane> {
 
         this.fuzzyMode.set(container.getFuzzyMode());
         this.fuzzyMode.setVisibility(container.supportsFuzzyMode());
+        this.formationPlaneMode.set(container.getFormationPlaneMode());
         this.placeMode.set(container.getPlaceMode());
     }
 }
