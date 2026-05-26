@@ -73,7 +73,10 @@ import java.util.Objects;
  * <p>
  * Note that a client will still have zero or more embedded servers (although only one at a time).
  */
-@Mod(modid = Tags.MOD_ID, name = Tags.MOD_NAME, version = Tags.VERSION, acceptedMinecraftVersions = "[1.12.2]")
+@Mod(modid = Tags.MOD_ID, name = Tags.MOD_NAME, version = Tags.VERSION, acceptedMinecraftVersions = "[1.12.2]",
+    dependencies = "after:jei@[4.30.3,);" +
+        "before:bogosorter"
+)
 public final class AppEngBase implements AppEng {
 
     private static final String CLIENT_PROXY = "appeng.core.AppEngClient";
