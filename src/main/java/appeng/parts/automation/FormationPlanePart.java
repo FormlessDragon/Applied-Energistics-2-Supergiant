@@ -20,13 +20,18 @@ package appeng.parts.automation;
 
 import appeng.api.behaviors.PlacementStrategy;
 import appeng.api.config.Actionable;
+import appeng.api.config.FormationPlaneMode;
 import appeng.api.config.FuzzyMode;
 import appeng.api.config.IncludeExclude;
 import appeng.api.config.Setting;
 import appeng.api.config.Settings;
 import appeng.api.config.YesNo;
+import appeng.api.networking.IGridNode;
 import appeng.api.networking.IGridNodeListener;
 import appeng.api.networking.security.IActionSource;
+import appeng.api.networking.ticking.IGridTickable;
+import appeng.api.networking.ticking.TickRateModulation;
+import appeng.api.networking.ticking.TickingRequest;
 import appeng.api.parts.IPartCollisionHelper;
 import appeng.api.parts.IPartItem;
 import appeng.api.parts.IPartModel;
@@ -35,6 +40,7 @@ import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.IStorageMounts;
 import appeng.api.storage.IStorageProvider;
 import appeng.api.storage.MEStorage;
+import appeng.api.storage.StorageHelper;
 import appeng.api.util.AECableType;
 import appeng.api.util.IConfigManager;
 import appeng.api.util.IConfigManagerBuilder;
@@ -42,11 +48,14 @@ import appeng.container.GuiIds;
 import appeng.container.ISubGui;
 import appeng.core.definitions.AEItems;
 import appeng.core.gui.GuiOpener;
+import appeng.core.settings.TickRates;
 import appeng.helpers.IConfigInvHost;
 import appeng.helpers.IPriorityHost;
 import appeng.items.parts.PartModels;
+import appeng.me.helpers.MachineSource;
 import appeng.text.TextComponentItemStack;
 import appeng.util.ConfigInventory;
+import appeng.util.Platform;
 import appeng.util.prioritylist.DefaultPriorityList;
 import appeng.util.prioritylist.FuzzyPriorityList;
 import appeng.util.prioritylist.IPartitionList;
@@ -62,16 +71,22 @@ import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.WorldServer;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-public class FormationPlanePart extends UpgradeablePart implements IStorageProvider, IPriorityHost, IConfigInvHost {
+public class FormationPlanePart extends UpgradeablePart
+    implements IStorageProvider, IPriorityHost, IConfigInvHost, IGridTickable {
 
     private static final PlaneModels MODELS = new PlaneModels("part/formation_plane",
         "part/formation_plane_on");
+    private static final int ACTIVE_OPERATIONS_PER_TICK = 1;
+    private static final Logger LOG = LoggerFactory.getLogger(FormationPlanePart.class);
     private final PlaneConnectionHelper connectionHelper = new PlaneConnectionHelper(this);
     private final MEStorage inventory = new InWorldStorage();
     private final ConfigInventory config;
+    private final IActionSource source;
     private boolean wasOnline = false;
     private int priority = 0;
     @Nullable
@@ -82,6 +97,8 @@ public class FormationPlanePart extends UpgradeablePart implements IStorageProvi
     public FormationPlanePart(IPartItem<?> partItem) {
         super(partItem);
         getMainNode().addService(IStorageProvider.class, this);
+        getMainNode().addService(IGridTickable.class, this);
+        this.source = new MachineSource(this);
         this.config = ConfigInventory.configTypes(63)
                                      .supportedTypes(StackWorldBehaviors.withPlacementStrategy())
                                      .changeListener(this::updateFilter)
@@ -97,6 +114,7 @@ public class FormationPlanePart extends UpgradeablePart implements IStorageProvi
     protected void registerSettings(IConfigManagerBuilder builder) {
         super.registerSettings(builder);
         builder.registerSetting(Settings.PLACE_BLOCK, YesNo.YES);
+        builder.registerSetting(Settings.FORMATION_PLANE_MODE, FormationPlaneMode.PASSIVE);
         builder.registerSetting(Settings.FUZZY_MODE, FuzzyMode.IGNORE_ALL);
     }
 
@@ -137,10 +155,28 @@ public class FormationPlanePart extends UpgradeablePart implements IStorageProvi
     @Override
     public void onSettingChanged(IConfigManager manager, Setting<?> setting) {
         this.getHost().markForSave();
+        if (setting == Settings.FORMATION_PLANE_MODE) {
+            this.remountStorage();
+        }
+        updateTickingState();
     }
 
     private void remountStorage() {
         IStorageProvider.requestUpdate(getMainNode());
+    }
+
+    private boolean isActiveMode() {
+        return getConfigManager().getSetting(Settings.FORMATION_PLANE_MODE) == FormationPlaneMode.ACTIVE;
+    }
+
+    private void updateTickingState() {
+        getMainNode().ifPresent((grid, node) -> {
+            if (isActiveMode()) {
+                grid.getTickManager().wakeDevice(node);
+            } else {
+                grid.getTickManager().sleepDevice(node);
+            }
+        });
     }
 
     @Override
@@ -150,6 +186,7 @@ public class FormationPlanePart extends UpgradeablePart implements IStorageProvi
         if (this.wasOnline != currentOnline) {
             this.wasOnline = currentOnline;
             this.remountStorage();
+            this.updateTickingState();
             this.getHost().markForUpdate();
         }
     }
@@ -235,7 +272,7 @@ public class FormationPlanePart extends UpgradeablePart implements IStorageProvi
 
     @Override
     public void mountInventories(IStorageMounts mounts) {
-        if (getMainNode().isOnline()) {
+        if (getMainNode().isOnline() && !isActiveMode()) {
             // Update the filter at least once before registering the inventory
             updateFilter();
             mounts.mount(inventory, priority);
@@ -316,13 +353,88 @@ public class FormationPlanePart extends UpgradeablePart implements IStorageProvi
         return getConnections();
     }
 
+    @Override
+    public TickingRequest getTickingRequest(IGridNode node) {
+        return new TickingRequest(TickRates.FormationPlane, !isActiveMode());
+    }
+
+    @Override
+    public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
+        if (!isActiveMode()) {
+            return TickRateModulation.SLEEP;
+        }
+
+        if (!getMainNode().isActive() || !canPlaceInTargetChunk()) {
+            return TickRateModulation.IDLE;
+        }
+
+        return doActivePlacement(node) ? TickRateModulation.FASTER : TickRateModulation.SLOWER;
+    }
+
+    private boolean canPlaceInTargetChunk() {
+        var self = this.getHost().getTileEntity();
+        var targetPos = self.getPos().offset(getSide());
+        return Platform.areBlockEntitiesTicking(self.getWorld(), targetPos);
+    }
+
+    private boolean doActivePlacement(IGridNode node) {
+        updateFilter();
+
+        var storageService = node.grid().getStorageService();
+        var cachedInventory = storageService.getCachedInventory();
+
+        for (var entry : cachedInventory) {
+            var what = entry.getKey();
+            if (!matchesFilter(what)) {
+                continue;
+            }
+
+            var amount = Math.min(entry.getLongValue(),
+                (long) ACTIVE_OPERATIONS_PER_TICK * what.getAmountPerOperation());
+            var placeable = placeInWorld(what, amount, Actionable.SIMULATE);
+            if (placeable <= 0) {
+                continue;
+            }
+
+            var extracted = StorageHelper.poweredExtraction(
+                node.grid().getEnergyService(),
+                storageService.getInventory(),
+                what,
+                placeable,
+                source,
+                Actionable.MODULATE);
+            if (extracted <= 0) {
+                continue;
+            }
+
+            var placed = placeInWorld(what, extracted, Actionable.MODULATE);
+            if (placed < extracted) {
+                var leftover = extracted - placed;
+                leftover -= storageService.getInventory().insert(what, leftover, Actionable.MODULATE, source);
+                if (leftover > 0) {
+                    LOG.error("Formation plane active placement unexpectedly failed to return {}x{}", leftover, what);
+                }
+            }
+
+            if (placed > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean matchesFilter(AEKey what) {
+        return filter == null || filter.matchesFilter(what, filterMode);
+    }
+
     /**
      * Models the block adjacent to this formation plane as storage.
      */
     class InWorldStorage implements MEStorage {
         @Override
         public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
-            if (filter != null && !filter.matchesFilter(what, filterMode)) {
+            if (!matchesFilter(what)) {
                 return 0;
             }
 

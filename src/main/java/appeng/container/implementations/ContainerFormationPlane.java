@@ -18,6 +18,7 @@
 
 package appeng.container.implementations;
 
+import appeng.api.config.FormationPlaneMode;
 import appeng.api.config.Settings;
 import appeng.api.config.YesNo;
 import appeng.api.stacks.AEKey;
@@ -31,6 +32,8 @@ public class ContainerFormationPlane extends UpgradeableContainer<FormationPlane
 
     @GuiSync(7)
     public YesNo placeMode;
+    @GuiSync(8)
+    public FormationPlaneMode formationPlaneMode;
 
     public ContainerFormationPlane( InventoryPlayer ip, FormationPlanePart host) {
         super(ip, host);
@@ -47,6 +50,7 @@ public class ContainerFormationPlane extends UpgradeableContainer<FormationPlane
             this.setFuzzyMode(cm.getSetting(Settings.FUZZY_MODE));
         }
         this.setPlaceMode(cm.getSetting(Settings.PLACE_BLOCK));
+        this.setFormationPlaneMode(cm.getSetting(Settings.FORMATION_PLANE_MODE));
     }
 
     @Override
@@ -61,6 +65,14 @@ public class ContainerFormationPlane extends UpgradeableContainer<FormationPlane
 
     private void setPlaceMode(YesNo placeMode) {
         this.placeMode = placeMode;
+    }
+
+    public FormationPlaneMode getFormationPlaneMode() {
+        return this.formationPlaneMode;
+    }
+
+    private void setFormationPlaneMode(FormationPlaneMode formationPlaneMode) {
+        this.formationPlaneMode = formationPlaneMode;
     }
 
     public boolean supportsFuzzyMode() {

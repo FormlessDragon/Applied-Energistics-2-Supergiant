@@ -22,6 +22,7 @@ import appeng.api.config.AccessRestriction;
 import appeng.api.config.BlockingMode;
 import appeng.api.config.CondenserOutput;
 import appeng.api.config.CpuSelectionMode;
+import appeng.api.config.FormationPlaneMode;
 import appeng.api.config.FullnessMode;
 import appeng.api.config.FuzzyMode;
 import appeng.api.config.InscriberInputCapacity;
@@ -250,6 +251,11 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
                 ButtonToolTips.BlockPlacement, ButtonToolTips.BlockPlacementYes);
             registerApp(Icon.PLACEMENT_ITEM, Settings.PLACE_BLOCK, YesNo.NO,
                 ButtonToolTips.BlockPlacement, ButtonToolTips.BlockPlacementNo);
+
+            registerApp(Icon.AUTO_EXPORT_OFF, Settings.FORMATION_PLANE_MODE, FormationPlaneMode.PASSIVE,
+                ButtonToolTips.FormationPlaneMode, ButtonToolTips.FormationPlanePassive);
+            registerApp(Icon.AUTO_EXPORT_ON, Settings.FORMATION_PLANE_MODE, FormationPlaneMode.ACTIVE,
+                ButtonToolTips.FormationPlaneMode, ButtonToolTips.FormationPlaneActive);
 
             registerApp(Icon.SCHEDULING_DEFAULT, Settings.SCHEDULING_MODE, SchedulingMode.DEFAULT,
                 ButtonToolTips.SchedulingMode, ButtonToolTips.SchedulingModeDefault);
