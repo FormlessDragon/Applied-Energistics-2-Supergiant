@@ -47,6 +47,11 @@ public abstract class CraftingSimulationState implements ICraftingSimulationStat
      * List of items to emit.
      */
     private final KeyCounter emittedItems;
+    /**
+     * Virtual outputs produced by pseudo patterns during planning. They may satisfy later pseudo-pattern inputs, but do
+     * not count as real simulated inventory or as network extraction requirements.
+     */
+    private final KeyCounter pseudoItems;
     private final Object2LongMap<IPatternDetails> crafts = new Object2LongOpenHashMap<>();
     /**
      * Minimum amount of each item that needs to be extracted from the network. This is the maximum of (unmodified -
@@ -62,6 +67,7 @@ public abstract class CraftingSimulationState implements ICraftingSimulationStat
         this.unmodifiedCache = new KeyCounter();
         this.modifiableCache = new KeyCounter();
         this.emittedItems = new KeyCounter();
+        this.pseudoItems = new KeyCounter();
         this.requiredExtract = new KeyCounter();
         this.crafts.defaultReturnValue(0);
     }
@@ -78,7 +84,8 @@ public abstract class CraftingSimulationState implements ICraftingSimulationStat
             calculation.getMissingItems(),
             calculation.getIntermediateFinalOutputAmount(),
             state.crafts,
-            calculation.getTree());
+            calculation.getTree(),
+            calculation.getTemporaryProviders());
     }
 
     protected abstract long simulateExtractParent(AEKey what);
@@ -156,6 +163,29 @@ public abstract class CraftingSimulationState implements ICraftingSimulationStat
         this.emittedItems.add(what, amount);
     }
 
+    public void insertPseudo(AEKey what, long amount, Actionable mode) {
+        if (mode == Actionable.MODULATE) {
+            this.pseudoItems.add(what, amount);
+        }
+    }
+
+    /**
+     * Extracts virtual pseudo outputs. This intentionally does not update requiredExtract because pseudo outputs are
+     * never pulled from network storage.
+     */
+    public long extractPseudo(AEKey what, long amount, Actionable mode) {
+        var available = this.pseudoItems.get(what);
+        if (available == 0) {
+            return 0;
+        }
+
+        long extracted = Math.min(available, amount);
+        if (mode == Actionable.MODULATE) {
+            this.pseudoItems.remove(what, extracted);
+        }
+        return extracted;
+    }
+
     @Override
     public void addBytes(double bytes) {
         this.bytes += bytes;
@@ -164,6 +194,10 @@ public abstract class CraftingSimulationState implements ICraftingSimulationStat
     @Override
     public void addCrafting(IPatternDetails details, long crafts) {
         this.crafts.merge(details, crafts, Long::sum);
+    }
+
+    public long getAvailablePseudoAmount(AEKey what) {
+        return this.pseudoItems.get(what);
     }
 
     public long getOriginalAmount(AEKey what) {
@@ -210,6 +244,10 @@ public abstract class CraftingSimulationState implements ICraftingSimulationStat
 
         for (var toEmit : emittedItems) {
             parent.emitItems(toEmit.getKey(), toEmit.getLongValue());
+        }
+
+        for (var pseudoItem : pseudoItems) {
+            parent.insertPseudo(pseudoItem.getKey(), pseudoItem.getLongValue(), Actionable.MODULATE);
         }
 
         parent.addBytes(bytes);

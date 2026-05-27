@@ -24,6 +24,10 @@ public abstract class ClientboundPacket implements IMessage {
     protected void write(ByteBuf buf) {
     }
 
+    public final void handleClient(Object minecraft) {
+        handleClient((Minecraft) minecraft);
+    }
+
     @SideOnly(Side.CLIENT)
     public void handleClient(Minecraft minecraft) {
     }

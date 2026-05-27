@@ -24,7 +24,9 @@ import appeng.api.networking.crafting.CalculationStrategy;
 import appeng.api.networking.crafting.CraftingSubmitErrorCode;
 import appeng.api.networking.crafting.ICraftingCPU;
 import appeng.api.networking.crafting.ICraftingPlan;
+import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.networking.crafting.ICraftingService;
+import appeng.api.networking.crafting.ICraftingSimulationRequester;
 import appeng.api.networking.crafting.ICraftingSubmitResult;
 import appeng.api.networking.crafting.UnsuitableCpus;
 import appeng.api.networking.security.IActionHost;
@@ -46,6 +48,7 @@ import appeng.core.gui.locator.GuiHostLocator;
 import appeng.core.localization.PlayerMessages;
 import appeng.core.network.clientbound.CraftConfirmPlanPacket;
 import appeng.core.network.serverbound.SwitchGuisPacket;
+import appeng.crafting.TemporaryPseudoCraftingProvider;
 import appeng.crafting.execution.CraftingSubmitResult;
 import appeng.me.helpers.PlayerSource;
 import com.google.common.primitives.Ints;
@@ -100,6 +103,8 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     private CraftingPlanSummary plan;
     @Nullable
     private List<ICraftingGridContainer.AutoCraftEntry> autoCraftingQueue;
+    @Nullable
+    private TemporaryPseudoCraftingProvider temporaryPseudoProvider;
 
     public ContainerCraftConfirm( InventoryPlayer ip, ISubGuiHost host) {
         super(ip, host);
@@ -146,6 +151,33 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         }
     }
 
+    public static void openWithTemporaryPseudoPattern(@Nullable IActionHost terminal, EntityPlayerMP player,
+                                                      @Nullable GuiHostLocator locator,
+                                                      TemporaryPseudoCraftingProvider provider) {
+        if (terminal == null || locator == null) {
+            return;
+        }
+
+        try {
+            SwitchGuisPacket.openSubGui(player, locator, GuiIds.GuiKey.CRAFT_CONFIRM, null);
+
+            if (player.openContainer instanceof ContainerCraftConfirm container) {
+                var primaryOutput = provider.pattern().getPrimaryOutput();
+                container.temporaryPseudoProvider = provider;
+                if (!container.planTemporaryPseudoJob(primaryOutput.what(), primaryOutput.amount(),
+                    CalculationStrategy.REPORT_MISSING_ITEMS)) {
+                    container.temporaryPseudoProvider = null;
+                    container.setValidContainer(false);
+                    return;
+                }
+
+                container.detectAndSendChanges();
+            }
+        } catch (Throwable e) {
+            AELog.info(e);
+        }
+    }
+
     public boolean planJob(AEKey what, long amount, CalculationStrategy strategy) {
         if (this.job != null) {
             this.job.cancel(true);
@@ -163,6 +195,27 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
 
         this.job = grid.getCraftingService().beginCraftingCalculation(getPlayer().world, this::getActionSrc, what,
             amount, strategy);
+        return true;
+    }
+
+    private boolean planTemporaryPseudoJob(AEKey what, long amount, CalculationStrategy strategy) {
+        if (this.job != null) {
+            this.job.cancel(true);
+        }
+        this.result = null;
+        this.clearError();
+        this.whatToCraft = what;
+        this.amount = amount;
+        this.strategy = strategy;
+
+        IGrid grid = getGrid();
+        TemporaryPseudoCraftingProvider provider = this.temporaryPseudoProvider;
+        if (grid == null || provider == null) {
+            return false;
+        }
+
+        this.job = grid.getCraftingService().beginCraftingCalculation(getPlayer().world,
+            new TemporaryPseudoSimulationRequester(provider), what, amount, strategy);
         return true;
     }
 
@@ -274,6 +327,9 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
                 this.getActionSrc(), forceStart);
             this.setAutoStart(false);
             if (submitResult.successful()) {
+                if (this.temporaryPseudoProvider != null) {
+                    this.temporaryPseudoProvider = null;
+                }
                 if (this.autoCraftingQueue != null && !this.autoCraftingQueue.isEmpty()) {
                     EntityPlayer player = getPlayer();
                     if (player instanceof EntityPlayerMP serverPlayer) {
@@ -313,6 +369,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             this.job.cancel(true);
             this.job = null;
         }
+        this.temporaryPseudoProvider = null;
     }
 
     private void onCPUSelectionChanged(@Nullable CraftingCPURecord cpuRecord, boolean cpusAvailable) {
@@ -406,7 +463,10 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         }
 
         if (this.whatToCraft != null) {
-            if (!planJob(this.whatToCraft, this.amount, this.strategy)) {
+            boolean planned = this.temporaryPseudoProvider != null
+                ? planTemporaryPseudoJob(this.whatToCraft, this.amount, this.strategy)
+                : planJob(this.whatToCraft, this.amount, this.strategy);
+            if (!planned) {
                 goBack();
             }
         } else {
@@ -483,5 +543,35 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     @Nullable
     public ICraftingPlan getResult() {
         return this.result;
+    }
+
+    private final class TemporaryPseudoSimulationRequester implements ICraftingSimulationRequester {
+        private final TemporaryPseudoCraftingProvider provider;
+
+        private TemporaryPseudoSimulationRequester(TemporaryPseudoCraftingProvider provider) {
+            this.provider = provider;
+        }
+
+        @Override
+        public IActionSource getActionSource() {
+            return ContainerCraftConfirm.this.getActionSrc();
+        }
+
+        @Override
+        @Nullable
+        public IGridNode getGridNode() {
+            IActionHost actionHost = (IActionHost) ContainerCraftConfirm.this.getTarget();
+            return actionHost.getActionableNode();
+        }
+
+        @Override
+        public List<appeng.api.crafting.IPatternDetails> getAdditionalPatterns() {
+            return List.of(this.provider.pattern());
+        }
+
+        @Override
+        public List<ICraftingProvider> getAdditionalProviders() {
+            return List.of(this.provider);
+        }
     }
 }

@@ -23,6 +23,7 @@ import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.crafting.ICraftingService;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
+import appeng.helpers.patternprovider.PseudoPatternDetails;
 import appeng.crafting.inv.CraftingSimulationState;
 import appeng.crafting.inv.ChildCraftingSimulationState;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
@@ -162,7 +163,11 @@ public class CraftingTreeProcess {
         }
 
         for (var out : this.details.getOutputs()) {
-            preview.state().insert(out.what(), out.amount() * times, Actionable.MODULATE);
+            if (PseudoPatternDetails.isPseudo(this.details)) {
+                preview.state().insertPseudo(out.what(), out.amount() * times, Actionable.MODULATE);
+            } else {
+                preview.state().insert(out.what(), out.amount() * times, Actionable.MODULATE);
+            }
         }
 
         preview.state().addCrafting(details, times);
@@ -201,7 +206,11 @@ public class CraftingTreeProcess {
 
             // add crafting results.
             for (var out : this.details.getOutputs()) {
-                inv.insert(out.what(), out.amount() * times, Actionable.MODULATE);
+                if (PseudoPatternDetails.isPseudo(this.details)) {
+                    inv.insertPseudo(out.what(), out.amount() * times, Actionable.MODULATE);
+                } else {
+                    inv.insert(out.what(), out.amount() * times, Actionable.MODULATE);
+                }
             }
 
             inv.addCrafting(details, times);

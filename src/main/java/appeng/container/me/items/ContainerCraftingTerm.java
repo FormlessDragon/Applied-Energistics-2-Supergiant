@@ -20,8 +20,10 @@ package appeng.container.me.items;
 
 import appeng.api.inventories.ISegmentedInventory;
 import appeng.api.inventories.InternalInventory;
+import appeng.api.networking.IGridNode;
 import appeng.api.networking.energy.IEnergySource;
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.GenericStack;
 import appeng.api.storage.ITerminalHost;
 import appeng.container.GuiIds;
 import appeng.container.SlotSemantics;
@@ -34,6 +36,7 @@ import appeng.container.slot.CraftingMatrixSlot;
 import appeng.container.slot.CraftingTermSlot;
 import appeng.core.network.InitNetwork;
 import appeng.core.network.serverbound.InventoryActionPacket;
+import appeng.crafting.TemporaryPseudoCraftingProvider;
 import appeng.helpers.InventoryAction;
 import appeng.me.storage.LinkStatusRespectingInventory;
 import appeng.parts.reporting.CraftingTerminalPart;
@@ -180,6 +183,21 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
         if (getPlayer() instanceof EntityPlayerMP player) {
             ContainerCraftConfirm.openWithCraftingList(getActionHost(), player, getLocator(), toCraft);
         }
+    }
+
+    @Override
+    public void startTemporaryPseudoCrafting(List<GenericStack> inputs, List<GenericStack> outputs) {
+        if (!(getPlayer() instanceof EntityPlayerMP player) || outputs.isEmpty()) {
+            return;
+        }
+
+        IGridNode node = getGridNode();
+        if (node == null || !getLinkStatus().connected()) {
+            return;
+        }
+
+        var provider = new TemporaryPseudoCraftingProvider(inputs, outputs);
+        ContainerCraftConfirm.openWithTemporaryPseudoPattern(getActionHost(), player, getLocator(), provider);
     }
 
     @Nullable

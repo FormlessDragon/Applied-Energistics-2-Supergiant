@@ -36,6 +36,11 @@ public class DelegatingMEInventory implements MEStorage {
     }
 
     @Override
+    public boolean isStickyStorageFor(AEKey what, IActionSource source) {
+        return getDelegate().isStickyStorageFor(what, source);
+    }
+
+    @Override
     public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
         return getDelegate().insert(what, amount, mode, source);
     }

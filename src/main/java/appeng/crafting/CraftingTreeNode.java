@@ -28,6 +28,7 @@ import appeng.crafting.execution.InputTemplate;
 import appeng.crafting.inv.ChildCraftingSimulationState;
 import appeng.crafting.inv.CraftingSimulationState;
 import appeng.crafting.inv.ICraftingInventory;
+import appeng.helpers.patternprovider.PseudoPatternDetails;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
@@ -116,6 +117,9 @@ public class CraftingTreeNode {
             if (gridNode != null) {
                 var craftingService = gridNode.grid().getCraftingService();
                 for (var details : this.job.getCraftingFor(this.what)) {
+                    if (!canUsePseudoProducer(details)) {
+                        continue;
+                    }
                     if (this.parent == null || this.parent.notRecursive(details)) {
                         this.nodes.add(new CraftingTreeProcess(craftingService, job, details, this));
                     }
@@ -131,6 +135,10 @@ public class CraftingTreeNode {
      */
     boolean notRecursive(IPatternDetails details) {
         return true;
+    }
+
+    private boolean canUsePseudoProducer(IPatternDetails details) {
+        return !PseudoPatternDetails.isPseudo(details) || isTopLevelRequestedOutput() || canUsePseudoInputs();
     }
 
     /**
@@ -194,6 +202,22 @@ public class CraftingTreeNode {
                     }
                 }
             }
+
+            if (requestedAmount > 0 && canUsePseudoInputs()) {
+                for (var template : getValidItemTemplates(inv)) {
+                    long extracted = extractPseudoTemplates(inv, template, requestedAmount);
+                    if (extracted <= 0) {
+                        continue;
+                    }
+
+                    requestedAmount -= extracted;
+                    addContainerItems(template.key(), extracted, containerItems);
+
+                    if (requestedAmount == 0) {
+                        return;
+                    }
+                }
+            }
         }
 
         // Already add the container items: if we fail, the process above will fail and they will be discarded anyway.
@@ -251,7 +275,7 @@ public class CraftingTreeNode {
 
             long available;
             if (pro.applyReusablePreview(inv, times)) {
-                available = inv.extract(this.what, totalRequestedItems, Actionable.MODULATE);
+                available = extractCraftedBranchOutput(inv, totalRequestedItems);
             } else {
                 final ChildCraftingSimulationState child = new ChildCraftingSimulationState(inv);
                 long intermediateFinalOutputMarker = this.job.getIntermediateFinalOutputMarker();
@@ -269,7 +293,7 @@ public class CraftingTreeNode {
                     this.job.popMissingSuppression();
                 }
 
-                available = child.extract(this.what, totalRequestedItems, Actionable.MODULATE);
+                available = extractCraftedBranchOutput(child, totalRequestedItems);
                 if (craftedPerPattern > 0) {
                     available = Math.min(available, craftedPerPattern * times);
                 }
@@ -313,7 +337,7 @@ public class CraftingTreeNode {
 
                 // by now we have succeeded, as request throws an exception in case of failure
                 // check how much was actually produced
-                var available = inv.extract(this.what, totalRequestedItems, Actionable.MODULATE);
+                var available = extractCraftedBranchOutput(inv, totalRequestedItems);
                 if (available != 0) {
                     totalRequestedItems -= available;
 
@@ -355,6 +379,15 @@ public class CraftingTreeNode {
                 this.job.addIntermediateFinalOutputInput(template.key(), extracted * template.amount());
                 if (available >= maxAmount) {
                     return maxAmount;
+                }
+            }
+            if (available < maxAmount && canUsePseudoInputs()) {
+                for (var template : getValidItemTemplates(inv)) {
+                    long extracted = extractPseudoTemplates(inv, template, maxAmount - available);
+                    available += extracted;
+                    if (available >= maxAmount) {
+                        return maxAmount;
+                    }
                 }
             }
             if (available == 0) {
@@ -407,7 +440,7 @@ public class CraftingTreeNode {
                     this.job.popMissingSuppression();
                 }
             }
-            long produced = inv.extract(this.what, totalRequestedItems, Actionable.MODULATE);
+            long produced = extractCraftedBranchOutput(inv, totalRequestedItems);
             if (produced > 0) {
                 totalRequestedItems -= produced;
                 available += produced / this.amount;
@@ -440,6 +473,42 @@ public class CraftingTreeNode {
         var templates = CraftingCpuHelper.getValidItemTemplates(inv, this.parentInput, level);
         this.job.recordPerformanceStage("fuzzy-templates " + this.what, System.nanoTime() - start);
         return templates;
+    }
+
+    private boolean canUsePseudoInputs() {
+        return this.parent != null && PseudoPatternDetails.isPseudo(this.parent.details);
+    }
+
+    private long extractCraftedBranchOutput(CraftingSimulationState inv, long amount) {
+        long extracted = inv.extract(this.what, amount, Actionable.MODULATE);
+        if (extracted >= amount || !canUsePseudoBranchOutput()) {
+            return extracted;
+        }
+        return extracted + inv.extractPseudo(this.what, amount - extracted, Actionable.MODULATE);
+    }
+
+    private boolean canUsePseudoBranchOutput() {
+        return isTopLevelRequestedOutput() || canUsePseudoInputs();
+    }
+
+    private long extractPseudoTemplates(CraftingSimulationState inv, InputTemplate template, long multiplier) {
+        long maxTotal = template.amount() * multiplier;
+        long extracted = inv.extractPseudo(template.key(), maxTotal, Actionable.SIMULATE);
+        if (extracted == 0) {
+            return 0;
+        }
+
+        multiplier = extracted / template.amount();
+        maxTotal = template.amount() * multiplier;
+        if (maxTotal == 0) {
+            return 0;
+        }
+
+        extracted = inv.extractPseudo(template.key(), maxTotal, Actionable.MODULATE);
+        if (extracted == 0 || extracted != maxTotal) {
+            throw new IllegalStateException("Failed to correctly extract pseudo templates. Invalid simulation!");
+        }
+        return multiplier;
     }
 
     private long getEffectiveOutputCount(CraftingTreeProcess pro) {

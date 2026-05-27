@@ -1,9 +1,12 @@
 package appeng.api.networking.crafting;
 
+import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.security.IActionHost;
 import appeng.api.networking.security.IActionSource;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * The source of a crafting simulation request. This allows the crafting simulation to keep track of the current grid
@@ -29,5 +32,13 @@ public interface ICraftingSimulationRequester {
             return actionSource.machine().map(IActionHost::getActionableNode).orElse(null);
         }
         return null;
+    }
+
+    default List<IPatternDetails> getAdditionalPatterns() {
+        return List.of();
+    }
+
+    default List<ICraftingProvider> getAdditionalProviders() {
+        return List.of();
     }
 }

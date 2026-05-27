@@ -23,6 +23,7 @@ import appeng.api.networking.IGridNode;
 import appeng.api.networking.energy.IEnergySource;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.GenericStack;
 import appeng.api.storage.ILinkStatus;
 import it.unimi.dsi.fastutil.ints.IntList;
 import net.minecraft.item.ItemStack;
@@ -75,6 +76,9 @@ public interface ICraftingGridContainer {
      * be used afterward.
      */
     default void startAutoCrafting(List<AutoCraftEntry> toCraft) {
+    }
+
+    default void startTemporaryPseudoCrafting(List<GenericStack> inputs, List<GenericStack> outputs) {
     }
 
     /**

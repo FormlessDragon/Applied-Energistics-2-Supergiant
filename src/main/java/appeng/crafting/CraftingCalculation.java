@@ -23,6 +23,7 @@ import appeng.api.config.Actionable;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.crafting.CalculationStrategy;
 import appeng.api.networking.crafting.ICraftingPlan;
+import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.networking.crafting.ICraftingSimulationRequester;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
@@ -36,7 +37,6 @@ import appeng.hooks.ticking.TickHandler;
 import com.google.common.base.Stopwatch;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.world.World;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
@@ -62,6 +62,7 @@ public class CraftingCalculation {
     private final List<CraftingTreeProcess> processStack = new ObjectArrayList<>();
     private final List<TimingFrame> timingStack = new ObjectArrayList<>();
     private final Map<AEKey, Collection<IPatternDetails>> patternCache = new HashMap<>();
+    private final List<ICraftingProvider> temporaryProviders;
     // The initially requested amount of "output", may be reduced depending on the strategy used
     private final long requestedAmount;
     private final CalculationStrategy strategy;
@@ -92,6 +93,7 @@ public class CraftingCalculation {
         this.strategy = strategy;
         this.simRequester = simRequester;
         this.performanceListener = performanceListener;
+        this.temporaryProviders = List.copyOf(simRequester.getAdditionalProviders());
 
         var storage = grid.getStorageService();
         var craftingService = grid.getCraftingService();
@@ -123,7 +125,14 @@ public class CraftingCalculation {
             if (gridNode == null) {
                 return List.of();
             }
-            return List.copyOf(gridNode.grid().getCraftingService().getCraftingFor(key));
+            var patterns = new ObjectArrayList<IPatternDetails>();
+            patterns.addAll(gridNode.grid().getCraftingService().getCraftingFor(key));
+            for (var pattern : this.simRequester.getAdditionalPatterns()) {
+                if (pattern.getPrimaryOutput().what().equals(key)) {
+                    patterns.add(pattern);
+                }
+            }
+            return List.copyOf(patterns);
         });
     }
 
@@ -183,15 +192,6 @@ public class CraftingCalculation {
         } finally {
             finishPerformanceListener(System.nanoTime() - calculationStart);
         }
-    }
-
-    /**
-     * @return null on failure
-     */
-    @Nullable
-    @Contract("true, _ -> !null") // the calculation can't fail if simulated
-    private CraftingPlan runCraftAttempt(boolean simulate, long amount) throws InterruptedException {
-        return runCraftAttempt(simulate, amount, amount, false);
     }
 
     private CraftingPlan runCraftAttempt(boolean simulate, long productionAmount, long finalAmount, boolean allowMissing)
@@ -713,6 +713,10 @@ public class CraftingCalculation {
 
     public CraftingTreeNode getTree() {
         return tree;
+    }
+
+    public List<ICraftingProvider> getTemporaryProviders() {
+        return temporaryProviders;
     }
 
     public long getIntermediateFinalOutputAmount() {

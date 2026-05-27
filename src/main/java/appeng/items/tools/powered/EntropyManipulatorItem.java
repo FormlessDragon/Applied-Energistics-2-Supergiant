@@ -48,6 +48,7 @@ import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.NonNullList;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
@@ -104,6 +105,10 @@ public class EntropyManipulatorItem extends AEBasePoweredItem implements IBlockT
         return fluid == null ? null : new FluidStack(fluid, Fluid.BUCKET_VOLUME);
     }
 
+    private static boolean isLiquidStateTargetable(IBlockState state) {
+        return state.getMaterial().isLiquid();
+    }
+
     private static double getBatteryCapacity() {
         try {
             return AEConfig.instance().getEntropyManipulatorBattery();
@@ -141,7 +146,7 @@ public class EntropyManipulatorItem extends AEBasePoweredItem implements IBlockT
         }
 
         BlockPos pos = target.getBlockPos();
-        if (!world.getBlockState(pos).getMaterial().isLiquid()) {
+        if (!isLiquidStateTargetable(world.getBlockState(pos))) {
             return new ActionResult<>(EnumActionResult.SUCCESS, stack);
         }
 
@@ -310,6 +315,31 @@ public class EntropyManipulatorItem extends AEBasePoweredItem implements IBlockT
         Vec3d from = new Vec3d(player.posX, player.posY + player.getEyeHeight(), player.posZ);
         Vec3d look = player.getLookVec();
         Vec3d to = from.add(look.x * 5.0D, look.y * 5.0D, look.z * 5.0D);
-        return world.rayTraceBlocks(from, to, true);
+        RayTraceResult hit = world.rayTraceBlocks(from, to, true);
+        return hit != null ? hit : findLiquidTargetAlongRay(world, from, to);
+    }
+
+    @Nullable
+    private static RayTraceResult findLiquidTargetAlongRay(World world, Vec3d from, Vec3d to) {
+        Vec3d delta = to.subtract(from);
+        double distance = delta.length();
+        if (distance <= 1.0E-6D) {
+            return null;
+        }
+
+        Vec3d step = delta.scale(0.25D / distance);
+        int steps = MathHelper.ceil(distance / 0.25D);
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+
+        for (int i = 0; i <= steps; i++) {
+            Vec3d sample = from.add(step.scale(i));
+            pos.setPos(MathHelper.floor(sample.x), MathHelper.floor(sample.y), MathHelper.floor(sample.z));
+            IBlockState state = world.getBlockState(pos);
+            if (isLiquidStateTargetable(state)) {
+                return new RayTraceResult(sample, EnumFacing.UP, pos.toImmutable());
+            }
+        }
+
+        return null;
     }
 }

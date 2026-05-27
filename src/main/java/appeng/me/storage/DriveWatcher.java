@@ -21,18 +21,24 @@ package appeng.me.storage;
 import appeng.api.config.Actionable;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEKey;
+import appeng.api.storage.cells.ICellWorkbenchItem;
 import appeng.api.storage.cells.CellState;
 import appeng.api.storage.cells.StorageCell;
+import appeng.core.definitions.AEItems;
+import net.minecraft.item.ItemStack;
 
 public class DriveWatcher extends MEInventoryHandler {
 
     private final Runnable activityCallback;
     private CellState oldStatus = CellState.EMPTY;
 
-    public DriveWatcher(StorageCell i, Runnable activityCallback) {
+    public DriveWatcher(StorageCell i, ItemStack cellItem, Runnable activityCallback) {
         super(i);
         this.activityCallback = activityCallback;
         this.oldStatus = getStatus();
+        if (cellItem.getItem() instanceof ICellWorkbenchItem workbenchItem) {
+            setSticky(workbenchItem.getUpgrades(cellItem).isInstalled(AEItems.STICKY_CARD.item()));
+        }
     }
 
     public CellState getStatus() {

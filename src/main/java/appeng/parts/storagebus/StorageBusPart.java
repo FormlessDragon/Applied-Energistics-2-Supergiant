@@ -359,6 +359,7 @@ public class StorageBusPart extends UpgradeablePart
             : IncludeExclude.WHITELIST);
         this.handler.setPartitionList(createFilter());
         this.handler.setVoidOverflow(this.isUpgradedWith(AEItems.VOID_CARD));
+        this.handler.setSticky(this.isUpgradedWith(AEItems.STICKY_CARD));
 
         boolean filterOnExtract = this.getConfigManager().getSetting(Settings.FILTER_ON_EXTRACT) == YesNo.YES;
         this.handler.setExtractFiltering(filterOnExtract, isExtractableOnly() && filterOnExtract);

@@ -1,0 +1,15 @@
+{
+  "type": "forge:ore_shapeless",
+  "ingredients": [
+    {
+      "item": "minecraft:slime_ball"
+    },
+    {
+      "item": "ae2:basic_card"
+    }
+  ],
+  "result": {
+    "item": "ae2:sticky_card",
+    "count": 1
+  }
+}

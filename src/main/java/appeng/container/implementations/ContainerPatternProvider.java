@@ -47,6 +47,8 @@ public class ContainerPatternProvider extends AEBaseContainer implements IConfig
                 patternInventory, index), SlotSemantics.ENCODED_PATTERN);
         }
 
+        this.setupUpgrades(this.logic.getUpgrades());
+
         ConfigGuiInventory returnInventory = this.logic.getReturnInv().createGuiWrapper();
         for (int index = 0; index < PatternProviderReturnInventory.NUMBER_OF_SLOTS
             && index < returnInventory.size(); index++) {

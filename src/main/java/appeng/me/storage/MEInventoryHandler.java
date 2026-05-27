@@ -36,6 +36,7 @@ public class MEInventoryHandler extends DelegatingMEInventory {
     private boolean allowExtraction = true;
     private boolean allowInsertion = true;
     private boolean voidOverflow;
+    private boolean sticky;
 
     private boolean gettingAvailableContent = false;
 
@@ -74,6 +75,10 @@ public class MEInventoryHandler extends DelegatingMEInventory {
 
     public void setVoidOverflow(boolean voidOverflow) {
         this.voidOverflow = voidOverflow;
+    }
+
+    public void setSticky(boolean sticky) {
+        this.sticky = sticky;
     }
 
     @Override
@@ -139,6 +144,11 @@ public class MEInventoryHandler extends DelegatingMEInventory {
         }
 
         return super.isPreferredStorageFor(input, source);
+    }
+
+    @Override
+    public boolean isStickyStorageFor(AEKey input, IActionSource source) {
+        return this.sticky && isPreferredStorageFor(input, source);
     }
 
     protected boolean canExtract(AEKey request) {

@@ -11,11 +11,14 @@ import appeng.client.gui.style.GuiStyle;
 import appeng.client.gui.widgets.ServerSettingToggleButton;
 import appeng.client.gui.widgets.SettingToggleButton;
 import appeng.client.gui.widgets.ToggleButton;
+import appeng.client.gui.widgets.UpgradesPanel;
+import appeng.container.SlotSemantics;
 import appeng.container.implementations.ContainerPatternProvider;
 import appeng.core.localization.GuiText;
 import appeng.core.localization.ButtonToolTips;
 import appeng.core.network.InitNetwork;
 import appeng.core.network.bidirectional.ConfigValuePacket;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import appeng.util.EnumCycler;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
@@ -51,6 +54,10 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
         this.lockCraftingModeButton = addToLeftToolbar(
             new ServerSettingToggleButton<>(Settings.LOCK_CRAFTING_MODE, LockCraftingMode.NONE));
         this.widgets.addOpenPriorityButton();
+        this.widgets.add("upgrades", UpgradesPanel.create(
+            this.widgets,
+            container.getSlots(SlotSemantics.UPGRADE),
+            this::getCompatibleUpgrades));
         this.showInPatternAccessTerminalButton = new ToggleButton(Icon.PATTERN_ACCESS_SHOW,
             Icon.PATTERN_ACCESS_HIDE,
             GuiText.PatternAccessTerminal.text(),
@@ -89,5 +96,11 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
                 isHandlingRightClick(),
                 Settings.PATTERN_ACCESS_TERMINAL.getValues())));
     }
-}
 
+    private List<ITextComponent> getCompatibleUpgrades() {
+        var list = new ObjectArrayList<ITextComponent>();
+        list.add(GuiText.CompatibleUpgrades.text());
+        list.addAll(appeng.api.upgrades.Upgrades.getTooltipLinesForInventory(this.container.getLogic().getUpgrades()));
+        return list;
+    }
+}

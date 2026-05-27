@@ -1,7 +1,12 @@
 package appeng.integration.modules.hei;
 
+import appeng.api.stacks.GenericStack;
+import appeng.api.stacks.KeyCounter;
+import appeng.container.me.common.GridInventoryEntry;
+import appeng.container.me.common.IClientRepo;
 import appeng.container.me.items.ContainerCraftingTerm;
 import appeng.core.localization.ItemModText;
+import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.integration.modules.itemlists.CraftingHelper;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -56,15 +61,22 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
                                                @Nonnull IRecipeLayout recipeLayout,
                                                @Nonnull EntityPlayer player, boolean maxTransfer, boolean doTransfer) {
         ExtractedRecipe extractedRecipe = extractRecipe(recipeLayout);
-        if (extractedRecipe == null) {
+        ExtractedPseudoRecipe pseudoRecipe = GuiScreen.isCtrlKeyDown()
+            ? extractTemporaryPseudoRecipe(container, recipeLayout)
+            : null;
+        if (extractedRecipe == null && pseudoRecipe == null) {
             return this.handlerHelper.createInternalError();
         }
 
-        if (extractedRecipe.tooLarge) {
+        if (extractedRecipe != null && extractedRecipe.tooLarge) {
             return this.handlerHelper.createUserErrorWithTooltip(ItemModText.RecipeTooLarge.getLocal());
         }
 
-        if (!doTransfer) {
+        if (!doTransfer && pseudoRecipe != null) {
+            return null;
+        }
+
+        if (!doTransfer && extractedRecipe != null) {
             ContainerCraftingTerm.MissingIngredientSlots missingSlots =
                 container.findMissingIngredients(extractedRecipe.ingredients);
             CraftingRecipeTransferAnalysis analysis = CraftingRecipeTransferAnalysis.analyze(missingSlots,
@@ -75,7 +87,16 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
             return null;
         }
 
-        CraftingHelper.performTransfer(container, null, extractedRecipe.templates, GuiScreen.isCtrlKeyDown());
+        if (!doTransfer) {
+            return null;
+        }
+
+        List<List<ItemStack>> templates = extractedRecipe != null ? extractedRecipe.templates : createEmptyTemplates();
+        if (pseudoRecipe != null) {
+            CraftingHelper.performTransfer(container, null, templates, true, pseudoRecipe.inputs, pseudoRecipe.outputs);
+        } else {
+            CraftingHelper.performTransfer(container, null, templates, GuiScreen.isCtrlKeyDown());
+        }
 
         return null;
     }
@@ -167,7 +188,105 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
         stacks.add(template);
     }
 
+    private static @Nullable ExtractedPseudoRecipe extractTemporaryPseudoRecipe(ContainerCraftingTerm container,
+                                                                               IRecipeLayout recipeLayout) {
+        boolean craftingLayout = VanillaRecipeCategoryUid.CRAFTING.equals(recipeLayout.getRecipeCategory().getUid());
+        List<GenericStack> recipeInputs = selectFirstGenericStackPerSlot(
+            GenericIngredientHelper.getIngredients(recipeLayout, true, craftingLayout,
+                craftingLayout ? CRAFTING_GRID_SIZE : AEProcessingPattern.MAX_INPUT_SLOTS),
+            AEProcessingPattern.MAX_INPUT_SLOTS);
+        List<GenericStack> outputs = selectFirstGenericStackPerSlot(
+            GenericIngredientHelper.getIngredients(recipeLayout, false, false, AEProcessingPattern.MAX_OUTPUT_SLOTS),
+            AEProcessingPattern.MAX_OUTPUT_SLOTS);
+
+        if (recipeInputs.isEmpty() || outputs.isEmpty()) {
+            return null;
+        }
+
+        List<GenericStack> missingInputs = getMissingInputsOnClient(container, recipeInputs);
+        if (missingInputs.isEmpty()) {
+            return null;
+        }
+        return new ExtractedPseudoRecipe(missingInputs, outputs);
+    }
+
+    private static List<GenericStack> selectFirstGenericStackPerSlot(List<List<GenericStack>> stacksBySlot, int maxSize) {
+        List<GenericStack> result = new ObjectArrayList<>(Math.min(stacksBySlot.size(), maxSize));
+        for (List<GenericStack> stacks : stacksBySlot) {
+            if (!stacks.isEmpty()) {
+                result.add(stacks.getFirst());
+                if (result.size() >= maxSize) {
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    static List<GenericStack> getMissingInputsOnClient(ContainerCraftingTerm container, List<GenericStack> recipeInputs) {
+        KeyCounter available = new KeyCounter();
+
+        var craftMatrix = container.getCraftingMatrix();
+        for (int i = 0; i < craftMatrix.size(); i++) {
+            addAvailableStack(available, GenericStack.fromItemStack(craftMatrix.getStackInSlot(i)));
+        }
+
+        IClientRepo clientRepo = container.getClientRepo();
+        if (clientRepo != null && container.getLinkStatus().connected()) {
+            for (GridInventoryEntry entry : clientRepo.getAllEntries()) {
+                if (entry.what() != null && entry.storedAmount() > 0) {
+                    available.add(entry.what(), entry.storedAmount());
+                }
+            }
+        }
+
+        var playerItems = container.getPlayerInventory().mainInventory;
+        for (int i = 0; i < playerItems.size(); i++) {
+            if (container.isPlayerInventorySlotLocked(i)) {
+                continue;
+            }
+            addAvailableStack(available, GenericStack.fromItemStack(playerItems.get(i)));
+        }
+
+        List<GenericStack> missing = new ObjectArrayList<>(recipeInputs.size());
+        for (GenericStack input : recipeInputs) {
+            long remaining = input.amount();
+            long fromAvailable = Math.min(remaining, available.get(input.what()));
+            if (fromAvailable > 0) {
+                available.remove(input.what(), fromAvailable);
+                remaining -= fromAvailable;
+            }
+            if (remaining > 0) {
+                addOrMerge(missing, new GenericStack(input.what(), remaining));
+                if (missing.size() >= AEProcessingPattern.MAX_INPUT_SLOTS) {
+                    break;
+                }
+            }
+        }
+        return missing;
+    }
+
+    private static void addAvailableStack(KeyCounter available, @Nullable GenericStack stack) {
+        if (stack != null && stack.amount() > 0) {
+            available.add(stack.what(), stack.amount());
+        }
+    }
+
+    private static void addOrMerge(List<GenericStack> stacks, GenericStack stack) {
+        for (int i = 0; i < stacks.size(); i++) {
+            GenericStack existing = stacks.get(i);
+            if (existing.what().equals(stack.what())) {
+                stacks.set(i, GenericStack.sum(existing, stack));
+                return;
+            }
+        }
+        stacks.add(stack);
+    }
+
     private record ExtractedRecipe(Int2ObjectMap<Ingredient> ingredients, List<List<ItemStack>> templates,
                                    boolean tooLarge) {
+    }
+
+    private record ExtractedPseudoRecipe(List<GenericStack> inputs, List<GenericStack> outputs) {
     }
 }

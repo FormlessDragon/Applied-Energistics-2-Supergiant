@@ -28,6 +28,7 @@ import appeng.api.storage.cells.CellState;
 import appeng.api.storage.cells.IBasicCellItem;
 import appeng.api.storage.cells.ISaveProvider;
 import appeng.api.storage.cells.StorageCell;
+import appeng.core.definitions.AEItems;
 import appeng.text.TextComponentItemStack;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
@@ -242,6 +243,12 @@ public class BasicCellInventory implements StorageCell {
     public boolean canFitInsideCell() {
         return cellType.storableInStorageCell() || (storedItems == 0 && storedItemCount == 0);
 // if there is no ISaveProvider, store to NBT immediately
+    }
+
+    @Override
+    public boolean isStickyStorageFor(AEKey what, IActionSource source) {
+        return cellType.getUpgrades(itemStack).isInstalled(AEItems.STICKY_CARD.item())
+            && cellItems.containsKey(what);
     }
 
     @Override

@@ -41,6 +41,9 @@ public class ChargerTESR extends TileEntitySpecialRenderer<TileCharger> {
         float yOffset = (float) Math.sin(time) * 0.02f;
 
         GlStateManager.translate(0.5F, 0.4F + yOffset, 0.5F);
+        var renderManager = Minecraft.getMinecraft().getRenderManager();
+        GlStateManager.rotate(-renderManager.playerViewY, 0.0F, 1.0F, 0.0F);
+        GlStateManager.rotate(renderManager.playerViewX, 1.0F, 0.0F, 0.0F);
         if (!(stack.getItem() instanceof ItemBlock)) {
             GlStateManager.scale(0.5F, 0.5F, 0.5F);
         }

@@ -81,11 +81,11 @@ public class NetworkStorage implements MEStorage {
         }
 
         long remaining = amount;
+        boolean stickyStorageFound = false;
 
         this.mountsInUse = true;
         try {
             for (List<MEStorage> inventories : this.priorityInventory.values()) {
-                this.secondPassInventories.clear();
                 for (MEStorage inventory : inventories) {
                     if (remaining <= 0) {
                         break;
@@ -93,21 +93,39 @@ public class NetworkStorage implements MEStorage {
                     if (isQueuedForRemoval(inventory)) {
                         continue;
                     }
-                    if (inventory.isPreferredStorageFor(what, source)) {
+                    if (inventory.isStickyStorageFor(what, source)) {
                         remaining -= inventory.insert(what, remaining, mode, source);
-                    } else {
-                        this.secondPassInventories.add(inventory);
+                        stickyStorageFound = true;
                     }
                 }
+            }
 
-                for (MEStorage inventory : this.secondPassInventories) {
-                    if (remaining <= 0) {
-                        break;
+            if (!stickyStorageFound) {
+                for (List<MEStorage> inventories : this.priorityInventory.values()) {
+                    this.secondPassInventories.clear();
+                    for (MEStorage inventory : inventories) {
+                        if (remaining <= 0) {
+                            break;
+                        }
+                        if (isQueuedForRemoval(inventory)) {
+                            continue;
+                        }
+                        if (inventory.isPreferredStorageFor(what, source)) {
+                            remaining -= inventory.insert(what, remaining, mode, source);
+                        } else {
+                            this.secondPassInventories.add(inventory);
+                        }
                     }
-                    if (isQueuedForRemoval(inventory)) {
-                        continue;
+
+                    for (MEStorage inventory : this.secondPassInventories) {
+                        if (remaining <= 0) {
+                            break;
+                        }
+                        if (isQueuedForRemoval(inventory)) {
+                            continue;
+                        }
+                        remaining -= inventory.insert(what, remaining, mode, source);
                     }
-                    remaining -= inventory.insert(what, remaining, mode, source);
                 }
             }
         } finally {

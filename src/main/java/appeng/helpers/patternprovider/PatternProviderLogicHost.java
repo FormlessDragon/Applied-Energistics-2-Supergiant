@@ -25,6 +25,7 @@ import appeng.api.inventories.InternalInventory;
 import appeng.api.networking.IGrid;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.storage.ISubGuiHost;
+import appeng.api.upgrades.IUpgradeableObject;
 import appeng.api.util.IConfigManager;
 import appeng.api.util.IConfigurableObject;
 import appeng.container.GuiIds;
@@ -42,7 +43,7 @@ import javax.annotation.Nullable;
 import java.util.EnumSet;
 
 public interface PatternProviderLogicHost
-    extends IConfigurableObject, IPriorityHost, PatternContainer, ISubGuiHost {
+    extends IConfigurableObject, IPriorityHost, PatternContainer, ISubGuiHost, IUpgradeableObject {
     PatternProviderLogic getLogic();
 
     TileEntity getTileEntity();
@@ -104,6 +105,11 @@ public interface PatternProviderLogicHost
     @Override
     default InternalInventory getTerminalPatternInventory() {
         return getLogic().getPatternInv();
+    }
+
+    @Override
+    default appeng.api.upgrades.IUpgradeInventory getUpgrades() {
+        return getLogic().getUpgrades();
     }
 
     @Override

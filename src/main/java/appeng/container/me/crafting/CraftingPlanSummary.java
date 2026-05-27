@@ -22,11 +22,13 @@ import appeng.api.networking.IGrid;
 import appeng.api.networking.crafting.ICraftingPlan;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEKey;
+import appeng.crafting.CraftingPlan;
 import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.network.PacketBuffer;
 
 import java.util.Collections;
@@ -48,20 +50,30 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
 
     public static CraftingPlanSummary fromJob(IGrid grid, IActionSource actionSource, ICraftingPlan job) {
         Object2ObjectMap<AEKey, KeyStats> plan = new Object2ObjectOpenHashMap<>();
+        var hiddenOutputs = getHiddenTemporaryOutputs(job);
 
         for (var used : job.usedItems()) {
             mapping(plan, used.getKey()).stored += used.getLongValue();
         }
         for (var missing : job.missingItems()) {
+            if (hiddenOutputs.contains(missing.getKey())) {
+                continue;
+            }
             mapping(plan, missing.getKey()).missing += missing.getLongValue();
         }
         for (var emitted : job.emittedItems()) {
+            if (hiddenOutputs.contains(emitted.getKey())) {
+                continue;
+            }
             var entry = mapping(plan, emitted.getKey());
             entry.stored += emitted.getLongValue();
             entry.crafting += emitted.getLongValue();
         }
         for (Object2LongMap.Entry<appeng.api.crafting.IPatternDetails> entry : job.patternTimes().object2LongEntrySet()) {
             for (var out : entry.getKey().getOutputs()) {
+                if (hiddenOutputs.contains(out.what())) {
+                    continue;
+                }
                 mapping(plan, out.what()).crafting += out.amount() * entry.getLongValue();
             }
         }
@@ -86,6 +98,20 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
 
         Collections.sort(entries);
         return new CraftingPlanSummary(job.bytes(), job.simulation(), List.copyOf(entries));
+    }
+
+    private static ObjectOpenHashSet<AEKey> getHiddenTemporaryOutputs(ICraftingPlan job) {
+        var hiddenOutputs = new ObjectOpenHashSet<AEKey>();
+        if (job instanceof CraftingPlan craftingPlan) {
+            for (var provider : craftingPlan.temporaryProviders()) {
+                for (var pattern : provider.getAvailablePatterns()) {
+                    for (var output : pattern.getOutputs()) {
+                        hiddenOutputs.add(output.what());
+                    }
+                }
+            }
+        }
+        return hiddenOutputs;
     }
 
     public boolean hasMissingEntries() {

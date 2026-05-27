@@ -194,8 +194,12 @@ public final class AEItems {
         Upgrades.createUpgradeCardItem());
     public static final ItemDefinition<Item> CRAFTING_CARD = new ItemDefinition<>(AEItemIds.CRAFTING_CARD,
         Upgrades.createUpgradeCardItem());
+    public static final ItemDefinition<Item> PSEUDO_CRAFTING_CARD = new ItemDefinition<>(AEItemIds.PSEUDO_CRAFTING_CARD,
+        Upgrades.createUpgradeCardItem());
     public static final ItemDefinition<Item> EQUAL_DISTRIBUTION_CARD = new ItemDefinition<>(
         AEItemIds.EQUAL_DISTRIBUTION_CARD, Upgrades.createUpgradeCardItem());
+    public static final ItemDefinition<Item> STICKY_CARD = new ItemDefinition<>(AEItemIds.STICKY_CARD,
+        Upgrades.createUpgradeCardItem());
     public static final ItemDefinition<EnergyCardItem> ENERGY_CARD = new ItemDefinition<>(AEItemIds.ENERGY_CARD,
         new EnergyCardItem(1));
     public static final ItemDefinition<Item> QUANTUM_BRIDGE_CARD = new ItemDefinition<>(AEItemIds.QUANTUM_BRIDGE_CARD,
@@ -408,7 +412,9 @@ public final class AEItems {
         SPEED_CARD,
         INVERTER_CARD,
         CRAFTING_CARD,
+        PSEUDO_CRAFTING_CARD,
         EQUAL_DISTRIBUTION_CARD,
+        STICKY_CARD,
         ENERGY_CARD,
         QUANTUM_BRIDGE_CARD,
         MAGNET_CARD,

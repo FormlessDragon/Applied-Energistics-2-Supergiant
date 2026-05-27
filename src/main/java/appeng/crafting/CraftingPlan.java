@@ -20,9 +20,12 @@ package appeng.crafting;
 
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.crafting.ICraftingPlan;
+import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
+
+import java.util.List;
 
 public record CraftingPlan(GenericStack finalOutput,
                            long bytes,
@@ -33,5 +36,19 @@ public record CraftingPlan(GenericStack finalOutput,
                            KeyCounter missingItems,
                            long intermediateFinalOutputAmount,
                            Object2LongMap<IPatternDetails> patternTimes,
-                           CraftingTreeNode tree) implements ICraftingPlan {
+                           CraftingTreeNode tree,
+                           List<ICraftingProvider> temporaryProviders) implements ICraftingPlan {
+    public CraftingPlan(GenericStack finalOutput,
+                        long bytes,
+                        boolean simulation,
+                        boolean multiplePaths,
+                        KeyCounter usedItems,
+                        KeyCounter emittedItems,
+                        KeyCounter missingItems,
+                        long intermediateFinalOutputAmount,
+                        Object2LongMap<IPatternDetails> patternTimes,
+                        CraftingTreeNode tree) {
+        this(finalOutput, bytes, simulation, multiplePaths, usedItems, emittedItems, missingItems,
+            intermediateFinalOutputAmount, patternTimes, tree, List.of());
+    }
 }

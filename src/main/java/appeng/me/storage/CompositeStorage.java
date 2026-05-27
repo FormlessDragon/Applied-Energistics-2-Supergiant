@@ -63,6 +63,12 @@ public class CompositeStorage implements MEStorage, ITickingMonitor {
     }
 
     @Override
+    public boolean isStickyStorageFor(AEKey what, IActionSource source) {
+        var storage = storages.get(what.getType());
+        return storage != null && storage.isStickyStorageFor(what, source);
+    }
+
+    @Override
     public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
         var storage = storages.get(what.getType());
         var inserted = storage != null ? storage.insert(what, amount, mode, source) : 0;

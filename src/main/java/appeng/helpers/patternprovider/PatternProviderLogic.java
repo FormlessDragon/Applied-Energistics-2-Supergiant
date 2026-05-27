@@ -45,6 +45,8 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import appeng.api.upgrades.IUpgradeInventory;
+import appeng.api.upgrades.UpgradeInventories;
 import appeng.api.util.IConfigManager;
 import appeng.core.definitions.AEItems;
 import appeng.core.localization.GuiText;
@@ -105,6 +107,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     private final IActionSource actionSource;
     private final IConfigManager configManager;
     private final AppEngInternalInventory patternInventory;
+    private final IUpgradeInventory upgrades;
     private final ObjectList<IPatternDetails> patterns = new ObjectArrayList<>();
     private final ObjectSet<AEKey> patternInputs = new ObjectOpenHashSet<>();
     private final ObjectList<GenericStack> sendList = new ObjectArrayList<>();
@@ -122,10 +125,15 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     private int lastSuccessfulPatternHash;
 
     public PatternProviderLogic(IManagedGridNode mainNode, PatternProviderLogicHost host) {
-        this(mainNode, host, 9);
+        this(mainNode, host, host.getMainContainerIcon().getItem(), 9);
     }
 
     public PatternProviderLogic(IManagedGridNode mainNode, PatternProviderLogicHost host, int patternInventorySize) {
+        this(mainNode, host, host.getMainContainerIcon().getItem(), patternInventorySize);
+    }
+
+    public PatternProviderLogic(IManagedGridNode mainNode, PatternProviderLogicHost host, net.minecraft.item.Item machineType,
+                                int patternInventorySize) {
         this.host = host;
         this.mainNode = mainNode
             .setFlags(GridFlags.REQUIRE_CHANNEL)
@@ -138,10 +146,11 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
                                            .registerSetting(Settings.BLOCKING_MODE, BlockingMode.NO)
                                            .registerSetting(Settings.PATTERN_PROVIDER_BLOCKING_TYPE,
                                                PatternProviderBlockingType.NORMAL)
-                                           .registerSetting(Settings.PATTERN_ACCESS_TERMINAL, YesNo.YES)
-                                           .registerSetting(Settings.LOCK_CRAFTING_MODE, LockCraftingMode.NONE)
-                                           .build();
+                                            .registerSetting(Settings.PATTERN_ACCESS_TERMINAL, YesNo.YES)
+                                            .registerSetting(Settings.LOCK_CRAFTING_MODE, LockCraftingMode.NONE)
+                                            .build();
         this.patternInventory = new AppEngInternalInventory(this, patternInventorySize, 1, new PatternInventoryFilter());
+        this.upgrades = UpgradeInventories.forMachine(machineType, 1, this::saveChanges);
         this.returnInv = new PatternProviderReturnInventory(() -> {
             this.mainNode.ifPresent((grid, node) -> grid.getTickManager().alertDevice(node));
             this.host.saveChanges();
@@ -191,6 +200,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     public void writeToNBT(NBTTagCompound tag) {
         this.configManager.writeToNBT(tag);
         this.patternInventory.writeToNBT(tag, NBT_PATTERNS);
+        this.upgrades.writeToNBT(tag, "upgrades");
         tag.setInteger(NBT_PRIORITY, this.priority);
 
         if (this.unlockEvent == UnlockCraftingEvent.REDSTONE_POWER) {
@@ -221,6 +231,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         this.configManager.readFromNBT(tag);
         migrateLegacyBlockingMode(tag);
         this.patternInventory.readFromNBT(tag, NBT_PATTERNS);
+        this.upgrades.readFromNBT(tag, "upgrades");
         this.priority = tag.getInteger(NBT_PRIORITY);
 
         byte unlockEventType = tag.getByte(NBT_UNLOCK_EVENT);
@@ -302,7 +313,13 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
     @Override
     public List<IPatternDetails> getAvailablePatterns() {
-        return this.mainNode.isActive() ? this.patterns : Collections.emptyList();
+        if (!this.mainNode.isActive()) {
+            return Collections.emptyList();
+        }
+        if (!this.upgrades.isInstalled(AEItems.PSEUDO_CRAFTING_CARD.item())) {
+            return this.patterns;
+        }
+        return this.patterns.stream().map(PseudoPatternDetails::wrap).collect(ObjectArrayList.toList());
     }
 
     @Override
@@ -324,7 +341,8 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
     @Override
     public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder) {
-        if (!this.sendList.isEmpty() || !this.mainNode.isActive() || !this.patterns.contains(patternDetails)) {
+        var basePatternDetails = PseudoPatternDetails.unwrap(patternDetails);
+        if (!this.sendList.isEmpty() || !this.mainNode.isActive() || !this.patterns.contains(basePatternDetails)) {
             return false;
         }
 
@@ -345,8 +363,8 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
             ICraftingMachine craftingMachine = ICraftingMachine.of(level, adjacentPos, adjacentSide);
             if (craftingMachine != null && craftingMachine.acceptsPlans()) {
-                if (craftingMachine.pushPattern(patternDetails, inputHolder, adjacentSide)) {
-                    onPushPatternSuccess(patternDetails);
+                if (craftingMachine.pushPattern(basePatternDetails, inputHolder, adjacentSide)) {
+                    onPushPatternSuccess(basePatternDetails);
                     return true;
                 }
                 continue;
@@ -358,25 +376,25 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             }
         }
 
-        if (!patternDetails.supportsPushInputsToExternalInventory()) {
+        if (!basePatternDetails.supportsPushInputsToExternalInventory()) {
             return false;
         }
 
         rearrangeRoundRobin(possibleTargets);
         for (int i = 0; i < possibleTargets.size(); ++i) {
             PushTarget target = possibleTargets.get(i);
-            if (this.isTargetBlocked(target.target, patternDetails)) {
+            if (this.isTargetBlocked(target.target, basePatternDetails)) {
                 continue;
             }
 
             if (this.adapterAcceptsAll(target.target, inputHolder)) {
-                patternDetails.pushInputsToExternalInventory(inputHolder, (what, amount) -> {
+                basePatternDetails.pushInputsToExternalInventory(inputHolder, (what, amount) -> {
                     long inserted = target.target.insert(what, amount, Actionable.MODULATE);
                     if (inserted < amount) {
                         this.addToSendList(what, amount - inserted);
                     }
                 });
-                onPushPatternSuccess(patternDetails);
+                onPushPatternSuccess(basePatternDetails);
                 this.sendDirection = target.direction;
                 this.saveChanges();
                 this.sendStacksOut();
@@ -603,6 +621,10 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         return this.patternInventory;
     }
 
+    public IUpgradeInventory getUpgrades() {
+        return this.upgrades;
+    }
+
     public void onMainNodeStateChanged() {
         boolean providerActive = this.mainNode.isActive();
         if (this.wasProviderActive != providerActive) {
@@ -634,8 +656,14 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
     public void clearContent() {
         this.patternInventory.clear();
+        this.upgrades.clear();
         this.sendList.clear();
         this.returnInv.clear();
+    }
+
+    void testSetPatterns(List<IPatternDetails> patterns) {
+        this.patterns.clear();
+        this.patterns.addAll(patterns);
     }
 
     public PatternProviderReturnInventory getReturnInv() {

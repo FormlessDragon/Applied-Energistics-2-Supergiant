@@ -205,12 +205,16 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         }
 
         for (var field : gui.getWidgets().getTextFields()) {
-            targets.add(new TextFieldTarget(gui, field));
+            if (field.getVisible()) {
+                targets.add(new TextFieldTarget(gui, field));
+            }
         }
 
         if (gui instanceof ITextFieldGui g) {
             for (var field : g.getTextFields()) {
-                targets.add(new TextFieldTarget(gui, field));
+                if (field.getVisible()) {
+                    targets.add(new TextFieldTarget(gui, field));
+                }
             }
         }
 

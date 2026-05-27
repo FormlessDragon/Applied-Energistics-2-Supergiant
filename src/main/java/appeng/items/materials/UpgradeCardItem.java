@@ -59,6 +59,13 @@ public class UpgradeCardItem extends AEBaseItem {
         return AEItemIds.CRAFTING_CARD.equals(stack.getItem().getRegistryName());
     }
 
+    public static boolean isPseudoCraftingCard(ItemStack stack) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof UpgradeCardItem)) {
+            return false;
+        }
+        return AEItemIds.PSEUDO_CRAFTING_CARD.equals(stack.getItem().getRegistryName());
+    }
+
     public static boolean isForceCraftingEnabled(ItemStack stack) {
         if (!isCraftingCard(stack)) {
             return false;
@@ -95,6 +102,9 @@ public class UpgradeCardItem extends AEBaseItem {
             lines.add(TextFormatting.GRAY + I18n.format("item.ae2.crafting_card.tooltip.force_crafting", status));
             lines.add(TextFormatting.DARK_GRAY + I18n.format("item.ae2.crafting_card.tooltip.force_crafting_hint"));
             lines.add(TextFormatting.DARK_GRAY + I18n.format("item.ae2.crafting_card.tooltip.force_crafting_desc"));
+        } else if (isPseudoCraftingCard(stack)) {
+            lines.add(TextFormatting.GRAY + I18n.format("item.ae2.pseudo_crafting_card.tooltip.line1"));
+            lines.add(TextFormatting.DARK_GRAY + I18n.format("item.ae2.pseudo_crafting_card.tooltip.line2"));
         }
 
         var supportedBy = Upgrades.getTooltipLinesForCard(this);

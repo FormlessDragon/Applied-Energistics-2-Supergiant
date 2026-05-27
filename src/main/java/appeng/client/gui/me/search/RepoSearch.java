@@ -69,9 +69,11 @@ public class RepoSearch {
             if (part.startsWith("@")) {
                 predicateFilters.add(new ModSearchPredicate(part.substring(1)));
             } else if (part.startsWith("$")) {
-                predicateFilters.add(new TooltipsSearchPredicate(part.substring(1), tooltipCache));
+                predicateFilters.add(new OreDictSearchPredicate(part.substring(1)));
             } else if (part.startsWith("#")) {
-                predicateFilters.add(new TagSearchPredicate(part.substring(1)));
+                predicateFilters.add(new TooltipsSearchPredicate(part.substring(1), tooltipCache));
+            } else if (part.startsWith("&")) {
+                predicateFilters.add(new ItemIdSearchPredicate(part.substring(1)));
             } else if (part.startsWith("*")) {
                 predicateFilters.add(new ItemIdSearchPredicate(part.substring(1)));
             } else {

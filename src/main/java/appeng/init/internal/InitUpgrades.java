@@ -44,6 +44,8 @@ public final class InitUpgrades {
         Upgrades.add(AEItems.CRAFTING_CARD.item(), AEBlocks.INTERFACE.item(), 1, interfaceGroup);
         Upgrades.add(AEItems.FUZZY_CARD.item(), AEParts.INTERFACE.item(), 1, interfaceGroup);
         Upgrades.add(AEItems.FUZZY_CARD.item(), AEBlocks.INTERFACE.item(), 1, interfaceGroup);
+        Upgrades.add(AEItems.PSEUDO_CRAFTING_CARD.item(), AEParts.PATTERN_PROVIDER.item(), 1);
+        Upgrades.add(AEItems.PSEUDO_CRAFTING_CARD.item(), AEBlocks.PATTERN_PROVIDER.item(), 1);
 
         Upgrades.add(AEItems.SPEED_CARD.item(), AEBlocks.MOLECULAR_ASSEMBLER.item(), 5);
         Upgrades.add(AEItems.SPEED_CARD.item(), AEBlocks.INSCRIBER.item(), 4);
@@ -75,6 +77,7 @@ public final class InitUpgrades {
             Upgrades.add(AEItems.FUZZY_CARD.item(), itemCell.item(), 1, storageCellGroup);
             Upgrades.add(AEItems.INVERTER_CARD.item(), itemCell.item(), 1, storageCellGroup);
             Upgrades.add(AEItems.EQUAL_DISTRIBUTION_CARD.item(), itemCell.item(), 1, storageCellGroup);
+            Upgrades.add(AEItems.STICKY_CARD.item(), itemCell.item(), 1, storageCellGroup);
             Upgrades.add(AEItems.VOID_CARD.item(), itemCell.item(), 1, storageCellGroup);
         }
 
@@ -86,6 +89,7 @@ public final class InitUpgrades {
             AEItems.FLUID_CELL_256K)) {
             Upgrades.add(AEItems.INVERTER_CARD.item(), fluidCell.item(), 1, storageCellGroup);
             Upgrades.add(AEItems.EQUAL_DISTRIBUTION_CARD.item(), fluidCell.item(), 1, storageCellGroup);
+            Upgrades.add(AEItems.STICKY_CARD.item(), fluidCell.item(), 1, storageCellGroup);
             Upgrades.add(AEItems.VOID_CARD.item(), fluidCell.item(), 1, storageCellGroup);
         }
 
@@ -101,6 +105,7 @@ public final class InitUpgrades {
             Upgrades.add(AEItems.FUZZY_CARD.item(), portableItemCell.item(), 1, portableCellGroup);
             Upgrades.add(AEItems.INVERTER_CARD.item(), portableItemCell.item(), 1, portableCellGroup);
             Upgrades.add(AEItems.EQUAL_DISTRIBUTION_CARD.item(), portableItemCell.item(), 1, portableCellGroup);
+            Upgrades.add(AEItems.STICKY_CARD.item(), portableItemCell.item(), 1, portableCellGroup);
             Upgrades.add(AEItems.VOID_CARD.item(), portableItemCell.item(), 1, portableCellGroup);
             Upgrades.add(AEItems.ENERGY_CARD.item(), portableItemCell.item(), 2, portableCellGroup);
         }
@@ -113,6 +118,7 @@ public final class InitUpgrades {
             AEItems.PORTABLE_FLUID_CELL256K)) {
             Upgrades.add(AEItems.INVERTER_CARD.item(), portableFluidCell.item(), 1, portableCellGroup);
             Upgrades.add(AEItems.EQUAL_DISTRIBUTION_CARD.item(), portableFluidCell.item(), 1, portableCellGroup);
+            Upgrades.add(AEItems.STICKY_CARD.item(), portableFluidCell.item(), 1, portableCellGroup);
             Upgrades.add(AEItems.VOID_CARD.item(), portableFluidCell.item(), 1, portableCellGroup);
             Upgrades.add(AEItems.ENERGY_CARD.item(), portableFluidCell.item(), 2, portableCellGroup);
         }
@@ -125,6 +131,7 @@ public final class InitUpgrades {
         Upgrades.add(AEItems.INVERTER_CARD.item(), AEParts.STORAGE_BUS.item(), 1);
         Upgrades.add(AEItems.CAPACITY_CARD.item(), AEParts.STORAGE_BUS.item(), 5);
         Upgrades.add(AEItems.VOID_CARD.item(), AEParts.STORAGE_BUS.item(), 1);
+        Upgrades.add(AEItems.STICKY_CARD.item(), AEParts.STORAGE_BUS.item(), 1);
 
         Upgrades.add(AEItems.FUZZY_CARD.item(), AEParts.FORMATION_PLANE.item(), 1);
         Upgrades.add(AEItems.INVERTER_CARD.item(), AEParts.FORMATION_PLANE.item(), 1);

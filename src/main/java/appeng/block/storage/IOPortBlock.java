@@ -58,12 +58,12 @@ public class IOPortBlock extends AEBaseTileBlock<TileIOPort> {
 
     @Override
     public int getMetaFromState(IBlockState state) {
-        return state.getValue(POWERED) ? 1 : 0;
+        return super.getMetaFromState(state) | (state.getValue(POWERED) ? 8 : 0);
     }
 
     @Override
     public IBlockState getStateFromMeta(int meta) {
-        return this.getDefaultState().withProperty(POWERED, meta != 0);
+        return super.getStateFromMeta(meta).withProperty(POWERED, (meta & 8) == 8);
     }
 
     @Override

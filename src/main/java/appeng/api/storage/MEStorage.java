@@ -69,6 +69,13 @@ public interface MEStorage {
     }
 
     /**
+     * Returns whether this inventory should claim insertions for the given stack before regular inventories.
+     */
+    default boolean isStickyStorageFor(AEKey what, IActionSource source) {
+        return false;
+    }
+
+    /**
      * Store new items, or simulate the addition of new items into the ME Inventory.
      *
      * @param what   what to insert

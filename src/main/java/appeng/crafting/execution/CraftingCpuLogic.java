@@ -19,8 +19,10 @@ package appeng.crafting.execution;
 
 import appeng.api.config.Actionable;
 import appeng.api.config.PowerMultiplier;
+import appeng.api.crafting.IPatternDetails;
 import appeng.api.features.IPlayerRegistry;
 import appeng.api.networking.IGrid;
+import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.networking.crafting.ICraftingLink;
 import appeng.api.networking.crafting.ICraftingPlan;
 import appeng.api.networking.crafting.ICraftingRequester;
@@ -34,6 +36,8 @@ import appeng.core.AELog;
 import appeng.core.network.InitNetwork;
 import appeng.core.network.clientbound.CraftingJobStatusPacket;
 import appeng.crafting.CraftingLink;
+import appeng.helpers.patternprovider.PseudoPatternDetails;
+import appeng.crafting.inv.ICraftingInventory;
 import appeng.crafting.inv.ListCraftingInventory;
 import appeng.hooks.ticking.TickHandler;
 import appeng.me.cluster.implementations.CraftingCPUCluster;
@@ -46,6 +50,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.List;
@@ -175,6 +180,21 @@ public class CraftingCpuLogic {
      */
     public int executeCrafting(int maxPatterns, CraftingService craftingService, IEnergyService energyService,
                                World level) {
+        return executeCraftingWithProviderLookup(maxPatterns, energyService, level,
+            details -> getProvidersForPattern(craftingService, details));
+    }
+
+    private Iterable<ICraftingProvider> getProvidersForPattern(CraftingService craftingService,
+                                                               IPatternDetails details) {
+        var job = this.job;
+        if (job != null && job.isTemporaryPattern(details)) {
+            return job.getProvidersForPattern(details);
+        }
+        return craftingService.getProviders(details);
+    }
+
+    int executeCraftingWithProviderLookup(int maxPatterns, IEnergyService energyService, World level,
+                                          java.util.function.Function<IPatternDetails, Iterable<ICraftingProvider>> providersForPattern) {
         var job = this.job;
         if (job == null)
             return 0;
@@ -191,15 +211,19 @@ public class CraftingCpuLogic {
             }
 
             var details = task.getKey();
+            var pseudoPattern = PseudoPatternDetails.isPseudo(details);
             var expectedOutputs = new KeyCounter();
             var expectedContainerItems = new KeyCounter();
+            ICraftingInventory taskInventory = pseudoPattern
+                ? new CpuTaskInventoryView(inventory, job.pseudoInventory)
+                : inventory;
             // Contains the inputs for the pattern.
             @Nullable
-            var craftingContainer = CraftingCpuHelper.extractPatternInputs(
-                details, inventory, level, expectedOutputs, expectedContainerItems);
+            var craftingContainer = CraftingCpuHelper.extractPatternInputs(details, taskInventory, level,
+                expectedOutputs, expectedContainerItems);
 
             // Try to push to each provider.
-            for (var provider : craftingService.getProviders(details)) {
+            for (var provider : providersForPattern.apply(details)) {
                 if (craftingContainer == null)
                     break;
                 if (provider.isBusy())
@@ -214,23 +238,22 @@ public class CraftingCpuLogic {
                 if (provider.pushPattern(details, craftingContainer)) {
                     energyService.extractAEPower(patternPower, Actionable.MODULATE, PowerMultiplier.CONFIG);
                     pushedPatterns++;
-
-                    for (var expectedOutput : expectedOutputs) {
-                        job.waitingFor.insert(expectedOutput.getKey(), expectedOutput.getLongValue(),
-                            Actionable.MODULATE);
-                    }
-                    for (var expectedContainerItem : expectedContainerItems) {
-                        job.waitingFor.insert(expectedContainerItem.getKey(), expectedContainerItem.getLongValue(),
-                            Actionable.MODULATE);
-                        job.timeTracker.addMaxItems(expectedContainerItem.getLongValue(),
-                            expectedContainerItem.getKey().getType());
-                    }
+                    recordPushedPattern(job, details, taskInventory, expectedOutputs, expectedContainerItems);
 
                     cluster.markDirty();
 
                     task.getValue().value--;
+                    if (pseudoPattern) {
+                        completePseudoOutputs(job, expectedOutputs);
+                        if (job != this.job) {
+                            break taskLoop;
+                        }
+                    }
                     if (task.getValue().value <= 0) {
                         it.remove();
+                        if (job != this.job) {
+                            break taskLoop;
+                        }
                         continue taskLoop;
                     }
 
@@ -241,18 +264,61 @@ public class CraftingCpuLogic {
                     // Prepare next inputs.
                     expectedOutputs.reset();
                     expectedContainerItems.reset();
-                    craftingContainer = CraftingCpuHelper.extractPatternInputs(details, inventory,
-                        level, expectedOutputs, expectedContainerItems);
+                    taskInventory = pseudoPattern
+                        ? new CpuTaskInventoryView(inventory, job.pseudoInventory)
+                        : inventory;
+                    craftingContainer = CraftingCpuHelper.extractPatternInputs(details, taskInventory, level,
+                        expectedOutputs, expectedContainerItems);
                 }
             }
 
             // Failed to push this pattern, reinject the inputs.
             if (craftingContainer != null) {
-                CraftingCpuHelper.reinjectPatternInputs(inventory, craftingContainer);
+                CraftingCpuHelper.reinjectPatternInputs(taskInventory, craftingContainer);
             }
         }
 
         return pushedPatterns;
+    }
+
+    private void recordPushedPattern(ExecutingCraftingJob job, IPatternDetails details,
+                                     ICraftingInventory taskInventory, KeyCounter expectedOutputs,
+                                     KeyCounter expectedContainerItems) {
+        if (PseudoPatternDetails.isPseudo(details)) {
+            recordPushedPseudoPattern(job, details, taskInventory, expectedOutputs, expectedContainerItems);
+        } else {
+            recordPushedNormalPattern(job, expectedOutputs, expectedContainerItems);
+        }
+    }
+
+    private void recordPushedNormalPattern(ExecutingCraftingJob job, KeyCounter expectedOutputs,
+                                           KeyCounter expectedContainerItems) {
+        for (var expectedOutput : expectedOutputs) {
+            job.waitingFor.insert(expectedOutput.getKey(), expectedOutput.getLongValue(), Actionable.MODULATE);
+        }
+        for (var expectedContainerItem : expectedContainerItems) {
+            job.waitingFor.insert(expectedContainerItem.getKey(), expectedContainerItem.getLongValue(),
+                Actionable.MODULATE);
+            job.timeTracker.addMaxItems(expectedContainerItem.getLongValue(), expectedContainerItem.getKey().getType());
+        }
+    }
+
+    private void recordPushedPseudoPattern(ExecutingCraftingJob job, IPatternDetails details,
+                                           ICraftingInventory taskInventory, KeyCounter expectedOutputs,
+                                           KeyCounter expectedContainerItems) {
+        var temporaryPattern = job.isTemporaryPattern(details);
+        if (temporaryPattern && taskInventory instanceof CpuTaskInventoryView taskInventoryView) {
+            returnTemporaryPatternInputs(taskInventoryView);
+        }
+        for (var expectedOutput : expectedOutputs) {
+            job.pseudoInventory.insert(expectedOutput.getKey(), expectedOutput.getLongValue(), Actionable.MODULATE);
+        }
+        if (!temporaryPattern) {
+            for (var expectedContainerItem : expectedContainerItems) {
+                inventory.insert(expectedContainerItem.getKey(), expectedContainerItem.getLongValue(),
+                    Actionable.MODULATE);
+            }
+        }
     }
 
     /**
@@ -355,6 +421,7 @@ public class CraftingCpuLogic {
 
         // Clear waitingFor list and post all the relevant changes.
         job.waitingFor.clear();
+        job.pseudoInventory.clear();
         // Notify opened menus of cancelled scheduled tasks.
         for (var entry : job.tasks.entrySet()) {
             for (var output : entry.getKey().getOutputs()) {
@@ -493,7 +560,8 @@ public class CraftingCpuLogic {
 
     public long getWaitingFor(AEKey template) {
         if (this.job != null) {
-            return this.job.waitingFor.extract(template, Long.MAX_VALUE, Actionable.SIMULATE);
+            return this.job.waitingFor.extract(template, Long.MAX_VALUE, Actionable.SIMULATE)
+                + this.job.pseudoInventory.extract(template, Long.MAX_VALUE, Actionable.SIMULATE);
         }
         return 0;
     }
@@ -501,6 +569,9 @@ public class CraftingCpuLogic {
     public void getAllWaitingFor(Set<AEKey> waitingFor) {
         if (this.job != null) {
             for (var entry : this.job.waitingFor.list) {
+                waitingFor.add(entry.getKey());
+            }
+            for (var entry : this.job.pseudoInventory.list) {
                 waitingFor.add(entry.getKey());
             }
         }
@@ -539,6 +610,7 @@ public class CraftingCpuLogic {
         out.addAll(this.inventory.list);
         if (this.job != null) {
             out.addAll(job.waitingFor.list);
+            out.addAll(job.pseudoInventory.list);
             for (var t : job.tasks.entrySet()) {
                 for (var output : t.getKey().getOutputs()) {
                     out.add(output.what(), output.amount() * t.getValue().value);
@@ -592,6 +664,116 @@ public class CraftingCpuLogic {
                 finalOutputAmount,
                 job.remainingAmount,
                 status), connectedPlayer);
+        }
+    }
+
+    private void completePseudoOutputs(ExecutingCraftingJob job, KeyCounter expectedOutputs) {
+        if (job != this.job) {
+            return;
+        }
+
+        for (var expectedOutput : expectedOutputs) {
+            if (!expectedOutput.getKey().matches(job.finalOutput)) {
+                continue;
+            }
+
+            long completedAmount = Math.min(expectedOutput.getLongValue(), job.remainingAmount);
+            if (completedAmount <= 0) {
+                continue;
+            }
+
+            job.pseudoInventory.extract(expectedOutput.getKey(), completedAmount, Actionable.MODULATE);
+            postChange(expectedOutput.getKey());
+            job.remainingAmount -= completedAmount;
+            if (job.remainingAmount <= 0) {
+                finishJob(true);
+                cluster.updateOutput(null);
+                return;
+            }
+            cluster.updateOutput(new GenericStack(job.finalOutput.what(), job.remainingAmount));
+        }
+    }
+
+    private void returnTemporaryPatternInputs(CpuTaskInventoryView taskInventory) {
+        var grid = cluster.getGrid();
+        if (grid == null) {
+            taskInventory.reinjectRealInputs(inventory);
+            return;
+        }
+
+        var storage = grid.getStorageService().getInventory();
+        for (var entry : taskInventory.realExtracted) {
+            var inserted = storage.insert(entry.getKey(), entry.getLongValue(), Actionable.MODULATE, cluster.getSrc());
+            if (inserted < entry.getLongValue()) {
+                inventory.insert(entry.getKey(), entry.getLongValue() - inserted, Actionable.MODULATE);
+            }
+        }
+    }
+
+    private static final class CpuTaskInventoryView implements appeng.crafting.inv.ICraftingInventory {
+        private final ListCraftingInventory realInventory;
+        private final ListCraftingInventory pseudoInventory;
+        private final KeyCounter realExtracted = new KeyCounter();
+        private final KeyCounter pseudoExtracted = new KeyCounter();
+
+        private CpuTaskInventoryView(ListCraftingInventory realInventory, ListCraftingInventory pseudoInventory) {
+            this.realInventory = realInventory;
+            this.pseudoInventory = pseudoInventory;
+        }
+
+        @Override
+        public void insert(AEKey what, long amount, Actionable mode) {
+            long toPseudo = Math.min(amount, pseudoExtracted.get(what));
+            if (toPseudo > 0) {
+                pseudoExtracted.remove(what, toPseudo);
+                pseudoInventory.insert(what, toPseudo, mode);
+                amount -= toPseudo;
+            }
+            if (amount > 0) {
+                long toReal = Math.min(amount, realExtracted.get(what));
+                if (toReal > 0) {
+                    realExtracted.remove(what, toReal);
+                    realInventory.insert(what, toReal, mode);
+                    amount -= toReal;
+                }
+            }
+            if (amount > 0) {
+                realInventory.insert(what, amount, mode);
+            }
+        }
+
+        @Override
+        public long extract(AEKey what, long amount, Actionable mode) {
+            long extracted = realInventory.extract(what, amount, mode);
+            if (mode == Actionable.MODULATE && extracted > 0) {
+                realExtracted.add(what, extracted);
+            }
+            if (extracted >= amount) {
+                return extracted;
+            }
+            long pseudoExtractedAmount = pseudoInventory.extract(what, amount - extracted, mode);
+            if (mode == Actionable.MODULATE && pseudoExtractedAmount > 0) {
+                pseudoExtracted.add(what, pseudoExtractedAmount);
+            }
+            return extracted + pseudoExtractedAmount;
+        }
+
+        @Override
+        public Iterable<AEKey> findFuzzyTemplates(AEKey input) {
+            var realTemplates = realInventory.findFuzzyTemplates(input);
+            var pseudoTemplates = pseudoInventory.findFuzzyTemplates(input);
+            return () -> java.util.stream.Stream.concat(
+                java.util.stream.StreamSupport.stream(realTemplates.spliterator(), false),
+                java.util.stream.StreamSupport.stream(pseudoTemplates.spliterator(), false))
+                .filter(Objects::nonNull)
+                .distinct()
+                .iterator();
+        }
+
+        private void reinjectRealInputs(ListCraftingInventory inventory) {
+            for (var entry : realExtracted) {
+                inventory.insert(entry.getKey(), entry.getLongValue(), Actionable.MODULATE);
+            }
         }
     }
 }

@@ -56,6 +56,7 @@ import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextComponentTranslation;
@@ -427,7 +428,8 @@ public class MemoryCardItem extends AEBaseItem implements IMemoryCard {
 
     @Override
     public ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, EnumHand hand) {
-        if (InteractionUtil.isInAlternateUseMode(player) && !world.isRemote) {
+        if (InteractionUtil.isInAlternateUseMode(player) && shouldClearOnShiftRightClick(rayTrace(world, player, false))
+            && !world.isRemote) {
             clearCard(player, hand);
         }
         return new ActionResult<>(EnumActionResult.SUCCESS, player.getHeldItem(hand));
@@ -442,6 +444,10 @@ public class MemoryCardItem extends AEBaseItem implements IMemoryCard {
         IMemoryCard memoryCard = (IMemoryCard) player.getHeldItem(hand).getItem();
         memoryCard.notifyUser(player, MemoryCardMessages.SETTINGS_CLEARED);
         clearCard(player.getHeldItem(hand));
+    }
+
+    static boolean shouldClearOnShiftRightClick(@Nullable RayTraceResult hitResult) {
+        return hitResult == null || hitResult.typeOfHit != RayTraceResult.Type.BLOCK;
     }
 
     public int getColor(ItemStack stack) {

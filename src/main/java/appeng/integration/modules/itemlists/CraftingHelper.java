@@ -2,6 +2,7 @@ package appeng.integration.modules.itemlists;
 
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
 import appeng.container.me.common.GridInventoryEntry;
 import appeng.container.me.common.IClientRepo;
 import appeng.container.me.items.ContainerCraftingTerm;
@@ -39,12 +40,20 @@ public final class CraftingHelper {
 
     public static void performTransfer(ContainerCraftingTerm container, @Nullable ResourceLocation recipeId,
                                        List<List<ItemStack>> templateItems, boolean craftMissing) {
+        performTransfer(container, recipeId, templateItems, craftMissing, List.of(), List.of());
+    }
+
+    public static void performTransfer(ContainerCraftingTerm container, @Nullable ResourceLocation recipeId,
+                                       List<List<ItemStack>> templateItems, boolean craftMissing,
+                                       List<GenericStack> temporaryPseudoInputs,
+                                       List<GenericStack> temporaryPseudoOutputs) {
         if (recipeId != null && CraftingManager.REGISTRY.getObject(recipeId) == null) {
             AELog.debug("Cannot send recipe id %s to server because it's transient", recipeId);
             recipeId = null;
         }
 
-        InitNetwork.sendToServer(new FillCraftingGridFromRecipePacket(recipeId, templateItems, craftMissing));
+        InitNetwork.sendToServer(new FillCraftingGridFromRecipePacket(recipeId, templateItems, craftMissing,
+            temporaryPseudoInputs, temporaryPseudoOutputs));
     }
 
     private static List<List<ItemStack>> findTemplateItems(IRecipe recipe, ContainerCraftingTerm container) {

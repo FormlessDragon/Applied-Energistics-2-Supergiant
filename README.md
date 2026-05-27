@@ -4,6 +4,8 @@ Applied Energistics 2 is a Minecraft mod about Matter, Energy and using them to 
 
 This repository is a Minecraft 1.12.2 Cleanroom migration of Applied Energistics 2. It adapts AE2's storage, networking, crafting, terminal, rendering, and addon API systems to the target runtime.
 
+Need Java25.
+
 ## Upstream
 
 This project is based on [AppliedEnergistics/Applied-Energistics-2](https://github.com/AppliedEnergistics/Applied-Energistics-2).

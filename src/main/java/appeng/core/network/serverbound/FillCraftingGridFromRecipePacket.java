@@ -8,11 +8,13 @@ import appeng.api.networking.energy.IEnergySource;
 import appeng.api.networking.storage.IStorageService;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 import appeng.api.storage.StorageHelper;
 import appeng.container.interfaces.ICraftingGridContainer;
 import appeng.core.network.ServerboundPacket;
+import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.items.storage.ViewCellItem;
 import appeng.me.storage.NullInventory;
 import appeng.util.CraftingRecipeUtil;
@@ -46,15 +48,25 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
     private ResourceLocation recipeId;
     private List<List<ItemStack>> ingredientTemplates = createEmptyIngredientTemplates();
     private boolean craftMissing;
+    private List<GenericStack> temporaryPseudoInputs = List.of();
+    private List<GenericStack> temporaryPseudoOutputs = List.of();
 
     public FillCraftingGridFromRecipePacket() {
     }
 
     public FillCraftingGridFromRecipePacket(ResourceLocation recipeId, List<List<ItemStack>> ingredientTemplates,
                                             boolean craftMissing) {
+        this(recipeId, ingredientTemplates, craftMissing, List.of(), List.of());
+    }
+
+    public FillCraftingGridFromRecipePacket(ResourceLocation recipeId, List<List<ItemStack>> ingredientTemplates,
+                                            boolean craftMissing, List<GenericStack> temporaryPseudoInputs,
+                                            List<GenericStack> temporaryPseudoOutputs) {
         this.recipeId = recipeId;
         this.ingredientTemplates = copyIngredientTemplates(ingredientTemplates);
         this.craftMissing = craftMissing;
+        this.temporaryPseudoInputs = copyGenericStacks(temporaryPseudoInputs, AEProcessingPattern.MAX_INPUT_SLOTS);
+        this.temporaryPseudoOutputs = copyGenericStacks(temporaryPseudoOutputs, AEProcessingPattern.MAX_OUTPUT_SLOTS);
     }
 
     private static List<List<ItemStack>> createEmptyIngredientTemplates() {
@@ -99,6 +111,19 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
         return result;
     }
 
+    private static List<GenericStack> copyGenericStacks(List<GenericStack> stacks, int maxSize) {
+        List<GenericStack> result = new ObjectArrayList<>(Math.min(stacks.size(), maxSize));
+        for (GenericStack stack : stacks) {
+            if (stack != null && stack.amount() > 0) {
+                result.add(stack);
+                if (result.size() >= maxSize) {
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
     @Override
     protected void read(ByteBuf buf) {
         PacketBuffer packetBuffer = new PacketBuffer(buf);
@@ -120,6 +145,8 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
             }
         }
         this.craftMissing = packetBuffer.readBoolean();
+        this.temporaryPseudoInputs = readGenericStacks(packetBuffer, AEProcessingPattern.MAX_INPUT_SLOTS);
+        this.temporaryPseudoOutputs = readGenericStacks(packetBuffer, AEProcessingPattern.MAX_OUTPUT_SLOTS);
     }
 
     @Override
@@ -137,6 +164,40 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
             }
         }
         packetBuffer.writeBoolean(this.craftMissing);
+        writeGenericStacks(packetBuffer, this.temporaryPseudoInputs);
+        writeGenericStacks(packetBuffer, this.temporaryPseudoOutputs);
+    }
+
+    private static List<GenericStack> readGenericStacks(PacketBuffer packetBuffer, int maxSize) {
+        if (!packetBuffer.readBoolean()) {
+            return List.of();
+        }
+
+        int size = packetBuffer.readVarInt();
+        Preconditions.checkArgument(size <= maxSize,
+            "Got %s generic stacks from client, expected at most %s",
+            size, maxSize);
+
+        List<GenericStack> result = new ObjectArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            GenericStack stack = GenericStack.readBuffer(packetBuffer);
+            if (stack != null && stack.amount() > 0) {
+                result.add(stack);
+            }
+        }
+        return result;
+    }
+
+    private static void writeGenericStacks(PacketBuffer packetBuffer, List<GenericStack> stacks) {
+        packetBuffer.writeBoolean(!stacks.isEmpty());
+        if (stacks.isEmpty()) {
+            return;
+        }
+
+        packetBuffer.writeVarInt(stacks.size());
+        for (GenericStack stack : stacks) {
+            GenericStack.writeBuffer(stack, packetBuffer);
+        }
     }
 
     @Override
@@ -166,6 +227,9 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
         InternalInventory craftMatrix = container.getCraftingMatrix();
         IPartitionList filter = ViewCellItem.createItemFilter(container.getViewCells());
         NonNullList<Ingredient> ingredients = getDesiredIngredients();
+        boolean useTemporaryPseudoCraft = this.craftMissing
+            && !this.temporaryPseudoInputs.isEmpty()
+            && !this.temporaryPseudoOutputs.isEmpty();
 
         Object2ObjectMap<AEItemKey, AutoCraftRequest> toAutoCraft = new Object2ObjectLinkedOpenHashMap<>();
         boolean touchedGridStorage = false;
@@ -242,7 +306,7 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
             int missingAmount = targetAmount - (!currentItem.isEmpty() && ingredient.apply(currentItem)
                 ? currentItem.getCount()
                 : 0);
-            if (missingAmount > 0 && this.craftMissing && craftingService != null) {
+            if (missingAmount > 0 && this.craftMissing && !useTemporaryPseudoCraft && craftingService != null) {
                 final int craftSlot = slot;
                 final int craftAmount = missingAmount;
                 findCraftableKey(ingredient, craftingService).ifPresent(key -> {
@@ -253,6 +317,15 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
         }
 
         player.openContainer.onCraftMatrixChanged(craftMatrix.toContainer());
+
+        if (useTemporaryPseudoCraft && craftingService != null) {
+            if (touchedGridStorage && storageService != null) {
+                storageService.invalidateCache();
+            }
+
+            container.startTemporaryPseudoCrafting(this.temporaryPseudoInputs, this.temporaryPseudoOutputs);
+            return;
+        }
 
         if (!toAutoCraft.isEmpty()) {
             if (touchedGridStorage && storageService != null) {

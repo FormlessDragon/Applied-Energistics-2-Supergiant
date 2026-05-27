@@ -6,6 +6,7 @@ import appeng.api.stacks.AEKey;
 import appeng.core.AEConfig;
 import appeng.core.AELog;
 import appeng.core.network.clientbound.CraftingJobStatusPacket;
+import appeng.items.tools.powered.WirelessTerminals;
 import appeng.util.SearchInventoryEvent;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
@@ -22,7 +23,6 @@ import java.util.UUID;
  */
 @SideOnly(Side.CLIENT)
 public final class PendingCraftingJobs {
-    private static final String WIRELESS_LINK_TARGET_TAG = "wireless_link_target";
     private static final Map<UUID, PendingJob> jobs = new Object2ObjectOpenHashMap<>();
 
     private PendingCraftingJobs() {
@@ -57,7 +57,6 @@ public final class PendingCraftingJobs {
                 jobs.remove(id);
                 Minecraft minecraft = Minecraft.getMinecraft();
                 if (AEConfig.instance().isNotifyForFinishedCraftingJobs()
-                    && !(minecraft.currentScreen instanceof GuiMEStorage)
                     && minecraft.player != null && hasNotificationEnablingItem(minecraft.player)) {
                     minecraft.getToastGui().add(new FinishedJobToast(what, requestedAmount));
                 }
@@ -74,7 +73,7 @@ public final class PendingCraftingJobs {
                 && stack.getItem() instanceof IAEItemPowerStorage
                 && ((IAEItemPowerStorage) stack.getItem()).getAECurrentPower(stack) > 0
                 && tag != null
-                && tag.hasKey(WIRELESS_LINK_TARGET_TAG, 10)) {
+                && tag.hasKey(WirelessTerminals.TAG_LINK, 10)) {
                 return true;
             }
         }

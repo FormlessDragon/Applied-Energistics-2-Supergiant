@@ -53,7 +53,8 @@ import java.util.List;
 public class TilePatternProvider extends AENetworkedTile implements PatternProviderLogicHost, IConfigurableObject {
     private static final String MEMORY_CARD_PUSH_DIRECTION = "pushDirection";
 
-    private final PatternProviderLogic logic = new PatternProviderLogic(this.getMainNode(), this);
+    private final PatternProviderLogic logic = new PatternProviderLogic(this.getMainNode(), this,
+        AEBlocks.PATTERN_PROVIDER.item(), 9);
     private final IItemHandler itemHandler = new GenericStackItemStorage(this.logic.getReturnInv());
     private final IFluidHandler fluidHandler = new GenericStackFluidStorage(this.logic.getReturnInv());
 

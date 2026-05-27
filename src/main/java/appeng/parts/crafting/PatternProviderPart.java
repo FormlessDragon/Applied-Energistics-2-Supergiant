@@ -70,7 +70,7 @@ public class PatternProviderPart extends AEBasePart implements PatternProviderLo
     }
 
     protected PatternProviderLogic createLogic() {
-        return new PatternProviderLogic(this.getMainNode(), this);
+        return new PatternProviderLogic(this.getMainNode(), this, AEParts.PATTERN_PROVIDER.item(), 9);
     }
 
     @Override

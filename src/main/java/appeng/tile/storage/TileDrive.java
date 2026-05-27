@@ -284,7 +284,7 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
             StorageCell cell = StorageCells.getCellInventory(stack, this::onCellContentChanged);
             if (cell != null) {
                 inv.setHandler(slot, cell);
-                invBySlot[slot] = new DriveWatcher(cell, this::updateVisualState);
+                invBySlot[slot] = new DriveWatcher(cell, stack, this::updateVisualState);
                 return cell.getIdleDrain();
             }
         }
