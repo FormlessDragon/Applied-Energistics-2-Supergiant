@@ -21,6 +21,24 @@ import java.util.Map;
 @Mixin(ITextComponent.Serializer.class)
 public class TextComponentSerializerMixin {
 
+    @Unique
+    private static String ae2_getRequiredString(JsonObject jsonObject) {
+        JsonElement element = jsonObject.get("ae2_custom");
+        if (element == null || !element.isJsonPrimitive()) {
+            throw new JsonParseException("Expected string for key: " + "ae2_custom");
+        }
+        return element.getAsString();
+    }
+
+    @Unique
+    private static JsonObject ae2_getRequiredObject(JsonObject jsonObject) {
+        JsonElement element = jsonObject.get("data");
+        if (element == null || !element.isJsonObject()) {
+            throw new JsonParseException("Expected object for key: " + "data");
+        }
+        return element.getAsJsonObject();
+    }
+
     @Inject(
         method = "deserialize(Lcom/google/gson/JsonElement;Ljava/lang/reflect/Type;Lcom/google/gson/JsonDeserializationContext;)Lnet/minecraft/util/text/ITextComponent;",
         at = @At("HEAD"),
@@ -99,23 +117,5 @@ public class TextComponentSerializerMixin {
         }
 
         cir.setReturnValue(jsonObject);
-    }
-
-    @Unique
-    private static String ae2_getRequiredString(JsonObject jsonObject) {
-        JsonElement element = jsonObject.get("ae2_custom");
-        if (element == null || !element.isJsonPrimitive()) {
-            throw new JsonParseException("Expected string for key: " + "ae2_custom");
-        }
-        return element.getAsString();
-    }
-
-    @Unique
-    private static JsonObject ae2_getRequiredObject(JsonObject jsonObject) {
-        JsonElement element = jsonObject.get("data");
-        if (element == null || !element.isJsonObject()) {
-            throw new JsonParseException("Expected object for key: " + "data");
-        }
-        return element.getAsJsonObject();
     }
 }

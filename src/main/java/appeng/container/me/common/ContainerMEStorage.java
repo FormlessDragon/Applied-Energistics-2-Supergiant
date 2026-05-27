@@ -176,6 +176,18 @@ public class ContainerMEStorage extends AEBaseContainer
         }
     }
 
+    private static boolean areStacksEqual(ItemStack left, ItemStack right) {
+        return ItemStack.areItemsEqual(left, right) && ItemStack.areItemStackTagsEqual(left, right);
+    }
+
+    private static <T> void addSetDifference(java.util.function.Consumer<T> consumer, Set<T> left, Set<T> right) {
+        for (var element : left) {
+            if (!right.contains(element)) {
+                consumer.accept(element);
+            }
+        }
+    }
+
     private void setupWirelessSingularity(ITerminalHost host) {
         if (host instanceof WirelessTerminalGuiHost<?> wirelessHost) {
             RestrictedInputSlot slot = new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.QE_SINGULARITY,
@@ -183,10 +195,6 @@ public class ContainerMEStorage extends AEBaseContainer
             slot.setStackLimit(1);
             this.addSlot(slot, SlotSemantics.WIRELESS_SINGULARITY);
         }
-    }
-
-    private static boolean areStacksEqual(ItemStack left, ItemStack right) {
-        return ItemStack.areItemsEqual(left, right) && ItemStack.areItemStackTagsEqual(left, right);
     }
 
     public ToolboxInventory getToolbox() {
@@ -284,14 +292,6 @@ public class ContainerMEStorage extends AEBaseContainer
 
     protected boolean showsCraftables() {
         return true;
-    }
-
-    private static <T> void addSetDifference(java.util.function.Consumer<T> consumer, Set<T> left, Set<T> right) {
-        for (var element : left) {
-            if (!right.contains(element)) {
-                consumer.accept(element);
-            }
-        }
     }
 
     private Set<AEKey> getCraftablesFromGrid() {

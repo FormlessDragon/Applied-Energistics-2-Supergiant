@@ -92,11 +92,11 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
     private IRecipe currentRecipe;
     private boolean clearGridOnClose;
 
-    public ContainerCraftingTerm( InventoryPlayer ip, ITerminalHost host) {
+    public ContainerCraftingTerm(InventoryPlayer ip, ITerminalHost host) {
         this(GuiIds.GuiKey.CRAFTING_TERMINAL, ip, host, true);
     }
 
-    protected ContainerCraftingTerm(GuiIds.GuiKey guiKey,  InventoryPlayer ip, ITerminalHost host,
+    protected ContainerCraftingTerm(GuiIds.GuiKey guiKey, InventoryPlayer ip, ITerminalHost host,
                                     boolean bindInventory) {
         super(guiKey, ip, host, bindInventory);
         Preconditions.checkArgument(host instanceof ISegmentedInventory,

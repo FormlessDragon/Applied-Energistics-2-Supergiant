@@ -2,17 +2,16 @@ package appeng.client.gui.style;
 
 import appeng.client.gui.Icon;
 import appeng.core.AppEng;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IReloadableResourceManager;
+import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
 import net.minecraft.util.ResourceLocation;
 
 import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.Map;

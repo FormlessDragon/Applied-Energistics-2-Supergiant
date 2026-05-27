@@ -108,7 +108,7 @@ public final class Upgrades {
                     ITextComponent upgradeName = TextComponentItemStack.of(new ItemStack(association.upgradeCard()));
                     if (association.maxCount() > 1) {
                         upgradeName = upgradeName.createCopy()
-                            .appendSibling(new TextComponentString(" (" + association.maxCount() + ")"));
+                                                 .appendSibling(new TextComponentString(" (" + association.maxCount() + ")"));
                     }
                     result.add(upgradeName);
                     break;
@@ -148,7 +148,7 @@ public final class Upgrades {
             Association association = associations.get(i);
             var ii = new ItemStack(association.upgradableItem());
             ITextComponent name = TextComponentItemStack.of(ii);
-            String dedupeKey = association.upgradableItem().getTranslationKey(ii) + ".name";
+            String dedupeKey = ii.getTranslationKey() + ".name";
 
             if (association.tooltipGroup() != null && namesAdded.contains(association.tooltipGroup())) {
                 continue;

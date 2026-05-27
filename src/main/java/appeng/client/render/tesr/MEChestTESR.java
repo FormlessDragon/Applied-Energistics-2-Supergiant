@@ -25,6 +25,7 @@ import appeng.client.render.DelegateBakedModel;
 import appeng.client.render.model.DriveBakedModel;
 import appeng.core.definitions.AEBlocks;
 import appeng.tile.storage.TileMEChest;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.BlockDirectional;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
@@ -43,10 +44,20 @@ import net.minecraft.util.EnumFacing;
 import org.lwjgl.opengl.GL11;
 
 import javax.annotation.Nullable;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.List;
 
 public class MEChestTESR extends TileEntitySpecialRenderer<TileMEChest> {
+    @Nullable
+    private static DriveBakedModel getDriveModel() {
+        IBlockState state = AEBlocks.DRIVE.block().getDefaultState()
+                                          .withProperty(BlockDirectional.FACING, EnumFacing.NORTH)
+                                          .withProperty(IOrientationStrategy.SPIN, 0);
+        IBakedModel model = Minecraft.getMinecraft()
+                                     .getBlockRendererDispatcher()
+                                     .getModelForState(state);
+        return BakedModelUnwrapper.unwrap(model, DriveBakedModel.class);
+    }
+
     @Override
     public void render(TileMEChest chest, double x, double y, double z, float partialTicks, int destroyStage,
                        float alpha) {
@@ -104,17 +115,6 @@ public class MEChestTESR extends TileEntitySpecialRenderer<TileMEChest> {
         GlStateManager.enableCull();
         GlStateManager.disableBlend();
         RenderHelper.enableStandardItemLighting();
-    }
-
-    @Nullable
-    private static DriveBakedModel getDriveModel() {
-        IBlockState state = AEBlocks.DRIVE.block().getDefaultState()
-                              .withProperty(BlockDirectional.FACING, EnumFacing.NORTH)
-                              .withProperty(IOrientationStrategy.SPIN, 0);
-        IBakedModel model = Minecraft.getMinecraft()
-                                     .getBlockRendererDispatcher()
-                                     .getModelForState(state);
-        return BakedModelUnwrapper.unwrap(model, DriveBakedModel.class);
     }
 
     private static final class FaceRotatingModel extends DelegateBakedModel {

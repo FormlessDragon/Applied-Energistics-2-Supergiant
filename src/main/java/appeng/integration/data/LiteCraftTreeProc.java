@@ -21,7 +21,7 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs) implements Compa
 
     @Nullable
     public static LiteCraftTreeProc of(final CraftingTreeProcess process, final CraftingTreeNode parent,
-                                      final long parentAmount) {
+                                       final long parentAmount) {
         List<LiteCraftTreeNode> inputs = new ArrayList<>();
         LiteCraftTreeProc proc = new LiteCraftTreeProc(inputs);
         long processTimes = getProcessTimes(process, parent, parentAmount);
@@ -61,6 +61,17 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs) implements Compa
         return proc;
     }
 
+    public static int diveToDeep(final LiteCraftTreeProc proc, final int depth, final LiteCraftTreeNode.DepthRecorder recorder) {
+        for (final LiteCraftTreeNode node : proc.inputs) {
+            for (final LiteCraftTreeProc subProc : node.inputs()) {
+                int newDepth = depth + 1;
+                recorder.dive(newDepth);
+                diveToDeep(subProc, newDepth, recorder);
+            }
+        }
+        return recorder.getDepth();
+    }
+
     public void writeToBuffer(final ByteBuf buf, final CraftingTreeStackRegistry stackSet) {
         if (inputs.size() > Byte.MAX_VALUE) {
             throw new IllegalStateException("Too many inputs for a single node");
@@ -81,17 +92,6 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs) implements Compa
     @Override
     public int compareTo(@Nonnull final LiteCraftTreeProc o) {
         return Integer.compare(diveToDeep(this, 0, new LiteCraftTreeNode.DepthRecorder()), diveToDeep(o, 0, new LiteCraftTreeNode.DepthRecorder()));
-    }
-
-    public static int diveToDeep(final LiteCraftTreeProc proc, final int depth, final LiteCraftTreeNode.DepthRecorder recorder) {
-        for (final LiteCraftTreeNode node : proc.inputs) {
-            for (final LiteCraftTreeProc subProc : node.inputs()) {
-                int newDepth = depth + 1;
-                recorder.dive(newDepth);
-                diveToDeep(subProc, newDepth, recorder);
-            }
-        }
-        return recorder.getDepth();
     }
 
 }

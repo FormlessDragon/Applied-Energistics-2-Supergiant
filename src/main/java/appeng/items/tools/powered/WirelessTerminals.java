@@ -78,7 +78,7 @@ public final class WirelessTerminals {
         return new IConfigManagerBuilder() {
             @Override
             public <T extends Enum<T>> IConfigManagerBuilder registerSetting(appeng.api.config.Setting<T> setting,
-                                                                              T defaultValue) {
+                                                                             T defaultValue) {
                 manager.registerSetting(setting, defaultValue);
                 return this;
             }

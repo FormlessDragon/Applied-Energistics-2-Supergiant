@@ -136,13 +136,13 @@ public class AppEngSlot extends Slot {
         return this.enabled;
     }
 
+    public void setSlotEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
     @Override
     public boolean isEnabled() {
         return super.isEnabled() && this.isSlotEnabled() && this.active;
-    }
-
-    public void setSlotEnabled(boolean enabled) {
-        this.enabled = enabled;
     }
 
     public boolean isActive() {

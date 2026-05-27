@@ -24,11 +24,11 @@ public class PatternEncodingLogic implements InternalInventoryHost {
 
     private final IPatternTerminalLogicHost host;
     private final AppEngInternalInventory blankPatternInv = new AppEngInternalInventory(this, 1);
-    private final AppEngInternalInventory encodedPatternInv = new AppEngInternalInventory(this, 1);    private final ConfigInventory encodedInputInv = ConfigInventory.configStacks(MAX_INPUT_SLOTS)
+    private final AppEngInternalInventory encodedPatternInv = new AppEngInternalInventory(this, 1);
+    private EncodingMode mode = EncodingMode.CRAFTING;    private final ConfigInventory encodedInputInv = ConfigInventory.configStacks(MAX_INPUT_SLOTS)
                                                                    .changeListener(this::onEncodedInputChanged)
                                                                    .allowOverstacking(true)
                                                                    .build();
-    private EncodingMode mode = EncodingMode.CRAFTING;
     private boolean substitute;
     private boolean substituteFluids = true;
     private boolean isLoading;

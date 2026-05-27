@@ -32,7 +32,7 @@ public class ContainerPriority extends AEBaseContainer implements ISubGui {
 
     private int priorityValue;
 
-    public ContainerPriority( InventoryPlayer ip, IPriorityHost host) {
+    public ContainerPriority(InventoryPlayer ip, IPriorityHost host) {
         super(ip, host);
         this.host = host;
         this.priorityValue = host.getPriority();

@@ -17,6 +17,12 @@ public final class EntitySingularity extends AEBaseEntityItem {
         super(world, x, y, z, stack);
     }
 
+    public static boolean applies(ItemStack stack) {
+        return AEItems.SINGULARITY.is(stack)
+            || AEItems.ENDER_DUST.is(stack)
+            || AEItems.QUANTUM_ENTANGLED_SINGULARITY.is(stack);
+    }
+
     @Override
     public boolean attackEntityFrom(DamageSource source, float amount) {
         if (source.isExplosion()) {
@@ -27,11 +33,5 @@ public final class EntitySingularity extends AEBaseEntityItem {
         }
 
         return super.attackEntityFrom(source, amount);
-    }
-
-    public static boolean applies(ItemStack stack) {
-        return AEItems.SINGULARITY.is(stack)
-            || AEItems.ENDER_DUST.is(stack)
-            || AEItems.QUANTUM_ENTANGLED_SINGULARITY.is(stack);
     }
 }

@@ -47,12 +47,6 @@ public class GuiCraftingTerm extends GuiMEStorage<ContainerCraftingTerm> {
         widgets.add("clearToPlayerInv", clearToPlayerInvBtn);
     }
 
-    @Override
-    public void initGui() {
-        super.initGui();
-        this.container.setClearGridOnClose(AEConfig.instance().isClearGridOnClose());
-    }
-
     private static ITextComponent resolveTitle(ContainerCraftingTerm container, @Nullable ITextComponent title) {
         if (title != null) {
             return title;
@@ -61,6 +55,12 @@ public class GuiCraftingTerm extends GuiMEStorage<ContainerCraftingTerm> {
             return container.getGuiTitle();
         }
         return new TextComponentString("");
+    }
+
+    @Override
+    public void initGui() {
+        super.initGui();
+        this.container.setClearGridOnClose(AEConfig.instance().isClearGridOnClose());
     }
 
     @Override

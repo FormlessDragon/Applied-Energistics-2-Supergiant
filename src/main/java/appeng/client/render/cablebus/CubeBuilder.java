@@ -20,6 +20,7 @@ package appeng.client.render.cablebus;
 
 import appeng.client.render.VertexFormats;
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
@@ -29,7 +30,6 @@ import net.minecraft.util.EnumFacing;
 import net.minecraftforge.client.model.pipeline.UnpackedBakedQuad;
 
 import javax.vecmath.Vector4f;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;

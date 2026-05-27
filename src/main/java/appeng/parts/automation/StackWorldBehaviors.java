@@ -9,6 +9,7 @@ import appeng.api.stacks.AEKeyType;
 import appeng.api.storage.AEKeyFilter;
 import appeng.util.CowMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.tileentity.TileEntity;
@@ -16,8 +17,6 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.WorldServer;
 import org.jetbrains.annotations.Nullable;
-
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.Collections;
 import java.util.List;

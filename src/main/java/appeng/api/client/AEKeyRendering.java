@@ -84,7 +84,7 @@ public class AEKeyRendering {
         getUnchecked(what).drawInGui(minecraft, x, y, what);
     }
 
-    @SuppressWarnings({ "unchecked", "unused" })
+    @SuppressWarnings({"unchecked", "unused"})
     public static void drawOnBlockFace(AEKey what, float scale, int combinedLightIn, World level) {
         getUnchecked(what).drawOnBlockFace(what, scale, combinedLightIn, level);
     }

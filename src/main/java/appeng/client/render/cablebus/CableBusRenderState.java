@@ -5,13 +5,13 @@ import appeng.api.util.AECableType;
 import appeng.api.util.AEColor;
 import appeng.util.collections.Enum2IntMap;
 import appeng.util.collections.Enum2LongMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2IntMap;
 import it.unimi.dsi.fastutil.objects.Reference2LongMap;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
@@ -31,12 +31,12 @@ public class CableBusRenderState {
     private final EnumMap<EnumFacing, Object> partModelData = new EnumMap<>(EnumFacing.class);
     private final Enum2IntMap<EnumFacing> attachmentSpins = new Enum2IntMap<>(EnumFacing.class);
     private final Enum2LongMap<EnumFacing> partFlags = new Enum2LongMap<>(EnumFacing.class);
+    private final Enum2IntMap<EnumFacing> channelsOnSide = new Enum2IntMap<>(EnumFacing.class);
     private AECableType cableType = AECableType.NONE;
     private CableCoreType coreType;
     private AEColor cableColor = AEColor.TRANSPARENT;
     private EnumMap<EnumFacing, AECableType> connectionTypes = new EnumMap<>(EnumFacing.class);
     private EnumSet<EnumFacing> cableBusAdjacent = EnumSet.noneOf(EnumFacing.class);
-    private final Enum2IntMap<EnumFacing> channelsOnSide = new Enum2IntMap<>(EnumFacing.class);
     private WeakReference<IBlockAccess> world;
     private BlockPos pos;
 

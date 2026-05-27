@@ -72,9 +72,9 @@ public class TileInscriber extends AENetworkedPoweredTile
     private static final int POWER_PER_CRANK_TURN = 160;
     private final IUpgradeInventory upgrades = UpgradeInventories.forMachine(AEBlocks.INSCRIBER.item(), 4,
         this::saveChanges);
-    private final AppEngInternalInventory topItemHandler = new AppEngInternalInventory(this, 1, 64, new BaseFilter());    private final ConfigManager configManager = new ConfigManager(this::onConfigChanged);
+    private final AppEngInternalInventory topItemHandler = new AppEngInternalInventory(this, 1, 64, new BaseFilter());
     private final AppEngInternalInventory bottomItemHandler = new AppEngInternalInventory(this, 1, 64,
-        new BaseFilter());
+        new BaseFilter());    private final ConfigManager configManager = new ConfigManager(this::onConfigChanged);
     private final AppEngInternalInventory sideItemHandler = new AppEngInternalInventory(this, 2, 64, new BaseFilter());
     private final InternalInventory inv = new CombinedInternalInventory(this.topItemHandler, this.bottomItemHandler,
         this.sideItemHandler);

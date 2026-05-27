@@ -76,7 +76,7 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
     public ShowPatternProviders showPatternProviders = ShowPatternProviders.VISIBLE;
     private ILinkStatus linkStatus = ILinkStatus.ofDisconnected();
 
-    public ContainerPatternAccessTerm( InventoryPlayer playerInventory, IPatternAccessTermContainerHost host) {
+    public ContainerPatternAccessTerm(InventoryPlayer playerInventory, IPatternAccessTermContainerHost host) {
         super(playerInventory, host);
         this.host = host;
         if (host instanceof WirelessTerminalGuiHost<?> wirelessHost) {
@@ -394,9 +394,9 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
     }
 
     private static final class VisitorState {
+        private final ReferenceSet<PatternContainer> visibleContainers = new ReferenceOpenHashSet<>();
         private int total;
         private boolean forceFullUpdate;
-        private final ReferenceSet<PatternContainer> visibleContainers = new ReferenceOpenHashSet<>();
     }
 
     private static final class ContainerTracker {

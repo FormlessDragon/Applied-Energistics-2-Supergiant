@@ -1,5 +1,7 @@
 package appeng.client.gui;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
@@ -8,8 +10,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
-
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 public class MathExpressionParser {
     private static final BigDecimal THIRTY = BigDecimal.valueOf(30);

@@ -28,11 +28,11 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
     private static final DateTimeFormatter SCREENSHOT_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
     private static final BackgroundSize[] BACKGROUNDS = {
-            new BackgroundSize(256, 256),
-            new BackgroundSize(320, 256),
-            new BackgroundSize(384, 320),
-            new BackgroundSize(512, 320),
-            new BackgroundSize(640, 384)
+        new BackgroundSize(256, 256),
+        new BackgroundSize(320, 256),
+        new BackgroundSize(384, 320),
+        new BackgroundSize(512, 320),
+        new BackgroundSize(640, 384)
     };
 
     private final CraftingTreeWidget tree = new CraftingTreeWidget();
@@ -62,6 +62,32 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
         widgets.add("back", back);
     }
 
+    private static ITextComponent savedMessage(Path file) {
+        ITextComponent message = PlayerMessages.CraftingTreeScreenshotSaved.text();
+        TextComponentString path = new TextComponentString(file.toString());
+        path.getStyle()
+            .setUnderlined(true)
+            .setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_FILE, file.getParent().toString()));
+        message.appendSibling(path);
+        return message;
+    }
+
+    private static ITextComponent error(ITextComponent message) {
+        ITextComponent copy = message.createCopy();
+        copy.getStyle().setColor(TextFormatting.RED);
+        return copy;
+    }
+
+    private static BackgroundSize getLargestBackground(int screenWidth, int screenHeight) {
+        for (int i = BACKGROUNDS.length - 1; i >= 0; i--) {
+            BackgroundSize background = BACKGROUNDS[i];
+            if (screenWidth >= background.width() * 1.25 && screenHeight >= background.height()) {
+                return background;
+            }
+        }
+        return BACKGROUNDS[0];
+    }
+
     @Override
     public void initGui() {
         this.background = getLargestBackground(width, height);
@@ -75,9 +101,9 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
     public void drawBG(int offsetX, int offsetY, int mouseX, int mouseY, float partialTicks) {
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         Blitter.texture(background.texture(), background.width(), background.height())
-                .src(0, 0, background.width(), background.height())
-                .dest(offsetX, offsetY, background.width(), background.height())
-                .blit();
+               .src(0, 0, background.width(), background.height())
+               .dest(offsetX, offsetY, background.width(), background.height())
+               .blit();
         fontRenderer.drawString(GuiText.CraftingTreeTitle.getLocal(), offsetX + 6, offsetY + 9, 0x404040);
     }
 
@@ -99,8 +125,8 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
 
         try {
             Path directory = minecraft.gameDir.toPath().toAbsolutePath().normalize()
-                .resolve("ae2")
-                .resolve("screenshots");
+                                              .resolve("ae2")
+                                              .resolve("screenshots");
             Files.createDirectories(directory);
 
             Path file = findAvailableScreenshotPath(directory);
@@ -122,22 +148,6 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
             counter++;
         }
         return file;
-    }
-
-    private static ITextComponent savedMessage(Path file) {
-        ITextComponent message = PlayerMessages.CraftingTreeScreenshotSaved.text();
-        TextComponentString path = new TextComponentString(file.toString());
-        path.getStyle()
-            .setUnderlined(true)
-            .setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_FILE, file.getParent().toString()));
-        message.appendSibling(path);
-        return message;
-    }
-
-    private static ITextComponent error(ITextComponent message) {
-        ITextComponent copy = message.createCopy();
-        copy.getStyle().setColor(TextFormatting.RED);
-        return copy;
     }
 
     private void setMissingOnly(boolean missingOnly) {
@@ -169,16 +179,6 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
                 return;
             }
         }
-    }
-
-    private static BackgroundSize getLargestBackground(int screenWidth, int screenHeight) {
-        for (int i = BACKGROUNDS.length - 1; i >= 0; i--) {
-            BackgroundSize background = BACKGROUNDS[i];
-            if (screenWidth >= background.width() * 1.25 && screenHeight >= background.height()) {
-                return background;
-            }
-        }
-        return BACKGROUNDS[0];
     }
 
     private record BackgroundSize(int width, int height) {

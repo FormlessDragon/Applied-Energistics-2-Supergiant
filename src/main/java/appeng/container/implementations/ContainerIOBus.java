@@ -33,7 +33,7 @@ public class ContainerIOBus extends UpgradeableContainer<IOBusPart> implements I
     @GuiSync(20)
     public SyncedKeyTypes importKeyTypes = new SyncedKeyTypes();
 
-    public ContainerIOBus( InventoryPlayer ip, IOBusPart host) {
+    public ContainerIOBus(InventoryPlayer ip, IOBusPart host) {
         super(ip, host);
         updateImportKeyTypes();
     }

@@ -39,9 +39,9 @@ import appeng.util.Platform;
 import appeng.util.inv.CarriedItemInventory;
 import appeng.util.inv.PlayerInternalInventory;
 import appeng.util.prioritylist.IPartitionList;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
 import net.minecraft.inventory.Container;
@@ -77,35 +77,6 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
     private final MEStorage storage;
     private final ICraftingGridContainer container;
 
-    private enum CraftSource {
-        NETWORK_EXACT_ITEM,
-        NETWORK_FUZZY_ITEM,
-        NETWORK_FLUID_CONTENT,
-        NETWORK_FLUID_BUCKET_ITEM,
-        GRID_ITEM
-    }
-
-    private record SlotUse(int slot, CraftSource source, ItemStack recipeInput, AEKey networkKey, long networkAmount,
-                           boolean consumeGrid, boolean suppressRemainder) {
-    }
-
-    private record Refill(int slot, AEItemKey key) {
-    }
-
-    private record CraftOperation(NonNullList<ItemStack> remainders) {
-    }
-
-    private record CraftPlan(ItemStack crafted, List<ItemStack> eventInputs, List<CraftOperation> operations,
-                             List<Refill> refills, Object2LongOpenHashMap<AEKey> networkRequests,
-                             int[] gridConsumes) {
-        int times() {
-            return operations.size();
-        }
-    }
-
-    private record FluidContainerInput(AEFluidKey fluid, long amount) {
-    }
-
     public CraftingTermSlot(EntityPlayer player, IActionSource actionSource, IEnergySource energySource,
                             MEStorage storage, InternalInventory craftingMatrix, InternalInventory craftInventory,
                             ICraftingGridContainer container, int x, int y) {
@@ -130,6 +101,35 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
         return ItemStack.areItemsEqual(first, second)
             && ItemStack.areItemStackTagsEqual(first, second)
             && first.getCount() == second.getCount();
+    }
+
+    private static int getMaxTimesForTarget(InternalInventory target, ItemStack crafted, int upperLimit) {
+        int maxTimes = 0;
+        for (int times = 1; times <= upperLimit; times++) {
+            ItemStack stack = crafted.copy();
+            stack.setCount(crafted.getCount() * times);
+            if (!target.simulateAdd(stack).isEmpty()) {
+                break;
+            }
+            maxTimes = times;
+        }
+        return maxTimes;
+    }
+
+    private static boolean isAllowedByFilter(IPartitionList filter, AEItemKey key) {
+        return filter == null || filter.isListed(key);
+    }
+
+    private static boolean shouldCheckFuzzy(ItemStack template) {
+        return template.hasTagCompound() || template.isItemStackDamageable();
+    }
+
+    private static List<ItemStack> copyInputs(List<ItemStack> inputs) {
+        List<ItemStack> result = new ObjectArrayList<>(inputs.size());
+        for (ItemStack input : inputs) {
+            result.add(input.copy());
+        }
+        return result;
     }
 
     @Override
@@ -199,19 +199,6 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
             return 0;
         }
         return Math.max(1, output.getMaxStackSize() / output.getCount());
-    }
-
-    private static int getMaxTimesForTarget(InternalInventory target, ItemStack crafted, int upperLimit) {
-        int maxTimes = 0;
-        for (int times = 1; times <= upperLimit; times++) {
-            ItemStack stack = crafted.copy();
-            stack.setCount(crafted.getCount() * times);
-            if (!target.simulateAdd(stack).isEmpty()) {
-                break;
-            }
-            maxTimes = times;
-        }
-        return maxTimes;
     }
 
     private CraftPlan planSingleCraft(EntityPlayer player) {
@@ -563,14 +550,6 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
         ctx.networkRequests.addTo(key, amount);
     }
 
-    private static boolean isAllowedByFilter(IPartitionList filter, AEItemKey key) {
-        return filter == null || filter.isListed(key);
-    }
-
-    private static boolean shouldCheckFuzzy(ItemStack template) {
-        return template.hasTagCompound() || template.isItemStackDamageable();
-    }
-
     private void executePlan(EntityPlayer player, InternalInventory target, CraftPlan plan, ItemStack output) {
         for (Object2LongMap.Entry<AEKey> entry : plan.networkRequests.object2LongEntrySet()) {
             long amount = entry.getLongValue();
@@ -652,14 +631,6 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
         }
     }
 
-    private static List<ItemStack> copyInputs(List<ItemStack> inputs) {
-        List<ItemStack> result = new ObjectArrayList<>(inputs.size());
-        for (ItemStack input : inputs) {
-            result.add(input.copy());
-        }
-        return result;
-    }
-
     IRecipe findRecipe(InventoryCrafting recipeInput, World world) {
         if (this.container instanceof ContainerCraftingTerm craftingTermContainer) {
             IRecipe recipe = craftingTermContainer.getCurrentRecipe();
@@ -671,6 +642,35 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
         return net.minecraft.item.crafting.CraftingManager.findMatchingRecipe(recipeInput, world);
     }
 
+    private enum CraftSource {
+        NETWORK_EXACT_ITEM,
+        NETWORK_FUZZY_ITEM,
+        NETWORK_FLUID_CONTENT,
+        NETWORK_FLUID_BUCKET_ITEM,
+        GRID_ITEM
+    }
+
+    private record SlotUse(int slot, CraftSource source, ItemStack recipeInput, AEKey networkKey, long networkAmount,
+                           boolean consumeGrid, boolean suppressRemainder) {
+    }
+
+    private record Refill(int slot, AEItemKey key) {
+    }
+
+    private record CraftOperation(NonNullList<ItemStack> remainders) {
+    }
+
+    private record CraftPlan(ItemStack crafted, List<ItemStack> eventInputs, List<CraftOperation> operations,
+                             List<Refill> refills, Object2LongOpenHashMap<AEKey> networkRequests,
+                             int[] gridConsumes) {
+        int times() {
+            return operations.size();
+        }
+    }
+
+    private record FluidContainerInput(AEFluidKey fluid, long amount) {
+    }
+
     private final class PlanContext {
         final EntityPlayer player;
         final World world;
@@ -679,13 +679,13 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
         final List<ItemStack> templateInputs;
         final NonNullList<ItemStack> templateRemainders;
         final IPartitionList filter;
-        KeyCounter availableStacks;
         final int[] gridRemaining = new int[GRID_SIZE];
         final int[] gridConsumes = new int[GRID_SIZE];
         final boolean[] slotsRequiringRefill = new boolean[GRID_SIZE];
         final Object2LongOpenHashMap<AEKey> networkRequests = new Object2LongOpenHashMap<>();
         final List<CraftOperation> operations = new ObjectArrayList<>();
         final List<Refill> refills = new ObjectArrayList<>();
+        KeyCounter availableStacks;
 
         PlanContext(EntityPlayer player, World world, IRecipe recipe, ItemStack crafted, List<ItemStack> templateInputs,
                     NonNullList<ItemStack> templateRemainders, IPartitionList filter) {

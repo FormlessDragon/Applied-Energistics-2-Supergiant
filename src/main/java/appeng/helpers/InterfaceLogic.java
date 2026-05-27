@@ -77,7 +77,7 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
     public InterfaceLogic(IManagedGridNode gridNode, InterfaceLogicHost host, Item machineType, int slots) {
         this.host = host;
         this.config = ConfigInventory.configStacks(slots).changeListener(this::onConfigRowChanged)
-                                      .allowOverstacking(true).build();
+                                     .allowOverstacking(true).build();
         this.storage = ConfigInventory.storage(slots).slotFilter(this::isAllowedInStorageSlot)
                                       .changeListener(this::onStorageChanged).allowOverstacking(true).build();
         this.mainNode = gridNode
@@ -97,6 +97,15 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
         this.getConfig().useRegisteredCapacities();
         this.getStorage().useRegisteredCapacities();
         this.applyInterfaceSlotCapacities();
+    }
+
+    public static boolean isForceStartCraftingEnabled(Iterable<ItemStack> upgrades) {
+        for (var stack : upgrades) {
+            if (UpgradeCardItem.isForceCraftingEnabled(stack)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void applyInterfaceSlotCapacities() {
@@ -395,15 +404,6 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
     @Override
     public boolean canForceStartCrafting(ICraftingPlan plan) {
         return isForceStartCraftingEnabled(this.upgrades);
-    }
-
-    public static boolean isForceStartCraftingEnabled(Iterable<ItemStack> upgrades) {
-        for (var stack : upgrades) {
-            if (UpgradeCardItem.isForceCraftingEnabled(stack)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void cancelCrafting() {

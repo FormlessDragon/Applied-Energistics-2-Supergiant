@@ -97,6 +97,41 @@ public class CPUSelectionList implements ICompositeWidget {
         GlStateManager.popMatrix();
     }
 
+    private static void drawScaledToolbarBackground(int x, int y, boolean hovered) {
+        Icon backgroundIcon = hovered ? Icon.TOOLBAR_BUTTON_BACKGROUND_HOVER : Icon.TOOLBAR_BUTTON_BACKGROUND;
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(x, y, 0);
+        GlStateManager.scale(MODE_BUTTON_SCALE, MODE_BUTTON_SCALE, 1.0f);
+        backgroundIcon.getBlitter().dest(0, 0).zOffset(10).blit();
+        GlStateManager.popMatrix();
+    }
+
+    private static void drawScaledModeIcon(int x, int y) {
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(x, y, 0);
+        GlStateManager.scale(MODE_BUTTON_SCALE, MODE_BUTTON_SCALE, 1.0f);
+        Icon.CRAFT_HAMMER.getBlitter().dest(0, 0).zOffset(20).blit();
+        GlStateManager.popMatrix();
+    }
+
+    private static void drawScaledModeItemStack(int x, int y, ItemStack stack) {
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(x, y, 20);
+        GlStateManager.scale(MODE_BUTTON_SCALE, MODE_BUTTON_SCALE, 1.0f);
+        GlStateManager.enableDepth();
+        RenderHelper.enableGUIStandardItemLighting();
+        Minecraft.getMinecraft().getRenderItem().renderItemAndEffectIntoGUI(stack, 0, 0);
+        Minecraft.getMinecraft().getRenderItem().renderItemOverlayIntoGUI(
+            Minecraft.getMinecraft().fontRenderer,
+            stack,
+            0,
+            0,
+            null);
+        RenderHelper.disableStandardItemLighting();
+        GlStateManager.disableDepth();
+        GlStateManager.popMatrix();
+    }
+
     @Override
     public void setPosition(Point position) {
         this.bounds = new Rectangle(position.x(), position.y(), bounds.width, bounds.height);
@@ -304,41 +339,6 @@ public class CPUSelectionList implements ICompositeWidget {
             case MACHINE_ONLY -> drawScaledModeItemStack(x + MODE_BUTTON_CONTENT_OFFSET, y + MODE_BUTTON_CONTENT_OFFSET,
                 AEParts.EXPORT_BUS.stack());
         }
-    }
-
-    private static void drawScaledToolbarBackground(int x, int y, boolean hovered) {
-        Icon backgroundIcon = hovered ? Icon.TOOLBAR_BUTTON_BACKGROUND_HOVER : Icon.TOOLBAR_BUTTON_BACKGROUND;
-        GlStateManager.pushMatrix();
-        GlStateManager.translate(x, y, 0);
-        GlStateManager.scale(MODE_BUTTON_SCALE, MODE_BUTTON_SCALE, 1.0f);
-        backgroundIcon.getBlitter().dest(0, 0).zOffset(10).blit();
-        GlStateManager.popMatrix();
-    }
-
-    private static void drawScaledModeIcon(int x, int y) {
-        GlStateManager.pushMatrix();
-        GlStateManager.translate(x, y, 0);
-        GlStateManager.scale(MODE_BUTTON_SCALE, MODE_BUTTON_SCALE, 1.0f);
-        Icon.CRAFT_HAMMER.getBlitter().dest(0, 0).zOffset(20).blit();
-        GlStateManager.popMatrix();
-    }
-
-    private static void drawScaledModeItemStack(int x, int y, ItemStack stack) {
-        GlStateManager.pushMatrix();
-        GlStateManager.translate(x, y, 20);
-        GlStateManager.scale(MODE_BUTTON_SCALE, MODE_BUTTON_SCALE, 1.0f);
-        GlStateManager.enableDepth();
-        RenderHelper.enableGUIStandardItemLighting();
-        Minecraft.getMinecraft().getRenderItem().renderItemAndEffectIntoGUI(stack, 0, 0);
-        Minecraft.getMinecraft().getRenderItem().renderItemOverlayIntoGUI(
-            Minecraft.getMinecraft().fontRenderer,
-            stack,
-            0,
-            0,
-            null);
-        RenderHelper.disableStandardItemLighting();
-        GlStateManager.disableDepth();
-        GlStateManager.popMatrix();
     }
 
     private ButtonToolTips getModeButtonTooltip(CpuSelectionMode mode) {

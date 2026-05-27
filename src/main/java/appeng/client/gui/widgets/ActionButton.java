@@ -22,10 +22,10 @@ import appeng.api.config.ActionItems;
 import appeng.client.gui.Icon;
 import appeng.core.localization.ButtonToolTips;
 import appeng.core.localization.LocalizationEnum;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.Collections;
 import java.util.List;

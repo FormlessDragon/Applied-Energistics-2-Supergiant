@@ -49,6 +49,14 @@ public class SkyChestTESR extends TileEntitySpecialRenderer<TileSkyChest> {
         return SkyChestType.BLOCK;
     }
 
+    private static EnumFacing swapNorthSouth(EnumFacing side) {
+        return switch (side) {
+            case NORTH -> EnumFacing.SOUTH;
+            case SOUTH -> EnumFacing.NORTH;
+            default -> side;
+        };
+    }
+
     @Override
     public void render(TileSkyChest te, double x, double y, double z, float partialTicks, int destroyStage,
                        float alpha) {
@@ -94,13 +102,5 @@ public class SkyChestTESR extends TileEntitySpecialRenderer<TileSkyChest> {
             GlStateManager.popMatrix();
             GlStateManager.matrixMode(5888);
         }
-    }
-
-    private static EnumFacing swapNorthSouth(EnumFacing side) {
-        return switch (side) {
-            case NORTH -> EnumFacing.SOUTH;
-            case SOUTH -> EnumFacing.NORTH;
-            default -> side;
-        };
     }
 }

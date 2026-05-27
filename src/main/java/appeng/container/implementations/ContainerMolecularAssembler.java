@@ -41,7 +41,7 @@ public class ContainerMolecularAssembler extends UpgradeableContainer<TileMolecu
 
     private Slot encodedPatternSlot;
 
-    public ContainerMolecularAssembler( InventoryPlayer playerInventory, TileMolecularAssembler host) {
+    public ContainerMolecularAssembler(InventoryPlayer playerInventory, TileMolecularAssembler host) {
         super(playerInventory, host);
     }
 

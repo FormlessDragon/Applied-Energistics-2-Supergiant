@@ -21,6 +21,16 @@ import org.jspecify.annotations.Nullable;
 public final class CableBusLeftClickHook {
     private boolean suppressUntilAttackReleased;
 
+    private static @Nullable Vec3d normalizeLocalHit(BlockPos pos, Vec3d hitVec) {
+        if (hitVec == null) {
+            return null;
+        }
+        if (hitVec.x >= 0 && hitVec.x <= 1 && hitVec.y >= 0 && hitVec.y <= 1 && hitVec.z >= 0 && hitVec.z <= 1) {
+            return hitVec;
+        }
+        return hitVec.subtract(pos.getX(), pos.getY(), pos.getZ());
+    }
+
     @SubscribeEvent
     public void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
         if (event.isCanceled() || event.getHand() != EnumHand.MAIN_HAND) {
@@ -76,15 +86,5 @@ public final class CableBusLeftClickHook {
         if (minecraft.player == null || minecraft.world == null || !minecraft.gameSettings.keyBindAttack.isKeyDown()) {
             this.suppressUntilAttackReleased = false;
         }
-    }
-
-    private static @Nullable Vec3d normalizeLocalHit(BlockPos pos, Vec3d hitVec) {
-        if (hitVec == null) {
-            return null;
-        }
-        if (hitVec.x >= 0 && hitVec.x <= 1 && hitVec.y >= 0 && hitVec.y <= 1 && hitVec.z >= 0 && hitVec.z <= 1) {
-            return hitVec;
-        }
-        return hitVec.subtract(pos.getX(), pos.getY(), pos.getZ());
     }
 }

@@ -37,6 +37,7 @@ import appeng.util.InteractionUtil;
 import appeng.util.Platform;
 import appeng.util.inv.PlayerInternalInventory;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Reference2IntMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
@@ -67,7 +68,6 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
 import javax.annotation.Nullable;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -370,6 +370,10 @@ public class MemoryCardItem extends AEBaseItem implements IMemoryCard {
         return 0xFFFFFF;
     }
 
+    static boolean shouldClearOnShiftRightClick(@Nullable RayTraceResult hitResult) {
+        return hitResult == null || hitResult.typeOfHit != RayTraceResult.Type.BLOCK;
+    }
+
     @SideOnly(Side.CLIENT)
     @Override
     protected void addCheckedInformation(ItemStack stack, World world, List<String> lines, ITooltipFlag advancedTooltips) {
@@ -444,10 +448,6 @@ public class MemoryCardItem extends AEBaseItem implements IMemoryCard {
         IMemoryCard memoryCard = (IMemoryCard) player.getHeldItem(hand).getItem();
         memoryCard.notifyUser(player, MemoryCardMessages.SETTINGS_CLEARED);
         clearCard(player.getHeldItem(hand));
-    }
-
-    static boolean shouldClearOnShiftRightClick(@Nullable RayTraceResult hitResult) {
-        return hitResult == null || hitResult.typeOfHit != RayTraceResult.Type.BLOCK;
     }
 
     public int getColor(ItemStack stack) {

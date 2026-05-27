@@ -1,9 +1,9 @@
 package appeng.core.network.serverbound;
 
 import appeng.api.networking.crafting.ICraftingPlan;
+import appeng.container.GuiIds;
 import appeng.container.implementations.ContainerCraftConfirm;
 import appeng.container.implementations.ContainerCraftingTree;
-import appeng.container.GuiIds;
 import appeng.core.AppEngBase;
 import appeng.core.network.InitNetwork;
 import appeng.core.network.ServerboundPacket;
@@ -17,15 +17,6 @@ import java.util.concurrent.FutureTask;
 public class SwitchCraftingTreePacket extends ServerboundPacket {
 
     public SwitchCraftingTreePacket() {
-    }
-
-    @Override
-    public void handleServer(EntityPlayerMP player) {
-        if (player.openContainer instanceof ContainerCraftConfirm confirm) {
-            processConfirmGUI(confirm, player);
-        } else if (player.openContainer instanceof ContainerCraftingTree craftingTree) {
-            processTreeGUI(craftingTree, player);
-        }
     }
 
     private static void processTreeGUI(final ContainerCraftingTree craftingTree, final EntityPlayerMP player) {
@@ -69,6 +60,15 @@ public class SwitchCraftingTreePacket extends ServerboundPacket {
         craftingTree.setJob(fakeFuture);
         fakeFuture.run();
         InitNetwork.sendToClient(player, new CraftingTreeDataPacket(tree, job.finalOutput()));
+    }
+
+    @Override
+    public void handleServer(EntityPlayerMP player) {
+        if (player.openContainer instanceof ContainerCraftConfirm confirm) {
+            processConfirmGUI(confirm, player);
+        } else if (player.openContainer instanceof ContainerCraftingTree craftingTree) {
+            processTreeGUI(craftingTree, player);
+        }
     }
 
 }

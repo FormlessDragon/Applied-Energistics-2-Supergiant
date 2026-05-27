@@ -23,10 +23,10 @@ import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.crafting.ICraftingService;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
+import appeng.crafting.inv.ChildCraftingSimulationState;
+import appeng.crafting.inv.CraftingSimulationState;
 import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.helpers.patternprovider.PseudoPatternDetails;
-import appeng.crafting.inv.CraftingSimulationState;
-import appeng.crafting.inv.ChildCraftingSimulationState;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 
@@ -340,15 +340,15 @@ public class CraftingTreeProcess {
         }
     }
 
-    private record Preview(CraftingSimulationState parent, ChildCraftingSimulationState state, long times,
-                           long intermediateFinalOutputAmount, KeyCounter recursiveMissingSeeds) {
-    }
-
     public IPatternDetails getDetails() {
         return this.details;
     }
 
     public Object2LongLinkedOpenHashMap<CraftingTreeNode> getNodes() {
         return nodes;
+    }
+
+    private record Preview(CraftingSimulationState parent, ChildCraftingSimulationState state, long times,
+                           long intermediateFinalOutputAmount, KeyCounter recursiveMissingSeeds) {
     }
 }

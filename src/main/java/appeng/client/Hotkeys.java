@@ -1,12 +1,11 @@
 package appeng.client;
 
 import appeng.hotkeys.HotkeyActions;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
-
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 import java.util.Map;
 

@@ -31,6 +31,7 @@ import appeng.helpers.ICustomCollision;
 import appeng.tile.misc.ChargerRecipes;
 import appeng.tile.misc.TileCharger;
 import appeng.util.Platform;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.Entity;
@@ -44,7 +45,6 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.World;
 
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;

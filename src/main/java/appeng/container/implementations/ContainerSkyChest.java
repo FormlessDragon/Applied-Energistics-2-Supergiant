@@ -28,7 +28,7 @@ import net.minecraft.entity.player.InventoryPlayer;
 public class ContainerSkyChest extends AEBaseContainer {
     private final TileSkyChest chest;
 
-    public ContainerSkyChest( InventoryPlayer ip, TileSkyChest chest) {
+    public ContainerSkyChest(InventoryPlayer ip, TileSkyChest chest) {
         super(ip, chest);
         this.chest = chest;
         chest.openInventory(ip.player);

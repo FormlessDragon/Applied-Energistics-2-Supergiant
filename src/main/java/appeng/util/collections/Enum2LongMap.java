@@ -159,6 +159,12 @@ public class Enum2LongMap<E extends Enum<E>> extends AbstractReference2LongMap<E
         return this.delegate.values();
     }
 
+    private static final class Helper<E extends Enum<E>> extends AbstractEnumPrimitiveMap<E> {
+        private Helper(Class<E> enumClass) {
+            super(enumClass);
+        }
+    }
+
     private final class EntryView implements Reference2LongMap.Entry<E> {
         private final Byte2LongMap.Entry delegateEntry;
 
@@ -222,12 +228,6 @@ public class Enum2LongMap<E extends Enum<E>> extends AbstractReference2LongMap<E
         @Override
         public String toString() {
             return getKey() + "->" + getLongValue();
-        }
-    }
-
-    private static final class Helper<E extends Enum<E>> extends AbstractEnumPrimitiveMap<E> {
-        private Helper(Class<E> enumClass) {
-            super(enumClass);
         }
     }
 }

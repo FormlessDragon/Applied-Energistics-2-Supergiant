@@ -21,17 +21,14 @@ import java.util.Objects;
 public class TextComponentItemStack implements ICustomTextComponent {
     public static final String TYPE_ID = "item_stack";
 
-    private final ItemStack itemStack;
-    private Style style;
-    private final ObjectList<ITextComponent> siblings = new ObjectArrayList<>();
-    private ITextComponent cache;
-
     static {
         CustomTextComponents.register(TYPE_ID, TextComponentItemStack::fromJson, TextComponentItemStack::fromPacket);
     }
 
-    public static void bootstrap() {
-    }
+    private final ItemStack itemStack;
+    private final ObjectList<ITextComponent> siblings = new ObjectArrayList<>();
+    private Style style;
+    private ITextComponent cache;
 
     public TextComponentItemStack() {
         this(ItemStack.EMPTY);
@@ -50,6 +47,9 @@ public class TextComponentItemStack implements ICustomTextComponent {
                 this.appendSibling(sibling.createCopy());
             }
         }
+    }
+
+    public static void bootstrap() {
     }
 
     public static TextComponentItemStack of(ItemStack itemStack) {

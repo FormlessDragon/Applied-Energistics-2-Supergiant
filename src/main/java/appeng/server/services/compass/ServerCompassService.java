@@ -1,8 +1,8 @@
 package appeng.server.services.compass;
 
+import appeng.core.definitions.AEBlocks;
 import appeng.core.network.InitNetwork;
 import appeng.core.network.clientbound.ClearCompassCachePacket;
-import appeng.core.definitions.AEBlocks;
 import appeng.tile.misc.TileMysteriousCube;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;

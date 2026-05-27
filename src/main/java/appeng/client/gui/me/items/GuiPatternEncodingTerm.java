@@ -64,12 +64,6 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
         }
     }
 
-    @Override
-    public void initGui() {
-        super.initGui();
-        this.container.setClearOnClose(AEConfig.instance().isClearGridOnClose());
-    }
-
     private static ITextComponent resolveTitle(ContainerPatternEncodingTerm container, @Nullable ITextComponent title) {
         if (title != null) {
             return title;
@@ -78,6 +72,12 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
             return container.getGuiTitle();
         }
         return new TextComponentString("");
+    }
+
+    @Override
+    public void initGui() {
+        super.initGui();
+        this.container.setClearOnClose(AEConfig.instance().isClearGridOnClose());
     }
 
     private void openImportPrioritySettings() {

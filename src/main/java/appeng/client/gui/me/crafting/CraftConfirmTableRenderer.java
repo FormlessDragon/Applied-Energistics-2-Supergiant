@@ -36,6 +36,35 @@ public class CraftConfirmTableRenderer extends AbstractTableRenderer<CraftingPla
         super(screen, x, y, 5);
     }
 
+    private static void addInventoryUsageLine(CraftingPlanSummaryEntry entry, List<ITextComponent> lines) {
+        if (entry.finalOutput() || entry.inventoryAmount() <= 0) {
+            return;
+        }
+
+        var usage = getInventoryUsage(entry);
+        var line = GuiText.InventoryUsage.text(usage.text);
+        line.getStyle().setColor(usage.color);
+        lines.add(line);
+    }
+
+    private static InventoryUsage getInventoryUsage(CraftingPlanSummaryEntry entry) {
+        double percent = entry.inventoryUsageAmount() * 100.0D / entry.inventoryAmount();
+        TextFormatting color = percent > 80.0D ? TextFormatting.RED : TextFormatting.GREEN;
+
+        if (percent > 1000.0D) {
+            return new InventoryUsage("> 1000", color);
+        }
+        if (percent > 0.0D && percent < 0.01D) {
+            return new InventoryUsage("< 0.01", color);
+        }
+        return new InventoryUsage(formatPercent(percent), color);
+    }
+
+    private static String formatPercent(double percent) {
+        long scaled = Math.round(percent * 100.0D);
+        return scaled / 100 + "." + scaled / 10 % 10 + scaled % 10;
+    }
+
     @Override
     protected List<ITextComponent> getEntryDescription(CraftingPlanSummaryEntry entry) {
         List<ITextComponent> lines = new ObjectArrayList<>(4);
@@ -95,35 +124,6 @@ public class CraftConfirmTableRenderer extends AbstractTableRenderer<CraftingPla
     @Override
     protected int getEntryBackgroundColor(CraftingPlanSummaryEntry entry) {
         return entry.missingAmount() > 0 ? 0x1AFF0000 : 0;
-    }
-
-    private static void addInventoryUsageLine(CraftingPlanSummaryEntry entry, List<ITextComponent> lines) {
-        if (entry.finalOutput() || entry.inventoryAmount() <= 0) {
-            return;
-        }
-
-        var usage = getInventoryUsage(entry);
-        var line = GuiText.InventoryUsage.text(usage.text);
-        line.getStyle().setColor(usage.color);
-        lines.add(line);
-    }
-
-    private static InventoryUsage getInventoryUsage(CraftingPlanSummaryEntry entry) {
-        double percent = entry.inventoryUsageAmount() * 100.0D / entry.inventoryAmount();
-        TextFormatting color = percent > 80.0D ? TextFormatting.RED : TextFormatting.GREEN;
-
-        if (percent > 1000.0D) {
-            return new InventoryUsage("> 1000", color);
-        }
-        if (percent > 0.0D && percent < 0.01D) {
-            return new InventoryUsage("< 0.01", color);
-        }
-        return new InventoryUsage(formatPercent(percent), color);
-    }
-
-    private static String formatPercent(double percent) {
-        long scaled = Math.round(percent * 100.0D);
-        return scaled / 100 + "." + scaled / 10 % 10 + scaled % 10;
     }
 
     private record InventoryUsage(String text, TextFormatting color) {

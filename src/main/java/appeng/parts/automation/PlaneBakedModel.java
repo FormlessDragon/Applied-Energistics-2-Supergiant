@@ -34,6 +34,7 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.util.EnumFacing;
 import org.jetbrains.annotations.Nullable;
+
 import java.util.Collections;
 import java.util.List;
 

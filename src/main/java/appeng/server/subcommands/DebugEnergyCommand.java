@@ -14,9 +14,14 @@ import net.minecraft.command.ICommandSender;
 import net.minecraft.command.WrongUsageException;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.BlockPos;
+
 import java.util.List;
 
 public class DebugEnergyCommand implements ISubCommand {
+    private static String getModeLabel(boolean enabled) {
+        return enabled ? Tooltips.On.text().getFormattedText() : Tooltips.Off.text().getFormattedText();
+    }
+
     @Override
     public String getHelp(MinecraftServer srv) {
         return "commands.ae2.debugenergy";
@@ -63,9 +68,5 @@ public class DebugEnergyCommand implements ISubCommand {
         }
 
         sender.sendMessage(PlayerMessages.DebugEnergySet.text(getModeLabel(enabled), gridCount));
-    }
-
-    private static String getModeLabel(boolean enabled) {
-        return enabled ? Tooltips.On.text().getFormattedText() : Tooltips.Off.text().getFormattedText();
     }
 }

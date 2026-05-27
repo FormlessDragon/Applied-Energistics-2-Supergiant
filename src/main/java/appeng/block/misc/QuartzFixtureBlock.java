@@ -7,6 +7,7 @@ import appeng.block.AEBaseBlock;
 import appeng.client.EffectType;
 import appeng.core.AEConfig;
 import appeng.core.AppEngBase;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockDirectional;
 import net.minecraft.block.material.Material;
@@ -24,7 +25,6 @@ import net.minecraft.world.World;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;

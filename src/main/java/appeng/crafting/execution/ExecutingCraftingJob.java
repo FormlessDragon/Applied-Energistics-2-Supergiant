@@ -31,14 +31,14 @@ import appeng.api.stacks.KeyCounter;
 import appeng.crafting.CraftingLink;
 import appeng.crafting.CraftingPlan;
 import appeng.crafting.TemporaryPseudoCraftingProvider;
-import appeng.helpers.patternprovider.PseudoPatternDetails;
 import appeng.crafting.inv.ListCraftingInventory;
+import appeng.helpers.patternprovider.PseudoPatternDetails;
 import appeng.me.service.CraftingService;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;

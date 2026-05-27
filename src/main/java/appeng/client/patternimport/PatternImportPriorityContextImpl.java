@@ -49,6 +49,16 @@ public final class PatternImportPriorityContextImpl implements PatternImportPrio
         return new PatternImportPriorityContextImpl(container, bookmarkedStacks);
     }
 
+    private static GridInventoryEntry mergeEntries(GridInventoryEntry left, GridInventoryEntry right) {
+        return new GridInventoryEntry(
+            left.serial(),
+            left.what(),
+            Math.max(left.storedAmount(), right.storedAmount()),
+            Math.max(left.requestableAmount(), right.requestableAmount()),
+            left.craftable() || right.craftable()
+        );
+    }
+
     @Override
     public ContainerPatternEncodingTerm getContainer() {
         return this.container;
@@ -86,15 +96,5 @@ public final class PatternImportPriorityContextImpl implements PatternImportPrio
     public boolean isStored(GenericStack candidate) {
         GridInventoryEntry entry = getClientRepoEntry(candidate);
         return entry != null && entry.storedAmount() > 0;
-    }
-
-    private static GridInventoryEntry mergeEntries(GridInventoryEntry left, GridInventoryEntry right) {
-        return new GridInventoryEntry(
-            left.serial(),
-            left.what(),
-            Math.max(left.storedAmount(), right.storedAmount()),
-            Math.max(left.requestableAmount(), right.requestableAmount()),
-            left.craftable() || right.craftable()
-        );
     }
 }

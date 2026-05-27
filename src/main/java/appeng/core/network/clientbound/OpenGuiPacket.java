@@ -108,6 +108,28 @@ public class OpenGuiPacket extends ClientboundPacket {
         return null;
     }
 
+    public static boolean isServerGuiSwitchSource(@Nullable GuiScreen screen) {
+        if (screen == null) {
+            return false;
+        }
+        synchronized (SERVER_GUI_SWITCH_SOURCES) {
+            return SERVER_GUI_SWITCH_SOURCES.getOrDefault(screen, Boolean.FALSE);
+        }
+    }
+
+    static boolean shouldCapturePreviousExternalGui(@Nullable GuiScreen screen, boolean externalGuiReturn) {
+        return externalGuiReturn && !isServerGuiSwitchSource(screen);
+    }
+
+    static void markServerGuiSwitchSource(@Nullable GuiScreen screen) {
+        if (screen == null) {
+            return;
+        }
+        synchronized (SERVER_GUI_SWITCH_SOURCES) {
+            SERVER_GUI_SWITCH_SOURCES.put(screen, Boolean.TRUE);
+        }
+    }
+
     @Override
     protected void read(ByteBuf buf) {
         PacketBuffer packetBuffer = new PacketBuffer(buf);
@@ -169,28 +191,6 @@ public class OpenGuiPacket extends ClientboundPacket {
             PreviousExternalGui.capture(previousScreen);
         }
         minecraft.displayGuiScreen(screen);
-    }
-
-    public static boolean isServerGuiSwitchSource(@Nullable GuiScreen screen) {
-        if (screen == null) {
-            return false;
-        }
-        synchronized (SERVER_GUI_SWITCH_SOURCES) {
-            return SERVER_GUI_SWITCH_SOURCES.getOrDefault(screen, Boolean.FALSE);
-        }
-    }
-
-    static boolean shouldCapturePreviousExternalGui(@Nullable GuiScreen screen, boolean externalGuiReturn) {
-        return externalGuiReturn && !isServerGuiSwitchSource(screen);
-    }
-
-    static void markServerGuiSwitchSource(@Nullable GuiScreen screen) {
-        if (screen == null) {
-            return;
-        }
-        synchronized (SERVER_GUI_SWITCH_SOURCES) {
-            SERVER_GUI_SWITCH_SOURCES.put(screen, Boolean.TRUE);
-        }
     }
 
     @SideOnly(Side.CLIENT)

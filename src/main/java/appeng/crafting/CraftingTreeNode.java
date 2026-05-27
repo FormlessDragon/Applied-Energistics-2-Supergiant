@@ -313,35 +313,35 @@ public class CraftingTreeNode {
 
     private void requestMissingBranch(CraftingSimulationState inv, CraftingTreeProcess pro, long totalRequestedItems)
         throws CraftBranchFailure, InterruptedException {
-            if (pro.getInputCount(this.what) >= pro.getOutputCount(this.what)) {
+        if (pro.getInputCount(this.what) >= pro.getOutputCount(this.what)) {
+            job.addMissing(this.what, totalRequestedItems);
+            return;
+        }
+
+        var craftedPerPattern = getEffectiveOutputCount(pro);
+        var recursiveBatch = this.job.getRecursivePatternBatch(pro.details, this.what);
+
+        while (totalRequestedItems > 0) {
+            long times = getRequestedPatternTimes(pro, totalRequestedItems, craftedPerPattern, recursiveBatch);
+            this.job.timedCrafting("request-missing-branch " + this.what, () -> {
+                pro.request(inv, times);
+                return null;
+            });
+
+            // by now we have succeeded, as request throws an exception in case of failure
+            // check how much was actually produced
+            var available = extractCraftedBranchOutput(inv, totalRequestedItems);
+            if (available != 0) {
+                totalRequestedItems -= available;
+
+                if (totalRequestedItems <= 0) {
+                    return;
+                }
+            } else {
                 job.addMissing(this.what, totalRequestedItems);
                 return;
             }
-
-            var craftedPerPattern = getEffectiveOutputCount(pro);
-            var recursiveBatch = this.job.getRecursivePatternBatch(pro.details, this.what);
-
-            while (totalRequestedItems > 0) {
-                long times = getRequestedPatternTimes(pro, totalRequestedItems, craftedPerPattern, recursiveBatch);
-                this.job.timedCrafting("request-missing-branch " + this.what, () -> {
-                    pro.request(inv, times);
-                    return null;
-                });
-
-                // by now we have succeeded, as request throws an exception in case of failure
-                // check how much was actually produced
-                var available = extractCraftedBranchOutput(inv, totalRequestedItems);
-                if (available != 0) {
-                    totalRequestedItems -= available;
-
-                    if (totalRequestedItems <= 0) {
-                        return;
-                    }
-                } else {
-                    job.addMissing(this.what, totalRequestedItems);
-                    return;
-                }
-            }
+        }
     }
 
     long extractAvailableForCrafting(CraftingSimulationState inv, long maxAmount)

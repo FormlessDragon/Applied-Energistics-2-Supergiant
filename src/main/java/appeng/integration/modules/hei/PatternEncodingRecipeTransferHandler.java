@@ -29,6 +29,7 @@ import mezz.jei.api.recipe.transfer.IRecipeTransferHandler;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.Ingredient;
+
 import javax.annotation.Nonnull;
 
 import java.util.List;
@@ -38,33 +39,6 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
     @SuppressWarnings("unused")
     private static final int RECIPE_OUTPUT_SLOT = 0;
     private static final int CRAFTING_GRID_SIZE = 9;
-
-    @Override
-    public Class<ContainerPatternEncodingTerm> getContainerClass() {
-        return ContainerPatternEncodingTerm.class;
-    }
-
-    @Override
-    public IRecipeTransferError transferRecipe(@Nonnull ContainerPatternEncodingTerm container,
-                                               @Nonnull IRecipeLayout recipeLayout,
-                                               @Nonnull EntityPlayer player, boolean maxTransfer, boolean doTransfer) {
-        if (recipeLayout.getRecipeCategory().getUid().equals(VanillaRecipeCategoryUid.INFORMATION)
-            || recipeLayout.getRecipeCategory().getUid().equals(VanillaRecipeCategoryUid.FUEL)) {
-            return null;
-        }
-
-        if (!doTransfer) {
-            RecipeTransferSlots slots = findTransferSlots(container, recipeLayout);
-            return new PatternRecipeTransferUserError(recipeLayout, slots.missingGuiSlots(), slots.craftableGuiSlots());
-        }
-
-        if (recipeLayout.getRecipeCategory().getUid().equals(VanillaRecipeCategoryUid.CRAFTING)) {
-            encodeCraftingRecipe(container, recipeLayout);
-        } else {
-            encodeProcessingRecipe(container, recipeLayout);
-        }
-        return null;
-    }
 
     private static void encodeCraftingRecipe(ContainerPatternEncodingTerm container, IRecipeLayout recipeLayout) {
         container.setMode(EncodingMode.CRAFTING);
@@ -186,13 +160,10 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
 
     private static Ingredient createIngredient(List<ItemStack> stacks) {
         ItemStack[] matchingStacks = stacks.stream()
-            .filter(stack -> stack != null && !stack.isEmpty())
-            .map(ItemStack::copy)
-            .toArray(ItemStack[]::new);
+                                           .filter(stack -> stack != null && !stack.isEmpty())
+                                           .map(ItemStack::copy)
+                                           .toArray(ItemStack[]::new);
         return matchingStacks.length == 0 ? Ingredient.EMPTY : Ingredient.fromStacks(matchingStacks);
-    }
-
-    private record RecipeTransferSlots(IntList missingGuiSlots, IntList craftableGuiSlots) {
     }
 
     private static void encodeSelectedStacksIntoSlots(ContainerPatternEncodingTerm container,
@@ -238,5 +209,35 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
             InventoryAction.SET_FILTER,
             slot.slotNumber,
             stack));
+    }
+
+    @Override
+    public Class<ContainerPatternEncodingTerm> getContainerClass() {
+        return ContainerPatternEncodingTerm.class;
+    }
+
+    @Override
+    public IRecipeTransferError transferRecipe(@Nonnull ContainerPatternEncodingTerm container,
+                                               @Nonnull IRecipeLayout recipeLayout,
+                                               @Nonnull EntityPlayer player, boolean maxTransfer, boolean doTransfer) {
+        if (recipeLayout.getRecipeCategory().getUid().equals(VanillaRecipeCategoryUid.INFORMATION)
+            || recipeLayout.getRecipeCategory().getUid().equals(VanillaRecipeCategoryUid.FUEL)) {
+            return null;
+        }
+
+        if (!doTransfer) {
+            RecipeTransferSlots slots = findTransferSlots(container, recipeLayout);
+            return new PatternRecipeTransferUserError(recipeLayout, slots.missingGuiSlots(), slots.craftableGuiSlots());
+        }
+
+        if (recipeLayout.getRecipeCategory().getUid().equals(VanillaRecipeCategoryUid.CRAFTING)) {
+            encodeCraftingRecipe(container, recipeLayout);
+        } else {
+            encodeProcessingRecipe(container, recipeLayout);
+        }
+        return null;
+    }
+
+    private record RecipeTransferSlots(IntList missingGuiSlots, IntList craftableGuiSlots) {
     }
 }

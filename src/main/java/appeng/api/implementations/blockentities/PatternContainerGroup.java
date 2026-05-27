@@ -104,6 +104,18 @@ public record PatternContainerGroup(
         return new PatternContainerGroup(icon, name, tooltip);
     }
 
+    private static String componentKey(ITextComponent component) {
+        return TextComponents.componentKey(component);
+    }
+
+    private static List<String> componentListKey(List<ITextComponent> components) {
+        ObjectList<String> result = new ObjectArrayList<>(components.size());
+        for (ITextComponent component : components) {
+            result.add(componentKey(component));
+        }
+        return result;
+    }
+
     public void writeToPacket(PacketBuffer buffer) {
         buffer.writeBoolean(this.icon != null);
         if (this.icon != null) {
@@ -121,7 +133,9 @@ public record PatternContainerGroup(
         if (this == o) {
             return true;
         }
-        if (!(o instanceof PatternContainerGroup(AEItemKey icon1, ITextComponent name1, List<ITextComponent> tooltip1))) {
+        if (!(o instanceof PatternContainerGroup(
+            AEItemKey icon1, ITextComponent name1, List<ITextComponent> tooltip1
+        ))) {
             return false;
         }
         return Objects.equals(this.icon, icon1)
@@ -132,17 +146,5 @@ public record PatternContainerGroup(
     @Override
     public int hashCode() {
         return Objects.hash(this.icon, componentKey(this.name), componentListKey(this.tooltip));
-    }
-
-    private static String componentKey(ITextComponent component) {
-        return TextComponents.componentKey(component);
-    }
-
-    private static List<String> componentListKey(List<ITextComponent> components) {
-        ObjectList<String> result = new ObjectArrayList<>(components.size());
-        for (ITextComponent component : components) {
-            result.add(componentKey(component));
-        }
-        return result;
     }
 }

@@ -1,9 +1,9 @@
 package appeng.server.subcommands;
 
 import appeng.api.networking.pathing.ChannelMode;
-import appeng.core.localization.GuiText;
 import appeng.core.AEConfig;
 import appeng.core.AELog;
+import appeng.core.localization.GuiText;
 import appeng.core.localization.PlayerMessages;
 import appeng.hooks.ticking.TickHandler;
 import appeng.me.Grid;
@@ -28,11 +28,6 @@ public class ChannelModeCommand implements ISubCommand {
         }
     }
 
-    @Override
-    public String getHelp(MinecraftServer srv) {
-        return "commands.ae2.channelmode";
-    }
-
     private static String[] getModeNames() {
         ChannelMode[] modes = ChannelMode.values();
         String[] names = new String[modes.length];
@@ -40,6 +35,21 @@ public class ChannelModeCommand implements ISubCommand {
             names[i] = modes[i].name().toLowerCase(Locale.ROOT);
         }
         return names;
+    }
+
+    private static ITextComponent getModeLabel(ChannelMode mode) {
+        return switch (mode) {
+            case DEFAULT -> GuiText.ChannelModeDefault.text();
+            case INFINITE -> GuiText.ChannelModeInfinite.text();
+            case X2 -> GuiText.ChannelModeX2.text();
+            case X3 -> GuiText.ChannelModeX3.text();
+            case X4 -> GuiText.ChannelModeX4.text();
+        };
+    }
+
+    @Override
+    public String getHelp(MinecraftServer srv) {
+        return "commands.ae2.channelmode";
     }
 
     @Override
@@ -76,15 +86,5 @@ public class ChannelModeCommand implements ISubCommand {
         }
 
         return CommandBase.getListOfStringsMatchingLastWord(args, getModeNames());
-    }
-
-    private static ITextComponent getModeLabel(ChannelMode mode) {
-        return switch (mode) {
-            case DEFAULT -> GuiText.ChannelModeDefault.text();
-            case INFINITE -> GuiText.ChannelModeInfinite.text();
-            case X2 -> GuiText.ChannelModeX2.text();
-            case X3 -> GuiText.ChannelModeX3.text();
-            case X4 -> GuiText.ChannelModeX4.text();
-        };
     }
 }

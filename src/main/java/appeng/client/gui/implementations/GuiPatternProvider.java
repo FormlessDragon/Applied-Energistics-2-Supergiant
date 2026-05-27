@@ -14,12 +14,12 @@ import appeng.client.gui.widgets.ToggleButton;
 import appeng.client.gui.widgets.UpgradesPanel;
 import appeng.container.SlotSemantics;
 import appeng.container.implementations.ContainerPatternProvider;
-import appeng.core.localization.GuiText;
 import appeng.core.localization.ButtonToolTips;
+import appeng.core.localization.GuiText;
 import appeng.core.network.InitNetwork;
 import appeng.core.network.bidirectional.ConfigValuePacket;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import appeng.util.EnumCycler;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 

@@ -15,12 +15,12 @@ public class ContainerCraftingTree extends AEBaseContainer {
         super(ip, te);
     }
 
-    public void setJob(final Future<ICraftingPlan> job) {
-        this.job = job;
-    }
-
     public Future<ICraftingPlan> getJob() {
         return job;
+    }
+
+    public void setJob(final Future<ICraftingPlan> job) {
+        this.job = job;
     }
 
 }

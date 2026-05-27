@@ -24,6 +24,7 @@ import appeng.client.render.DelegateBakedModel;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.IBakedModel;
@@ -37,7 +38,6 @@ import net.minecraftforge.client.model.pipeline.IVertexConsumer;
 import net.minecraftforge.client.model.pipeline.QuadGatheringTransformer;
 import net.minecraftforge.client.model.pipeline.UnpackedBakedQuad;
 import net.minecraftforge.common.property.IExtendedBlockState;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -61,6 +61,21 @@ public class AutoRotatingModel extends DelegateBakedModel implements IResourceMa
                         key.up());
                 }
             });
+    }
+
+    private static BakedQuad rotateQuad(BakedQuad quad, BlockOrientation rotation) {
+        VertexFormat format = quad.getFormat();
+        UnpackedBakedQuad.Builder builder = new UnpackedBakedQuad.Builder(format);
+        VertexRotator rotator = new VertexRotator(rotation, quad.getFace());
+        rotator.setParent(builder);
+        quad.pipe(rotator);
+
+        EnumFacing face = quad.getFace();
+        builder.setQuadOrientation(face != null ? rotation.rotate(face) : EnumFacing.NORTH);
+
+        BakedQuad unpackedQuad = builder.build();
+        return new BakedQuad(unpackedQuad.getVertexData(), quad.getTintIndex(), unpackedQuad.getFace(),
+            quad.getSprite(), quad.shouldApplyDiffuseLighting(), format);
     }
 
     @Override
@@ -101,21 +116,6 @@ public class AutoRotatingModel extends DelegateBakedModel implements IResourceMa
             rotated.add(rotateQuad(quad, rotation));
         }
         return rotated;
-    }
-
-    private static BakedQuad rotateQuad(BakedQuad quad, BlockOrientation rotation) {
-        VertexFormat format = quad.getFormat();
-        UnpackedBakedQuad.Builder builder = new UnpackedBakedQuad.Builder(format);
-        VertexRotator rotator = new VertexRotator(rotation, quad.getFace());
-        rotator.setParent(builder);
-        quad.pipe(rotator);
-
-        EnumFacing face = quad.getFace();
-        builder.setQuadOrientation(face != null ? rotation.rotate(face) : EnumFacing.NORTH);
-
-        BakedQuad unpackedQuad = builder.build();
-        return new BakedQuad(unpackedQuad.getVertexData(), quad.getTintIndex(), unpackedQuad.getFace(),
-            quad.getSprite(), quad.shouldApplyDiffuseLighting(), format);
     }
 
     @ParametersAreNonnullByDefault

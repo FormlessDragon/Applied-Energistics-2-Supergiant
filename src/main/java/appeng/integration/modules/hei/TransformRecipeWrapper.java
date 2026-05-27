@@ -5,6 +5,8 @@ import appeng.api.stacks.AEFluidKey;
 import appeng.recipes.transform.TransformCircumstance;
 import appeng.recipes.transform.TransformRecipe;
 import com.google.common.base.Splitter;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
 import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.ingredients.VanillaTypes;
 import mezz.jei.api.recipe.IRecipeWrapper;
@@ -13,8 +15,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidStack;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectLists;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Collections;

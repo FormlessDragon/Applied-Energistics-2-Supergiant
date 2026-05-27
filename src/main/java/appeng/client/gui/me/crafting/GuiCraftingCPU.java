@@ -33,10 +33,11 @@ import appeng.container.me.crafting.CraftingStatusEntry;
 import appeng.core.localization.GuiText;
 import appeng.core.network.InitNetwork;
 import appeng.core.network.serverbound.TraceCraftingSupplierPacket;
-import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.util.text.ITextComponent;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
@@ -45,8 +46,6 @@ import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T> {
 

@@ -79,11 +79,9 @@ import java.util.Objects;
 )
 public final class AppEngBase implements AppEng {
 
+    public static final Logger LOGGER = LogManager.getLogger(Tags.MOD_NAME);
     private static final String CLIENT_PROXY = "appeng.core.AppEngClient";
     private static final String COMMON_PROXY = "appeng.core.AppEngServer";
-
-    public static final Logger LOGGER = LogManager.getLogger(Tags.MOD_NAME);
-
     @Mod.Instance(Tags.MOD_ID)
     public static AppEngBase INSTANCE;
     @SidedProxy(clientSide = CLIENT_PROXY, serverSide = COMMON_PROXY)

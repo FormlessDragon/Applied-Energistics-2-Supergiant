@@ -18,6 +18,7 @@
 
 package appeng.items.materials;
 
+import appeng.api.ids.AEItemIds;
 import appeng.api.parts.IPartHost;
 import appeng.api.parts.SelectedPart;
 import appeng.api.upgrades.IUpgradeInventory;
@@ -26,7 +27,6 @@ import appeng.api.upgrades.Upgrades;
 import appeng.container.AEBaseContainer;
 import appeng.container.SlotSemantics;
 import appeng.container.slot.AppEngSlot;
-import appeng.api.ids.AEItemIds;
 import appeng.core.localization.GuiText;
 import appeng.core.localization.InGameTooltip;
 import appeng.core.localization.PlayerMessages;

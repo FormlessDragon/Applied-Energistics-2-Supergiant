@@ -11,9 +11,9 @@ import appeng.client.gui.style.GeneratedBackground;
 import appeng.client.gui.style.GuiStyle;
 import appeng.client.gui.style.GuiStyleManager;
 import appeng.client.gui.style.WidgetStyle;
+import appeng.client.gui.widgets.ITooltip;
 import appeng.client.gui.widgets.IconButton;
 import appeng.client.gui.widgets.ItemStackButton;
-import appeng.client.gui.widgets.ITooltip;
 import appeng.container.AEBaseContainer;
 import appeng.core.localization.GuiText;
 import appeng.core.network.InitNetwork;
@@ -55,6 +55,58 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
 
     public WirelessUniversalTerminalSelectorWindow(AEBaseGui<? extends AEBaseContainer> parent) {
         this.parent = parent;
+    }
+
+    private static boolean contains(Rectangle area, int mouseX, int mouseY) {
+        return mouseX >= area.x
+            && mouseY >= area.y
+            && mouseX < area.x + area.width
+            && mouseY < area.y + area.height;
+    }
+
+    private static int getWindowWidth() {
+        GeneratedBackground background = STYLE.getGeneratedBackground();
+        return background != null ? background.getWidth() : DEFAULT_WIDTH;
+    }
+
+    private static int getWindowHeight() {
+        GeneratedBackground background = STYLE.getGeneratedBackground();
+        return background != null ? background.getHeight() : DEFAULT_HEIGHT;
+    }
+
+    private static int getWindowHeight(int terminalCount) {
+        TerminalLayout layout = getTerminalLayout();
+        int rows = Math.max(1, (terminalCount + layout.columns() - 1) / layout.columns());
+        return layout.baseHeight() + Math.max(0, rows - 1) * layout.stepY();
+    }
+
+    private static TerminalLayout getTerminalLayout() {
+        WidgetStyle first = STYLE.getWidget(FIRST_TERMINAL_WIDGET);
+        WidgetStyle second = STYLE.getWidget(SECOND_TERMINAL_WIDGET);
+        WidgetStyle last = STYLE.getWidget(LAST_TERMINAL_WIDGET);
+        int firstLeft = requireCoordinate(first.getLeft(), FIRST_TERMINAL_WIDGET, "left");
+        int firstTop = requireCoordinate(first.getTop(), FIRST_TERMINAL_WIDGET, "top");
+        int secondLeft = requireCoordinate(second.getLeft(), SECOND_TERMINAL_WIDGET, "left");
+        int lastLeft = requireCoordinate(last.getLeft(), LAST_TERMINAL_WIDGET, "left");
+        int stepX = secondLeft - firstLeft;
+        int stepY = first.getHeight() + 10;
+        int columns = Math.max(1, ((lastLeft - firstLeft) / Math.max(1, stepX)) + 1);
+        return new TerminalLayout(
+            firstLeft,
+            firstTop,
+            stepX,
+            stepY,
+            columns,
+            first.getWidth(),
+            first.getHeight(),
+            getWindowHeight());
+    }
+
+    private static int requireCoordinate(@Nullable Integer coordinate, String widgetId, String axis) {
+        if (coordinate == null) {
+            throw new IllegalStateException("Missing " + axis + " for widget " + widgetId);
+        }
+        return coordinate;
     }
 
     public void open() {
@@ -303,13 +355,6 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
         button.height = layout.buttonHeight();
     }
 
-    private static boolean contains(Rectangle area, int mouseX, int mouseY) {
-        return mouseX >= area.x
-            && mouseY >= area.y
-            && mouseX < area.x + area.width
-            && mouseY < area.y + area.height;
-    }
-
     private boolean canStartDrag(Point mousePos) {
         if (!contains(this.bounds, mousePos.x(), mousePos.y())) {
             return false;
@@ -353,25 +398,9 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
         this.bounds.y = Math.clamp(this.bounds.y, minY, Math.max(minY, maxY));
     }
 
-    private static int getWindowWidth() {
-        GeneratedBackground background = STYLE.getGeneratedBackground();
-        return background != null ? background.getWidth() : DEFAULT_WIDTH;
-    }
-
     private void updateWindowHeight(int terminalCount) {
         this.bounds.width = getWindowWidth();
         this.bounds.height = getWindowHeight(terminalCount);
-    }
-
-    private static int getWindowHeight() {
-        GeneratedBackground background = STYLE.getGeneratedBackground();
-        return background != null ? background.getHeight() : DEFAULT_HEIGHT;
-    }
-
-    private static int getWindowHeight(int terminalCount) {
-        TerminalLayout layout = getTerminalLayout();
-        int rows = Math.max(1, (terminalCount + layout.columns() - 1) / layout.columns());
-        return layout.baseHeight() + Math.max(0, rows - 1) * layout.stepY();
     }
 
     private int getInstalledTerminalCount() {
@@ -391,35 +420,6 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
             }
         }
         return count;
-    }
-
-    private static TerminalLayout getTerminalLayout() {
-        WidgetStyle first = STYLE.getWidget(FIRST_TERMINAL_WIDGET);
-        WidgetStyle second = STYLE.getWidget(SECOND_TERMINAL_WIDGET);
-        WidgetStyle last = STYLE.getWidget(LAST_TERMINAL_WIDGET);
-        int firstLeft = requireCoordinate(first.getLeft(), FIRST_TERMINAL_WIDGET, "left");
-        int firstTop = requireCoordinate(first.getTop(), FIRST_TERMINAL_WIDGET, "top");
-        int secondLeft = requireCoordinate(second.getLeft(), SECOND_TERMINAL_WIDGET, "left");
-        int lastLeft = requireCoordinate(last.getLeft(), LAST_TERMINAL_WIDGET, "left");
-        int stepX = secondLeft - firstLeft;
-        int stepY = first.getHeight() + 10;
-        int columns = Math.max(1, ((lastLeft - firstLeft) / Math.max(1, stepX)) + 1);
-        return new TerminalLayout(
-            firstLeft,
-            firstTop,
-            stepX,
-            stepY,
-            columns,
-            first.getWidth(),
-            first.getHeight(),
-            getWindowHeight());
-    }
-
-    private static int requireCoordinate(@Nullable Integer coordinate, String widgetId, String axis) {
-        if (coordinate == null) {
-            throw new IllegalStateException("Missing " + axis + " for widget " + widgetId);
-        }
-        return coordinate;
     }
 
     private record TerminalLayout(int originX, int originY, int stepX, int stepY, int columns,

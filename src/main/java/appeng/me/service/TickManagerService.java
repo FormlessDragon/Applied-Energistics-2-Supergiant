@@ -402,15 +402,6 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
             currentTick - lastTick);
     }
 
-    public record NodeStatus(
-        boolean alertable,
-        boolean sleeping,
-        boolean awake,
-        boolean queued,
-        int currentRate,
-        long lastTick) {
-    }
-
     public void resetMonitoringStatistics() {
         resetStatistics(this.alertable);
         resetStatistics(this.sleeping);
@@ -421,6 +412,15 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
         for (var tracker : trackers.values()) {
             tracker.resetStatistics();
         }
+    }
+
+    public record NodeStatus(
+        boolean alertable,
+        boolean sleeping,
+        boolean awake,
+        boolean queued,
+        int currentRate,
+        long lastTick) {
     }
 
 }

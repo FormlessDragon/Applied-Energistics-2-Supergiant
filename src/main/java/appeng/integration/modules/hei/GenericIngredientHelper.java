@@ -5,9 +5,9 @@ import appeng.api.integrations.hei.IngredientConverters;
 import appeng.api.stacks.GenericStack;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
-import mezz.jei.bookmarks.BookmarkItem;
 import mezz.jei.api.gui.IGuiIngredient;
 import mezz.jei.api.gui.IRecipeLayout;
+import mezz.jei.bookmarks.BookmarkItem;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;

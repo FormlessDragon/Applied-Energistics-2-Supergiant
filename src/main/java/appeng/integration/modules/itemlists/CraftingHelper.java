@@ -10,13 +10,13 @@ import appeng.core.AELog;
 import appeng.core.network.InitNetwork;
 import appeng.core.network.serverbound.FillCraftingGridFromRecipePacket;
 import appeng.util.CraftingRecipeUtil;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.CraftingManager;
 import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.item.crafting.Ingredient;
 import net.minecraft.util.NonNullList;
 import net.minecraft.util.ResourceLocation;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;

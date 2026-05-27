@@ -13,8 +13,8 @@ import appeng.me.helpers.BaseActionSource;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import net.minecraft.item.ItemStack;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.Fluid;
 import org.jetbrains.annotations.Nullable;
 

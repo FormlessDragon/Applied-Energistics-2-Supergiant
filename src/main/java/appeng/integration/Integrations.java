@@ -56,8 +56,8 @@ public final class Integrations {
     private static HeiAdapter loadHei() {
         try {
             return (HeiAdapter) Class.forName(HEI_MODULE_CLASS, true, Loader.instance().getModClassLoader())
-                .getDeclaredConstructor()
-                .newInstance();
+                                     .getDeclaredConstructor()
+                                     .newInstance();
         } catch (ReflectiveOperationException ignored) {
             return NO_HEI;
         }

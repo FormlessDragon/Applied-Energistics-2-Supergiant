@@ -23,12 +23,12 @@ public class WirelessPatternEncodingTerminalGuiHost
 
     private final PatternEncodingLogic logic = new PatternEncodingLogic(this);
     private final IConfigManager configManager = WirelessTerminals.configBuilder(this::getItemStack, getTerminalItem())
-                                                               .registerSetting(Settings.SORT_BY, SortOrder.NAME)
-                                                               .registerSetting(Settings.VIEW_MODE, ViewItems.ALL)
-                                                               .registerSetting(Settings.SORT_DIRECTION,
-                                                                   SortDir.ASCENDING)
-                                                               .registerSetting(Settings.PATTERN_AUTO_FILL, YesNo.NO)
-                                                               .build();
+                                                                  .registerSetting(Settings.SORT_BY, SortOrder.NAME)
+                                                                  .registerSetting(Settings.VIEW_MODE, ViewItems.ALL)
+                                                                  .registerSetting(Settings.SORT_DIRECTION,
+                                                                      SortDir.ASCENDING)
+                                                                  .registerSetting(Settings.PATTERN_AUTO_FILL, YesNo.NO)
+                                                                  .build();
 
     public WirelessPatternEncodingTerminalGuiHost(WirelessTerminalItem stackItem,
                                                   WirelessTerminalItem terminalItem,

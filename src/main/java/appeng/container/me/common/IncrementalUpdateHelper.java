@@ -21,10 +21,9 @@ package appeng.container.me.common;
 import appeng.api.stacks.AEKey;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 
 import java.util.Iterator;
 import java.util.Set;

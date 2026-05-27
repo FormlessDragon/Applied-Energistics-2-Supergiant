@@ -57,11 +57,11 @@ public class TileCondenser extends AEBaseInvTile implements IConfigurableObject 
         new FluidTankProperties(null, Fluid.BUCKET_VOLUME, true, false)
     };
     private final AppEngInternalInventory outputSlot = new AppEngInternalInventory(this, 1);
-    private final AppEngInternalInventory storageSlot = new AppEngInternalInventory(this, 1);    private final ConfigManager cm = new ConfigManager(() -> {
+    private final AppEngInternalInventory storageSlot = new AppEngInternalInventory(this, 1);
+    private final InternalInventory inputSlot = new CondenseItemHandler();    private final ConfigManager cm = new ConfigManager(() -> {
         saveChanges();
         addPower(0);
     });
-    private final InternalInventory inputSlot = new CondenseItemHandler();
     private final IFluidHandler fluidHandler = new FluidHandler();
     private final CondenserMEStorage meStorage = new CondenserMEStorage(this);
     private final InternalInventory externalInv = new CombinedInternalInventory(this.inputSlot,

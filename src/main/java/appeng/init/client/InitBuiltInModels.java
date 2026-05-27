@@ -35,9 +35,9 @@ import appeng.client.render.model.MeteoriteCompassModel;
 import appeng.client.render.model.WrappedGenericStackModel;
 import appeng.client.render.tesr.spatial.SpatialPylonModel;
 import appeng.core.AppEng;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraftforge.client.model.IModel;
 import net.minecraftforge.client.model.ModelLoaderRegistry;
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 

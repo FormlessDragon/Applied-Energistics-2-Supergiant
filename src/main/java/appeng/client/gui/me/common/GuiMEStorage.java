@@ -221,6 +221,16 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         updateSearch();
     }
 
+    private static void restoreGuiStateAfterRepoItem() {
+        RenderHelper.disableStandardItemLighting();
+        GlStateManager.colorMask(true, true, true, true);
+        GlStateManager.enableTexture2D();
+        GlStateManager.disableLighting();
+        GlStateManager.disableDepth();
+        GlStateManager.enableBlend();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+    }
+
     @Override
     public void initGui() {
         this.rows = getConfiguredRows();
@@ -480,7 +490,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
                 AppEng.makeId("block/molecular_assembler_lights").toString());
             if (sprite != null && sprite != this.mc.getTextureMapBlocks().getMissingSprite()) {
                 Blitter.sprite(sprite, 2, 2, Math.max(0, sprite.getIconWidth() - 4),
-                        Math.max(0, sprite.getIconHeight() - 4))
+                           Math.max(0, sprite.getIconHeight() - 4))
                        .dest(slot.xPos - 1, slot.yPos - 1, 18, 18)
                        .zOffset(150)
                        .blit();
@@ -542,16 +552,6 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
     private void renderRepoSizeLabel(RepoSlot slot, String amount, boolean useLargeFonts) {
         StackSizeRenderer.renderSizeLabel(this.fontRenderer, slot.xPos, slot.yPos, amount, useLargeFonts);
-    }
-
-    private static void restoreGuiStateAfterRepoItem() {
-        RenderHelper.disableStandardItemLighting();
-        GlStateManager.colorMask(true, true, true, true);
-        GlStateManager.enableTexture2D();
-        GlStateManager.disableLighting();
-        GlStateManager.disableDepth();
-        GlStateManager.enableBlend();
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private void renderLinkStatus(ILinkStatus linkStatus) {

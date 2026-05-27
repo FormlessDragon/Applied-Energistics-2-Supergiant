@@ -43,13 +43,12 @@ import appeng.server.services.ChunkLoadingService;
 import appeng.tile.grid.AENetworkedTile;
 import com.google.common.collect.Multiset;
 import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.WorldServer;
-
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 
 import java.util.Iterator;
 import java.util.Set;

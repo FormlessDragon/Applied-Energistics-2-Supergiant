@@ -128,6 +128,14 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         storageGrid.addGlobalStorageProvider(new CraftingServiceStorage(this));
     }
 
+    private static <T> void addSetDifference(Set<T> output, Set<T> left, Set<T> right) {
+        for (var element : left) {
+            if (!right.contains(element)) {
+                output.add(element);
+            }
+        }
+    }
+
     @Override
     public void onServerEndTick() {
         if (this.updateList) {
@@ -196,14 +204,6 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
                         }
                     }
                 }
-            }
-        }
-    }
-
-    private static <T> void addSetDifference(Set<T> output, Set<T> left, Set<T> right) {
-        for (var element : left) {
-            if (!right.contains(element)) {
-                output.add(element);
             }
         }
     }

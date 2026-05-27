@@ -28,6 +28,8 @@ import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import it.unimi.dsi.fastutil.floats.FloatFloatPair;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -74,9 +76,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.function.Function;
-
-import it.unimi.dsi.fastutil.floats.FloatFloatPair;
-import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 
 @SuppressWarnings("deprecation")
 public enum UVLModelLoader implements ICustomModelLoader {

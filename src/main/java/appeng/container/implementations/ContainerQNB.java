@@ -26,7 +26,7 @@ import net.minecraft.entity.player.InventoryPlayer;
 
 public class ContainerQNB extends AEBaseContainer {
 
-    public ContainerQNB( InventoryPlayer ip, TileQuantumBridge quantumBridge) {
+    public ContainerQNB(InventoryPlayer ip, TileQuantumBridge quantumBridge) {
         super(ip, quantumBridge);
 
         this.addSlot(new RestrictedInputSlot(

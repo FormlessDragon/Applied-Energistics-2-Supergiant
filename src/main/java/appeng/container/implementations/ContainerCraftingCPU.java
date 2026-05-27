@@ -31,8 +31,8 @@ import appeng.container.AEBaseContainer;
 import appeng.container.guisync.GuiSync;
 import appeng.container.me.common.IncrementalUpdateHelper;
 import appeng.container.me.crafting.CraftingStatus;
-import appeng.core.network.clientbound.CraftingSupplierLocationsPacket;
 import appeng.core.network.clientbound.CraftingStatusPacket;
+import appeng.core.network.clientbound.CraftingSupplierLocationsPacket;
 import appeng.crafting.execution.CraftingSupplierLocation;
 import appeng.me.cluster.implementations.CraftingCPUCluster;
 import appeng.tile.crafting.TileCraftingUnit;
@@ -67,17 +67,17 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
     private ITextComponent initialTitle;
     private boolean cachedSuspend;
 
-    public ContainerCraftingCPU( InventoryPlayer ip, TileCraftingUnit host) {
+    public ContainerCraftingCPU(InventoryPlayer ip, TileCraftingUnit host) {
         this(ip, (Object) host);
     }
 
-    public ContainerCraftingCPU( InventoryPlayer ip, TileCraftingUnit host,
+    public ContainerCraftingCPU(InventoryPlayer ip, TileCraftingUnit host,
                                 @Nullable ITextComponent initialTitle) {
         this(ip, host);
         setInitialTitle(initialTitle);
     }
 
-    protected ContainerCraftingCPU( InventoryPlayer ip, Object host) {
+    protected ContainerCraftingCPU(InventoryPlayer ip, Object host) {
         super(ip, host);
 
         this.configHost = host instanceof IConfigurableObject ? (IConfigurableObject) host : null;

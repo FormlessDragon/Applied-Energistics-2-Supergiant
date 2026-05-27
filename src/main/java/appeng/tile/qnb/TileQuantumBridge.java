@@ -47,9 +47,8 @@ import java.util.EnumSet;
 public class TileQuantumBridge extends AENetworkedInvTile
     implements IAEMultiBlock<QuantumCluster>, ServerTickingTile {
 
-    private static int singularitySeed = 0;
     private static final String ENTANGLED_SINGULARITY_ID = "entangled_singularity_id";
-
+    private static int singularitySeed = 0;
     private final byte corner = 16;
     private final byte hasSingularity = 32;
     private final byte powered = 64;

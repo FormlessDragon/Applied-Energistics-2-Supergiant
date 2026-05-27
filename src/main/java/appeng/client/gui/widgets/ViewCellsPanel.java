@@ -120,8 +120,8 @@ public final class ViewCellsPanel implements ICompositeWidget {
         }
 
         BACKGROUND.copy().src(0, PANEL_TOP_HEIGHT + PANEL_ROW_HEIGHT, PANEL_WIDTH, PANEL_BOTTOM_HEIGHT)
-            .dest(drawX, bodyY)
-            .blit();
+                  .dest(drawX, bodyY)
+                  .blit();
 
         int slotLeft = drawX + SLOT_INSET_X - 1;
         int slotTop = drawY + SLOT_INSET_Y - 1;

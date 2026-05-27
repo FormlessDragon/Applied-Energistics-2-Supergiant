@@ -159,6 +159,12 @@ public class Enum2IntMap<E extends Enum<E>> extends AbstractReference2IntMap<E> 
         return this.delegate.values();
     }
 
+    private static final class Helper<E extends Enum<E>> extends AbstractEnumPrimitiveMap<E> {
+        private Helper(Class<E> enumClass) {
+            super(enumClass);
+        }
+    }
+
     private final class EntryView implements Reference2IntMap.Entry<E> {
         private final Byte2IntMap.Entry delegateEntry;
 
@@ -208,12 +214,6 @@ public class Enum2IntMap<E extends Enum<E>> extends AbstractReference2IntMap<E> 
         @Override
         public String toString() {
             return getKey() + "->" + getIntValue();
-        }
-    }
-
-    private static final class Helper<E extends Enum<E>> extends AbstractEnumPrimitiveMap<E> {
-        private Helper(Class<E> enumClass) {
-            super(enumClass);
         }
     }
 }

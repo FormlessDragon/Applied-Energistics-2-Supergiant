@@ -19,9 +19,9 @@
 package appeng.core;
 
 import appeng.api.parts.CableRenderMode;
+import appeng.client.ClientTickHandler;
 import appeng.client.EffectType;
 import appeng.client.Hotkeys;
-import appeng.client.ClientTickHandler;
 import appeng.client.commands.ClientCommands;
 import appeng.client.gui.StackTooltipRenderer;
 import appeng.client.gui.me.common.PendingCraftingJobs;
@@ -31,9 +31,9 @@ import appeng.client.render.effects.EnergyParticleData;
 import appeng.client.render.effects.LightningArcParticleData;
 import appeng.client.render.effects.ParticleTypes;
 import appeng.client.render.model.UVLModelLoader;
+import appeng.client.render.overlay.CraftingSupplierHighlightHandler;
 import appeng.client.render.overlay.MeteoriteCompassBeaconRenderer;
 import appeng.client.render.overlay.OverlayManager;
-import appeng.client.render.overlay.CraftingSupplierHighlightHandler;
 import appeng.client.render.tesr.ChargerTESR;
 import appeng.client.render.tesr.CrankRenderer;
 import appeng.client.render.tesr.DriveLedTESR;

@@ -18,6 +18,7 @@
 
 package appeng.client.gui.me.common;
 
+import appeng.api.config.ActionItems;
 import appeng.client.gui.AEBaseGui;
 import appeng.client.gui.Icon;
 import appeng.client.gui.style.GuiStyleManager;
@@ -26,7 +27,6 @@ import appeng.client.gui.widgets.AECheckbox;
 import appeng.client.gui.widgets.ActionButton;
 import appeng.client.gui.widgets.IconButton;
 import appeng.client.gui.widgets.TabButton;
-import appeng.api.config.ActionItems;
 import appeng.container.AEBaseContainer;
 import appeng.container.GuiIds;
 import appeng.container.me.common.ContainerMEStorage;
@@ -353,6 +353,11 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         return ItemListMod.isEnabled();
     }
 
+    private enum Page {
+        GENERAL,
+        WIRELESS
+    }
+
     private static class WirelessSettingsPageButton extends IconButton {
         private WirelessSettingsPageButton(Runnable onPress) {
             super(onPress);
@@ -363,10 +368,5 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         protected Icon getIcon() {
             return Icon.WIRELESS_SETTINGS_PAGE;
         }
-    }
-
-    private enum Page {
-        GENERAL,
-        WIRELESS
     }
 }

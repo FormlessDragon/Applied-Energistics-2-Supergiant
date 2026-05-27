@@ -41,7 +41,7 @@ public class ContainerQuartzKnife extends AEBaseContainer {
     private final InternalInventory input = new AppEngInternalInventory(null, 1, 1);
     private String currentName = "";
 
-    public ContainerQuartzKnife( InventoryPlayer playerInventory, ItemGuiHost<?> host) {
+    public ContainerQuartzKnife(InventoryPlayer playerInventory, ItemGuiHost<?> host) {
         super(playerInventory, host);
 
         this.addSlot(new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.METAL_INGOTS, this.input, 0),

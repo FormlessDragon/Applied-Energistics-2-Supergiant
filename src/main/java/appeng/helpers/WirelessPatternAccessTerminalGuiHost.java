@@ -22,14 +22,14 @@ public class WirelessPatternAccessTerminalGuiHost
     implements IPatternAccessTermContainerHost {
 
     private final IConfigManager configManager = WirelessTerminals.configBuilder(this::getItemStack, getTerminalItem())
-                                                               .registerSetting(Settings.SORT_BY, SortOrder.NAME)
-                                                               .registerSetting(Settings.VIEW_MODE, ViewItems.ALL)
-                                                               .registerSetting(Settings.SORT_DIRECTION,
-                                                                   SortDir.ASCENDING)
-                                                               .registerSetting(
-                                                                   Settings.TERMINAL_SHOW_PATTERN_PROVIDERS,
-                                                                   ShowPatternProviders.VISIBLE)
-                                                               .build();
+                                                                  .registerSetting(Settings.SORT_BY, SortOrder.NAME)
+                                                                  .registerSetting(Settings.VIEW_MODE, ViewItems.ALL)
+                                                                  .registerSetting(Settings.SORT_DIRECTION,
+                                                                      SortDir.ASCENDING)
+                                                                  .registerSetting(
+                                                                      Settings.TERMINAL_SHOW_PATTERN_PROVIDERS,
+                                                                      ShowPatternProviders.VISIBLE)
+                                                                  .build();
 
     public WirelessPatternAccessTerminalGuiHost(WirelessTerminalItem stackItem,
                                                 WirelessTerminalItem terminalItem, EntityPlayer player,

@@ -1,6 +1,7 @@
 package appeng.integration.modules.hei;
 
 import appeng.recipes.quartzcutting.QuartzCuttingRecipe;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.ingredients.VanillaTypes;
 import mezz.jei.api.recipe.IRecipeWrapper;
@@ -11,8 +12,6 @@ import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 @ParametersAreNonnullByDefault
 class QuartzCuttingRecipeWrapper implements IRecipeWrapper {

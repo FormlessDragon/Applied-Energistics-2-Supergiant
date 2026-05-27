@@ -114,6 +114,11 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
         return hiddenOutputs;
     }
 
+    private static KeyStats mapping(Object2ObjectMap<AEKey, KeyStats> plan, AEKey key) {
+        Objects.requireNonNull(key, "Key may not be null");
+        return plan.computeIfAbsent(key, ignored -> new KeyStats());
+    }
+
     public boolean hasMissingEntries() {
         for (var entry : this.entries) {
             if (entry.missingAmount() > 0) {
@@ -121,11 +126,6 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
             }
         }
         return false;
-    }
-
-    private static KeyStats mapping(Object2ObjectMap<AEKey, KeyStats> plan, AEKey key) {
-        Objects.requireNonNull(key, "Key may not be null");
-        return plan.computeIfAbsent(key, ignored -> new KeyStats());
     }
 
     public void write(PacketBuffer buffer) {

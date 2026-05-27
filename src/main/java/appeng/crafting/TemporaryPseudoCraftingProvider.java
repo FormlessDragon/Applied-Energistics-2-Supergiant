@@ -11,16 +11,14 @@ import appeng.helpers.patternprovider.PseudoPatternDetails;
 
 import java.util.List;
 
-public final class TemporaryPseudoCraftingProvider implements ICraftingProvider {
-    private final IPatternDetails pattern;
-
+public record TemporaryPseudoCraftingProvider(IPatternDetails pattern) implements ICraftingProvider {
     public TemporaryPseudoCraftingProvider(List<GenericStack> inputs, List<GenericStack> outputs) {
         var patternStack = PatternDetailsHelper.encodeProcessingPattern(inputs, outputs);
         var definition = AEItemKey.of(patternStack);
         if (definition == null) {
             throw new IllegalArgumentException("Failed to create temporary pseudo pattern definition.");
         }
-        this.pattern = PseudoPatternDetails.wrap(new AEProcessingPattern(definition));
+        this(PseudoPatternDetails.wrap(new AEProcessingPattern(definition)));
     }
 
     public TemporaryPseudoCraftingProvider(IPatternDetails pattern) {
@@ -29,10 +27,6 @@ public final class TemporaryPseudoCraftingProvider implements ICraftingProvider 
             throw new IllegalArgumentException("Temporary pseudo patterns must be processing patterns.");
         }
         this.pattern = PseudoPatternDetails.wrap(basePattern);
-    }
-
-    public IPatternDetails pattern() {
-        return this.pattern;
     }
 
     @Override

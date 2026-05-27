@@ -101,11 +101,11 @@ public class StorageBusPart extends UpgradeablePart
 
     protected final IActionSource source;
     private final StorageBusInventory handler = new StorageBusInventory(NullInventory.of());
-    private final PartAdjacentApi<MEStorage> adjacentStorageAccessor;    private final ConfigInventory config = ConfigInventory.configTypes(63)
+    private final PartAdjacentApi<MEStorage> adjacentStorageAccessor;
+    @Nullable
+    private ITextComponent handlerDescription;    private final ConfigInventory config = ConfigInventory.configTypes(63)
                                                           .changeListener(this::onConfigurationChanged)
                                                           .build();
-    @Nullable
-    private ITextComponent handlerDescription;
     @Nullable
     private Map<AEKeyType, ExternalStorageStrategy> externalStorageStrategies;
     private boolean wasOnline;

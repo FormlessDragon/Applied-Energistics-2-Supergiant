@@ -497,15 +497,15 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage {
         return this.substituteFluids;
     }
 
-    public YesNo getAutoFillPatterns() {
-        return this.autoFillPatterns;
-    }
-
     public void setSubstituteFluids(boolean substituteFluids) {
         if (isClientSide()) {
             sendClientAction(ACTION_SET_FLUID_SUBSTITUTION, substituteFluids);
         }
         changeFluidSubstitution(substituteFluids);
+    }
+
+    public YesNo getAutoFillPatterns() {
+        return this.autoFillPatterns;
     }
 
     private void changeFluidSubstitution(boolean substituteFluids) {

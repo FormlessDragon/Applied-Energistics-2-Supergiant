@@ -32,7 +32,7 @@ public class StackTooltipRenderer {
 
     private static final char SECTION_SIGN = 167;
     private static final String RESERVED_LINE_PREFIX = new String(
-        new char[] { SECTION_SIGN, '0', SECTION_SIGN, 'r', SECTION_SIGN, '0', SECTION_SIGN, 'r' });
+        new char[]{SECTION_SIGN, '0', SECTION_SIGN, 'r', SECTION_SIGN, '0', SECTION_SIGN, 'r'});
     private static final int ROW_HEIGHT = 17;
     private static final int SLOT_STEP = 17;
     private static final int ELLIPSIS_WIDTH = 10;
@@ -124,7 +124,7 @@ public class StackTooltipRenderer {
     }
 
     private static void renderUpgradesRow(RenderItem renderItem, FontRenderer font, int x, int y,
-                                           StorageCellTooltipComponent data) {
+                                          StorageCellTooltipComponent data) {
         var label = getUpgradesLabel();
         int labelY = y + (16 - font.FONT_HEIGHT) / 2;
 

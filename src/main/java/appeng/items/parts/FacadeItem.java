@@ -24,6 +24,7 @@ import appeng.api.parts.IPartHost;
 import appeng.facade.FacadePart;
 import appeng.items.AEBaseItem;
 import appeng.text.TextComponentItemStack;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.block.Block;
 import net.minecraft.block.SoundType;
@@ -46,8 +47,6 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerDestroyItemEvent;
 import org.jetbrains.annotations.Nullable;
-
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.Collections;
 import java.util.List;

@@ -22,8 +22,8 @@ final class OreDictSearchPredicate implements Predicate<GridInventoryEntry> {
 
     private List<String> getOreDictEntriesMatchingTerm(AEKeyType keyType) {
         return keyType.getTagNames()
-            .filter(this::matchesTerm)
-            .collect(Collectors.toList());
+                      .filter(this::matchesTerm)
+                      .collect(Collectors.toList());
     }
 
     private boolean matchesTerm(String oreDictName) {

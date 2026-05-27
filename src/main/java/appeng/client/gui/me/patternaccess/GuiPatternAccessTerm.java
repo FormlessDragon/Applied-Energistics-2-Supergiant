@@ -19,6 +19,7 @@
 package appeng.client.gui.me.patternaccess;
 
 import appeng.api.client.AEKeyRendering;
+import appeng.api.config.ActionItems;
 import appeng.api.config.Settings;
 import appeng.api.config.ShowPatternProviders;
 import appeng.api.config.TerminalStyle;
@@ -38,7 +39,6 @@ import appeng.client.gui.widgets.Scrollbar;
 import appeng.client.gui.widgets.ServerSettingToggleButton;
 import appeng.client.gui.widgets.SettingToggleButton;
 import appeng.client.gui.widgets.UpgradesPanel;
-import appeng.api.config.ActionItems;
 import appeng.container.SlotSemantics;
 import appeng.container.implementations.ContainerPatternAccessTerm;
 import appeng.core.AEConfig;
@@ -154,6 +154,16 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         this.xSize = GUI_WIDTH;
         this.ySize = GUI_HEADER_HEIGHT + GUI_FOOTER_HEIGHT + MIN_VISIBLE_ROWS * ROW_HEIGHT;
         this.setTextHidden("entriesShown", true);
+    }
+
+    private static void restoreGuiStateAfterHeaderIcon() {
+        RenderHelper.disableStandardItemLighting();
+        GlStateManager.colorMask(true, true, true, true);
+        GlStateManager.enableTexture2D();
+        GlStateManager.disableLighting();
+        GlStateManager.disableDepth();
+        GlStateManager.enableBlend();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private void addWirelessUniversalTerminalButton() {
@@ -303,16 +313,6 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             GUI_PADDING_X + PATTERN_PROVIDER_NAME_MARGIN_X + 18,
             GUI_HEADER_HEIGHT + GUI_PADDING_Y + rowIndex * ROW_HEIGHT,
             4210752);
-    }
-
-    private static void restoreGuiStateAfterHeaderIcon() {
-        RenderHelper.disableStandardItemLighting();
-        GlStateManager.colorMask(true, true, true, true);
-        GlStateManager.enableTexture2D();
-        GlStateManager.disableLighting();
-        GlStateManager.disableDepth();
-        GlStateManager.enableBlend();
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private void drawInvalidPatternOverlays(SlotsRow slotsRow, int rowIndex) {

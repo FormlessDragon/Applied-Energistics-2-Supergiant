@@ -44,7 +44,7 @@ public final class PatternProviderDataProvider
                     genericStack.what().formatAmount(genericStack.amount(), AmountFormat.FULL));
             }
             tooltip.addLine(TopText.crafting_locked_until_result.text(stackName, stackAmount)
-                .setStyle(new Style().setColor(TextFormatting.RED)));
+                                                                .setStyle(new Style().setColor(TextFormatting.RED)));
         }
     }
 

@@ -66,6 +66,19 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
         this.scrollbar.setCaptureMouseWheel(false);
     }
 
+    private static void disableSlots(List<Slot> slots) {
+        for (Slot slot : slots) {
+            if (slot instanceof AppEngSlot appEngSlot) {
+                appEngSlot.setSlotEnabled(false);
+                appEngSlot.setActive(false);
+            }
+        }
+    }
+
+    private static boolean isSlotEnabled(Slot slot) {
+        return !(slot instanceof AppEngSlot appEngSlot) || appEngSlot.isSlotEnabled();
+    }
+
     @Override
     public void setPosition(Point position) {
         this.x = position.x() + PANEL_X_OFFSET;
@@ -171,19 +184,6 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
     @Override
     public boolean onMouseWheel(Point mousePos, double delta) {
         return this.scrollbar.isVisible() && this.scrollbar.onMouseWheel(mousePos, delta);
-    }
-
-    private static void disableSlots(List<Slot> slots) {
-        for (Slot slot : slots) {
-            if (slot instanceof AppEngSlot appEngSlot) {
-                appEngSlot.setSlotEnabled(false);
-                appEngSlot.setActive(false);
-            }
-        }
-    }
-
-    private static boolean isSlotEnabled(Slot slot) {
-        return !(slot instanceof AppEngSlot appEngSlot) || appEngSlot.isSlotEnabled();
     }
 
     private List<Slot> getPanelSlots() {

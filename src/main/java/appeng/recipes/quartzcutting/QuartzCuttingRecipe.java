@@ -1,5 +1,6 @@
 package appeng.recipes.quartzcutting;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.IRecipe;
@@ -9,7 +10,6 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.World;
 import net.minecraftforge.registries.IForgeRegistryEntry;
 
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.List;
 
 public class QuartzCuttingRecipe extends IForgeRegistryEntry.Impl<IRecipe> implements IRecipe {

@@ -20,7 +20,7 @@ final class RecipeTransferHighlightHelper {
     static void drawHighlights(Minecraft minecraft, IRecipeLayout recipeLayout, IntCollection missingGuiSlots,
                                IntCollection craftableGuiSlots, int recipeX, int recipeY) {
         Map<Integer, ? extends IGuiIngredient<ItemStack>> ingredients = recipeLayout.getItemStacks()
-            .getGuiIngredients();
+                                                                                    .getGuiIngredients();
         drawHighlights(minecraft, ingredients, missingGuiSlots, MISSING_SLOT_COLOR, recipeX, recipeY);
         drawHighlights(minecraft, ingredients, craftableGuiSlots, CRAFTABLE_SLOT_COLOR, recipeX, recipeY);
     }

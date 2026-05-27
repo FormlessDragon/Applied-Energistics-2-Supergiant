@@ -22,9 +22,9 @@ import appeng.api.config.PowerMultiplier;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.features.IPlayerRegistry;
 import appeng.api.networking.IGrid;
-import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.networking.crafting.ICraftingLink;
 import appeng.api.networking.crafting.ICraftingPlan;
+import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.networking.crafting.ICraftingRequester;
 import appeng.api.networking.crafting.ICraftingSubmitResult;
 import appeng.api.networking.energy.IEnergyService;
@@ -36,10 +36,10 @@ import appeng.core.AELog;
 import appeng.core.network.InitNetwork;
 import appeng.core.network.clientbound.CraftingJobStatusPacket;
 import appeng.crafting.CraftingLink;
-import appeng.helpers.patternprovider.PseudoPatternDetails;
 import appeng.crafting.inv.ICraftingInventory;
 import appeng.crafting.inv.ListCraftingInventory;
 import appeng.crafting.pattern.AEProcessingPattern;
+import appeng.helpers.patternprovider.PseudoPatternDetails;
 import appeng.hooks.ticking.TickHandler;
 import appeng.me.cluster.implementations.CraftingCPUCluster;
 import appeng.me.service.CraftingService;
@@ -51,9 +51,9 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -82,6 +82,39 @@ public class CraftingCpuLogic {
 
     public CraftingCpuLogic(CraftingCPUCluster cluster) {
         this.cluster = cluster;
+    }
+
+    private static boolean isFinalOutputPseudoPattern(ExecutingCraftingJob job, IPatternDetails details) {
+        if (!PseudoPatternDetails.isPseudo(details)) {
+            return false;
+        }
+        if (!(PseudoPatternDetails.unwrap(details) instanceof AEProcessingPattern)) {
+            return false;
+        }
+        for (var output : details.getOutputs()) {
+            if (output.what().matches(job.finalOutput)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static long getRemainingNormalInputDemand(ExecutingCraftingJob job, AEKey what) {
+        long demand = 0;
+        for (var task : job.tasks.entrySet()) {
+            if (task.getValue().value <= 0 || PseudoPatternDetails.isPseudo(task.getKey())) {
+                continue;
+            }
+            for (var input : task.getKey().getInputs()) {
+                for (var possibleInput : input.possibleInputs()) {
+                    if (what.matches(possibleInput)) {
+                        demand += possibleInput.amount() * input.getMultiplier() * task.getValue().value;
+                        break;
+                    }
+                }
+            }
+        }
+        return demand;
     }
 
     public ICraftingSubmitResult trySubmitJob(IGrid grid, ICraftingPlan plan, IActionSource src,
@@ -328,39 +361,6 @@ public class CraftingCpuLogic {
                     Actionable.MODULATE);
             }
         }
-    }
-
-    private static boolean isFinalOutputPseudoPattern(ExecutingCraftingJob job, IPatternDetails details) {
-        if (!PseudoPatternDetails.isPseudo(details)) {
-            return false;
-        }
-        if (!(PseudoPatternDetails.unwrap(details) instanceof AEProcessingPattern)) {
-            return false;
-        }
-        for (var output : details.getOutputs()) {
-            if (output.what().matches(job.finalOutput)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static long getRemainingNormalInputDemand(ExecutingCraftingJob job, AEKey what) {
-        long demand = 0;
-        for (var task : job.tasks.entrySet()) {
-            if (task.getValue().value <= 0 || PseudoPatternDetails.isPseudo(task.getKey())) {
-                continue;
-            }
-            for (var input : task.getKey().getInputs()) {
-                for (var possibleInput : input.possibleInputs()) {
-                    if (what.matches(possibleInput)) {
-                        demand += possibleInput.amount() * input.getMultiplier() * task.getValue().value;
-                        break;
-                    }
-                }
-            }
-        }
-        return demand;
     }
 
     /**

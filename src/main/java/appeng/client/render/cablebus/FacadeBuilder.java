@@ -9,6 +9,7 @@ import appeng.thirdparty.codechicken.lib.model.pipeline.transformers.QuadCornerK
 import appeng.thirdparty.codechicken.lib.model.pipeline.transformers.QuadFaceStripper;
 import appeng.thirdparty.codechicken.lib.model.pipeline.transformers.QuadReInterpolator;
 import appeng.thirdparty.codechicken.lib.model.pipeline.transformers.QuadTinter;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockRendererDispatcher;
@@ -27,7 +28,6 @@ import net.minecraft.world.IBlockAccess;
 import net.minecraftforge.client.ForgeHooksClient;
 
 import javax.annotation.Nullable;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
@@ -181,6 +181,70 @@ public class FacadeBuilder {
         }
     }
 
+    private static void emitFacadeQuads(IBakedModel model, IBlockState renderedState, EnumFacing side,
+                                        FacadeBlockAccess facadeAccess, BlockPos pos, long rand,
+                                        List<AxisAlignedBB> holeStrips, QuadFaceStripper faceStripper,
+                                        QuadCornerKicker kicker, QuadReInterpolator interpolator,
+                                        MutableQuadView mutableQuad, BlockColors blockColors,
+                                        TextureAtlasSprite fallbackSprite, boolean transparent,
+                                        List<BakedQuad> quadsOut) {
+        for (int cullFaceIdx = 0; cullFaceIdx <= ModelHelper.NULL_FACE_ID; cullFaceIdx++) {
+            EnumFacing cullFace = ModelHelper.faceFromIndex(cullFaceIdx);
+            List<BakedQuad> quads = model.getQuads(renderedState, cullFace, rand);
+            for (BakedQuad quad : quads) {
+                QuadTinter quadTinter = null;
+                if (quad.hasTintIndex()) {
+                    quadTinter = new QuadTinter(blockColors.colorMultiplier(renderedState, facadeAccess, pos,
+                        quad.getTintIndex()));
+                }
+
+                TextureAtlasSprite sprite = quad.getSprite() != null ? quad.getSprite() : fallbackSprite;
+
+                for (AxisAlignedBB box : holeStrips) {
+                    mutableQuad.fromVanilla(quad, cullFace == side ? side : null);
+                    mutableQuad.nominalFace(getNominalFace(quad));
+                    interpolator.setInputQuad(mutableQuad);
+
+                    if (!new QuadClamper(box).transform(mutableQuad)) {
+                        continue;
+                    }
+
+                    if (!faceStripper.transform(mutableQuad)) {
+                        continue;
+                    }
+
+                    if (!kicker.transform(mutableQuad)) {
+                        continue;
+                    }
+
+                    interpolator.transform(mutableQuad);
+
+                    if (quadTinter != null) {
+                        quadTinter.transform(mutableQuad);
+                    }
+                    if (transparent) {
+                        applyAlpha(mutableQuad);
+                    }
+
+                    quadsOut.add(toTransformedBakedQuad(mutableQuad, quad, sprite));
+                }
+            }
+        }
+    }
+
+    private static BakedQuad toTransformedBakedQuad(MutableQuadView mutableQuad, BakedQuad sourceQuad,
+                                                    TextureAtlasSprite sprite) {
+        int[] vertexData = new int[sourceQuad.getVertexData().length];
+        mutableQuad.toVanilla(vertexData, 0);
+        return new BakedQuad(vertexData, sourceQuad.getTintIndex(), mutableQuad.lightFace(), sprite,
+            sourceQuad.shouldApplyDiffuseLighting(), sourceQuad.getFormat());
+    }
+
+    private static EnumFacing getNominalFace(BakedQuad quad) {
+        EnumFacing face = quad.getFace();
+        return face != null ? face : EnumFacing.UP;
+    }
+
     public void addFacadeQuads(CableBusRenderState renderState, long rand, @Nullable BlockRenderLayer layer,
                                List<BakedQuad> quadsOut) {
         Map<EnumFacing, FacadeRenderState> facadeStates = renderState.getFacades();
@@ -313,57 +377,6 @@ public class FacadeBuilder {
         }
     }
 
-    private static void emitFacadeQuads(IBakedModel model, IBlockState renderedState, EnumFacing side,
-                                        FacadeBlockAccess facadeAccess, BlockPos pos, long rand,
-                                        List<AxisAlignedBB> holeStrips, QuadFaceStripper faceStripper,
-                                        QuadCornerKicker kicker, QuadReInterpolator interpolator,
-                                        MutableQuadView mutableQuad, BlockColors blockColors,
-                                        TextureAtlasSprite fallbackSprite, boolean transparent,
-                                        List<BakedQuad> quadsOut) {
-        for (int cullFaceIdx = 0; cullFaceIdx <= ModelHelper.NULL_FACE_ID; cullFaceIdx++) {
-            EnumFacing cullFace = ModelHelper.faceFromIndex(cullFaceIdx);
-            List<BakedQuad> quads = model.getQuads(renderedState, cullFace, rand);
-            for (BakedQuad quad : quads) {
-                QuadTinter quadTinter = null;
-                if (quad.hasTintIndex()) {
-                    quadTinter = new QuadTinter(blockColors.colorMultiplier(renderedState, facadeAccess, pos,
-                        quad.getTintIndex()));
-                }
-
-                TextureAtlasSprite sprite = quad.getSprite() != null ? quad.getSprite() : fallbackSprite;
-
-                for (AxisAlignedBB box : holeStrips) {
-                    mutableQuad.fromVanilla(quad, cullFace == side ? side : null);
-                    mutableQuad.nominalFace(getNominalFace(quad));
-                    interpolator.setInputQuad(mutableQuad);
-
-                    if (!new QuadClamper(box).transform(mutableQuad)) {
-                        continue;
-                    }
-
-                    if (!faceStripper.transform(mutableQuad)) {
-                        continue;
-                    }
-
-                    if (!kicker.transform(mutableQuad)) {
-                        continue;
-                    }
-
-                    interpolator.transform(mutableQuad);
-
-                    if (quadTinter != null) {
-                        quadTinter.transform(mutableQuad);
-                    }
-                    if (transparent) {
-                        applyAlpha(mutableQuad);
-                    }
-
-                    quadsOut.add(toTransformedBakedQuad(mutableQuad, quad, sprite));
-                }
-            }
-        }
-    }
-
     public List<BakedQuad> buildFacadeItemQuads(ItemStack textureItem, EnumFacing side) {
         List<BakedQuad> facadeQuads = new ObjectArrayList<>();
         IBakedModel model = Minecraft.getMinecraft().getRenderItem().getItemModelWithOverrides(textureItem, null, null);
@@ -404,18 +417,5 @@ public class FacadeBuilder {
         }
 
         return facadeQuads;
-    }
-
-    private static BakedQuad toTransformedBakedQuad(MutableQuadView mutableQuad, BakedQuad sourceQuad,
-                                                    TextureAtlasSprite sprite) {
-        int[] vertexData = new int[sourceQuad.getVertexData().length];
-        mutableQuad.toVanilla(vertexData, 0);
-        return new BakedQuad(vertexData, sourceQuad.getTintIndex(), mutableQuad.lightFace(), sprite,
-            sourceQuad.shouldApplyDiffuseLighting(), sourceQuad.getFormat());
-    }
-
-    private static EnumFacing getNominalFace(BakedQuad quad) {
-        EnumFacing face = quad.getFace();
-        return face != null ? face : EnumFacing.UP;
     }
 }

@@ -25,7 +25,7 @@ import net.minecraft.entity.player.InventoryPlayer;
 
 public class ContainerDrive extends AEBaseContainer {
 
-    public ContainerDrive( InventoryPlayer ip, TileDrive drive) {
+    public ContainerDrive(InventoryPlayer ip, TileDrive drive) {
         super(ip, drive);
 
         for (int i = 0; i < 10; i++) {

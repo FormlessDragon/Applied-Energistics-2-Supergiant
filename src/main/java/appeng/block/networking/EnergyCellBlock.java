@@ -35,12 +35,9 @@ import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 
 public class EnergyCellBlock extends AEBaseTileBlock<TileEnergyCell> {
-    private static final String STORED_ENERGY = "stored_energy";
-
     public static final int MAX_FULLNESS = 4;
-
     public static final PropertyInteger ENERGY_STORAGE = PropertyInteger.create("fullness", 0, MAX_FULLNESS);
-
+    private static final String STORED_ENERGY = "stored_energy";
     private final double maxPower;
     private final double chargeRate;
     private final int priority;

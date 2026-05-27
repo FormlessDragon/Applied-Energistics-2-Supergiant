@@ -2,6 +2,7 @@ package appeng.items.tools.fluix;
 
 import appeng.core.localization.GuiText;
 import net.minecraft.enchantment.Enchantment;
+
 import java.util.List;
 
 final class IntrinsicEnchantment {

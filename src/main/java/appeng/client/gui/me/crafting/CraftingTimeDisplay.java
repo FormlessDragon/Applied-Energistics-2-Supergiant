@@ -25,7 +25,7 @@ public final class CraftingTimeDisplay {
     public static LocalizedTooltip getElapsedTimeTooltip(float progress, long elapsedTimeNanos) {
         return new LocalizedTooltip(
             ButtonToolTips.CpuStatusElapsedTime.getTranslationKey(),
-            new Object[] { Math.round(progress * 100) + "%", formatElapsedTime(elapsedTimeNanos) });
+            new Object[]{Math.round(progress * 100) + "%", formatElapsedTime(elapsedTimeNanos)});
     }
 
     private static String formatElapsedTime(long elapsedTimeNanos) {

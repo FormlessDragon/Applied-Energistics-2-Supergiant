@@ -36,8 +36,8 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
-import java.awt.Rectangle;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
@@ -82,6 +82,92 @@ public class CraftingTreeWidget implements ICompositeWidget {
     private boolean missingOnly;
     private int renderedNodes;
 
+    private static boolean hasSameOutput(@Nullable GenericStack left, GenericStack right) {
+        return left != null && left.what().equals(right.what()) && left.amount() == right.amount();
+    }
+
+    private static boolean findLeftNode(TreeNode node, boolean missingOnly) {
+        TreeNode previous = node.previous;
+        while (previous != null) {
+            if (!missingOnly || LiteCraftTreeNode.isMissing(previous.node)) {
+                previous.select();
+                return true;
+            }
+            previous = previous.previous;
+        }
+        return false;
+    }
+
+    private static boolean findRightNode(TreeNode node, boolean missingOnly) {
+        TreeNode next = node.next;
+        while (next != null) {
+            if (!missingOnly || LiteCraftTreeNode.isMissing(next.node)) {
+                next.select();
+                return true;
+            }
+            next = next.next;
+        }
+        return false;
+    }
+
+    private static void drawTexturedRect(int x, int y, int textureX, int textureY) {
+        GlStateManager.enableTexture2D();
+        GlStateManager.enableBlend();
+        GlStateManager.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        Minecraft.getMinecraft().getTextureManager().bindTexture(TEXTURE);
+        Gui.drawModalRectWithCustomSizedTexture(x, y, textureX, textureY, NODE_WIDTH, NODE_HEIGHT, 256, 256);
+    }
+
+    private static void renderLine(Point pos, int width, int height, int color) {
+        GuiContainer.drawRect(pos.x(), pos.y(), pos.x() + width, pos.y() + height, color);
+    }
+
+    private static BufferedImage readFramebuffer(ScreenshotFramebuffer framebuffer, int width, int height) {
+        ByteBuffer pixelBuffer = BufferUtils.createByteBuffer(width * height * 4);
+        int[] pixels = new int[width * height];
+
+        framebuffer.bind(false);
+        GlStateManager.glPixelStorei(GL11.GL_PACK_ALIGNMENT, 1);
+        GlStateManager.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1);
+        pixelBuffer.clear();
+
+        GL11.glReadPixels(0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixelBuffer);
+
+        for (int y = 0; y < height; y++) {
+            int sourceRow = height - 1 - y;
+            for (int x = 0; x < width; x++) {
+                int sourceIndex = (sourceRow * width + x) * 4;
+                int red = pixelBuffer.get(sourceIndex) & 0xFF;
+                int green = pixelBuffer.get(sourceIndex + 1) & 0xFF;
+                int blue = pixelBuffer.get(sourceIndex + 2) & 0xFF;
+                int alpha = pixelBuffer.get(sourceIndex + 3) & 0xFF;
+                pixels[y * width + x] = (alpha << 24) | (red << 16) | (green << 8) | blue;
+            }
+        }
+
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        image.setRGB(0, 0, width, height, pixels, 0, width);
+        return image;
+    }
+
+    private static int getScreenshotTileSize() {
+        int maxTextureSize = GL11.glGetInteger(GL11.GL_MAX_TEXTURE_SIZE);
+        if (maxTextureSize <= 0) {
+            return SCREENSHOT_TILE_SIZE;
+        }
+        return MathHelper.clamp(maxTextureSize, 256, SCREENSHOT_TILE_SIZE);
+    }
+
+    private static void restoreMainFramebuffer(Minecraft minecraft) {
+        if (OpenGlHelper.isFramebufferEnabled()) {
+            minecraft.getFramebuffer().bindFramebuffer(true);
+        } else {
+            OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, 0);
+        }
+        GlStateManager.viewport(0, 0, minecraft.displayWidth, minecraft.displayHeight);
+    }
+
     @Override
     public void setPosition(Point position) {
         this.bounds.x = position.x();
@@ -121,14 +207,6 @@ public class CraftingTreeWidget implements ICompositeWidget {
         return missingOnly;
     }
 
-    public boolean hasMissingItems() {
-        return root != null && LiteCraftTreeNode.isMissing(root);
-    }
-
-    public boolean hasTree() {
-        return getCurrentRoot() != null && !rows.isEmpty();
-    }
-
     public void setMissingOnly(boolean missingOnly) {
         if (!hasMissingItems() || missingOnly == this.missingOnly) {
             return;
@@ -144,6 +222,14 @@ public class CraftingTreeWidget implements ICompositeWidget {
 
         this.missingOnly = missingOnly;
         rebuildTree();
+    }
+
+    public boolean hasMissingItems() {
+        return root != null && LiteCraftTreeNode.isMissing(root);
+    }
+
+    public boolean hasTree() {
+        return getCurrentRoot() != null && !rows.isEmpty();
     }
 
     @Override
@@ -188,16 +274,16 @@ public class CraftingTreeWidget implements ICompositeWidget {
         int x = bounds.x + 2;
         if (selected == null) {
             font.drawStringWithShadow(GuiText.CraftingTreeRenderedNodes.getLocal(renderedNodes, nodes),
-                    x, bounds.y + bounds.height - 18, 0x80FFFFFF);
+                x, bounds.y + bounds.height - 18, 0x80FFFFFF);
             font.drawStringWithShadow(GuiText.CraftingTreeTip0.getLocal(),
-                    x, bounds.y + bounds.height - 9, 0x80FFFFFF);
+                x, bounds.y + bounds.height - 9, 0x80FFFFFF);
         } else {
             font.drawStringWithShadow(GuiText.CraftingTreeRenderedNodes.getLocal(renderedNodes, nodes),
-                    x, bounds.y + bounds.height - 27, 0x80FFFFFF);
+                x, bounds.y + bounds.height - 27, 0x80FFFFFF);
             font.drawStringWithShadow(GuiText.CraftingTreeTip1.getLocal(),
-                    x, bounds.y + bounds.height - 18, 0x80FFFFFF);
+                x, bounds.y + bounds.height - 18, 0x80FFFFFF);
             font.drawStringWithShadow(GuiText.CraftingTreeTip2.getLocal(),
-                    x, bounds.y + bounds.height - 9, 0x80FFFFFF);
+                x, bounds.y + bounds.height - 9, 0x80FFFFFF);
         }
     }
 
@@ -503,10 +589,6 @@ public class CraftingTreeWidget implements ICompositeWidget {
         this.offsetY = MathHelper.clamp(offsetY, minOffsetY, 0);
     }
 
-    private static boolean hasSameOutput(@Nullable GenericStack left, GenericStack right) {
-        return left != null && left.what().equals(right.what()) && left.amount() == right.amount();
-    }
-
     private int getTotalWidth() {
         int width = 0;
         for (TreeRow row : rows) {
@@ -531,30 +613,6 @@ public class CraftingTreeWidget implements ICompositeWidget {
         if (selected != null) {
             selected.selected = true;
         }
-    }
-
-    private static boolean findLeftNode(TreeNode node, boolean missingOnly) {
-        TreeNode previous = node.previous;
-        while (previous != null) {
-            if (!missingOnly || LiteCraftTreeNode.isMissing(previous.node)) {
-                previous.select();
-                return true;
-            }
-            previous = previous.previous;
-        }
-        return false;
-    }
-
-    private static boolean findRightNode(TreeNode node, boolean missingOnly) {
-        TreeNode next = node.next;
-        while (next != null) {
-            if (!missingOnly || LiteCraftTreeNode.isMissing(next.node)) {
-                next.select();
-                return true;
-            }
-            next = next.next;
-        }
-        return false;
     }
 
     private boolean findVerticalNode(int rowOffset) {
@@ -600,6 +658,86 @@ public class CraftingTreeWidget implements ICompositeWidget {
         }
     }
 
+    private void withScissor(Rectangle screenBounds, Runnable action) {
+        boolean wasEnabled = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
+        IntBuffer previousBox = BufferUtils.createIntBuffer(4);
+        GL11.glGetInteger(GL11.GL_SCISSOR_BOX, previousBox);
+
+        Minecraft minecraft = Minecraft.getMinecraft();
+        ScaledResolution resolution = new ScaledResolution(minecraft);
+        int scaleFactor = resolution.getScaleFactor();
+        int scissorX = (screenBounds.x + bounds.x) * scaleFactor;
+        int scissorY = minecraft.displayHeight - (screenBounds.y + bounds.y + bounds.height) * scaleFactor;
+        int scissorWidth = bounds.width * scaleFactor;
+        int scissorHeight = bounds.height * scaleFactor;
+        try {
+            GL11.glEnable(GL11.GL_SCISSOR_TEST);
+            GL11.glScissor(scissorX, scissorY, scissorWidth, scissorHeight);
+            action.run();
+        } finally {
+            GL11.glScissor(previousBox.get(0), previousBox.get(1), previousBox.get(2), previousBox.get(3));
+            if (wasEnabled) {
+                GL11.glEnable(GL11.GL_SCISSOR_TEST);
+            } else {
+                GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            }
+        }
+    }
+
+    private void renderScreenshotTile(ScreenshotFramebuffer framebuffer, int tileX, int tileY, int tileWidth, int tileHeight,
+                                      int renderScale) {
+        framebuffer.bind(true);
+        framebuffer.clear();
+
+        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+        GlStateManager.matrixMode(GL11.GL_PROJECTION);
+        GlStateManager.pushMatrix();
+        GlStateManager.matrixMode(GL11.GL_MODELVIEW);
+        GlStateManager.pushMatrix();
+        try {
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            GlStateManager.colorMask(true, true, true, true);
+            GlStateManager.enableAlpha();
+            GlStateManager.alphaFunc(GL11.GL_GREATER, 0.1F);
+            GlStateManager.disableLighting();
+            GlStateManager.disableDepth();
+            GlStateManager.enableTexture2D();
+            GlStateManager.enableBlend();
+            GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            GlStateManager.viewport(0, 0, tileWidth * renderScale, tileHeight * renderScale);
+
+            GlStateManager.matrixMode(GL11.GL_PROJECTION);
+            GlStateManager.loadIdentity();
+            GlStateManager.ortho(0.0D, tileWidth, tileHeight, 0.0D, 1000.0D, 3000.0D);
+            GlStateManager.matrixMode(GL11.GL_MODELVIEW);
+            GlStateManager.loadIdentity();
+            GlStateManager.translate(0.0F, 0.0F, -2000.0F);
+
+            int y = -tileY;
+            for (TreeRow row : rows) {
+                if (y + row.getHeight() >= 0) {
+                    framebuffer.bind(false);
+                    row.renderForScreenshot(new Point(-tileX, y), tileWidth);
+                }
+                y += row.getHeight();
+                if (y > tileHeight) {
+                    break;
+                }
+            }
+        } finally {
+            GlStateManager.matrixMode(GL11.GL_MODELVIEW);
+            GlStateManager.popMatrix();
+            GlStateManager.matrixMode(GL11.GL_PROJECTION);
+            GlStateManager.popMatrix();
+            GlStateManager.matrixMode(GL11.GL_MODELVIEW);
+            GL11.glPopAttrib();
+        }
+
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        framebuffer.bind(false);
+    }
+
     private interface RowElement {
         int getFullWidth();
     }
@@ -608,6 +746,74 @@ public class CraftingTreeWidget implements ICompositeWidget {
         @Override
         public int getFullWidth() {
             return NODE_MARGIN_LEFT + NODE_WIDTH;
+        }
+    }
+
+    private static final class ScreenshotFramebuffer {
+        private final int width;
+        private final int height;
+        private final int framebuffer;
+        private final int colorTexture;
+        private final int depthBuffer;
+
+        private ScreenshotFramebuffer(int width, int height) {
+            if (!OpenGlHelper.framebufferSupported) {
+                throw new IllegalStateException("Framebuffer objects are not supported");
+            }
+
+            this.width = width;
+            this.height = height;
+            this.framebuffer = OpenGlHelper.glGenFramebuffers();
+            this.colorTexture = GL11.glGenTextures();
+            this.depthBuffer = OpenGlHelper.glGenRenderbuffers();
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, colorTexture);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_CLAMP);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_CLAMP);
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, width, height, 0,
+                GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
+
+            OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, framebuffer);
+            OpenGlHelper.glFramebufferTexture2D(OpenGlHelper.GL_FRAMEBUFFER, OpenGlHelper.GL_COLOR_ATTACHMENT0,
+                GL11.GL_TEXTURE_2D, colorTexture, 0);
+            OpenGlHelper.glBindRenderbuffer(OpenGlHelper.GL_RENDERBUFFER, depthBuffer);
+            OpenGlHelper.glRenderbufferStorage(OpenGlHelper.GL_RENDERBUFFER, GL11.GL_DEPTH_COMPONENT, width, height);
+            OpenGlHelper.glFramebufferRenderbuffer(OpenGlHelper.GL_FRAMEBUFFER, OpenGlHelper.GL_DEPTH_ATTACHMENT,
+                OpenGlHelper.GL_RENDERBUFFER, depthBuffer);
+
+            int status = OpenGlHelper.glCheckFramebufferStatus(OpenGlHelper.GL_FRAMEBUFFER);
+            if (status != OpenGlHelper.GL_FRAMEBUFFER_COMPLETE) {
+                delete();
+                throw new IllegalStateException("Crafting tree screenshot framebuffer is incomplete: " + status);
+            }
+
+            OpenGlHelper.glBindRenderbuffer(OpenGlHelper.GL_RENDERBUFFER, 0);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+            OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, 0);
+        }
+
+        private void bind(boolean setViewport) {
+            OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, framebuffer);
+            if (setViewport) {
+                GlStateManager.viewport(0, 0, width, height);
+            }
+        }
+
+        private void clear() {
+            bind(true);
+            GlStateManager.clearColor(0.0F, 0.0F, 0.0F, 0.0F);
+            GlStateManager.clearDepth(1.0D);
+            GlStateManager.clear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+        }
+
+        private void delete() {
+            OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, 0);
+            OpenGlHelper.glBindRenderbuffer(OpenGlHelper.GL_RENDERBUFFER, 0);
+            OpenGlHelper.glDeleteRenderbuffers(depthBuffer);
+            OpenGlHelper.glDeleteFramebuffers(framebuffer);
+            GL11.glDeleteTextures(colorTexture);
         }
     }
 
@@ -759,7 +965,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
             minecraft.getRenderItem().renderItemAndEffectIntoGUI(null, stack, position.x(), position.y());
             minecraft.getRenderItem().renderItemOverlayIntoGUI(font, stack, position.x(), position.y(), "");
             StackSizeRenderer.renderSizeLabel(font, position.x(), position.y(),
-                    output.what().formatAmount(output.amount(), AmountFormat.SLOT));
+                output.what().formatAmount(output.amount(), AmountFormat.SLOT));
             RenderHelper.disableStandardItemLighting();
             GlStateManager.disableLighting();
             GlStateManager.disableDepth();
@@ -809,9 +1015,9 @@ public class CraftingTreeWidget implements ICompositeWidget {
 
         private boolean isMouseOver(Point mouse) {
             return mouse.x() >= currentPosition.x()
-                    && mouse.x() < currentPosition.x() + NODE_WIDTH
-                    && mouse.y() >= currentPosition.y() + LINE_HEIGHT
-                    && mouse.y() < currentPosition.y() + LINE_HEIGHT + NODE_HEIGHT;
+                && mouse.x() < currentPosition.x() + NODE_WIDTH
+                && mouse.y() >= currentPosition.y() + LINE_HEIGHT
+                && mouse.y() < currentPosition.y() + LINE_HEIGHT + NODE_HEIGHT;
         }
 
         private Tooltip getTooltip() {
@@ -836,220 +1042,14 @@ public class CraftingTreeWidget implements ICompositeWidget {
             lines.add(Tooltips.getAmountTooltip(ButtonToolTips.Amount, output));
             if (LiteCraftTreeNode.isMissing(node)) {
                 lines.add(new TextComponentString(node.missing() > 0
-                        ? GuiText.CraftingTreeMissing.getLocal(CraftingTreeNumberFormat.formatDecimal(node.missing()))
-                        : GuiText.CraftingTreeSubNodeMissing.getLocal()));
+                    ? GuiText.CraftingTreeMissing.getLocal(CraftingTreeNumberFormat.formatDecimal(node.missing()))
+                    : GuiText.CraftingTreeSubNodeMissing.getLocal()));
             }
             if (output.amount() >= 10000) {
                 lines.add(new TextComponentString(CraftingTreeNumberFormat.formatDecimal(output.amount())));
             }
 
             return new Tooltip(lines);
-        }
-    }
-
-    private static void drawTexturedRect(int x, int y, int textureX, int textureY) {
-        GlStateManager.enableTexture2D();
-        GlStateManager.enableBlend();
-        GlStateManager.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        Minecraft.getMinecraft().getTextureManager().bindTexture(TEXTURE);
-        Gui.drawModalRectWithCustomSizedTexture(x, y, textureX, textureY, NODE_WIDTH, NODE_HEIGHT, 256, 256);
-    }
-
-    private static void renderLine(Point pos, int width, int height, int color) {
-        GuiContainer.drawRect(pos.x(), pos.y(), pos.x() + width, pos.y() + height, color);
-    }
-
-    private void withScissor(Rectangle screenBounds, Runnable action) {
-        boolean wasEnabled = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
-        IntBuffer previousBox = BufferUtils.createIntBuffer(4);
-        GL11.glGetInteger(GL11.GL_SCISSOR_BOX, previousBox);
-
-        Minecraft minecraft = Minecraft.getMinecraft();
-        ScaledResolution resolution = new ScaledResolution(minecraft);
-        int scaleFactor = resolution.getScaleFactor();
-        int scissorX = (screenBounds.x + bounds.x) * scaleFactor;
-        int scissorY = minecraft.displayHeight - (screenBounds.y + bounds.y + bounds.height) * scaleFactor;
-        int scissorWidth = bounds.width * scaleFactor;
-        int scissorHeight = bounds.height * scaleFactor;
-        try {
-            GL11.glEnable(GL11.GL_SCISSOR_TEST);
-            GL11.glScissor(scissorX, scissorY, scissorWidth, scissorHeight);
-            action.run();
-        } finally {
-            GL11.glScissor(previousBox.get(0), previousBox.get(1), previousBox.get(2), previousBox.get(3));
-            if (wasEnabled) {
-                GL11.glEnable(GL11.GL_SCISSOR_TEST);
-            } else {
-                GL11.glDisable(GL11.GL_SCISSOR_TEST);
-            }
-        }
-    }
-
-    private void renderScreenshotTile(ScreenshotFramebuffer framebuffer, int tileX, int tileY, int tileWidth, int tileHeight,
-                                      int renderScale) {
-        framebuffer.bind(true);
-        framebuffer.clear();
-
-        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
-        GlStateManager.matrixMode(GL11.GL_PROJECTION);
-        GlStateManager.pushMatrix();
-        GlStateManager.matrixMode(GL11.GL_MODELVIEW);
-        GlStateManager.pushMatrix();
-        try {
-            GL11.glDisable(GL11.GL_SCISSOR_TEST);
-            GlStateManager.colorMask(true, true, true, true);
-            GlStateManager.enableAlpha();
-            GlStateManager.alphaFunc(GL11.GL_GREATER, 0.1F);
-            GlStateManager.disableLighting();
-            GlStateManager.disableDepth();
-            GlStateManager.enableTexture2D();
-            GlStateManager.enableBlend();
-            GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
-            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-            GlStateManager.viewport(0, 0, tileWidth * renderScale, tileHeight * renderScale);
-
-            GlStateManager.matrixMode(GL11.GL_PROJECTION);
-            GlStateManager.loadIdentity();
-            GlStateManager.ortho(0.0D, tileWidth, tileHeight, 0.0D, 1000.0D, 3000.0D);
-            GlStateManager.matrixMode(GL11.GL_MODELVIEW);
-            GlStateManager.loadIdentity();
-            GlStateManager.translate(0.0F, 0.0F, -2000.0F);
-
-            int y = -tileY;
-            for (TreeRow row : rows) {
-                if (y + row.getHeight() >= 0) {
-                    framebuffer.bind(false);
-                    row.renderForScreenshot(new Point(-tileX, y), tileWidth);
-                }
-                y += row.getHeight();
-                if (y > tileHeight) {
-                    break;
-                }
-            }
-        } finally {
-            GlStateManager.matrixMode(GL11.GL_MODELVIEW);
-            GlStateManager.popMatrix();
-            GlStateManager.matrixMode(GL11.GL_PROJECTION);
-            GlStateManager.popMatrix();
-            GlStateManager.matrixMode(GL11.GL_MODELVIEW);
-            GL11.glPopAttrib();
-        }
-
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        framebuffer.bind(false);
-    }
-
-    private static BufferedImage readFramebuffer(ScreenshotFramebuffer framebuffer, int width, int height) {
-        ByteBuffer pixelBuffer = BufferUtils.createByteBuffer(width * height * 4);
-        int[] pixels = new int[width * height];
-
-        framebuffer.bind(false);
-        GlStateManager.glPixelStorei(GL11.GL_PACK_ALIGNMENT, 1);
-        GlStateManager.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1);
-        pixelBuffer.clear();
-
-        GL11.glReadPixels(0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixelBuffer);
-
-        for (int y = 0; y < height; y++) {
-            int sourceRow = height - 1 - y;
-            for (int x = 0; x < width; x++) {
-                int sourceIndex = (sourceRow * width + x) * 4;
-                int red = pixelBuffer.get(sourceIndex) & 0xFF;
-                int green = pixelBuffer.get(sourceIndex + 1) & 0xFF;
-                int blue = pixelBuffer.get(sourceIndex + 2) & 0xFF;
-                int alpha = pixelBuffer.get(sourceIndex + 3) & 0xFF;
-                pixels[y * width + x] = (alpha << 24) | (red << 16) | (green << 8) | blue;
-            }
-        }
-
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-        image.setRGB(0, 0, width, height, pixels, 0, width);
-        return image;
-    }
-
-    private static int getScreenshotTileSize() {
-        int maxTextureSize = GL11.glGetInteger(GL11.GL_MAX_TEXTURE_SIZE);
-        if (maxTextureSize <= 0) {
-            return SCREENSHOT_TILE_SIZE;
-        }
-        return MathHelper.clamp(maxTextureSize, 256, SCREENSHOT_TILE_SIZE);
-    }
-
-    private static void restoreMainFramebuffer(Minecraft minecraft) {
-        if (OpenGlHelper.isFramebufferEnabled()) {
-            minecraft.getFramebuffer().bindFramebuffer(true);
-        } else {
-            OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, 0);
-        }
-        GlStateManager.viewport(0, 0, minecraft.displayWidth, minecraft.displayHeight);
-    }
-
-    private static final class ScreenshotFramebuffer {
-        private final int width;
-        private final int height;
-        private final int framebuffer;
-        private final int colorTexture;
-        private final int depthBuffer;
-
-        private ScreenshotFramebuffer(int width, int height) {
-            if (!OpenGlHelper.framebufferSupported) {
-                throw new IllegalStateException("Framebuffer objects are not supported");
-            }
-
-            this.width = width;
-            this.height = height;
-            this.framebuffer = OpenGlHelper.glGenFramebuffers();
-            this.colorTexture = GL11.glGenTextures();
-            this.depthBuffer = OpenGlHelper.glGenRenderbuffers();
-
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, colorTexture);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_CLAMP);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_CLAMP);
-            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, width, height, 0,
-                    GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
-
-            OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, framebuffer);
-            OpenGlHelper.glFramebufferTexture2D(OpenGlHelper.GL_FRAMEBUFFER, OpenGlHelper.GL_COLOR_ATTACHMENT0,
-                    GL11.GL_TEXTURE_2D, colorTexture, 0);
-            OpenGlHelper.glBindRenderbuffer(OpenGlHelper.GL_RENDERBUFFER, depthBuffer);
-            OpenGlHelper.glRenderbufferStorage(OpenGlHelper.GL_RENDERBUFFER, GL11.GL_DEPTH_COMPONENT, width, height);
-            OpenGlHelper.glFramebufferRenderbuffer(OpenGlHelper.GL_FRAMEBUFFER, OpenGlHelper.GL_DEPTH_ATTACHMENT,
-                    OpenGlHelper.GL_RENDERBUFFER, depthBuffer);
-
-            int status = OpenGlHelper.glCheckFramebufferStatus(OpenGlHelper.GL_FRAMEBUFFER);
-            if (status != OpenGlHelper.GL_FRAMEBUFFER_COMPLETE) {
-                delete();
-                throw new IllegalStateException("Crafting tree screenshot framebuffer is incomplete: " + status);
-            }
-
-            OpenGlHelper.glBindRenderbuffer(OpenGlHelper.GL_RENDERBUFFER, 0);
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
-            OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, 0);
-        }
-
-        private void bind(boolean setViewport) {
-            OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, framebuffer);
-            if (setViewport) {
-                GlStateManager.viewport(0, 0, width, height);
-            }
-        }
-
-        private void clear() {
-            bind(true);
-            GlStateManager.clearColor(0.0F, 0.0F, 0.0F, 0.0F);
-            GlStateManager.clearDepth(1.0D);
-            GlStateManager.clear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-        }
-
-        private void delete() {
-            OpenGlHelper.glBindFramebuffer(OpenGlHelper.GL_FRAMEBUFFER, 0);
-            OpenGlHelper.glBindRenderbuffer(OpenGlHelper.GL_RENDERBUFFER, 0);
-            OpenGlHelper.glDeleteRenderbuffers(depthBuffer);
-            OpenGlHelper.glDeleteFramebuffers(framebuffer);
-            GL11.glDeleteTextures(colorTexture);
         }
     }
 

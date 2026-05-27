@@ -82,7 +82,7 @@ public class ChunkLoadingService implements ForgeChunkManager.LoadingCallback {
             }
 
             this.ticketsByDimension.computeIfAbsent(serverLevel.provider.getDimension(),
-                                   ignored -> new Object2ObjectOpenHashMap<>())
+                    ignored -> new Object2ObjectOpenHashMap<>())
                                    .put(ownerPos, ticket);
 
             for (ChunkPos chunkPos : ticket.getChunkList()) {

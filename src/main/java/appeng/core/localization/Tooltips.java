@@ -11,6 +11,7 @@ import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
+
 import java.util.List;
 
 public enum Tooltips implements LocalizationEnum {
@@ -31,10 +32,9 @@ public enum Tooltips implements LocalizationEnum {
     Singularity,
     QuantumKey;
 
-    private final String translationKey;
-
     public static final TextFormatting RED = TextFormatting.RED;
     public static final TextFormatting GREEN = TextFormatting.GREEN;
+    private final String translationKey;
 
     Tooltips() {
         this.translationKey = "gui.tooltips.ae2." + name();

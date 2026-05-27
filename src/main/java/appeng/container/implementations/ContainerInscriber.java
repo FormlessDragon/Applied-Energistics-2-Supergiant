@@ -50,7 +50,7 @@ public class ContainerInscriber extends UpgradeableContainer<TileInscriber> impl
     @GuiSync(9)
     public InscriberInputCapacity bufferSize = InscriberInputCapacity.SIXTY_FOUR;
 
-    public ContainerInscriber( InventoryPlayer ip, TileInscriber host) {
+    public ContainerInscriber(InventoryPlayer ip, TileInscriber host) {
         super(ip, host);
 
         var inv = host.getInternalInventory();

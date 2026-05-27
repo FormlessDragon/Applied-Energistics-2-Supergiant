@@ -18,8 +18,8 @@
 
 package appeng.crafting;
 
-import appeng.api.crafting.IPatternDetails;
 import appeng.api.config.Actionable;
+import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.crafting.CalculationStrategy;
 import appeng.api.networking.crafting.ICraftingPlan;
@@ -113,6 +113,44 @@ public class CraftingCalculation {
             // Tests can construct calculations before the mod configuration exists.
         }
         return CraftingPerformanceListener.NOOP;
+    }
+
+    private static long getPatternOutputCount(IPatternDetails pattern, AEKey what) {
+        long total = 0;
+        for (var output : pattern.getOutputs()) {
+            if (what.matches(output)) {
+                total += output.amount();
+            }
+        }
+        return total;
+    }
+
+    private static long getPatternInputCount(IPatternDetails pattern, AEKey what) {
+        long total = 0;
+        for (var input : pattern.getInputs()) {
+            for (var possibleInput : input.possibleInputs()) {
+                if (what.matches(possibleInput)) {
+                    total += possibleInput.amount() * input.getMultiplier();
+                    break;
+                }
+            }
+        }
+        return total;
+    }
+
+    private static void accumulatePatternNet(KeyCounter netByKey, IPatternDetails pattern) {
+        accumulatePatternNet(netByKey, pattern, 1);
+    }
+
+    private static void accumulatePatternNet(KeyCounter netByKey, IPatternDetails pattern, long times) {
+        for (var output : pattern.getOutputs()) {
+            netByKey.add(output.what(), output.amount() * times);
+        }
+
+        for (var input : pattern.getInputs()) {
+            var primaryInput = input.possibleInputs()[0];
+            netByKey.add(primaryInput.what(), -primaryInput.amount() * input.getMultiplier() * times);
+        }
     }
 
     void addMissing(AEKey what, long amount) {
@@ -527,29 +565,6 @@ public class CraftingCalculation {
         return new RecursivePatternBatch(1, directOutput);
     }
 
-    private static long getPatternOutputCount(IPatternDetails pattern, AEKey what) {
-        long total = 0;
-        for (var output : pattern.getOutputs()) {
-            if (what.matches(output)) {
-                total += output.amount();
-            }
-        }
-        return total;
-    }
-
-    private static long getPatternInputCount(IPatternDetails pattern, AEKey what) {
-        long total = 0;
-        for (var input : pattern.getInputs()) {
-            for (var possibleInput : input.possibleInputs()) {
-                if (what.matches(possibleInput)) {
-                    total += possibleInput.amount() * input.getMultiplier();
-                    break;
-                }
-            }
-        }
-        return total;
-    }
-
     private RecursiveSeed getRecursiveSeed(KeyCounter netByKey, int requestIndex) {
         for (var entry : netByKey) {
             if (entry.getLongValue() >= 0 && this.networkInv.getOriginalAmount(entry.getKey()) > 0) {
@@ -646,21 +661,6 @@ public class CraftingCalculation {
                 }
             }
         } while (changed);
-    }
-
-    private static void accumulatePatternNet(KeyCounter netByKey, IPatternDetails pattern) {
-        accumulatePatternNet(netByKey, pattern, 1);
-    }
-
-    private static void accumulatePatternNet(KeyCounter netByKey, IPatternDetails pattern, long times) {
-        for (var output : pattern.getOutputs()) {
-            netByKey.add(output.what(), output.amount() * times);
-        }
-
-        for (var input : pattern.getInputs()) {
-            var primaryInput = input.possibleInputs()[0];
-            netByKey.add(primaryInput.what(), -primaryInput.amount() * input.getMultiplier() * times);
-        }
     }
 
     private boolean expandRecursiveBatchNet(KeyCounter netByKey, AEKey target, RecursiveUse recursiveUse) {
@@ -911,6 +911,16 @@ public class CraftingCalculation {
         }
     }
 
+    @FunctionalInterface
+    interface InterruptibleSupplier<T> {
+        T get() throws InterruptedException;
+    }
+
+    @FunctionalInterface
+    interface CraftingSupplier<T> {
+        T get() throws InterruptedException, CraftBranchFailure;
+    }
+
     private record CraftAttempt(String description, Stopwatch stopwatch) {
     }
 
@@ -941,15 +951,5 @@ public class CraftingCalculation {
 
     private static final class TimingFrame {
         private long childNanos;
-    }
-
-    @FunctionalInterface
-    interface InterruptibleSupplier<T> {
-        T get() throws InterruptedException;
-    }
-
-    @FunctionalInterface
-    interface CraftingSupplier<T> {
-        T get() throws InterruptedException, CraftBranchFailure;
     }
 }

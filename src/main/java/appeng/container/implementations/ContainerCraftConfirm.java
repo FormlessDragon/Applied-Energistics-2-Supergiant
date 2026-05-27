@@ -106,7 +106,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     @Nullable
     private TemporaryPseudoCraftingProvider temporaryPseudoProvider;
 
-    public ContainerCraftConfirm( InventoryPlayer ip, ISubGuiHost host) {
+    public ContainerCraftConfirm(InventoryPlayer ip, ISubGuiHost host) {
         super(ip, host);
         this.host = host;
         this.cpuCycler = new CraftingCPUCycler(this::cpuMatches, this::onCPUSelectionChanged);
@@ -176,6 +176,18 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         } catch (Throwable e) {
             AELog.info(e);
         }
+    }
+
+    static boolean canUseCpuForRequest(ICraftingCPU cpu, @Nullable CraftingPlanSummary plan, boolean playerRequest) {
+        return switch (cpu.getSelectionMode()) {
+            case ANY -> true;
+            case PLAYER_ONLY -> playerRequest;
+            case MACHINE_ONLY -> !playerRequest;
+        };
+    }
+
+    static boolean shouldAutoStart(ICraftingPlan result, boolean autoStart) {
+        return autoStart && !result.simulation() && result.missingItems().isEmpty();
     }
 
     public boolean planJob(AEKey what, long amount, CalculationStrategy strategy) {
@@ -293,14 +305,6 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         return cpu.getAvailableStorage() >= this.plan.usedBytes() && !cpu.isBusy();
     }
 
-    static boolean canUseCpuForRequest(ICraftingCPU cpu, @Nullable CraftingPlanSummary plan, boolean playerRequest) {
-        return switch (cpu.getSelectionMode()) {
-            case ANY -> true;
-            case PLAYER_ONLY -> playerRequest;
-            case MACHINE_ONLY -> !playerRequest;
-        };
-    }
-
     public void startJob() {
         startJob(false);
     }
@@ -352,10 +356,6 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
                 this.submitError = new SyncableSubmitResult(submitResult);
             }
         }
-    }
-
-    static boolean shouldAutoStart(ICraftingPlan result, boolean autoStart) {
-        return autoStart && !result.simulation() && result.missingItems().isEmpty();
     }
 
     private IActionSource getActionSrc() {
@@ -478,6 +478,11 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         this.submitError = NO_ERROR;
     }
 
+    @Nullable
+    public ICraftingPlan getResult() {
+        return this.result;
+    }
+
     public record SyncableSubmitResult(@Nullable ICraftingSubmitResult result) implements PacketWritable {
 
         @SuppressWarnings("unused")
@@ -538,11 +543,6 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             }
         }
 
-    }
-
-    @Nullable
-    public ICraftingPlan getResult() {
-        return this.result;
     }
 
     private final class TemporaryPseudoSimulationRequester implements ICraftingSimulationRequester {

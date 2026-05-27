@@ -17,9 +17,9 @@ public final class IngredientConverters {
             }
         }
         converters = ImmutableList.<IngredientConverter<?>>builder()
-            .addAll(converters)
-            .add(converter)
-            .build();
+                                  .addAll(converters)
+                                  .add(converter)
+                                  .build();
     }
 
     public static synchronized List<IngredientConverter<?>> getConverters() {

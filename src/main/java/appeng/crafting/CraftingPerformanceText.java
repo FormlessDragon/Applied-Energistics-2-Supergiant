@@ -1,9 +1,9 @@
 package appeng.crafting;
 
+import appeng.api.stacks.AEKey;
+
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
-
-import appeng.api.stacks.AEKey;
 
 class CraftingPerformanceText {
     private final boolean chinese;

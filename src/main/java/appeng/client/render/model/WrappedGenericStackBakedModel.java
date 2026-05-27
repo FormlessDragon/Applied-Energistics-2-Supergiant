@@ -21,6 +21,7 @@ import net.minecraftforge.client.model.PerspectiveMapWrapper;
 import net.minecraftforge.common.model.IModelState;
 
 import java.util.Collections;
+
 @SuppressWarnings("deprecation")
 class WrappedGenericStackBakedModel extends BakedItemModel {
     private final VertexFormat format;
@@ -52,7 +53,7 @@ class WrappedGenericStackBakedModel extends BakedItemModel {
                 if (key instanceof AEItemKey itemKey) {
                     ItemStack displayStack = itemKey.toStack();
                     return Minecraft.getMinecraft().getRenderItem()
-                        .getItemModelWithOverrides(displayStack, world, entity);
+                                    .getItemModelWithOverrides(displayStack, world, entity);
                 }
 
                 if (key instanceof AEFluidKey fluidKey) {

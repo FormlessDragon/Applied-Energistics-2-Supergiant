@@ -33,7 +33,7 @@ public class ContainerVibrationChamber extends UpgradeableContainer<TileVibratio
     @GuiSync(3)
     public int remainingBurnTime = 0;
 
-    public ContainerVibrationChamber( InventoryPlayer ip, TileVibrationChamber host) {
+    public ContainerVibrationChamber(InventoryPlayer ip, TileVibrationChamber host) {
         super(ip, host);
     }
 

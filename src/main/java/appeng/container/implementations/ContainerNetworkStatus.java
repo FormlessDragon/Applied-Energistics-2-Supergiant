@@ -40,7 +40,7 @@ public class ContainerNetworkStatus extends AEBaseContainer implements INetworkS
     private NetworkStatus status = new NetworkStatus();
     private boolean canExportGrid;
 
-    public ContainerNetworkStatus( InventoryPlayer ip, NetworkToolGuiHost<?> host) {
+    public ContainerNetworkStatus(InventoryPlayer ip, NetworkToolGuiHost<?> host) {
         super(ip, host);
 
         buildForGridHost(host.getGridHost());

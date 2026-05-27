@@ -69,7 +69,7 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
     @GuiSync(9)
     private int selectedCpuSerial = -1;
 
-    public ContainerCraftingStatus( InventoryPlayer ip, ITerminalHost host) {
+    public ContainerCraftingStatus(InventoryPlayer ip, ITerminalHost host) {
         super(ip, host);
         this.host = host;
         registerClientAction(ACTION_SELECT_CPU, Integer.class, this::selectCpu);
@@ -249,10 +249,10 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
             this.cpuList = new CraftingCpuList(updatedCpus);
             if (selectedCpuSerial == serial) {
                 this.schedulingMode = updatedCpus.stream()
-                    .filter(cpu -> cpu.serial() == serial)
-                    .map(CraftingCpuListEntry::mode)
-                    .findFirst()
-                    .orElse(this.schedulingMode);
+                                                 .filter(cpu -> cpu.serial() == serial)
+                                                 .map(CraftingCpuListEntry::mode)
+                                                 .findFirst()
+                                                 .orElse(this.schedulingMode);
             }
         }
     }

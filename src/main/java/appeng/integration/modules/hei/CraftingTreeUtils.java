@@ -68,7 +68,7 @@ public class CraftingTreeUtils {
         ClientTickHandler.addTask(() -> {
             IJeiRuntime runtime = CraftingTreeUtils.getJeiRuntime();
             Object ingredient = GenericIngredientHelper.stackToIngredient(stack);
-            if(ingredient == null) {
+            if (ingredient == null) {
                 return;
             }
             IFocus<Object> focus = runtime.getRecipeRegistry().createFocus(mode, ingredient);

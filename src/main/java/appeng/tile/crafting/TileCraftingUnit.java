@@ -69,6 +69,24 @@ public class TileCraftingUnit extends AENetworkedTile
             .addService(IGridMultiblock.class, this::getMultiblockNodes);
     }
 
+    private static int encodeConnections(EnumSet<EnumFacing> connections) {
+        int mask = 0;
+        for (EnumFacing facing : connections) {
+            mask |= 1 << facing.getIndex();
+        }
+        return mask;
+    }
+
+    private static EnumSet<EnumFacing> decodeConnections(int mask) {
+        EnumSet<EnumFacing> connections = EnumSet.noneOf(EnumFacing.class);
+        for (EnumFacing facing : EnumFacing.values()) {
+            if ((mask & (1 << facing.getIndex())) != 0) {
+                connections.add(facing);
+            }
+        }
+        return connections;
+    }
+
     @Override
     public ItemStack getItemFromTile() {
         if (this.world == null) {
@@ -113,24 +131,6 @@ public class TileCraftingUnit extends AENetworkedTile
 
     public int getAcceleratorThreads() {
         return AEBlockIds.CRAFTING_ACCELERATOR.equals(getCraftingBlockId()) ? 1 : 0;
-    }
-
-    private static int encodeConnections(EnumSet<EnumFacing> connections) {
-        int mask = 0;
-        for (EnumFacing facing : connections) {
-            mask |= 1 << facing.getIndex();
-        }
-        return mask;
-    }
-
-    private static EnumSet<EnumFacing> decodeConnections(int mask) {
-        EnumSet<EnumFacing> connections = EnumSet.noneOf(EnumFacing.class);
-        for (EnumFacing facing : EnumFacing.values()) {
-            if ((mask & (1 << facing.getIndex())) != 0) {
-                connections.add(facing);
-            }
-        }
-        return connections;
     }
 
     @Override
@@ -408,14 +408,6 @@ public class TileCraftingUnit extends AENetworkedTile
         return connections;
     }
 
-    public record ClientState(boolean formed, boolean powered, EnumSet<EnumFacing> connections) {
-        public static final ClientState DEFAULT = new ClientState(false, false, EnumSet.noneOf(EnumFacing.class));
-
-        public ClientState {
-            connections = connections.clone();
-        }
-    }
-
     private Iterator<IGridNode> getMultiblockNodes() {
         if (this.getCluster() == null) {
             return java.util.Collections.emptyIterator();
@@ -440,5 +432,13 @@ public class TileCraftingUnit extends AENetworkedTile
             return cluster.getConfigManager();
         }
         return NullConfigManager.INSTANCE;
+    }
+
+    public record ClientState(boolean formed, boolean powered, EnumSet<EnumFacing> connections) {
+        public static final ClientState DEFAULT = new ClientState(false, false, EnumSet.noneOf(EnumFacing.class));
+
+        public ClientState {
+            connections = connections.clone();
+        }
     }
 }

@@ -23,10 +23,9 @@ import appeng.core.AppEngBase;
 import appeng.entity.EntityChargedQuartz;
 import appeng.entity.EntitySingularity;
 import appeng.entity.TinyTNTPrimedEntity;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.common.registry.EntityRegistry;
-
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 import java.util.Map;
 

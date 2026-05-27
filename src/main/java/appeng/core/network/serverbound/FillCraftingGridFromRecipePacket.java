@@ -25,10 +25,10 @@ import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.objects.AbstractObject2LongMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.CraftingManager;
@@ -124,6 +124,38 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
         return result;
     }
 
+    private static List<GenericStack> readGenericStacks(PacketBuffer packetBuffer, int maxSize) {
+        if (!packetBuffer.readBoolean()) {
+            return List.of();
+        }
+
+        int size = packetBuffer.readVarInt();
+        Preconditions.checkArgument(size <= maxSize,
+            "Got %s generic stacks from client, expected at most %s",
+            size, maxSize);
+
+        List<GenericStack> result = new ObjectArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            GenericStack stack = GenericStack.readBuffer(packetBuffer);
+            if (stack != null && stack.amount() > 0) {
+                result.add(stack);
+            }
+        }
+        return result;
+    }
+
+    private static void writeGenericStacks(PacketBuffer packetBuffer, List<GenericStack> stacks) {
+        packetBuffer.writeBoolean(!stacks.isEmpty());
+        if (stacks.isEmpty()) {
+            return;
+        }
+
+        packetBuffer.writeVarInt(stacks.size());
+        for (GenericStack stack : stacks) {
+            GenericStack.writeBuffer(stack, packetBuffer);
+        }
+    }
+
     @Override
     protected void read(ByteBuf buf) {
         PacketBuffer packetBuffer = new PacketBuffer(buf);
@@ -166,38 +198,6 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
         packetBuffer.writeBoolean(this.craftMissing);
         writeGenericStacks(packetBuffer, this.temporaryPseudoInputs);
         writeGenericStacks(packetBuffer, this.temporaryPseudoOutputs);
-    }
-
-    private static List<GenericStack> readGenericStacks(PacketBuffer packetBuffer, int maxSize) {
-        if (!packetBuffer.readBoolean()) {
-            return List.of();
-        }
-
-        int size = packetBuffer.readVarInt();
-        Preconditions.checkArgument(size <= maxSize,
-            "Got %s generic stacks from client, expected at most %s",
-            size, maxSize);
-
-        List<GenericStack> result = new ObjectArrayList<>(size);
-        for (int i = 0; i < size; i++) {
-            GenericStack stack = GenericStack.readBuffer(packetBuffer);
-            if (stack != null && stack.amount() > 0) {
-                result.add(stack);
-            }
-        }
-        return result;
-    }
-
-    private static void writeGenericStacks(PacketBuffer packetBuffer, List<GenericStack> stacks) {
-        packetBuffer.writeBoolean(!stacks.isEmpty());
-        if (stacks.isEmpty()) {
-            return;
-        }
-
-        packetBuffer.writeVarInt(stacks.size());
-        for (GenericStack stack : stacks) {
-            GenericStack.writeBuffer(stack, packetBuffer);
-        }
     }
 
     @Override

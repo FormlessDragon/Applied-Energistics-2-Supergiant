@@ -573,6 +573,10 @@ public class WidgetContainer {
         return this.style;
     }
 
+    public Collection<? extends GuiTextField> getTextFields() {
+        return textFields.values();
+    }
+
     private static class ResolvedTooltipArea {
         private final Rectangle area;
         private final Tooltip tooltip;
@@ -582,9 +586,5 @@ public class WidgetContainer {
             this.area = area;
             this.tooltip = tooltip;
         }
-    }
-
-    public Collection<? extends GuiTextField> getTextFields() {
-        return textFields.values();
     }
 }

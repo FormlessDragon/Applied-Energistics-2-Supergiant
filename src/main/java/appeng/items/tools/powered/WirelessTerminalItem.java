@@ -99,14 +99,14 @@ public class WirelessTerminalItem extends PoweredContainerItem implements IGuiIt
         }
     }
 
-    @Override
-    public double getChargeRate(ItemStack stack) {
-        return 800d + 800d * Upgrades.getEnergyCardMultiplier(getUpgrades(stack));
-    }
-
     private static boolean openBuiltInGui(WirelessTerminalDefinition definition, EntityPlayer player,
                                           ItemGuiHostLocator locator, boolean returningFromSubmenu) {
         return GuiOpener.openItemGui(player, definition.item().getGuiKey(), locator, returningFromSubmenu);
+    }
+
+    @Override
+    public double getChargeRate(ItemStack stack) {
+        return 800d + 800d * Upgrades.getEnergyCardMultiplier(getUpgrades(stack));
     }
 
     public final double powerCapacity() {

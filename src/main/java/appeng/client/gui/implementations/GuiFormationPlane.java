@@ -18,8 +18,8 @@
 
 package appeng.client.gui.implementations;
 
-import appeng.api.config.FuzzyMode;
 import appeng.api.config.FormationPlaneMode;
+import appeng.api.config.FuzzyMode;
 import appeng.api.config.Settings;
 import appeng.api.config.YesNo;
 import appeng.client.gui.style.GuiStyle;

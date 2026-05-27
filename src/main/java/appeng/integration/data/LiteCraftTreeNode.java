@@ -61,6 +61,40 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
         return new LiteCraftTreeNode(parent, output, inputs, missing);
     }
 
+    public static int diveToDeep(final LiteCraftTreeNode node, final int depth, final DepthRecorder recorder) {
+        for (final LiteCraftTreeProc input : node.inputs) {
+            for (final LiteCraftTreeNode subNode : input.inputs()) {
+                int newDepth = depth + 1;
+                recorder.dive(newDepth);
+                diveToDeep(subNode, newDepth, recorder);
+            }
+        }
+        return recorder.getDepth();
+    }
+
+    /**
+     * Check if this node or sub nodes is missing ingredients.
+     */
+    public static boolean isMissing(final LiteCraftTreeNode node) {
+        if (node.missingCached) {
+            return node.missingCache;
+        }
+        if (node.missing() > 0) {
+            node.missingCached = true;
+            return node.missingCache = true;
+        }
+        for (final LiteCraftTreeProc input : node.inputs()) {
+            for (final LiteCraftTreeNode subNode : input.inputs()) {
+                if (isMissing(subNode)) {
+                    return node.missingCached = node.missingCache = true;
+                }
+            }
+        }
+        node.missingCached = true;
+        node.missingCache = false;
+        return false;
+    }
+
     public void writeToBuffer(final ByteBuf buf, final CraftingTreeStackRegistry stackSet) {
         if (inputs.size() > Byte.MAX_VALUE) {
             throw new IllegalStateException("Too many inputs for a single node");
@@ -90,17 +124,6 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
     @Override
     public int compareTo(@Nonnull final LiteCraftTreeNode o) {
         return Integer.compare(diveToDeep(this, 0, new DepthRecorder()), diveToDeep(o, 0, new DepthRecorder()));
-    }
-
-    public static int diveToDeep(final LiteCraftTreeNode node, final int depth, final DepthRecorder recorder) {
-        for (final LiteCraftTreeProc input : node.inputs) {
-            for (final LiteCraftTreeNode subNode : input.inputs()) {
-                int newDepth = depth + 1;
-                recorder.dive(newDepth);
-                diveToDeep(subNode, newDepth, recorder);
-            }
-        }
-        return recorder.getDepth();
     }
 
     public int getRenderExpandNodes() {
@@ -154,37 +177,14 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
         return missing;
     }
 
-    /**
-     * Check if this node or sub nodes is missing ingredients.
-     */
-    public static boolean isMissing(final LiteCraftTreeNode node) {
-        if (node.missingCached) {
-            return node.missingCache;
-        }
-        if (node.missing() > 0) {
-            node.missingCached = true;
-            return node.missingCache = true;
-        }
-        for (final LiteCraftTreeProc input : node.inputs()) {
-            for (final LiteCraftTreeNode subNode : input.inputs()) {
-                if (isMissing(subNode)) {
-                    return node.missingCached = node.missingCache = true;
-                }
-            }
-        }
-        node.missingCached = true;
-        node.missingCache = false;
-        return false;
-    }
-
     @Override
     public boolean equals(Object obj) {
         if (obj == this) return true;
         if (obj == null || obj.getClass() != this.getClass()) return false;
         var that = (LiteCraftTreeNode) obj;
         return Objects.equals(this.output, that.output) &&
-                Objects.equals(this.inputs, that.inputs) &&
-                this.missing == that.missing;
+            Objects.equals(this.inputs, that.inputs) &&
+            this.missing == that.missing;
     }
 
     @Override
@@ -195,9 +195,9 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
     @Override
     public String toString() {
         return "LiteCraftTreeNode[" +
-                "output=" + output + ", " +
-                "inputs=" + inputs + ", " +
-                "missing=" + missing + ']';
+            "output=" + output + ", " +
+            "inputs=" + inputs + ", " +
+            "missing=" + missing + ']';
     }
 
     public static class DepthRecorder {

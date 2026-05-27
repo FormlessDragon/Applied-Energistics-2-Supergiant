@@ -35,13 +35,13 @@ public class ContainerStorageLevelEmitter extends UpgradeableContainer<StorageLe
 
     private long currentValue;
 
-    public ContainerStorageLevelEmitter( InventoryPlayer ip, StorageLevelEmitterPart te) {
+    public ContainerStorageLevelEmitter(InventoryPlayer ip, StorageLevelEmitterPart te) {
         super(ip, te);
 
         registerClientAction(ACTION_SET_REPORTING_VALUE, Long.class, this::setValue);
     }
 
-    public ContainerStorageLevelEmitter( InventoryPlayer ip, StorageLevelEmitterPart te,
+    public ContainerStorageLevelEmitter(InventoryPlayer ip, StorageLevelEmitterPart te,
                                         @Nullable GenericStack initialFilter, long initialValue) {
         this(ip, te);
         setInitialFilter(initialFilter);

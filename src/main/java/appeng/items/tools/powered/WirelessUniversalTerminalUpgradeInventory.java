@@ -48,6 +48,24 @@ final class WirelessUniversalTerminalUpgradeInventory extends AppEngInternalInve
         return slots;
     }
 
+    static int combineMaxInstalled(Item upgradeCard, PrimitiveIterator.OfInt terminalMaximums) {
+        int max = 0;
+        while (terminalMaximums.hasNext()) {
+            max += terminalMaximums.nextInt();
+        }
+
+        if (isUniqueWirelessUpgrade(upgradeCard)) {
+            return Math.min(1, max);
+        }
+
+        return max;
+    }
+
+    private static boolean isUniqueWirelessUpgrade(Item upgradeCard) {
+        return upgradeCard == AEItems.QUANTUM_BRIDGE_CARD.item()
+            || upgradeCard == AEItems.MAGNET_CARD.item();
+    }
+
     @Override
     public Item getUpgradableItem() {
         return stack.getItem();
@@ -105,24 +123,6 @@ final class WirelessUniversalTerminalUpgradeInventory extends AppEngInternalInve
     @Override
     public boolean isClientSide() {
         return false;
-    }
-
-    static int combineMaxInstalled(Item upgradeCard, PrimitiveIterator.OfInt terminalMaximums) {
-        int max = 0;
-        while (terminalMaximums.hasNext()) {
-            max += terminalMaximums.nextInt();
-        }
-
-        if (isUniqueWirelessUpgrade(upgradeCard)) {
-            return Math.min(1, max);
-        }
-
-        return max;
-    }
-
-    private static boolean isUniqueWirelessUpgrade(Item upgradeCard) {
-        return upgradeCard == AEItems.QUANTUM_BRIDGE_CARD.item()
-            || upgradeCard == AEItems.MAGNET_CARD.item();
     }
 
     private class UpgradeFilter implements IAEItemFilter {

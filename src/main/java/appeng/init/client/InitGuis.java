@@ -1,7 +1,7 @@
 package appeng.init.client;
 
-import appeng.client.gui.style.IconAtlas;
 import appeng.client.gui.style.GuiStyleManager;
+import appeng.client.gui.style.IconAtlas;
 import net.minecraft.client.Minecraft;
 
 public final class InitGuis {

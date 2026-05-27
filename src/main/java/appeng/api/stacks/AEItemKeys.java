@@ -30,9 +30,8 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 final class AEItemKeys extends AEKeyType {
-    private static final ResourceLocation ID = AppEng.makeId("i");
-
     static final AEItemKeys INSTANCE = new AEItemKeys();
+    private static final ResourceLocation ID = AppEng.makeId("i");
 
     private AEItemKeys() {
         super(ID, AEItemKey.class, GuiText.Items.text());

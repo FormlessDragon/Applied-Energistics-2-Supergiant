@@ -237,12 +237,6 @@ public class CraftingCpuHelper {
         };
     }
 
-    private record FuzzyInputKey(Object primaryKey, long amount) {
-        private FuzzyInputKey(AEKey key, long amount) {
-            this(key.getPrimaryKey(), amount);
-        }
-    }
-
     /**
      * Extract a whole number of templates, and return how many were extracted.
      */
@@ -262,5 +256,11 @@ public class CraftingCpuHelper {
             throw new IllegalStateException("Failed to correctly extract whole number. Invalid simulation!");
         }
         return multiplier;
+    }
+
+    private record FuzzyInputKey(Object primaryKey, long amount) {
+        private FuzzyInputKey(AEKey key, long amount) {
+            this(key.getPrimaryKey(), amount);
+        }
     }
 }

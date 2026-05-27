@@ -22,13 +22,13 @@ public class EncodedPatternBakedModel extends DelegateBakedModel {
                 ItemStack output = encodedPattern.getOutput(stack, level);
                 if (!output.isEmpty()) {
                     return Minecraft.getMinecraft().getRenderItem()
-                        .getItemModelWithOverrides(output, world, entity);
+                                    .getItemModelWithOverrides(output, world, entity);
                 }
             }
 
             return EncodedPatternBakedModel.this.getBaseModel()
-                .getOverrides()
-                .handleItemState(EncodedPatternBakedModel.this.getBaseModel(), stack, world, entity);
+                                                .getOverrides()
+                                                .handleItemState(EncodedPatternBakedModel.this.getBaseModel(), stack, world, entity);
         }
     };
 

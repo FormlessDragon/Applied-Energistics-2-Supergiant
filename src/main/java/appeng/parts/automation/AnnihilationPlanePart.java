@@ -99,6 +99,16 @@ public class AnnihilationPlanePart extends AEBasePart implements IGridTickable {
         return stack.getEnchantmentTagList().copy();
     }
 
+    private static Object2IntMap<Enchantment> readEnchantmentsFromTag(NBTTagCompound data) {
+        if (data.hasKey(PART_ENCHANTMENTS_TAG, 9)) {
+            return readEnchantments(data.getTagList(PART_ENCHANTMENTS_TAG, 10));
+        }
+        if (data.hasKey(VANILLA_ENCHANTMENTS_TAG, 9)) {
+            return readEnchantments(data.getTagList(VANILLA_ENCHANTMENTS_TAG, 10));
+        }
+        return new Object2IntLinkedOpenHashMap<>();
+    }
+
     @Override
     public void addToWorld() {
         super.addToWorld();
@@ -146,16 +156,6 @@ public class AnnihilationPlanePart extends AEBasePart implements IGridTickable {
             data.setTag(PART_ENCHANTMENTS_TAG, writeEnchantments(this.enchantments));
             data.setTag(VANILLA_ENCHANTMENTS_TAG, writeEnchantments(this.enchantments));
         }
-    }
-
-    private static Object2IntMap<Enchantment> readEnchantmentsFromTag(NBTTagCompound data) {
-        if (data.hasKey(PART_ENCHANTMENTS_TAG, 9)) {
-            return readEnchantments(data.getTagList(PART_ENCHANTMENTS_TAG, 10));
-        }
-        if (data.hasKey(VANILLA_ENCHANTMENTS_TAG, 9)) {
-            return readEnchantments(data.getTagList(VANILLA_ENCHANTMENTS_TAG, 10));
-        }
-        return new Object2IntLinkedOpenHashMap<>();
     }
 
     public Object2IntMap<Enchantment> getEnchantments() {

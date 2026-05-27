@@ -41,8 +41,8 @@ import appeng.client.gui.widgets.VerticalButtonBar;
 import appeng.container.AEBaseContainer;
 import appeng.container.SlotSemantic;
 import appeng.container.SlotSemantics;
-import appeng.container.slot.AppEngSlot;
 import appeng.container.slot.AppEngCraftingSlot;
+import appeng.container.slot.AppEngSlot;
 import appeng.container.slot.CraftingTermSlot;
 import appeng.container.slot.DisabledSlot;
 import appeng.container.slot.FakeSlot;
@@ -99,35 +99,29 @@ import java.util.stream.Collectors;
 
 @Optional.Interface(iface = "yalter.mousetweaks.api.IMTModGuiContainer2", modid = "mousetweaks")
 public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer implements IMTModGuiContainer2 {
-    private static final Point HIDDEN_SLOT_POS = new Point(-9999, -9999);
-    private static final float TOOLTIP_Z_LEVEL = 500.0F;
-
     /**
      * Commonly used id for text that is used to show the dialog title.
      */
     public static final String TEXT_ID_DIALOG_TITLE = "dialog_title";
-
+    private static final Point HIDDEN_SLOT_POS = new Point(-9999, -9999);
+    private static final float TOOLTIP_Z_LEVEL = 500.0F;
     protected final T container;
     protected final InventoryPlayer playerInventory;
     protected final WidgetContainer widgets;
-    private final VerticalButtonBar verticalToolbar;
     @Nullable
     protected final GuiStyle style;
-
+    private final VerticalButtonBar verticalToolbar;
     private final Set<Slot> drag_click = new ReferenceOpenHashSet<>();
     private final Set<Slot> drag_click_sent = new ReferenceOpenHashSet<>();
+    private final Map<String, TextOverride> textOverrides = new Object2ObjectOpenHashMap<>();
+    private final Set<SlotSemantic> hiddenSlots = new ObjectOpenHashSet<>();
+    private final List<SavedSlotInfo> savedSlotInfos = new ObjectArrayList<>();
     private boolean disableShiftClick;
     private Stopwatch dbl_clickTimer = Stopwatch.createStarted();
     private ItemStack dbl_whichItem = ItemStack.EMPTY;
     private Slot bl_clicked;
     private boolean handlingRightClick;
-    private final Map<String, TextOverride> textOverrides = new Object2ObjectOpenHashMap<>();
-    private final Set<SlotSemantic> hiddenSlots = new ObjectOpenHashSet<>();
-    private final List<SavedSlotInfo> savedSlotInfos = new ObjectArrayList<>();
     private boolean suppressVanillaSlotHover;
-    private GuiStyle requireStyle() {
-        return Objects.requireNonNull(style, "GUI style has not been initialized");
-    }
 
     protected AEBaseGui(T container, InventoryPlayer playerInventory) {
         this(container, playerInventory, null);
@@ -161,6 +155,61 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
                 this.ySize = style.getBackground().getSrcHeight();
             }
         }
+    }
+
+    private static ITextComponent buildTextFieldInsertionAction(int mouseButton, String insertedText) {
+        return Tooltips.of(ButtonToolTips.SetAction.text(
+            Tooltips.getMouseButtonText(mouseButton),
+            Tooltips.of(new TextComponentString(insertedText))));
+    }
+
+    private static boolean isClickedTextField(GuiTextField textField, int mouseX, int mouseY) {
+        if (!textField.getVisible()) {
+            return false;
+        }
+
+        if (textField instanceof AETextField aeTextField) {
+            return aeTextField.isMouseOver(mouseX, mouseY);
+        }
+
+        return mouseX >= textField.x && mouseX < textField.x + textField.width
+            && mouseY >= textField.y && mouseY < textField.y + textField.height;
+    }
+
+    public static String getTextFieldInsertionText(ItemStack stack, int mouseButton) {
+        if (mouseButton == 1) {
+            GenericStack containedStack = ContainerItemStrategies.getContainedStack(stack);
+            if (containedStack != null) {
+                return containedStack.what().getDisplayName().getFormattedText();
+            }
+        }
+
+        return stack.getDisplayName();
+    }
+
+    private static ItemStack getRawStack(AppEngSlot slot) {
+        return slot.getRawStack();
+    }
+
+    private static void drainQueuedKeyPresses(KeyBinding keyBinding) {
+        int drainedPresses = 0;
+        while (keyBinding.isPressed()) {
+            drainedPresses++;
+        }
+        if (drainedPresses > 0) {
+            KeyBinding.setKeyBindState(keyBinding.getKeyCode(), false);
+        }
+    }
+
+    public static boolean isSameInventory(Slot a, Slot b) {
+        if (a instanceof AppEngSlot appEngSlotA && b instanceof AppEngSlot appEngSlotB) {
+            return appEngSlotA.getInventory() == appEngSlotB.getInventory();
+        }
+        return a.inventory == b.inventory;
+    }
+
+    private GuiStyle requireStyle() {
+        return Objects.requireNonNull(style, "GUI style has not been initialized");
     }
 
     @Override
@@ -246,12 +295,6 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         }
     }
 
-    private static ITextComponent buildTextFieldInsertionAction(int mouseButton, String insertedText) {
-        return Tooltips.of(ButtonToolTips.SetAction.text(
-            Tooltips.getMouseButtonText(mouseButton),
-            Tooltips.of(new TextComponentString(insertedText))));
-    }
-
     private List<Slot> getInventorySlots() {
         return this.container.inventorySlots;
     }
@@ -305,40 +348,16 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         }
     }
 
-    private static boolean isClickedTextField(GuiTextField textField, int mouseX, int mouseY) {
-        if (!textField.getVisible()) {
-            return false;
-        }
-
-        if (textField instanceof AETextField aeTextField) {
-            return aeTextField.isMouseOver(mouseX, mouseY);
-        }
-
-        return mouseX >= textField.x && mouseX < textField.x + textField.width
-            && mouseY >= textField.y && mouseY < textField.y + textField.height;
-    }
-
     private boolean renderEmptyingTooltip(int mouseX, int mouseY) {
         EmptyingAction emptyingAction = getEmptyingAction(this.hoveredSlot, playerInventory.getItemStack());
         if (emptyingAction != null) {
             drawTooltip(mouseX, mouseY,
-                    Tooltips.getEmptyingTooltip(ButtonToolTips.SetAction, playerInventory.getItemStack(),
-                            emptyingAction));
+                Tooltips.getEmptyingTooltip(ButtonToolTips.SetAction, playerInventory.getItemStack(),
+                    emptyingAction));
             return true;
         }
 
         return false;
-    }
-
-    public static String getTextFieldInsertionText(ItemStack stack, int mouseButton) {
-        if (mouseButton == 1) {
-            GenericStack containedStack = ContainerItemStrategies.getContainedStack(stack);
-            if (containedStack != null) {
-                return containedStack.what().getDisplayName().getFormattedText();
-            }
-        }
-
-        return stack.getDisplayName();
     }
 
     private void renderWidgetTooltip(int mouseX, int mouseY) {
@@ -543,15 +562,15 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         var backgroundIcon = SlotBackgroundIconMapping.resolve(slot.getBackgroundIcon());
         if ((slot.renderIconWithItem() || stack.isEmpty()) && slot.isSlotEnabled() && backgroundIcon != null) {
             backgroundIcon.getBlitter()
-                      .dest(guiLeft + slot.xPos, guiTop + slot.yPos)
-                      .opacity(slot.getOpacityOfIcon())
-                      .blit();
+                          .dest(guiLeft + slot.xPos, guiTop + slot.yPos)
+                          .opacity(slot.getOpacityOfIcon())
+                          .blit();
         }
 
         if (!slot.isValid()) {
             drawGradientRect(guiLeft + slot.xPos, guiTop + slot.yPos,
-                    guiLeft + slot.xPos + 16, guiTop + slot.yPos + 16,
-                    0x66ff6666, 0x66ff6666);
+                guiLeft + slot.xPos + 16, guiTop + slot.yPos + 16,
+                0x66ff6666, 0x66ff6666);
         }
     }
 
@@ -561,9 +580,9 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
             Point pos = slot.getBackgroundPos();
             Icon.SLOT_BACKGROUND.getBlitter()
-                    .dest(guiLeft + pos.x(), guiTop + pos.y())
-                    .color(1, 1, 1, alpha)
-                    .blit();
+                                .dest(guiLeft + pos.x(), guiTop + pos.y())
+                                .color(1, 1, 1, alpha)
+                                .blit();
         }
     }
 
@@ -648,10 +667,6 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         return true;
     }
 
-    private static ItemStack getRawStack(AppEngSlot slot) {
-        return slot.getRawStack();
-    }
-
     @Override
     protected void drawSlot(Slot slot) {
         if (!(slot instanceof AppEngSlot appEngSlot)) {
@@ -713,26 +728,16 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     private void suppressLockedOffhandSwapKey(int keyCode) {
         KeyBinding swapHandsKey = this.mc.gameSettings.keyBindSwapHands;
         if (swapHandsKey.isActiveAndMatches(keyCode)
-                && container.isPlayerInventorySlotLocked(getOffhandPlayerInventorySlot())) {
+            && container.isPlayerInventorySlotLocked(getOffhandPlayerInventorySlot())) {
             KeyBinding.setKeyBindState(swapHandsKey.getKeyCode(), false);
             drainQueuedKeyPresses(swapHandsKey);
         }
     }
 
-    private static void drainQueuedKeyPresses(KeyBinding keyBinding) {
-        int drainedPresses = 0;
-        while (keyBinding.isPressed()) {
-            drainedPresses++;
-        }
-        if (drainedPresses > 0) {
-            KeyBinding.setKeyBindState(keyBinding.getKeyCode(), false);
-        }
-    }
-
     private int getOffhandPlayerInventorySlot() {
         return AEBaseContainer.getOffhandPlayerInventorySlot(
-                this.playerInventory.mainInventory.size(),
-                this.playerInventory.armorInventory.size());
+            this.playerInventory.mainInventory.size(),
+            this.playerInventory.armorInventory.size());
     }
 
     @Override
@@ -744,9 +749,9 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
                 if (this.mc.gameSettings.keyBindsHotbar[hotbarSlot].isActiveAndMatches(keyCode)) {
                     for (Slot inventorySlot : this.getInventorySlots()) {
                         if (inventorySlot != null
-                                && inventorySlot.getSlotIndex() == hotbarSlot
-                                && inventorySlot.inventory == this.playerInventory
-                                && !inventorySlot.canTakeStack(this.mc.player)) {
+                            && inventorySlot.getSlotIndex() == hotbarSlot
+                            && inventorySlot.inventory == this.playerInventory
+                            && !inventorySlot.canTakeStack(this.mc.player)) {
                             return false;
                         }
                     }
@@ -754,12 +759,12 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
                     if (theSlot.getSlotStackLimit() != 64) {
                         for (Slot inventorySlot : this.getInventorySlots()) {
                             if (inventorySlot != null
-                                    && inventorySlot.getSlotIndex() == hotbarSlot
-                                    && inventorySlot.inventory == this.playerInventory) {
+                                && inventorySlot.getSlotIndex() == hotbarSlot
+                                && inventorySlot.inventory == this.playerInventory) {
                                 InitNetwork.sendToServer(new SwapSlotsPacket(
-                                        this.container.windowId,
-                                        inventorySlot.slotNumber,
-                                        theSlot.slotNumber));
+                                    this.container.windowId,
+                                    inventorySlot.slotNumber,
+                                    theSlot.slotNumber));
                                 return true;
                             }
                         }
@@ -959,8 +964,8 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             this.drag_click.add(slot);
             if (this.drag_click.size() > 1) {
                 InventoryAction action = clickedMouseButton == 0
-                        ? InventoryAction.PICKUP_OR_SET_DOWN
-                        : InventoryAction.PLACE_SINGLE;
+                    ? InventoryAction.PICKUP_OR_SET_DOWN
+                    : InventoryAction.PLACE_SINGLE;
                 for (Slot draggedSlot : this.drag_click) {
                     if (this.drag_click_sent.add(draggedSlot)) {
                         sendInventoryAction(action, draggedSlot.slotNumber);
@@ -978,7 +983,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         int delta = Mouse.getEventDWheel();
         if (delta != 0) {
             Point mouse = getMousePoint(Mouse.getEventX() * this.width / this.mc.displayWidth,
-                    this.height - Mouse.getEventY() * this.height / this.mc.displayHeight - 1);
+                this.height - Mouse.getEventY() * this.height / this.mc.displayHeight - 1);
             if (widgets.onMouseWheel(mouse, delta > 0 ? 1 : -1)) {
                 return;
             }
@@ -1041,8 +1046,8 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         }
 
         if (this.drag_click.size() <= 1
-                && mouseButton == 1
-                && getEmptyingAction(slot, playerInventory.getItemStack()) != null) {
+            && mouseButton == 1
+            && getEmptyingAction(slot, playerInventory.getItemStack()) != null) {
             sendInventoryAction(InventoryAction.EMPTY_ITEM, slotId);
             return;
         }
@@ -1053,7 +1058,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             }
 
             InventoryAction action = mouseButton == 1 ? InventoryAction.SPLIT_OR_PLACE_SINGLE
-                    : InventoryAction.PICKUP_OR_SET_DOWN;
+                : InventoryAction.PICKUP_OR_SET_DOWN;
             sendInventoryAction(action, slotId);
             this.drag_click.add(slot);
             this.drag_click_sent.add(slot);
@@ -1069,16 +1074,16 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             this.disableShiftClick = true;
 
             if (this.dbl_whichItem.isEmpty() || this.bl_clicked != slot
-                    || this.dbl_clickTimer.elapsed(TimeUnit.MILLISECONDS) > 250) {
+                || this.dbl_clickTimer.elapsed(TimeUnit.MILLISECONDS) > 250) {
                 this.bl_clicked = slot;
                 this.dbl_clickTimer = Stopwatch.createStarted();
                 this.dbl_whichItem = slot.getHasStack() ? slot.getStack().copy() : ItemStack.EMPTY;
             } else if (!this.dbl_whichItem.isEmpty()) {
                 for (Slot inventorySlot : this.getInventorySlots()) {
                     if (inventorySlot != null && inventorySlot.canTakeStack(this.mc.player)
-                            && inventorySlot.getHasStack()
-                            && isSameInventory(inventorySlot, slot)
-                            && Container.canAddItemToSlot(inventorySlot, this.dbl_whichItem, true)) {
+                        && inventorySlot.getHasStack()
+                        && isSameInventory(inventorySlot, slot)
+                        && Container.canAddItemToSlot(inventorySlot, this.dbl_whichItem, true)) {
                         this.handleMouseClick(inventorySlot, inventorySlot.slotNumber, 0, ClickType.QUICK_MOVE);
                     }
                 }
@@ -1354,13 +1359,6 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
     protected void onReturnFromSubScreen(AEBaseGui<?> subScreen) {
         Objects.requireNonNull(subScreen, "subScreen");
-    }
-
-    public static boolean isSameInventory(Slot a, Slot b) {
-        if (a instanceof AppEngSlot appEngSlotA && b instanceof AppEngSlot appEngSlotB) {
-            return appEngSlotA.getInventory() == appEngSlotB.getInventory();
-        }
-        return a.inventory == b.inventory;
     }
 
     private static final class SavedSlotInfo {

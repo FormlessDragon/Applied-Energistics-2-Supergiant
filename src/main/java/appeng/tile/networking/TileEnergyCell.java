@@ -68,6 +68,41 @@ public class TileEnergyCell extends AENetworkedTile implements IAEPowerStorage, 
         return (int) Math.floor(EnergyCellBlock.MAX_FULLNESS * MathHelper.clamp(fillFactor + 0.01, 0, 1));
     }
 
+    private static double readSavedMaxPower(NBTTagCompound data, double defaultValue) {
+        return data.hasKey(INTERNAL_MAX_POWER_TAG) ? data.getDouble(INTERNAL_MAX_POWER_TAG) : defaultValue;
+    }
+
+    private static double readStoredEnergy(NBTTagCompound input) {
+        NBTBase storedEnergy = input.hasKey(STORED_ENERGY, 99) ? input.getTag(STORED_ENERGY) : null;
+        if (storedEnergy instanceof NBTPrimitive storedEnergyNumber) {
+            return storedEnergyNumber.getDouble();
+        }
+
+        NBTTagCompound blockEntityTag = input.getCompoundTag("BlockEntityTag");
+        if (blockEntityTag.hasKey(INTERNAL_CURRENT_POWER_TAG)) {
+            return blockEntityTag.getDouble(INTERNAL_CURRENT_POWER_TAG);
+        }
+
+        if (input.hasKey(INTERNAL_CURRENT_POWER_TAG)) {
+            return input.getDouble(INTERNAL_CURRENT_POWER_TAG);
+        }
+
+        return 0;
+    }
+
+    private static double readMaxPower(NBTTagCompound input, double defaultValue) {
+        NBTTagCompound blockEntityTag = input.getCompoundTag("BlockEntityTag");
+        if (blockEntityTag.hasKey(INTERNAL_MAX_POWER_TAG)) {
+            return blockEntityTag.getDouble(INTERNAL_MAX_POWER_TAG);
+        }
+
+        if (input.hasKey(INTERNAL_MAX_POWER_TAG)) {
+            return input.getDouble(INTERNAL_MAX_POWER_TAG);
+        }
+
+        return defaultValue;
+    }
+
     @Override
     public AECableType getCableConnectionType(EnumFacing dir) {
         return AECableType.COVERED;
@@ -195,41 +230,6 @@ public class TileEnergyCell extends AENetworkedTile implements IAEPowerStorage, 
             this.onAmountChanged();
         }
         return extracted;
-    }
-
-    private static double readSavedMaxPower(NBTTagCompound data, double defaultValue) {
-        return data.hasKey(INTERNAL_MAX_POWER_TAG) ? data.getDouble(INTERNAL_MAX_POWER_TAG) : defaultValue;
-    }
-
-    private static double readStoredEnergy(NBTTagCompound input) {
-        NBTBase storedEnergy = input.hasKey(STORED_ENERGY, 99) ? input.getTag(STORED_ENERGY) : null;
-        if (storedEnergy instanceof NBTPrimitive storedEnergyNumber) {
-            return storedEnergyNumber.getDouble();
-        }
-
-        NBTTagCompound blockEntityTag = input.getCompoundTag("BlockEntityTag");
-        if (blockEntityTag.hasKey(INTERNAL_CURRENT_POWER_TAG)) {
-            return blockEntityTag.getDouble(INTERNAL_CURRENT_POWER_TAG);
-        }
-
-        if (input.hasKey(INTERNAL_CURRENT_POWER_TAG)) {
-            return input.getDouble(INTERNAL_CURRENT_POWER_TAG);
-        }
-
-        return 0;
-    }
-
-    private static double readMaxPower(NBTTagCompound input, double defaultValue) {
-        NBTTagCompound blockEntityTag = input.getCompoundTag("BlockEntityTag");
-        if (blockEntityTag.hasKey(INTERNAL_MAX_POWER_TAG)) {
-            return blockEntityTag.getDouble(INTERNAL_MAX_POWER_TAG);
-        }
-
-        if (input.hasKey(INTERNAL_MAX_POWER_TAG)) {
-            return input.getDouble(INTERNAL_MAX_POWER_TAG);
-        }
-
-        return defaultValue;
     }
 
     @Override

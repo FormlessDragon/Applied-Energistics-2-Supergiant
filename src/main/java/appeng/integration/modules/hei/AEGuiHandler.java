@@ -30,57 +30,8 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
     @Nullable
     private Object currentGhostIngredient;
 
-    @Nonnull
-    @Override
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public Class<AEBaseGui<?>> getGuiContainerClass() {
-        return (Class) AEBaseGui.class;
-    }
-
-    @Override
-    public List<Rectangle> getGuiExtraAreas(@Nonnull AEBaseGui<?> guiContainer) {
-        return guiContainer.getExclusionZones()
-            .stream()
-            .map(AEGuiHandler::toRectangle)
-            .toList();
-    }
-
-    @Override
-    public @Nullable Object getIngredientUnderMouse(@Nonnull AEBaseGui<?> guiContainer, int mouseX, int mouseY) {
-        StackWithBounds hoveredStack = guiContainer.getStackUnderMouse(mouseX, mouseY);
-        if (hoveredStack != null) {
-            return GenericIngredientHelper.stackToIngredient(hoveredStack.stack());
-        }
-
-        var slot = guiContainer.getSlotUnderMouse();
-        if (slot != null && slot.getHasStack()) {
-            return slot.getStack();
-        }
-        return null;
-    }
-
     private static Rectangle toRectangle(Rectangle rect) {
         return new Rectangle(rect.x, rect.y, rect.width, rect.height);
-    }
-
-    @Nonnull
-    @Override
-    @SuppressWarnings("unchecked")
-    public <I> List<Target<I>> getTargets(@Nonnull AEBaseGui<?> gui, @Nonnull I ingredient, boolean doStart) {
-        if (doStart) {
-            this.currentGhostIngredient = ingredient;
-        }
-        return (List<Target<I>>) (List<?>) getTargetsForIngredient(gui, ingredient);
-    }
-
-    @Override
-    public void onComplete() {
-        this.currentGhostIngredient = null;
-    }
-
-    @Override
-    public boolean shouldHighlightTargets() {
-        return true;
     }
 
     static ItemStack toFilterStack(FakeSlot slot, Object ingredient) {
@@ -108,11 +59,6 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
             }
         }
         return ItemStack.EMPTY;
-    }
-
-    @Nullable
-    public Object getCurrentGhostIngredient() {
-        return this.currentGhostIngredient;
     }
 
     @Nullable
@@ -162,32 +108,71 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         return GenericStack.wrapInItemStack(stack.what(), Math.max(1, stack.amount()));
     }
 
-    private record FakeSlotTarget(AEBaseGui<?> gui, FakeSlot slot) implements Target<Object> {
-
-        @Override
-        public Rectangle getArea() {
-            return new Rectangle(this.gui.getGuiLeft() + this.slot.xPos, this.gui.getGuiTop() + this.slot.yPos, 16, 16);
+    private static ItemStack toPacketFilterStack(Object ingredient) {
+        if (ingredient instanceof BookmarkItem<?> bookmarkItem) {
+            return toPacketFilterStack(bookmarkItem.ingredient);
         }
 
-        @Override
-        public void accept(@Nonnull Object ingredient) {
-            if (!this.slot.isEnabled()) {
-                return;
-            }
-
-            ItemStack stack = toPacketFilterStack(ingredient);
-            if (stack.isEmpty()) {
-                return;
-            }
-
-            InitNetwork.sendToServer(new InventoryActionPacket(
-                this.gui.getContainer().windowId,
-                InventoryAction.SET_FILTER,
-                this.slot.slotNumber,
-                Mouse.getEventButton(),
-                stack));
+        if (ingredient instanceof ItemStack itemStack) {
+            return itemStack.copy();
         }
 
+        GenericStack stack = GenericIngredientHelper.ingredientToStack(ingredient);
+        return stack != null ? GenericStack.wrapInItemStack(stack) : ItemStack.EMPTY;
+    }
+
+    @Nonnull
+    @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public Class<AEBaseGui<?>> getGuiContainerClass() {
+        return (Class) AEBaseGui.class;
+    }
+
+    @Override
+    public List<Rectangle> getGuiExtraAreas(@Nonnull AEBaseGui<?> guiContainer) {
+        return guiContainer.getExclusionZones()
+                           .stream()
+                           .map(AEGuiHandler::toRectangle)
+                           .toList();
+    }
+
+    @Override
+    public @Nullable Object getIngredientUnderMouse(@Nonnull AEBaseGui<?> guiContainer, int mouseX, int mouseY) {
+        StackWithBounds hoveredStack = guiContainer.getStackUnderMouse(mouseX, mouseY);
+        if (hoveredStack != null) {
+            return GenericIngredientHelper.stackToIngredient(hoveredStack.stack());
+        }
+
+        var slot = guiContainer.getSlotUnderMouse();
+        if (slot != null && slot.getHasStack()) {
+            return slot.getStack();
+        }
+        return null;
+    }
+
+    @Nonnull
+    @Override
+    @SuppressWarnings("unchecked")
+    public <I> List<Target<I>> getTargets(@Nonnull AEBaseGui<?> gui, @Nonnull I ingredient, boolean doStart) {
+        if (doStart) {
+            this.currentGhostIngredient = ingredient;
+        }
+        return (List<Target<I>>) (List<?>) getTargetsForIngredient(gui, ingredient);
+    }
+
+    @Override
+    public void onComplete() {
+        this.currentGhostIngredient = null;
+    }
+
+    @Override
+    public boolean shouldHighlightTargets() {
+        return true;
+    }
+
+    @Nullable
+    public Object getCurrentGhostIngredient() {
+        return this.currentGhostIngredient;
     }
 
     public List<Target<Object>> getTargetsForIngredient(AEBaseGui<?> gui, Object ingredient) {
@@ -221,6 +206,34 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         return targets;
     }
 
+    private record FakeSlotTarget(AEBaseGui<?> gui, FakeSlot slot) implements Target<Object> {
+
+        @Override
+        public Rectangle getArea() {
+            return new Rectangle(this.gui.getGuiLeft() + this.slot.xPos, this.gui.getGuiTop() + this.slot.yPos, 16, 16);
+        }
+
+        @Override
+        public void accept(@Nonnull Object ingredient) {
+            if (!this.slot.isEnabled()) {
+                return;
+            }
+
+            ItemStack stack = toPacketFilterStack(ingredient);
+            if (stack.isEmpty()) {
+                return;
+            }
+
+            InitNetwork.sendToServer(new InventoryActionPacket(
+                this.gui.getContainer().windowId,
+                InventoryAction.SET_FILTER,
+                this.slot.slotNumber,
+                Mouse.getEventButton(),
+                stack));
+        }
+
+    }
+
     private record TextFieldTarget(AEBaseGui<?> gui, GuiTextField field) implements Target<Object> {
 
         @Override
@@ -245,18 +258,5 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
             }
         }
 
-    }
-
-    private static ItemStack toPacketFilterStack(Object ingredient) {
-        if (ingredient instanceof BookmarkItem<?> bookmarkItem) {
-            return toPacketFilterStack(bookmarkItem.ingredient);
-        }
-
-        if (ingredient instanceof ItemStack itemStack) {
-            return itemStack.copy();
-        }
-
-        GenericStack stack = GenericIngredientHelper.ingredientToStack(ingredient);
-        return stack != null ? GenericStack.wrapInItemStack(stack) : ItemStack.EMPTY;
     }
 }

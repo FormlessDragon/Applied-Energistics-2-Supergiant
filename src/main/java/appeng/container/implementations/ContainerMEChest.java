@@ -26,7 +26,7 @@ import appeng.tile.storage.TileMEChest;
 import net.minecraft.entity.player.InventoryPlayer;
 
 public class ContainerMEChest extends AEBaseContainer {
-    public ContainerMEChest( InventoryPlayer playerInventory, TileMEChest host) {
+    public ContainerMEChest(InventoryPlayer playerInventory, TileMEChest host) {
         super(playerInventory, host);
         setLocator(GuiHostLocators.forTile(host));
 

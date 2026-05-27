@@ -159,7 +159,7 @@ public class AEGuiHandler implements IGuiHandler {
     }
 
     private static <H, C extends AEBaseContainer> @Nullable C createPartContainer(EntityPlayer player, GuiHostLocator locator,
-                                                                                            int guiId, Class<H> hostType, Function<H, C> factory) {
+                                                                                  int guiId, Class<H> hostType, Function<H, C> factory) {
         if (locator == null) {
             return null;
         }

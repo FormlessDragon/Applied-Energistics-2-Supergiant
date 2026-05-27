@@ -29,6 +29,7 @@ import appeng.recipes.entropy.EntropyMode;
 import appeng.recipes.entropy.EntropyRecipe;
 import appeng.util.InteractionUtil;
 import appeng.util.Platform;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockTNT;
 import net.minecraft.block.state.IBlockState;
@@ -56,8 +57,6 @@ import net.minecraft.world.WorldServer;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidRegistry;
 import net.minecraftforge.fluids.FluidStack;
-
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import javax.annotation.Nullable;
 import java.util.Collections;
@@ -115,6 +114,30 @@ public class EntropyManipulatorItem extends AEBasePoweredItem implements IBlockT
         } catch (IllegalStateException ignored) {
             return 100000;
         }
+    }
+
+    @Nullable
+    private static RayTraceResult findLiquidTargetAlongRay(World world, Vec3d from, Vec3d to) {
+        Vec3d delta = to.subtract(from);
+        double distance = delta.length();
+        if (distance <= 1.0E-6D) {
+            return null;
+        }
+
+        Vec3d step = delta.scale(0.25D / distance);
+        int steps = MathHelper.ceil(distance / 0.25D);
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+
+        for (int i = 0; i <= steps; i++) {
+            Vec3d sample = from.add(step.scale(i));
+            pos.setPos(MathHelper.floor(sample.x), MathHelper.floor(sample.y), MathHelper.floor(sample.z));
+            IBlockState state = world.getBlockState(pos);
+            if (isLiquidStateTargetable(state)) {
+                return new RayTraceResult(sample, EnumFacing.UP, pos.toImmutable());
+            }
+        }
+
+        return null;
     }
 
     @Override
@@ -317,29 +340,5 @@ public class EntropyManipulatorItem extends AEBasePoweredItem implements IBlockT
         Vec3d to = from.add(look.x * 5.0D, look.y * 5.0D, look.z * 5.0D);
         RayTraceResult hit = world.rayTraceBlocks(from, to, true);
         return hit != null ? hit : findLiquidTargetAlongRay(world, from, to);
-    }
-
-    @Nullable
-    private static RayTraceResult findLiquidTargetAlongRay(World world, Vec3d from, Vec3d to) {
-        Vec3d delta = to.subtract(from);
-        double distance = delta.length();
-        if (distance <= 1.0E-6D) {
-            return null;
-        }
-
-        Vec3d step = delta.scale(0.25D / distance);
-        int steps = MathHelper.ceil(distance / 0.25D);
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-
-        for (int i = 0; i <= steps; i++) {
-            Vec3d sample = from.add(step.scale(i));
-            pos.setPos(MathHelper.floor(sample.x), MathHelper.floor(sample.y), MathHelper.floor(sample.z));
-            IBlockState state = world.getBlockState(pos);
-            if (isLiquidStateTargetable(state)) {
-                return new RayTraceResult(sample, EnumFacing.UP, pos.toImmutable());
-            }
-        }
-
-        return null;
     }
 }

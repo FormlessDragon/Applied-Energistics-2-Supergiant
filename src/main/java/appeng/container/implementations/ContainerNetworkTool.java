@@ -25,7 +25,7 @@ import appeng.items.contents.NetworkToolGuiHost;
 import net.minecraft.entity.player.InventoryPlayer;
 
 public class ContainerNetworkTool extends AEBaseContainer {
-    public ContainerNetworkTool( InventoryPlayer ip, NetworkToolGuiHost<?> host) {
+    public ContainerNetworkTool(InventoryPlayer ip, NetworkToolGuiHost<?> host) {
         super(ip, host);
 
         for (int i = 0; i < 9; i++) {

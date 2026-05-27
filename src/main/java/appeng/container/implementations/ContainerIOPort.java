@@ -39,7 +39,7 @@ public class ContainerIOPort extends UpgradeableContainer<TileIOPort> {
     @GuiSync(3)
     public OperationMode opMode = OperationMode.EMPTY;
 
-    public ContainerIOPort( InventoryPlayer ip, TileIOPort host) {
+    public ContainerIOPort(InventoryPlayer ip, TileIOPort host) {
         super(ip, host);
     }
 

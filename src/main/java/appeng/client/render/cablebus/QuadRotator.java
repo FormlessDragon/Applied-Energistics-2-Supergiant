@@ -2,6 +2,7 @@ package appeng.client.render.cablebus;
 
 import appeng.api.orientation.BlockOrientation;
 import appeng.core.AELog;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.client.renderer.vertex.VertexFormatElement;
@@ -11,7 +12,6 @@ import net.minecraftforge.common.model.TRSRTransformation;
 import javax.annotation.Nullable;
 import javax.vecmath.Vector3f;
 import javax.vecmath.Vector4f;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.List;
 
 public class QuadRotator {

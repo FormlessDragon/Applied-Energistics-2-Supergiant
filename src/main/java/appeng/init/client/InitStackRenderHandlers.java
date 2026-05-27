@@ -25,9 +25,9 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKeyType;
 import appeng.api.stacks.GenericStack;
 import appeng.client.gui.style.FluidBlitter;
-import appeng.crafting.pattern.EncodedPatternItem;
 import appeng.core.definitions.AEItems;
 import appeng.core.definitions.ItemDefinition;
+import appeng.crafting.pattern.EncodedPatternItem;
 import appeng.items.misc.WrappedGenericStack;
 import appeng.util.Platform;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -36,11 +36,11 @@ import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.RenderItem;
+import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.block.model.IBakedModel;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.renderer.tileentity.TileEntityItemStackRenderer;
-import net.minecraft.client.renderer.block.model.IBakedModel;
-import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
@@ -99,6 +99,29 @@ public final class InitStackRenderHandlers {
         }
 
         return itemKey.toStack();
+    }
+
+    static GuiRenderCleanupState getGuiRenderCleanupState() {
+        return GUI_RENDER_CLEANUP_STATE;
+    }
+
+    private static void restoreGuiRenderState() {
+        if (GUI_RENDER_CLEANUP_STATE.blendEnabled()) {
+            GlStateManager.enableBlend();
+        } else {
+            GlStateManager.disableBlend();
+        }
+        if (GUI_RENDER_CLEANUP_STATE.depthEnabled()) {
+            GlStateManager.enableDepth();
+        } else {
+            GlStateManager.disableDepth();
+        }
+        if (GUI_RENDER_CLEANUP_STATE.lightingEnabled()) {
+            GlStateManager.enableLighting();
+        } else {
+            GlStateManager.disableLighting();
+        }
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private static final class ItemKeyRenderHandler implements AEKeyRenderHandler<AEItemKey> {
@@ -278,29 +301,6 @@ public final class InitStackRenderHandlers {
             }
             renderItem.renderItem(displayStack, model);
         }
-    }
-
-    static GuiRenderCleanupState getGuiRenderCleanupState() {
-        return GUI_RENDER_CLEANUP_STATE;
-    }
-
-    private static void restoreGuiRenderState() {
-        if (GUI_RENDER_CLEANUP_STATE.blendEnabled()) {
-            GlStateManager.enableBlend();
-        } else {
-            GlStateManager.disableBlend();
-        }
-        if (GUI_RENDER_CLEANUP_STATE.depthEnabled()) {
-            GlStateManager.enableDepth();
-        } else {
-            GlStateManager.disableDepth();
-        }
-        if (GUI_RENDER_CLEANUP_STATE.lightingEnabled()) {
-            GlStateManager.enableLighting();
-        } else {
-            GlStateManager.disableLighting();
-        }
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     record GuiRenderCleanupState(boolean blendEnabled, boolean depthEnabled, boolean lightingEnabled) {

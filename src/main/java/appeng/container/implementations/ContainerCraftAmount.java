@@ -50,12 +50,12 @@ public class ContainerCraftAmount extends AEBaseContainer implements ISubGui {
 
     private final AppEngSlot craftingItem;
     private final ISubGuiHost host;
-    @Nullable
-    private AEKey whatToCraft;
     @GuiSync(4)
     public int initialAmount = 1;
+    @Nullable
+    private AEKey whatToCraft;
 
-    public ContainerCraftAmount( InventoryPlayer ip, ISubGuiHost host) {
+    public ContainerCraftAmount(InventoryPlayer ip, ISubGuiHost host) {
         super(ip, host);
         this.host = host;
         this.craftingItem = new InaccessibleSlot(new AppEngInternalInventory(1), 0);

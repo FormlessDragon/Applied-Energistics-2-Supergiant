@@ -27,6 +27,10 @@ public final class EntityChargedQuartz extends AEBaseEntityItem {
         super(world, x, y, z, stack);
     }
 
+    public static boolean applies(ItemStack stack) {
+        return AEItems.CERTUS_QUARTZ_CRYSTAL_CHARGED.is(stack);
+    }
+
     @Override
     public void onUpdate() {
         super.onUpdate();
@@ -60,9 +64,5 @@ public final class EntityChargedQuartz extends AEBaseEntityItem {
         } else {
             this.transformTime = 0;
         }
-    }
-
-    public static boolean applies(ItemStack stack) {
-        return AEItems.CERTUS_QUARTZ_CRYSTAL_CHARGED.is(stack);
     }
 }

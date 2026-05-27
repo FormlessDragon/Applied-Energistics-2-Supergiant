@@ -20,6 +20,7 @@ package appeng.client.render.crafting;
 
 import appeng.block.crafting.AbstractCraftingUnitBlock;
 import appeng.client.render.cablebus.CubeBuilder;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.IBakedModel;
@@ -31,7 +32,6 @@ import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.property.IExtendedBlockState;
 
 import javax.annotation.Nullable;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;

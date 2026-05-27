@@ -27,9 +27,8 @@ import net.minecraft.util.ResourceLocation;
 import java.util.Objects;
 
 final class AEFluidKeys extends AEKeyType {
-    private static final ResourceLocation ID = AppEng.makeId("f");
-
     static final AEFluidKeys INSTANCE = new AEFluidKeys();
+    private static final ResourceLocation ID = AppEng.makeId("f");
 
     private AEFluidKeys() {
         super(ID, AEFluidKey.class, GuiText.Fluids.text());

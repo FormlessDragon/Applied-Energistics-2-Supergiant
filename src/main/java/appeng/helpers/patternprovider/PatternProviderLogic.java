@@ -59,13 +59,13 @@ import appeng.util.inv.AppEngInternalInventory;
 import appeng.util.inv.InternalInventoryHost;
 import appeng.util.inv.PlayerInternalInventory;
 import appeng.util.inv.filter.IAEItemFilter;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -147,9 +147,9 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
                                            .registerSetting(Settings.BLOCKING_MODE, BlockingMode.NO)
                                            .registerSetting(Settings.PATTERN_PROVIDER_BLOCKING_TYPE,
                                                PatternProviderBlockingType.NORMAL)
-                                            .registerSetting(Settings.PATTERN_ACCESS_TERMINAL, YesNo.YES)
-                                            .registerSetting(Settings.LOCK_CRAFTING_MODE, LockCraftingMode.NONE)
-                                            .build();
+                                           .registerSetting(Settings.PATTERN_ACCESS_TERMINAL, YesNo.YES)
+                                           .registerSetting(Settings.LOCK_CRAFTING_MODE, LockCraftingMode.NONE)
+                                           .build();
         this.patternInventory = new AppEngInternalInventory(this, patternInventorySize, 1, new PatternInventoryFilter());
         this.upgrades = UpgradeInventories.forMachine(machineType, 1, this::onUpgradesChanged);
         this.returnInv = new PatternProviderReturnInventory(() -> {
@@ -326,8 +326,8 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             return this.patterns;
         }
         return this.patterns.stream()
-            .map(pattern -> pattern instanceof AEProcessingPattern ? PseudoPatternDetails.wrap(pattern) : pattern)
-            .collect(ObjectArrayList.toList());
+                            .map(pattern -> pattern instanceof AEProcessingPattern ? PseudoPatternDetails.wrap(pattern) : pattern)
+                            .collect(ObjectArrayList.toList());
     }
 
     @Override

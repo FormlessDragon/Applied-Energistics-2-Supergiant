@@ -124,15 +124,26 @@ public class SpatialStorageCommand implements ISubCommand {
         return transition != null ? transition.timestamp() : java.time.Instant.MIN;
     }
 
-    @Override
-    public String getHelp(MinecraftServer srv) {
-        return "commands.ae2.spatial";
-    }
-
     private static boolean acceptsPlotId(String action) {
         String normalized = action.toLowerCase(Locale.ROOT);
         return "info".equals(normalized) || "tp".equals(normalized) || "tpback".equals(normalized)
             || "givecell".equals(normalized);
+    }
+
+    private static ObjectList<String> getPlotIdCandidates() {
+        ObjectList<String> candidates = new ObjectArrayList<>();
+        try {
+            for (SpatialStoragePlot plot : SpatialStoragePlotManager.INSTANCE.getPlots()) {
+                candidates.add(Integer.toString(plot.getId()));
+            }
+        } catch (IllegalStateException ignored) {
+        }
+        return candidates;
+    }
+
+    @Override
+    public String getHelp(MinecraftServer srv) {
+        return "commands.ae2.spatial";
     }
 
     @Override
@@ -254,17 +265,6 @@ public class SpatialStorageCommand implements ISubCommand {
 
         spatialCellItem.setStoredDimension(cell, plot.getId(), plot.getSize());
         player.addItemStackToInventory(cell);
-    }
-
-    private static ObjectList<String> getPlotIdCandidates() {
-        ObjectList<String> candidates = new ObjectArrayList<>();
-        try {
-            for (SpatialStoragePlot plot : SpatialStoragePlotManager.INSTANCE.getPlots()) {
-                candidates.add(Integer.toString(plot.getId()));
-            }
-        } catch (IllegalStateException ignored) {
-        }
-        return candidates;
     }
 
     @Override

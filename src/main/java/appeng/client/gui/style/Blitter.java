@@ -100,6 +100,10 @@ public final class Blitter {
         return texture(resourceLocation);
     }
 
+    private static float interpolate(float min, float max, float progress) {
+        return min + (max - min) * progress;
+    }
+
     public Blitter copy() {
         Blitter result = new Blitter(texture, referenceWidth, referenceHeight);
         result.srcRect = srcRect;
@@ -252,10 +256,6 @@ public final class Blitter {
         this.maxU = maxU;
         this.maxV = maxV;
         return this;
-    }
-
-    private static float interpolate(float min, float max, float progress) {
-        return min + (max - min) * progress;
     }
 
     public void blit() {

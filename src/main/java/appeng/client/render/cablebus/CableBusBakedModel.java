@@ -9,6 +9,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.Weigher;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -23,7 +24,6 @@ import net.minecraftforge.client.MinecraftForgeClient;
 import net.minecraftforge.common.property.IExtendedBlockState;
 
 import javax.annotation.Nonnull;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Iterator;
@@ -213,7 +213,8 @@ public class CableBusBakedModel implements IBakedModel {
 
             switch (cableType) {
                 case GLASS -> this.cableBuilder.addConstrainedGlassConnection(facing, cableColor, distance, quadsOut);
-                case COVERED -> this.cableBuilder.addConstrainedCoveredConnection(facing, cableColor, distance, quadsOut);
+                case COVERED ->
+                    this.cableBuilder.addConstrainedCoveredConnection(facing, cableColor, distance, quadsOut);
                 case SMART -> this.cableBuilder.addConstrainedSmartConnection(facing, cableColor, distance, channels,
                     quadsOut);
                 default -> {

@@ -35,7 +35,7 @@ public class ContainerFormationPlane extends UpgradeableContainer<FormationPlane
     @GuiSync(8)
     public FormationPlaneMode formationPlaneMode;
 
-    public ContainerFormationPlane( InventoryPlayer ip, FormationPlanePart host) {
+    public ContainerFormationPlane(InventoryPlayer ip, FormationPlanePart host) {
         super(ip, host);
     }
 

@@ -81,25 +81,25 @@ public class CraftingFx extends Particle {
         int block = lightmap & 0xFFFF;
 
         buffer.pos(x - rotationX * scale - rotationXY * scale, y - rotationZ * scale,
-                   z - rotationYZ * scale - rotationXZ * scale)
+                  z - rotationYZ * scale - rotationXZ * scale)
               .tex(maxU, maxV)
               .color(this.particleRed, this.particleGreen, this.particleBlue, this.particleAlpha)
               .lightmap(sky, block)
               .endVertex();
         buffer.pos(x - rotationX * scale + rotationXY * scale, y + rotationZ * scale,
-                   z - rotationYZ * scale + rotationXZ * scale)
+                  z - rotationYZ * scale + rotationXZ * scale)
               .tex(maxU, minV)
               .color(this.particleRed, this.particleGreen, this.particleBlue, this.particleAlpha)
               .lightmap(sky, block)
               .endVertex();
         buffer.pos(x + rotationX * scale + rotationXY * scale, y + rotationZ * scale,
-                   z + rotationYZ * scale + rotationXZ * scale)
+                  z + rotationYZ * scale + rotationXZ * scale)
               .tex(minU, minV)
               .color(this.particleRed, this.particleGreen, this.particleBlue, this.particleAlpha)
               .lightmap(sky, block)
               .endVertex();
         buffer.pos(x + rotationX * scale - rotationXY * scale, y - rotationZ * scale,
-                   z + rotationYZ * scale - rotationXZ * scale)
+                  z + rotationYZ * scale - rotationXZ * scale)
               .tex(minU, maxV)
               .color(this.particleRed, this.particleGreen, this.particleBlue, this.particleAlpha)
               .lightmap(sky, block)

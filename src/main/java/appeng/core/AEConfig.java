@@ -319,6 +319,14 @@ public final class AEConfig {
         return this.debugEnergy;
     }
 
+    public void setDebugEnergyEnabled(boolean enabled) {
+        if (enabled != this.debugEnergy) {
+            this.debugEnergy = enabled;
+            this.configuration.get("debug", "debugEnergy", false).set(enabled);
+            this.configuration.save();
+        }
+    }
+
     public boolean isCraftingPerformanceLogEnabled() {
         return this.craftingPerformanceLog;
     }
@@ -449,14 +457,6 @@ public final class AEConfig {
         this.channelMode = channelMode == null ? ChannelMode.DEFAULT : channelMode;
         this.configuration.get("general", "channels", ChannelMode.DEFAULT.name()).set(this.channelMode.name());
         this.configuration.save();
-    }
-
-    public void setDebugEnergyEnabled(boolean enabled) {
-        if (enabled != this.debugEnergy) {
-            this.debugEnergy = enabled;
-            this.configuration.get("debug", "debugEnergy", false).set(enabled);
-            this.configuration.save();
-        }
     }
 
     public double getSpatialPowerExponent() {
