@@ -24,7 +24,11 @@ public final class TemporaryPseudoCraftingProvider implements ICraftingProvider 
     }
 
     public TemporaryPseudoCraftingProvider(IPatternDetails pattern) {
-        this.pattern = PseudoPatternDetails.wrap(PseudoPatternDetails.unwrap(pattern));
+        var basePattern = PseudoPatternDetails.unwrap(pattern);
+        if (!(basePattern instanceof AEProcessingPattern)) {
+            throw new IllegalArgumentException("Temporary pseudo patterns must be processing patterns.");
+        }
+        this.pattern = PseudoPatternDetails.wrap(basePattern);
     }
 
     public IPatternDetails pattern() {

@@ -17,6 +17,7 @@ import appeng.client.gui.widgets.TabButton;
 import appeng.container.me.items.ContainerPatternEncodingTerm;
 import appeng.core.AEConfig;
 import appeng.core.localization.ButtonToolTips;
+import appeng.core.localization.GuiText;
 import appeng.core.localization.Tooltips;
 import appeng.core.network.InitNetwork;
 import appeng.core.network.serverbound.InventoryActionPacket;
@@ -30,7 +31,6 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
@@ -53,7 +53,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
         if (Integrations.hei().isEnabled()) {
             addToLeftToolbar(new IconButton(this::openImportPrioritySettings) {
                 {
-                    setMessage(new TextComponentTranslation("gui.ae2.PatternImportPrioritiesTitle"));
+                    setMessage(GuiText.PatternImportPrioritiesTitle.text());
                 }
 
                 @Override

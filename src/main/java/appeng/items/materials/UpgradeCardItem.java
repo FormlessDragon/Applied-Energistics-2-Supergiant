@@ -27,6 +27,7 @@ import appeng.container.AEBaseContainer;
 import appeng.container.SlotSemantics;
 import appeng.container.slot.AppEngSlot;
 import appeng.api.ids.AEItemIds;
+import appeng.core.localization.GuiText;
 import appeng.core.localization.InGameTooltip;
 import appeng.core.localization.PlayerMessages;
 import appeng.items.AEBaseItem;
@@ -42,7 +43,6 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextFormatting;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.world.World;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -97,14 +97,14 @@ public class UpgradeCardItem extends AEBaseItem {
 
         if (isCraftingCard(stack)) {
             String status = isForceCraftingEnabled(stack)
-                ? TextFormatting.GREEN + I18n.format("gui.ae2.Yes")
-                : TextFormatting.RED + I18n.format("gui.ae2.No");
-            lines.add(TextFormatting.GRAY + I18n.format("item.ae2.crafting_card.tooltip.force_crafting", status));
-            lines.add(TextFormatting.DARK_GRAY + I18n.format("item.ae2.crafting_card.tooltip.force_crafting_hint"));
-            lines.add(TextFormatting.DARK_GRAY + I18n.format("item.ae2.crafting_card.tooltip.force_crafting_desc"));
+                ? TextFormatting.GREEN + GuiText.Yes.getLocal()
+                : TextFormatting.RED + GuiText.No.getLocal();
+            lines.add(TextFormatting.GRAY + GuiText.CraftingCardForceCrafting.getLocal(status));
+            lines.add(TextFormatting.DARK_GRAY + GuiText.CraftingCardForceCraftingHint.getLocal());
+            lines.add(TextFormatting.DARK_GRAY + GuiText.CraftingCardForceCraftingDesc.getLocal());
         } else if (isPseudoCraftingCard(stack)) {
-            lines.add(TextFormatting.GRAY + I18n.format("item.ae2.pseudo_crafting_card.tooltip.line1"));
-            lines.add(TextFormatting.DARK_GRAY + I18n.format("item.ae2.pseudo_crafting_card.tooltip.line2"));
+            lines.add(TextFormatting.GRAY + GuiText.PseudoCraftingCardLine1.getLocal());
+            lines.add(TextFormatting.DARK_GRAY + GuiText.PseudoCraftingCardLine2.getLocal());
         }
 
         var supportedBy = Upgrades.getTooltipLinesForCard(this);

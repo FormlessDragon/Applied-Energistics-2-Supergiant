@@ -120,6 +120,10 @@ public class CraftingCpuHelper {
             long remainingMultiplier = inputs[x].getMultiplier();
             for (var template : getValidItemTemplates(sourceInv, inputs[x], level)) {
                 long extracted = extractTemplates(sourceInv, template, remainingMultiplier);
+                if (extracted <= 0) {
+                    continue;
+                }
+
                 list.add(template.key(), extracted * template.amount());
 
                 // Container items!

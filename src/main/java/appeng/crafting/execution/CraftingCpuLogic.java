@@ -39,6 +39,7 @@ import appeng.crafting.CraftingLink;
 import appeng.helpers.patternprovider.PseudoPatternDetails;
 import appeng.crafting.inv.ICraftingInventory;
 import appeng.crafting.inv.ListCraftingInventory;
+import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.hooks.ticking.TickHandler;
 import appeng.me.cluster.implementations.CraftingCPUCluster;
 import appeng.me.service.CraftingService;
@@ -50,7 +51,6 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.List;
@@ -211,11 +211,11 @@ public class CraftingCpuLogic {
             }
 
             var details = task.getKey();
-            var pseudoPattern = PseudoPatternDetails.isPseudo(details);
+            var finalOutputPseudoPattern = isFinalOutputPseudoPattern(job, details);
             var expectedOutputs = new KeyCounter();
             var expectedContainerItems = new KeyCounter();
-            ICraftingInventory taskInventory = pseudoPattern
-                ? new CpuTaskInventoryView(inventory, job.pseudoInventory)
+            ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
+                ? new RealInputTrackingInventoryView(inventory)
                 : inventory;
             // Contains the inputs for the pattern.
             @Nullable
@@ -243,7 +243,7 @@ public class CraftingCpuLogic {
                     cluster.markDirty();
 
                     task.getValue().value--;
-                    if (pseudoPattern) {
+                    if (finalOutputPseudoPattern) {
                         completePseudoOutputs(job, expectedOutputs);
                         if (job != this.job) {
                             break taskLoop;
@@ -264,8 +264,8 @@ public class CraftingCpuLogic {
                     // Prepare next inputs.
                     expectedOutputs.reset();
                     expectedContainerItems.reset();
-                    taskInventory = pseudoPattern
-                        ? new CpuTaskInventoryView(inventory, job.pseudoInventory)
+                    taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
+                        ? new RealInputTrackingInventoryView(inventory)
                         : inventory;
                     craftingContainer = CraftingCpuHelper.extractPatternInputs(details, taskInventory, level,
                         expectedOutputs, expectedContainerItems);
@@ -284,7 +284,7 @@ public class CraftingCpuLogic {
     private void recordPushedPattern(ExecutingCraftingJob job, IPatternDetails details,
                                      ICraftingInventory taskInventory, KeyCounter expectedOutputs,
                                      KeyCounter expectedContainerItems) {
-        if (PseudoPatternDetails.isPseudo(details)) {
+        if (isFinalOutputPseudoPattern(job, details)) {
             recordPushedPseudoPattern(job, details, taskInventory, expectedOutputs, expectedContainerItems);
         } else {
             recordPushedNormalPattern(job, expectedOutputs, expectedContainerItems);
@@ -307,11 +307,20 @@ public class CraftingCpuLogic {
                                            ICraftingInventory taskInventory, KeyCounter expectedOutputs,
                                            KeyCounter expectedContainerItems) {
         var temporaryPattern = job.isTemporaryPattern(details);
-        if (temporaryPattern && taskInventory instanceof CpuTaskInventoryView taskInventoryView) {
+        if (temporaryPattern && taskInventory instanceof RealInputTrackingInventory taskInventoryView) {
             returnTemporaryPatternInputs(taskInventoryView);
         }
         for (var expectedOutput : expectedOutputs) {
-            job.pseudoInventory.insert(expectedOutput.getKey(), expectedOutput.getLongValue(), Actionable.MODULATE);
+            long waitingAmount = Math.min(expectedOutput.getLongValue(),
+                getRemainingNormalInputDemand(job, expectedOutput.getKey()));
+            if (waitingAmount > 0) {
+                job.waitingFor.insert(expectedOutput.getKey(), waitingAmount, Actionable.MODULATE);
+                job.timeTracker.addMaxItems(waitingAmount, expectedOutput.getKey().getType());
+            }
+            long pseudoAmount = expectedOutput.getLongValue() - waitingAmount;
+            if (pseudoAmount > 0) {
+                job.pseudoInventory.insert(expectedOutput.getKey(), pseudoAmount, Actionable.MODULATE);
+            }
         }
         if (!temporaryPattern) {
             for (var expectedContainerItem : expectedContainerItems) {
@@ -319,6 +328,39 @@ public class CraftingCpuLogic {
                     Actionable.MODULATE);
             }
         }
+    }
+
+    private static boolean isFinalOutputPseudoPattern(ExecutingCraftingJob job, IPatternDetails details) {
+        if (!PseudoPatternDetails.isPseudo(details)) {
+            return false;
+        }
+        if (!(PseudoPatternDetails.unwrap(details) instanceof AEProcessingPattern)) {
+            return false;
+        }
+        for (var output : details.getOutputs()) {
+            if (output.what().matches(job.finalOutput)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static long getRemainingNormalInputDemand(ExecutingCraftingJob job, AEKey what) {
+        long demand = 0;
+        for (var task : job.tasks.entrySet()) {
+            if (task.getValue().value <= 0 || PseudoPatternDetails.isPseudo(task.getKey())) {
+                continue;
+            }
+            for (var input : task.getKey().getInputs()) {
+                for (var possibleInput : input.possibleInputs()) {
+                    if (what.matches(possibleInput)) {
+                        demand += possibleInput.amount() * input.getMultiplier() * task.getValue().value;
+                        break;
+                    }
+                }
+            }
+        }
+        return demand;
     }
 
     /**
@@ -694,7 +736,7 @@ public class CraftingCpuLogic {
         }
     }
 
-    private void returnTemporaryPatternInputs(CpuTaskInventoryView taskInventory) {
+    private void returnTemporaryPatternInputs(RealInputTrackingInventory taskInventory) {
         var grid = cluster.getGrid();
         if (grid == null) {
             taskInventory.reinjectRealInputs(inventory);
@@ -702,7 +744,7 @@ public class CraftingCpuLogic {
         }
 
         var storage = grid.getStorageService().getInventory();
-        for (var entry : taskInventory.realExtracted) {
+        for (var entry : taskInventory.realExtracted()) {
             var inserted = storage.insert(entry.getKey(), entry.getLongValue(), Actionable.MODULATE, cluster.getSrc());
             if (inserted < entry.getLongValue()) {
                 inventory.insert(entry.getKey(), entry.getLongValue() - inserted, Actionable.MODULATE);
@@ -710,32 +752,27 @@ public class CraftingCpuLogic {
         }
     }
 
-    private static final class CpuTaskInventoryView implements appeng.crafting.inv.ICraftingInventory {
-        private final ListCraftingInventory realInventory;
-        private final ListCraftingInventory pseudoInventory;
-        private final KeyCounter realExtracted = new KeyCounter();
-        private final KeyCounter pseudoExtracted = new KeyCounter();
+    private interface RealInputTrackingInventory extends ICraftingInventory {
+        KeyCounter realExtracted();
 
-        private CpuTaskInventoryView(ListCraftingInventory realInventory, ListCraftingInventory pseudoInventory) {
+        void reinjectRealInputs(ListCraftingInventory inventory);
+    }
+
+    private static final class RealInputTrackingInventoryView implements RealInputTrackingInventory {
+        private final ListCraftingInventory realInventory;
+        private final KeyCounter realExtracted = new KeyCounter();
+
+        private RealInputTrackingInventoryView(ListCraftingInventory realInventory) {
             this.realInventory = realInventory;
-            this.pseudoInventory = pseudoInventory;
         }
 
         @Override
         public void insert(AEKey what, long amount, Actionable mode) {
-            long toPseudo = Math.min(amount, pseudoExtracted.get(what));
-            if (toPseudo > 0) {
-                pseudoExtracted.remove(what, toPseudo);
-                pseudoInventory.insert(what, toPseudo, mode);
-                amount -= toPseudo;
-            }
-            if (amount > 0) {
-                long toReal = Math.min(amount, realExtracted.get(what));
-                if (toReal > 0) {
-                    realExtracted.remove(what, toReal);
-                    realInventory.insert(what, toReal, mode);
-                    amount -= toReal;
-                }
+            long tracked = Math.min(amount, realExtracted.get(what));
+            if (tracked > 0) {
+                realExtracted.remove(what, tracked);
+                realInventory.insert(what, tracked, mode);
+                amount -= tracked;
             }
             if (amount > 0) {
                 realInventory.insert(what, amount, mode);
@@ -748,32 +785,25 @@ public class CraftingCpuLogic {
             if (mode == Actionable.MODULATE && extracted > 0) {
                 realExtracted.add(what, extracted);
             }
-            if (extracted >= amount) {
-                return extracted;
-            }
-            long pseudoExtractedAmount = pseudoInventory.extract(what, amount - extracted, mode);
-            if (mode == Actionable.MODULATE && pseudoExtractedAmount > 0) {
-                pseudoExtracted.add(what, pseudoExtractedAmount);
-            }
-            return extracted + pseudoExtractedAmount;
+            return extracted;
         }
 
         @Override
         public Iterable<AEKey> findFuzzyTemplates(AEKey input) {
-            var realTemplates = realInventory.findFuzzyTemplates(input);
-            var pseudoTemplates = pseudoInventory.findFuzzyTemplates(input);
-            return () -> java.util.stream.Stream.concat(
-                java.util.stream.StreamSupport.stream(realTemplates.spliterator(), false),
-                java.util.stream.StreamSupport.stream(pseudoTemplates.spliterator(), false))
-                .filter(Objects::nonNull)
-                .distinct()
-                .iterator();
+            return realInventory.findFuzzyTemplates(input);
         }
 
-        private void reinjectRealInputs(ListCraftingInventory inventory) {
+        @Override
+        public KeyCounter realExtracted() {
+            return realExtracted;
+        }
+
+        @Override
+        public void reinjectRealInputs(ListCraftingInventory inventory) {
             for (var entry : realExtracted) {
                 inventory.insert(entry.getKey(), entry.getLongValue(), Actionable.MODULATE);
             }
         }
     }
+
 }

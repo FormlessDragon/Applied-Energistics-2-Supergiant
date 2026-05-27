@@ -148,7 +148,13 @@ public class MEInventoryHandler extends DelegatingMEInventory {
 
     @Override
     public boolean isStickyStorageFor(AEKey input, IActionSource source) {
-        return this.sticky && isPreferredStorageFor(input, source);
+        if (!this.sticky || this.partitionListMode != IncludeExclude.WHITELIST) {
+            return false;
+        }
+        if (this.partitionList.isEmpty()) {
+            return super.extract(input, 1, Actionable.SIMULATE, source) > 0;
+        }
+        return this.partitionList.isListed(input);
     }
 
     protected boolean canExtract(AEKey request) {

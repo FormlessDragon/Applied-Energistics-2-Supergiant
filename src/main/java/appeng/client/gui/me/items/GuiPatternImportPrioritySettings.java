@@ -9,10 +9,10 @@ import appeng.client.gui.widgets.ITooltip;
 import appeng.client.gui.widgets.TabButton;
 import appeng.client.patternimport.PatternImportPriorityOrder;
 import appeng.container.me.items.ContainerPatternEncodingTerm;
+import appeng.core.localization.GuiText;
 import appeng.text.TextComponentItemStack;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 
 import java.awt.Rectangle;
 import java.util.ArrayList;
@@ -47,7 +47,7 @@ public class GuiPatternImportPrioritySettings extends AEBaseGui<ContainerPattern
             this.priorityButtons.add(button);
         }
 
-        setTextContent(TEXT_ID_DIALOG_TITLE, new TextComponentTranslation("gui.ae2.PatternImportPrioritiesTitle"));
+        setTextContent(TEXT_ID_DIALOG_TITLE, GuiText.PatternImportPrioritiesTitle.text());
         updateButtons();
     }
 

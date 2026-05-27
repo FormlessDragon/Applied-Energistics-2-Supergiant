@@ -1,8 +1,8 @@
 package appeng.items.misc;
 
 import appeng.client.render.model.MeteoriteCompassBakedModel;
+import appeng.core.localization.GuiText;
 import appeng.items.AEBaseItem;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -52,12 +52,12 @@ public class MeteoriteCompassItem extends AEBaseItem {
         super.addCheckedInformation(stack, world, lines, advancedTooltips);
 
         if (hasBeacon(stack)) {
-            lines.add(TextFormatting.DARK_GRAY + I18n.format("item.ae2.meteorite_compass_beacon"));
+            lines.add(TextFormatting.DARK_GRAY + GuiText.MeteoriteCompassBeacon.getLocal());
             lines.add(TextFormatting.DARK_GRAY.toString() + TextFormatting.ITALIC
-                + I18n.format("item.ae2.meteorite_compass_beacon_hint"));
+                + GuiText.MeteoriteCompassBeaconHint.getLocal());
         } else {
             lines.add(TextFormatting.DARK_GRAY.toString() + TextFormatting.ITALIC
-                + I18n.format("item.ae2.meteorite_compass_beacon_upgrade_hint"));
+                + GuiText.MeteoriteCompassBeaconUpgradeHint.getLocal());
         }
     }
 

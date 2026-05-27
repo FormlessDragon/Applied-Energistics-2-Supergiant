@@ -52,6 +52,7 @@ import appeng.core.definitions.AEItems;
 import appeng.core.localization.GuiText;
 import appeng.core.localization.PlayerMessages;
 import appeng.core.settings.TickRates;
+import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.helpers.InterfaceLogicHost;
 import appeng.me.helpers.MachineSource;
 import appeng.util.inv.AppEngInternalInventory;
@@ -150,7 +151,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
                                             .registerSetting(Settings.LOCK_CRAFTING_MODE, LockCraftingMode.NONE)
                                             .build();
         this.patternInventory = new AppEngInternalInventory(this, patternInventorySize, 1, new PatternInventoryFilter());
-        this.upgrades = UpgradeInventories.forMachine(machineType, 1, this::saveChanges);
+        this.upgrades = UpgradeInventories.forMachine(machineType, 1, this::onUpgradesChanged);
         this.returnInv = new PatternProviderReturnInventory(() -> {
             this.mainNode.ifPresent((grid, node) -> grid.getTickManager().alertDevice(node));
             this.host.saveChanges();
@@ -195,6 +196,11 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
     public void saveChanges() {
         this.host.saveChanges();
+    }
+
+    private void onUpgradesChanged() {
+        this.host.saveChanges();
+        ICraftingProvider.requestUpdate(this.mainNode);
     }
 
     public void writeToNBT(NBTTagCompound tag) {
@@ -319,7 +325,9 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         if (!this.upgrades.isInstalled(AEItems.PSEUDO_CRAFTING_CARD.item())) {
             return this.patterns;
         }
-        return this.patterns.stream().map(PseudoPatternDetails::wrap).collect(ObjectArrayList.toList());
+        return this.patterns.stream()
+            .map(pattern -> pattern instanceof AEProcessingPattern ? PseudoPatternDetails.wrap(pattern) : pattern)
+            .collect(ObjectArrayList.toList());
     }
 
     @Override

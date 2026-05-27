@@ -23,6 +23,7 @@ import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.crafting.ICraftingService;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
+import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.helpers.patternprovider.PseudoPatternDetails;
 import appeng.crafting.inv.CraftingSimulationState;
 import appeng.crafting.inv.ChildCraftingSimulationState;
@@ -163,7 +164,7 @@ public class CraftingTreeProcess {
         }
 
         for (var out : this.details.getOutputs()) {
-            if (PseudoPatternDetails.isPseudo(this.details)) {
+            if (isFinalOutputPseudoPattern()) {
                 preview.state().insertPseudo(out.what(), out.amount() * times, Actionable.MODULATE);
             } else {
                 preview.state().insert(out.what(), out.amount() * times, Actionable.MODULATE);
@@ -206,7 +207,7 @@ public class CraftingTreeProcess {
 
             // add crafting results.
             for (var out : this.details.getOutputs()) {
-                if (PseudoPatternDetails.isPseudo(this.details)) {
+                if (isFinalOutputPseudoPattern()) {
                     inv.insertPseudo(out.what(), out.amount() * times, Actionable.MODULATE);
                 } else {
                     inv.insert(out.what(), out.amount() * times, Actionable.MODULATE);
@@ -218,6 +219,12 @@ public class CraftingTreeProcess {
         } finally {
             this.job.popProcess();
         }
+    }
+
+    private boolean isFinalOutputPseudoPattern() {
+        return PseudoPatternDetails.isPseudo(this.details)
+            && PseudoPatternDetails.unwrap(this.details) instanceof AEProcessingPattern
+            && getOutputCount(this.job.getOutput()) > 0;
     }
 
     long getNodeCount() {

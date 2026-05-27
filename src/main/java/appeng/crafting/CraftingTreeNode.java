@@ -117,9 +117,6 @@ public class CraftingTreeNode {
             if (gridNode != null) {
                 var craftingService = gridNode.grid().getCraftingService();
                 for (var details : this.job.getCraftingFor(this.what)) {
-                    if (!canUsePseudoProducer(details)) {
-                        continue;
-                    }
                     if (this.parent == null || this.parent.notRecursive(details)) {
                         this.nodes.add(new CraftingTreeProcess(craftingService, job, details, this));
                     }
@@ -135,10 +132,6 @@ public class CraftingTreeNode {
      */
     boolean notRecursive(IPatternDetails details) {
         return true;
-    }
-
-    private boolean canUsePseudoProducer(IPatternDetails details) {
-        return !PseudoPatternDetails.isPseudo(details) || isTopLevelRequestedOutput() || canUsePseudoInputs();
     }
 
     /**
@@ -481,14 +474,10 @@ public class CraftingTreeNode {
 
     private long extractCraftedBranchOutput(CraftingSimulationState inv, long amount) {
         long extracted = inv.extract(this.what, amount, Actionable.MODULATE);
-        if (extracted >= amount || !canUsePseudoBranchOutput()) {
+        if (extracted >= amount) {
             return extracted;
         }
         return extracted + inv.extractPseudo(this.what, amount - extracted, Actionable.MODULATE);
-    }
-
-    private boolean canUsePseudoBranchOutput() {
-        return isTopLevelRequestedOutput() || canUsePseudoInputs();
     }
 
     private long extractPseudoTemplates(CraftingSimulationState inv, InputTemplate template, long multiplier) {

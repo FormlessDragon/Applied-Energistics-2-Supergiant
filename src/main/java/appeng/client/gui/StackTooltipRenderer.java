@@ -124,15 +124,30 @@ public class StackTooltipRenderer {
     }
 
     private static void renderUpgradesRow(RenderItem renderItem, FontRenderer font, int x, int y,
-                                          StorageCellTooltipComponent data) {
+                                           StorageCellTooltipComponent data) {
         var label = getUpgradesLabel();
-        font.drawStringWithShadow(label, x, y + (float) (16 - font.FONT_HEIGHT) / 2, 0x7E7E7E);
+        int labelY = y + (16 - font.FONT_HEIGHT) / 2;
 
         int xOffset = font.getStringWidth(label) + UPGRADES_LABEL_GAP;
         for (ItemStack upgrade : data.upgrades()) {
             renderItem.renderItemAndEffectIntoGUI(upgrade, x + xOffset, y);
             renderItem.renderItemOverlayIntoGUI(font, upgrade, x + xOffset, y, null);
             xOffset += SLOT_STEP;
+        }
+
+        GlStateManager.pushMatrix();
+        try {
+            GlStateManager.translate(0.0F, 0.0F, TOOLTIP_CONTENT_TEXT_Z_LEVEL - TOOLTIP_IMAGE_Z_LEVEL);
+            GlStateManager.disableLighting();
+            GlStateManager.disableDepth();
+            GlStateManager.enableBlend();
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            font.drawString(label, x, labelY, 0x7E7E7E);
+        } finally {
+            GlStateManager.enableDepth();
+            GlStateManager.enableLighting();
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            GlStateManager.popMatrix();
         }
     }
 

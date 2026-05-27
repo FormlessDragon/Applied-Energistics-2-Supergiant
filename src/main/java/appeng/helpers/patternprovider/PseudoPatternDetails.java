@@ -5,6 +5,7 @@ import appeng.api.crafting.PatternDetailsTooltip;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import appeng.crafting.pattern.AEProcessingPattern;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.world.World;
 
@@ -18,7 +19,10 @@ public final class PseudoPatternDetails implements IPatternDetails {
     }
 
     public static IPatternDetails wrap(IPatternDetails details) {
-        return details instanceof PseudoPatternDetails ? details : new PseudoPatternDetails(details);
+        if (!(details instanceof AEProcessingPattern)) {
+            return details;
+        }
+        return new PseudoPatternDetails(details);
     }
 
     public static boolean isPseudo(IPatternDetails details) {

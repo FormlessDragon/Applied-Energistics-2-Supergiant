@@ -247,8 +247,15 @@ public class BasicCellInventory implements StorageCell {
 
     @Override
     public boolean isStickyStorageFor(AEKey what, IActionSource source) {
-        return cellType.getUpgrades(itemStack).isInstalled(AEItems.STICKY_CARD.item())
-            && cellItems.containsKey(what);
+        if (!cellType.getUpgrades(itemStack).isInstalled(AEItems.STICKY_CARD.item())) {
+            return false;
+        }
+
+        var config = cellType.getConfigInventory(itemStack);
+        if (config.isEmpty()) {
+            return cellItems.containsKey(what);
+        }
+        return cellType.isAllowedByCellWorkbench(itemStack, what);
     }
 
     @Override

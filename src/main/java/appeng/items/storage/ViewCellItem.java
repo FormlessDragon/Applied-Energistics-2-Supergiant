@@ -28,6 +28,7 @@ import appeng.api.upgrades.UpgradeInventories;
 import appeng.container.AEBaseContainer;
 import appeng.container.SlotSemantics;
 import appeng.container.slot.AppEngSlot;
+import appeng.core.localization.GuiText;
 import appeng.core.definitions.AEItems;
 import appeng.items.AEBaseItem;
 import appeng.items.contents.CellConfig;
@@ -36,7 +37,6 @@ import appeng.util.prioritylist.FuzzyPriorityList;
 import appeng.util.prioritylist.IPartitionList;
 import appeng.util.prioritylist.MergedPriorityList;
 import appeng.util.prioritylist.PrecisePriorityList;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Slot;
@@ -181,9 +181,9 @@ public class ViewCellItem extends AEBaseItem implements ICellWorkbenchItem {
         super.addCheckedInformation(stack, world, lines, advancedTooltips);
 
         String status = isEnabled(stack)
-            ? TextFormatting.GREEN + I18n.format("gui.ae2.Yes")
-            : TextFormatting.RED + I18n.format("gui.ae2.No");
-        lines.add(TextFormatting.GRAY + I18n.format("item.ae2.view_cell.tooltip.enabled", status));
-        lines.add(TextFormatting.DARK_GRAY + I18n.format("item.ae2.view_cell.tooltip.toggle_hint"));
+            ? TextFormatting.GREEN + GuiText.Yes.getLocal()
+            : TextFormatting.RED + GuiText.No.getLocal();
+        lines.add(TextFormatting.GRAY + GuiText.ViewCellEnabled.getLocal(status));
+        lines.add(TextFormatting.DARK_GRAY + GuiText.ViewCellToggleHint.getLocal());
     }
 }

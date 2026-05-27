@@ -4,6 +4,7 @@ import appeng.client.gui.AEBaseGui;
 import appeng.client.gui.style.Blitter;
 import appeng.container.implementations.ContainerCraftingTree;
 import appeng.core.AELog;
+import appeng.core.localization.GuiText;
 import appeng.core.localization.PlayerMessages;
 import appeng.core.network.InitNetwork;
 import appeng.core.network.serverbound.SwitchCraftingTreePacket;
@@ -11,12 +12,10 @@ import appeng.integration.data.LiteCraftTreeNode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.text.event.ClickEvent;
 
 import javax.imageio.ImageIO;
@@ -50,15 +49,15 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
 
         widgets.add("tree", tree);
         this.screenshot = new CraftingTreeButton(0, 232,
-            new TextComponentTranslation("gui.crafting_tree.screenshot"),
+            GuiText.CraftingTreeScreenshot.text(),
             this::saveScreenshot);
         widgets.add("screenshot", screenshot);
         this.missingOnly = new CraftingTreeButton(60, 160,
-            new TextComponentTranslation("gui.crafting_tree.missing_only"),
+            GuiText.CraftingTreeMissingOnly.text(),
             () -> setMissingOnly(!tree.isMissingOnly()));
         widgets.add("missingOnly", missingOnly);
         this.back = new CraftingTreeButton(100, 232,
-            new TextComponentTranslation("gui.crafting_tree.back"),
+            GuiText.CraftingTreeBack.text(),
             () -> InitNetwork.sendToServer(new SwitchCraftingTreePacket()));
         widgets.add("back", back);
     }
@@ -79,7 +78,7 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
                 .src(0, 0, background.width(), background.height())
                 .dest(offsetX, offsetY, background.width(), background.height())
                 .blit();
-        fontRenderer.drawString(I18n.format("gui.crafting_tree.title"), offsetX + 6, offsetY + 9, 0x404040);
+        fontRenderer.drawString(GuiText.CraftingTreeTitle.getLocal(), offsetX + 6, offsetY + 9, 0x404040);
     }
 
     public void onDataUpdate(LiteCraftTreeNode root) {
@@ -144,9 +143,9 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
     private void setMissingOnly(boolean missingOnly) {
         tree.setMissingOnly(missingOnly);
         boolean active = tree.isMissingOnly();
-        this.missingOnly.setTooltip(new TextComponentTranslation(active
-                ? "gui.crafting_tree.default"
-                : "gui.crafting_tree.missing_only"));
+        this.missingOnly.setTooltip(active
+            ? GuiText.CraftingTreeDefault.text()
+            : GuiText.CraftingTreeMissingOnly.text());
         this.missingOnly.setActive(active);
         this.missingOnly.enabled = tree.hasMissingItems();
         this.screenshot.enabled = tree.hasTree();

@@ -8,6 +8,7 @@ import appeng.client.gui.Tooltip;
 import appeng.client.gui.me.common.StackSizeRenderer;
 import appeng.core.AppEng;
 import appeng.core.localization.ButtonToolTips;
+import appeng.core.localization.GuiText;
 import appeng.core.localization.Tooltips;
 import appeng.integration.data.LiteCraftTreeNode;
 import appeng.integration.data.LiteCraftTreeProc;
@@ -24,7 +25,6 @@ import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.RenderHelper;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.MathHelper;
@@ -187,16 +187,16 @@ public class CraftingTreeWidget implements ICompositeWidget {
 
         int x = bounds.x + 2;
         if (selected == null) {
-            font.drawStringWithShadow(I18n.format("gui.crafting_tree.rendered_nodes", renderedNodes, nodes),
+            font.drawStringWithShadow(GuiText.CraftingTreeRenderedNodes.getLocal(renderedNodes, nodes),
                     x, bounds.y + bounds.height - 18, 0x80FFFFFF);
-            font.drawStringWithShadow(I18n.format("gui.crafting_tree.tip.0"),
+            font.drawStringWithShadow(GuiText.CraftingTreeTip0.getLocal(),
                     x, bounds.y + bounds.height - 9, 0x80FFFFFF);
         } else {
-            font.drawStringWithShadow(I18n.format("gui.crafting_tree.rendered_nodes", renderedNodes, nodes),
+            font.drawStringWithShadow(GuiText.CraftingTreeRenderedNodes.getLocal(renderedNodes, nodes),
                     x, bounds.y + bounds.height - 27, 0x80FFFFFF);
-            font.drawStringWithShadow(I18n.format("gui.crafting_tree.tip.1"),
+            font.drawStringWithShadow(GuiText.CraftingTreeTip1.getLocal(),
                     x, bounds.y + bounds.height - 18, 0x80FFFFFF);
-            font.drawStringWithShadow(I18n.format("gui.crafting_tree.tip.2"),
+            font.drawStringWithShadow(GuiText.CraftingTreeTip2.getLocal(),
                     x, bounds.y + bounds.height - 9, 0x80FFFFFF);
         }
     }
@@ -836,8 +836,8 @@ public class CraftingTreeWidget implements ICompositeWidget {
             lines.add(Tooltips.getAmountTooltip(ButtonToolTips.Amount, output));
             if (LiteCraftTreeNode.isMissing(node)) {
                 lines.add(new TextComponentString(node.missing() > 0
-                        ? I18n.format("gui.crafting_tree.missing", CraftingTreeNumberFormat.formatDecimal(node.missing()))
-                        : I18n.format("gui.crafting_tree.sub_node_missing")));
+                        ? GuiText.CraftingTreeMissing.getLocal(CraftingTreeNumberFormat.formatDecimal(node.missing()))
+                        : GuiText.CraftingTreeSubNodeMissing.getLocal()));
             }
             if (output.amount() >= 10000) {
                 lines.add(new TextComponentString(CraftingTreeNumberFormat.formatDecimal(output.amount())));
