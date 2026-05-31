@@ -1,17 +1,17 @@
 {
   "recipes": {
-    "add_item_upgrade": "appeng.recipes.serializers.AddItemUpgradeRecipeFactory",
-    "remove_item_upgrade": "appeng.recipes.serializers.RemoveItemUpgradeRecipeFactory",
-    "wireless_universal_terminal": "appeng.recipes.serializers.WirelessUniversalTerminalRecipeFactory",
-    "storage_cell_upgrade": "appeng.recipes.serializers.StorageCellUpgradeRecipeFactory",
-    "quartz_cutting": "appeng.recipes.serializers.QuartzCuttingRecipeFactory",
-    "charger": "appeng.recipes.serializers.ChargerRecipeFactory",
-    "inscriber": "appeng.recipes.serializers.InscriberRecipeFactory",
-    "crystal_assembler": "appeng.recipes.serializers.CrystalAssemblerRecipeFactory",
-    "matter_cannon": "appeng.recipes.serializers.MatterCannonAmmoRecipeFactory",
-    "storage_cell_disassembly": "appeng.recipes.serializers.StorageCellDisassemblyRecipeFactory",
-    "transform": "appeng.recipes.serializers.TransformRecipeFactory",
-    "crafting_unit_transform": "appeng.recipes.serializers.CraftingUnitTransformRecipeFactory",
-    "entropy": "appeng.recipes.serializers.EntropyRecipeFactory"
+    "add_item_upgrade": "ae2.recipes.serializers.AddItemUpgradeRecipeFactory",
+    "remove_item_upgrade": "ae2.recipes.serializers.RemoveItemUpgradeRecipeFactory",
+    "wireless_universal_terminal": "ae2.recipes.serializers.WirelessUniversalTerminalRecipeFactory",
+    "storage_cell_upgrade": "ae2.recipes.serializers.StorageCellUpgradeRecipeFactory",
+    "quartz_cutting": "ae2.recipes.serializers.QuartzCuttingRecipeFactory",
+    "charger": "ae2.recipes.serializers.ChargerRecipeFactory",
+    "inscriber": "ae2.recipes.serializers.InscriberRecipeFactory",
+    "crystal_assembler": "ae2.recipes.serializers.CrystalAssemblerRecipeFactory",
+    "matter_cannon": "ae2.recipes.serializers.MatterCannonAmmoRecipeFactory",
+    "storage_cell_disassembly": "ae2.recipes.serializers.StorageCellDisassemblyRecipeFactory",
+    "transform": "ae2.recipes.serializers.TransformRecipeFactory",
+    "crafting_unit_transform": "ae2.recipes.serializers.CraftingUnitTransformRecipeFactory",
+    "entropy": "ae2.recipes.serializers.EntropyRecipeFactory"
   }
 }

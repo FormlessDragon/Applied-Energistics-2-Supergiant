@@ -1,0 +1,49 @@
+/*
+ * This file is part of Applied Energistics 2.
+ * Copyright (c) 2021, TeamAppliedEnergistics, All rights reserved.
+ *
+ * Applied Energistics 2 is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Applied Energistics 2 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with Applied Energistics 2.  If not, see <http://www.gnu.org/licenses/lgpl>.
+ */
+
+package ae2.parts.networking;
+
+import ae2.api.networking.IGridNode;
+import ae2.api.networking.pathing.ChannelMode;
+import ae2.api.parts.IPart;
+import ae2.me.GridNode;
+
+public interface IUsedChannelProvider extends IPart {
+
+    default int getUsedChannelsInfo() {
+        int howMany = 0;
+        IGridNode node = this.getGridNode();
+        if (node != null && node.isActive()) {
+            for (var gc : node.getConnections()) {
+                howMany = Math.max(gc.getUsedChannels(), howMany);
+            }
+        }
+        return howMany;
+    }
+
+    default int getMaxChannelsInfo() {
+        var node = this.getGridNode();
+        if (node instanceof GridNode gridNode) {
+            if (gridNode.grid().getPathingService().getChannelMode() == ChannelMode.INFINITE) {
+                return -1;
+            }
+            return gridNode.getMaxChannels();
+        }
+        return 0;
+    }
+}

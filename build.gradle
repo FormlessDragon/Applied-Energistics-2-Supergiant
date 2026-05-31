@@ -11,6 +11,32 @@ plugins {
 
 apply from: 'gradle/scripts/helpers.gradle'
 
+private String gitOutput(List<String> args, String fallback) {
+    try {
+        def process = new ProcessBuilder(['git'] + args)
+            .directory(rootProject.projectDir)
+            .redirectErrorStream(true)
+            .start()
+        def stdout = process.inputStream.getText('UTF-8').trim()
+        if (process.waitFor() == 0 && !stdout.isEmpty()) {
+            return stdout
+        }
+    } catch (Exception ignored) {
+        // Fall through to the fallback for source archives or environments without git.
+    }
+    return fallback
+}
+
+private String defaultModVersion() {
+    def previousTag = gitOutput(['describe', '--tags', '--abbrev=0', '--exclude=dev'], '0.0.0')
+    def shortHash = gitOutput(['rev-parse', '--short', 'HEAD'], 'unknown')
+    return "${previousTag}+${shortHash}"
+}
+
+if (!gradle.startParameter.projectProperties.containsKey('mod_version')) {
+    project.setProperty('mod_version', defaultModVersion())
+}
+
 // Early Assertions
 assertProperty 'mod_version'
 assertProperty 'root_package'

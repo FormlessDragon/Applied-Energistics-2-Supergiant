@@ -12,6 +12,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
@@ -24,10 +26,12 @@ jobs:
       - name: Add permission
         run: chmod +x ./gradlew
       - name: Execute Gradle build
-        run: ./gradlew build -x spotlessCheck
+        run: ./gradlew build -x spotlessCheck -Pmod_version="${{ github.ref_name }}"
 
       - uses: ncipollo/release-action@v1.20.0
         with:
+          tag: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           artifacts: "build/libs/*"
           generateReleaseNotes: true
 

@@ -1,0 +1,124 @@
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2021 TeamAppliedEnergistics
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+package ae2.api.storage;
+
+import ae2.api.storage.cells.IBasicCellItem;
+import ae2.api.storage.cells.ICellHandler;
+import ae2.api.storage.cells.ISaveProvider;
+import ae2.api.storage.cells.StorageCell;
+import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import net.minecraft.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Objects;
+
+/**
+ * Storage Cell Registry, used for specially implemented cells. If you just want to make an item act like a cell, or a
+ * new
+ * cell with different bytes, you should probably consider implementing {@link IBasicCellItem} on your item instead.
+ */
+public final class StorageCells {
+
+    private static final ObjectList<ICellHandler> handlers = new ObjectArrayList<>();
+
+    private StorageCells() {
+    }
+
+    /**
+     * Register a new handler.
+     * <p>
+     * Must not be called before AE2 has completed its initialization. Will throw an exception otherwise.
+     *
+     * @param handler cell handler
+     */
+    public static synchronized void addCellHandler(ICellHandler handler) {
+        Objects.requireNonNull(handler, "Called before AE2 initialization completed.");
+        Preconditions.checkArgument(!handlers.contains(handler),
+            "Tried to register the same handler instance twice.");
+
+        handlers.add(handler);
+    }
+
+    /**
+     * return true, if you can get a InventoryHandler for the item passed.
+     *
+     * @param is to be checked item
+     * @return true if the provided item can be handled by a handler in AE. AE may choose to skip this and just get the
+     * handler instead.
+     */
+    public static synchronized boolean isCellHandled(ItemStack is) {
+        if (is.isEmpty()) {
+            return false;
+        }
+        for (ICellHandler ch : handlers) {
+            if (ch.isCell(is)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * get the handler, for the requested item.
+     *
+     * @param is to be checked item
+     * @return the handler registered for this item type.
+     */
+    @Nullable
+    public static synchronized ICellHandler getHandler(ItemStack is) {
+        if (is.isEmpty()) {
+            return null;
+        }
+        for (ICellHandler ch : handlers) {
+            if (ch.isCell(is)) {
+                return ch;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns the inventory for the provided storage cell item by querying all registered handlers.
+     *
+     * @param is   item with inventory handler
+     * @param host can be null. If provided, the host is responsible for persisting the cell content.
+     * @return The cell inventory, or null if there isn't one.
+     */
+    @Nullable
+    public static synchronized StorageCell getCellInventory(ItemStack is, @Nullable ISaveProvider host) {
+        if (is.isEmpty()) {
+            return null;
+        }
+        for (var ch : handlers) {
+            var inventory = ch.getCellInventory(is, host);
+            if (inventory != null) {
+                return inventory;
+            }
+        }
+        return null;
+    }
+
+}

@@ -13,6 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
     - name: Set up JDK
       uses: actions/setup-java@v5
       with:
@@ -24,8 +26,14 @@ jobs:
       name: Set up Gradle
     - name: Add permission
       run: chmod +x ./gradlew
+    - name: Set build version
+      run: |
+        previous_tag="$(git describe --tags --abbrev=0 --exclude=dev 2>/dev/null || echo 0.0.0)"
+        short_hash="$(git rev-parse --short HEAD)"
+        echo "MOD_VERSION=${previous_tag}+${short_hash}" >> "$GITHUB_ENV"
+        echo "Build version: ${previous_tag}+${short_hash}"
     - name: Execute Gradle build
-      run: ./gradlew build -x spotlessCheck
+      run: ./gradlew build -x spotlessCheck -Pmod_version="${MOD_VERSION}"
         
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v7

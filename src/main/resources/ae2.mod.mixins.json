@@ -1,8 +1,8 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "package": "appeng.mixins",
-  "plugin": "appeng.core.mixins.AE2MixinPlugin",
+  "package": "ae2.mixins",
+  "plugin": "ae2.core.mixins.AE2MixinPlugin",
   "compatibilityLevel": "JAVA_25",
   "target": "@env(MOD)",
   "refmap": "ae2.refmap.json",

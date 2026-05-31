@@ -1,0 +1,68 @@
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2013 AlgorithmX2
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+package ae2.api.parts;
+
+import net.minecraft.util.EnumFacing;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * Reports a selected part from the IPartHost
+ *
+ */
+public class SelectedPart {
+
+    /**
+     * selected part.
+     */
+    public final IPart part;
+
+    /**
+     * facade part.
+     */
+    public final IFacadePart facade;
+
+    /**
+     * side the part is mounted too, or null for cables.
+     */
+    @Nullable
+    public final EnumFacing side;
+
+    public SelectedPart() {
+        this.part = null;
+        this.facade = null;
+        this.side = null;
+    }
+
+    public SelectedPart(IPart part, @org.jspecify.annotations.Nullable EnumFacing side) {
+        this.part = part;
+        this.facade = null;
+        this.side = side;
+    }
+
+    public SelectedPart(IFacadePart facade, @org.jspecify.annotations.Nullable EnumFacing side) {
+        this.part = null;
+        this.facade = facade;
+        this.side = side;
+    }
+}

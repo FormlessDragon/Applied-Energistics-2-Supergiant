@@ -1,0 +1,79 @@
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2021 TeamAppliedEnergistics
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+package ae2.api.crafting;
+
+import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.AEKey;
+import ae2.api.stacks.GenericStack;
+import ae2.api.stacks.KeyCounter;
+import net.minecraft.client.util.ITooltipFlag;
+import net.minecraft.world.World;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+
+public interface IPatternDetails {
+    AEItemKey getDefinition();
+
+    IInput[] getInputs();
+
+    default GenericStack getPrimaryOutput() {
+        return getOutputs().getFirst();
+    }
+
+    List<GenericStack> getOutputs();
+
+    default boolean supportsPushInputsToExternalInventory() {
+        return true;
+    }
+
+    default void pushInputsToExternalInventory(KeyCounter[] inputHolder, PatternInputSink inputSink) {
+        for (var inputList : inputHolder) {
+            for (var input : inputList) {
+                inputSink.pushInput(input.getKey(), input.getLongValue());
+            }
+        }
+    }
+
+    default PatternDetailsTooltip getTooltip(World level, ITooltipFlag flags) {
+        var tooltip = new PatternDetailsTooltip(PatternDetailsTooltip.OUTPUT_TEXT_PRODUCES);
+        tooltip.addInputsAndOutputs(this);
+        return tooltip;
+    }
+
+    interface IInput {
+        GenericStack[] possibleInputs();
+
+        long getMultiplier();
+
+        boolean isValid(AEKey input, World level);
+
+        @Nullable
+        AEKey getRemainingKey(AEKey template);
+    }
+
+    interface PatternInputSink {
+        void pushInput(AEKey key, long amount);
+    }
+}

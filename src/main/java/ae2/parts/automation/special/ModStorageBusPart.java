@@ -1,0 +1,78 @@
+package ae2.parts.automation.special;
+
+import ae2.api.parts.IPartItem;
+import ae2.api.parts.IPartModel;
+import ae2.container.GuiIds.GuiKey;
+import ae2.core.AppEng;
+import ae2.items.parts.PartModels;
+import ae2.parts.PartModel;
+import ae2.parts.storagebus.StorageBusPart;
+import ae2.util.prioritylist.IPartitionList;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.ResourceLocation;
+
+public class ModStorageBusPart extends StorageBusPart implements ModFilterHost {
+    private static final ResourceLocation MODEL_BASE = AppEng.makeId("part/mod_storage_bus_base");
+
+    @PartModels
+    public static final IPartModel MODELS_OFF = new PartModel(MODEL_BASE, StorageBusPartModels.OFF);
+
+    @PartModels
+    public static final IPartModel MODELS_ON = new PartModel(MODEL_BASE, StorageBusPartModels.ON);
+
+    @PartModels
+    public static final IPartModel MODELS_HAS_CHANNEL = new PartModel(MODEL_BASE, StorageBusPartModels.HAS_CHANNEL);
+
+    private String modExpression = "";
+
+    public ModStorageBusPart(IPartItem<?> partItem) {
+        super(partItem);
+    }
+
+    @Override
+    public void readFromNBT(NBTTagCompound data) {
+        super.readFromNBT(data);
+        this.modExpression = data.getString("modid");
+    }
+
+    @Override
+    public void writeToNBT(NBTTagCompound data) {
+        super.writeToNBT(data);
+        data.setString("modid", this.modExpression);
+    }
+
+    @Override
+    protected IPartitionList createFilter() {
+        return new ModPriorityList(this.modExpression);
+    }
+
+    @Override
+    public String getModFilter() {
+        return this.modExpression;
+    }
+
+    @Override
+    public void setModFilter(String expression) {
+        expression = expression == null ? "" : expression;
+        if (!expression.equals(this.modExpression)) {
+            this.modExpression = expression;
+            onConfigurationChanged();
+            getHost().markForSave();
+        }
+    }
+
+    @Override
+    public GuiKey getGuiKey() {
+        return GuiKey.MOD_STORAGE_BUS;
+    }
+
+    @Override
+    public IPartModel getStaticModels() {
+        if (this.isActive() && this.isPowered()) {
+            return MODELS_HAS_CHANNEL;
+        } else if (this.isPowered()) {
+            return MODELS_ON;
+        }
+        return MODELS_OFF;
+    }
+}

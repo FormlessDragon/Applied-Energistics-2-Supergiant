@@ -1,0 +1,22 @@
+package ae2.container.slot;
+
+public enum SlotBackgroundIcon {
+    PRIMARY_OUTPUT,
+    STORAGE_CELL,
+    ORE,
+    STORAGE_COMPONENT,
+    WIRELESS_TERM,
+    TRASH,
+    ENCODED_PATTERN,
+    BLANK_PATTERN,
+    CHARGABLE,
+    WIRELESS_BOOSTER,
+    SINGULARITY,
+    SPATIAL_CELL,
+    SPATIAL_CELL_NO_SHADOW,
+    FUEL,
+    UPGRADE,
+    VIEW_CELL,
+    PLATE,
+    INGOT
+}

@@ -1,0 +1,197 @@
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2013 AlgorithmX2
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+package ae2.api.networking;
+
+import ae2.api.networking.crafting.ICraftingService;
+import ae2.api.networking.pathing.IPathingService;
+import ae2.api.stacks.AEItemKey;
+import ae2.api.util.AEColor;
+import net.minecraft.crash.CrashReportCategory;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.world.WorldServer;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * Gives you a view into a Nodes connections and information.
+ * <p>
+ * updateState, getGrid, destroy are required to implement a proper IGridHost.
+ * <p>
+ * Don't Implement; Acquire from {@link GridHelper} via {@link IManagedGridNode}.
+ */
+public interface IGridNode {
+
+    /**
+     * Tries to get a service that was attached to this grid node when it was created. Used by overlay grids such as the
+     * {@link ICraftingService}.
+     */
+    @Nullable
+    <T extends IGridNodeService> T getService(Class<T> serviceClass);
+
+    /**
+     * Gets the host of the grid node, which does not necessarily have a representation in the game level. In most
+     * cases, this will be the game object that has created the node, for example a {@link TileEntity} or
+     * {@link ae2.api.parts.IPart}, but may also represent something entirely different.
+     */
+
+    Object getOwner();
+
+    /**
+     * Lets you walk the grid stating at the current node using an IGridVisitor. This is generally not needed; please
+     * use it only if required.
+     *
+     * @param visitor visitor
+     */
+    void beginVisit(IGridVisitor visitor);
+
+    /**
+     * Get the grid for the node. This can change at a moment's notice.
+     *
+     * @return The grid this node is a part of.
+     * @throws IllegalStateException If the node is being used after being destroyed or before it's initialized.
+     */
+    IGrid grid();
+
+    /**
+     * @return the level the node is located in
+     */
+
+    WorldServer getLevel();
+
+    /**
+     * @return The externally accessible sides of the host that this grid node has formed a connection through.
+     */
+
+    Set<EnumFacing> getConnectedSides();
+
+    /**
+     * lets you iterate a nodes connections that have been made via the grid host's exposed sides to other adjacent grid
+     * nodes.
+     */
+
+    Map<EnumFacing, IGridConnection> getInWorldConnections();
+
+    /**
+     * lets you iterate all of a nodes connections that have been made either internally within the grid host, or to
+     * other grid hosts, including connections made through the hosts sides and indirectly (QNB, tunnels). Includes
+     * connections from {@link #getInWorldConnections()}.
+     */
+
+    List<IGridConnection> getConnections();
+
+    /**
+     * Reflects the networks status, returns true only if the network is powered, and the network has fully booted, and
+     * this node has the channels it needs (if any).
+     * <p>
+     * This should be used for active behavior such as network I/O. Use {@link #isOnline()} instead for visual state
+     * display so the device does not look disabled while the grid is booting.
+     */
+    default boolean isActive() {
+        return isPowered() && hasGridBooted() && meetsChannelRequirements();
+    }
+
+    /**
+     * Return true only if the network is powered and the node has the channels it needs (if any).
+     * <p>
+     * This ignores whether the network is booting, so it should be used for "enabled" visuals or other "passive"
+     * behavior. Do not perform active actions (such as network I/O) without checking that booting is finished, because
+     * the channels might still be outdated.
+     */
+    default boolean isOnline() {
+        return isPowered() && meetsChannelRequirements();
+    }
+
+    /**
+     * @return True if the grid is connected to a network, and that network has fully booted.
+     * @see IPathingService#isNetworkBooting()
+     */
+    boolean hasGridBooted();
+
+    /**
+     * @return True if the node has power from it's connected grid. Can be used to show a machine being powered, even if
+     * the machine doesn't have it's required channel or the network is still booting.
+     * @see #isActive()
+     */
+    boolean isPowered();
+
+    /**
+     * @return if the node's channel requirements are currently met, use this for display purposes, use isActive for
+     * status.
+     */
+    boolean meetsChannelRequirements();
+
+    /**
+     * See if this node has a certain flag.
+     *
+     * @param flag flags
+     * @return true if the flag is set
+     */
+    boolean hasFlag(GridFlags flag);
+
+    /**
+     * @return the ownerID this represents the person who placed the node.
+     * @see ae2.api.features.IPlayerRegistry
+     */
+    int getOwningPlayerId();
+
+    /**
+     * @return the UUID of the owners game profile. null if not known.
+     * @see ae2.api.features.IPlayerRegistry
+     */
+    @Nullable
+    UUID getOwningPlayerProfileId();
+
+    /**
+     * @return The power in AE/t that will be drained by this node. Non-negative.
+     */
+    double getIdlePowerUsage();
+
+    /**
+     * @return An item that will only be used to represent this grid node in user interfaces. Can return an
+     * <code>null</code> to indicate the node should not be shown in the UI.
+     */
+    @Nullable
+    AEItemKey getVisualRepresentation();
+
+    /**
+     * Colors can be used to prevent adjacent grid nodes from connecting. {@link AEColor#TRANSPARENT} indicates that the
+     * node will connect to nodes of any color.
+     */
+
+    AEColor getGridColor();
+
+    /**
+     * Fills in details about this node in the given crash report category.
+     */
+    void fillCrashReportCategory(CrashReportCategory category);
+
+    int getMaxChannels();
+
+    int getUsedChannels();
+}

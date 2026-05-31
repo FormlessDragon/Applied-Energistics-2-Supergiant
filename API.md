@@ -5,11 +5,11 @@ title: Addon and Mod API
 
 ## Source Layout
 
-This branch exposes AE2's public API from `src/main/java/appeng/api`.
+This branch exposes AE2's public API from `src/main/java/ae2/api`.
 
 The `src/api/java` source set contains compatibility stubs for optional external mods. It is compiled as the
 `stubApi` source set, is placed on the main source set's compile classpath, and is then removed from the final AE2 jar.
-Use `src/main/java/appeng/api` as the public AE2 API surface.
+Use `src/main/java/ae2/api` as the public AE2 API surface.
 
 ## Mod Initialization
 
@@ -18,17 +18,17 @@ relevant during normal Forge mod initialization:
 
 | Class                                          | Purpose                                                                                             |
 |------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| `appeng.api.stacks.AEKeyTypes`                 | Addons can register custom storage types similar to `AEItemKey` and `AEFluidKey`.                   |
-| `appeng.api.networking.GridServices`           | Addons can register their own grid-wide services here.                                              |
-| `appeng.api.movable.BlockEntityMoveStrategies` | Allows mods to register custom strategies for moving tile entities in and out of spatial storage.   |
-| `appeng.api.features.GridLinkables`            | For working with and adding items that can be linked to a grid in the security station.             |
-| `appeng.api.storage.StorageCells`              | For working with and adding items that serve as storage cells for grids.                            |
-| `appeng.api.features.Locatables`               | For discovering quantum network bridges and other locatable objects based on their unique keys.     |
-| `appeng.api.parts.PartModels`                  | For registering JSON block models used by custom cable bus parts.                                   |
-| `appeng.api.features.P2PTunnelAttunement`      | For registering new items that attune P2P tunnels to specific types when right-clicked.             |
-| `appeng.api.client.StorageCellModels`          | For customizing the models of storage cells when they are inserted into drives or ME chests.        |
-| `appeng.api.upgrades.Upgrades`                 | For managing upgrade cards and associating them with upgradable items, parts, or blocks.            |
-| `appeng.api.upgrades.UpgradeInventories`       | For creating upgrade inventories for upgradable machines and item-backed hosts.                     |
+| `ae2.api.stacks.AEKeyTypes`                 | Addons can register custom storage types similar to `AEItemKey` and `AEFluidKey`.                   |
+| `ae2.api.networking.GridServices`           | Addons can register their own grid-wide services here.                                              |
+| `ae2.api.movable.BlockEntityMoveStrategies` | Allows mods to register custom strategies for moving tile entities in and out of spatial storage.   |
+| `ae2.api.features.GridLinkables`            | For working with and adding items that can be linked to a grid in the security station.             |
+| `ae2.api.storage.StorageCells`              | For working with and adding items that serve as storage cells for grids.                            |
+| `ae2.api.features.Locatables`               | For discovering quantum network bridges and other locatable objects based on their unique keys.     |
+| `ae2.api.parts.PartModels`                  | For registering JSON block models used by custom cable bus parts.                                   |
+| `ae2.api.features.P2PTunnelAttunement`      | For registering new items that attune P2P tunnels to specific types when right-clicked.             |
+| `ae2.api.client.StorageCellModels`          | For customizing the models of storage cells when they are inserted into drives or ME chests.        |
+| `ae2.api.upgrades.Upgrades`                 | For managing upgrade cards and associating them with upgradable items, parts, or blocks.            |
+| `ae2.api.upgrades.UpgradeInventories`       | For creating upgrade inventories for upgradable machines and item-backed hosts.                     |
 
 In general, these registries are synchronized and may be used during mod loading. Finish registration before gameplay
 starts using the affected systems. Changes after mod initialization can leave already-created grids, storage cells,
@@ -215,7 +215,7 @@ slow down, sleep, or keep the current rate.
 
 #### Storage
 
-**Service Interface:** `appeng.api.networking.storage.IStorageService`  
+**Service Interface:** `ae2.api.networking.storage.IStorageService`  
 **Convenience Getter:** `IGrid.getStorageService()`
 
 Storage in grids is organized as mounted `MEStorage` inventories. The storage service exposes the unified grid
@@ -274,7 +274,7 @@ when those items later arrive through normal crafting or external insertion.
 
 The older `submitJob(...)` signature remains conservative and behaves as `forceStart = false`.
 
-Automation can opt in by implementing `appeng.api.networking.crafting.ICraftingForceStartRequester`, which is a direct
+Automation can opt in by implementing `ae2.api.networking.crafting.ICraftingForceStartRequester`, which is a direct
 extension of `ICraftingRequester`:
 
 ```java
@@ -289,8 +289,8 @@ public interface ICraftingForceStartRequester extends ICraftingRequester {
 
 Current built-in automated requesters that implement this contract:
 
-* `appeng.helpers.InterfaceLogic`
-* `appeng.parts.automation.ExportBusPart`
+* `ae2.helpers.InterfaceLogic`
+* `ae2.parts.automation.ExportBusPart`
 
 Both use the installed AE2 crafting card upgrade to decide whether forced start is allowed. The requester only opts in
 when it has a crafting card with its force-start mode enabled. This keeps normal automation conservative while still
@@ -316,9 +316,9 @@ required power.
 
 Relevant APIs:
 
-* `appeng.api.upgrades.Upgrades` for managing upgrade cards and associating them with machines
-* `appeng.api.upgrades.UpgradeInventories` for creating upgrade inventories for use in upgradable machines or items
-* `appeng.api.upgrades.IUpgradeInventory` for querying and iterating installed upgrades
+* `ae2.api.upgrades.Upgrades` for managing upgrade cards and associating them with machines
+* `ae2.api.upgrades.UpgradeInventories` for creating upgrade inventories for use in upgradable machines or items
+* `ae2.api.upgrades.IUpgradeInventory` for querying and iterating installed upgrades
 
 ### Custom Upgrade Cards
 
@@ -360,11 +360,11 @@ fields, invalid upgrade slot counts, and registrations after the event fail with
 
 | Class                                                             | Purpose                                                                 |
 |-------------------------------------------------------------------|-------------------------------------------------------------------------|
-| `appeng.api.implementations.items.AddWirelessTerminalEvent`       | Registers terminal definitions during AE2 initialization.                |
-| `appeng.api.implementations.items.WirelessTerminalDefinition`     | Read-only terminal definition used by hotkeys, universal terminals, and GUIs. |
-| `appeng.api.implementations.items.WirelessTerminalDefinitionBuilder` | Builder for registering a wireless terminal definition.                  |
-| `appeng.api.implementations.items.WirelessTerminalApi`            | Lookup helpers and universal terminal helpers.                           |
-| `appeng.api.implementations.items.WirelessTerminalUpgradeHelper`  | Registers upgrade cards against all registered wireless terminals.       |
+| `ae2.api.implementations.items.AddWirelessTerminalEvent`       | Registers terminal definitions during AE2 initialization.                |
+| `ae2.api.implementations.items.WirelessTerminalDefinition`     | Read-only terminal definition used by hotkeys, universal terminals, and GUIs. |
+| `ae2.api.implementations.items.WirelessTerminalDefinitionBuilder` | Builder for registering a wireless terminal definition.                  |
+| `ae2.api.implementations.items.WirelessTerminalApi`            | Lookup helpers and universal terminal helpers.                           |
+| `ae2.api.implementations.items.WirelessTerminalUpgradeHelper`  | Registers upgrade cards against all registered wireless terminals.       |
 
 Definitions contain a unique id, the terminal item, an icon factory, a GUI opener, a host factory, a hotkey name, and
 the number of upgrade slots supported by that terminal. Terminal items should extend `WirelessTerminalItem`.
@@ -407,7 +407,7 @@ count for registered terminals.
 The pattern access terminal can quick-move crafting patterns into compatible pattern providers.
 
 For crafting patterns, compatibility is declared through
-`appeng.api.implementations.items.ICraftingPatternQuickMoveHost`.
+`ae2.api.implementations.items.ICraftingPatternQuickMoveHost`.
 
 Implement this marker interface on either:
 
@@ -482,7 +482,7 @@ screen closes.
 
 Custom storage cells are based on the unified key-storage model. Addon cells should expose `MEStorage` through the
 appropriate cell or capability APIs and should use key filters to restrict accepted key types when needed. Item and
-fluid storage math can still differ, so prefer the public cell APIs in `appeng.api.storage.cells` over depending on
+fluid storage math can still differ, so prefer the public cell APIs in `ae2.api.storage.cells` over depending on
 AE2 implementation classes.
 
 ## Crank
