@@ -16,8 +16,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class PatternModifierLogic {
-    private static final long MAX_PATTERN_AMOUNT = 999_999L;
-
     private PatternModifierLogic() {
     }
 
@@ -126,8 +124,7 @@ public final class PatternModifierLogic {
                     return false;
                 }
             } else {
-                long max = MAX_PATTERN_AMOUNT * stack.what().getAmountPerUnit();
-                if (stack.amount() > max / factor) {
+                if (stack.amount() > PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT / factor) {
                     return false;
                 }
             }

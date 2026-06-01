@@ -84,7 +84,7 @@ public class StackTooltipRenderer {
 
     private static int findReservedLineStart(List<String> tooltipLines) {
         for (int i = 0; i < tooltipLines.size(); i++) {
-            if (tooltipLines.get(i).startsWith(RESERVED_LINE_PREFIX)) {
+            if (isReservedTooltipLine(tooltipLines.get(i))) {
                 return i;
             }
         }
@@ -92,7 +92,7 @@ public class StackTooltipRenderer {
     }
 
     public static boolean isReservedTooltipLine(String line) {
-        return line != null && line.startsWith(RESERVED_LINE_PREFIX);
+        return line != null && line.contains(RESERVED_LINE_PREFIX);
     }
 
     private static void renderContentRow(Minecraft minecraft, FontRenderer font, int x, int y,

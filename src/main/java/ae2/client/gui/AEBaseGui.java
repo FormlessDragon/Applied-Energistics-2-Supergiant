@@ -21,6 +21,8 @@ package ae2.client.gui;
 import ae2.api.behaviors.ContainerItemStrategies;
 import ae2.api.behaviors.EmptyingAction;
 import ae2.api.client.AEKeyRendering;
+import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.cells.IStackTooltipDataProvider;
@@ -411,7 +413,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
         GenericStack genericStack = GenericStack.unwrapItemStack(displayStack);
         if (genericStack != null) {
-            drawTooltip(mouseX, mouseY, AEKeyRendering.getTooltip(genericStack.what()));
+            drawKeyTooltipWithImages(mouseX, mouseY, genericStack.what(), AEKeyRendering.getTooltip(genericStack.what()));
             return true;
         }
 
@@ -452,7 +454,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
         GenericStack genericStack = hei.ingredientToStack(ingredient);
         if (genericStack != null) {
-            drawTooltip(mouseX, mouseY, AEKeyRendering.getTooltip(genericStack.what()));
+            drawKeyTooltipWithImages(mouseX, mouseY, genericStack.what(), AEKeyRendering.getTooltip(genericStack.what()));
             return true;
         }
 
@@ -466,13 +468,24 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return false;
         }
 
-        List<String> anchorTooltipLines = getItemToolTip(hoveredStack);
-        List<String> visibleTooltipLines = new ObjectArrayList<>(anchorTooltipLines);
-        visibleTooltipLines.removeIf(StackTooltipRenderer::isReservedTooltipLine);
-
-        drawHoveringTextAtTopZ(visibleTooltipLines, mouseX, mouseY);
-        renderStorageCellTooltipImage(mouseX, mouseY, hoveredStack, anchorTooltipLines);
+        drawItemTooltipWithImages(mouseX, mouseY, hoveredStack, getItemToolTip(hoveredStack));
         return true;
+    }
+
+    protected final void drawItemTooltipWithImages(int mouseX, int mouseY, ItemStack hoveredStack,
+                                                   List<String> anchorTooltipLines) {
+        if (hoveredStack.isEmpty() || !(hoveredStack.getItem() instanceof IStackTooltipDataProvider)) {
+            GenericStack genericStack = GenericStack.unwrapItemStack(hoveredStack);
+            if (genericStack != null) {
+                drawKeyTooltipLinesWithImages(mouseX, mouseY, genericStack.what(), anchorTooltipLines);
+            } else {
+                drawTooltipLines(mouseX, mouseY, anchorTooltipLines);
+            }
+            return;
+        }
+
+        drawHoveringTextAtTopZ(anchorTooltipLines, mouseX, mouseY);
+        renderStorageCellTooltipImage(mouseX, mouseY, hoveredStack, anchorTooltipLines);
     }
 
     private void renderStorageCellTooltipImage(int mouseX, int mouseY, ItemStack hoveredStack, List<String> tooltipLines) {
@@ -509,6 +522,64 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
     private void drawTooltip(int mouseX, int mouseY, List<ITextComponent> tooltip) {
         drawTooltipLines(mouseX, mouseY, tooltip.stream().map(ITextComponent::getFormattedText).collect(Collectors.toList()));
+    }
+
+    protected final void drawKeyTooltipWithImages(int mouseX, int mouseY, AEKey what, List<ITextComponent> tooltip) {
+        drawKeyTooltipLinesWithImages(mouseX, mouseY, what, tooltip.stream()
+                                                                   .map(ITextComponent::getFormattedText)
+                                                                   .collect(Collectors.toCollection(ObjectArrayList::new)));
+    }
+
+    protected final void drawKeyTooltipLinesWithImages(int mouseX, int mouseY, AEKey what,
+                                                       List<String> visibleTooltipLines) {
+        ItemStack imageStack = getImageTooltipStack(what);
+        if (imageStack.isEmpty()) {
+            drawHoveringTextAtTopZ(visibleTooltipLines, mouseX, mouseY);
+            return;
+        }
+
+        for (String line : visibleTooltipLines) {
+            if (StackTooltipRenderer.isReservedTooltipLine(line)) {
+                drawHoveringTextAtTopZ(visibleTooltipLines, mouseX, mouseY);
+                renderStorageCellTooltipImage(mouseX, mouseY, imageStack, visibleTooltipLines);
+                return;
+            }
+        }
+
+        List<String> anchorTooltipLines = getItemToolTip(imageStack);
+        List<String> imageTooltipLines = new ObjectArrayList<>(visibleTooltipLines);
+        int insertionIndex = 0;
+        boolean foundReservedLines = false;
+        for (String line : anchorTooltipLines) {
+            if (StackTooltipRenderer.isReservedTooltipLine(line)) {
+                imageTooltipLines.add(Math.min(insertionIndex, imageTooltipLines.size()), line);
+                insertionIndex++;
+                foundReservedLines = true;
+            } else if (!foundReservedLines) {
+                insertionIndex++;
+            }
+        }
+
+        if (imageTooltipLines.size() == visibleTooltipLines.size()) {
+            drawHoveringTextAtTopZ(visibleTooltipLines, mouseX, mouseY);
+            return;
+        }
+
+        drawHoveringTextAtTopZ(imageTooltipLines, mouseX, mouseY);
+        renderStorageCellTooltipImage(mouseX, mouseY, imageStack, imageTooltipLines);
+    }
+
+    private ItemStack getImageTooltipStack(AEKey what) {
+        if (!(what instanceof AEItemKey itemKey)) {
+            return ItemStack.EMPTY;
+        }
+
+        ItemStack stack = itemKey.getReadOnlyStack();
+        if (stack.isEmpty() || !(stack.getItem() instanceof IStackTooltipDataProvider)) {
+            return ItemStack.EMPTY;
+        }
+
+        return stack;
     }
 
     protected final void drawTooltipLines(int mouseX, int mouseY, List<String> tooltip) {

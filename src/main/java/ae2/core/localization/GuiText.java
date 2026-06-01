@@ -60,6 +60,8 @@ public enum GuiText implements LocalizationEnum {
     PatternModifierMultiplyDescription,
     PatternModifierDivideDescription,
     PatternModifierClearDescription,
+    ProcessingPatternMultiplyDescription,
+    ProcessingPatternDivideDescription,
     Crafting,
     CraftingCPUs,
     CraftingPattern,

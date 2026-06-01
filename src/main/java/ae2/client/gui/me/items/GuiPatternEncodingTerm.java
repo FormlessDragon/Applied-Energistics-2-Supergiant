@@ -182,7 +182,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
                 itemTooltip.add(Tooltips.getAmountTooltip(ButtonToolTips.Amount, unwrapped).getFormattedText());
             }
             itemTooltip.add(Tooltips.getSetAmountTooltip().getFormattedText());
-            drawTooltipLines(mouseX, mouseY, itemTooltip);
+            drawItemTooltipWithImages(mouseX, mouseY, slot.getStack(), itemTooltip);
             return;
         }
 

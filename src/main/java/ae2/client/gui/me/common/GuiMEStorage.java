@@ -746,7 +746,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             if (carried.isEmpty() || this.terminalStyle.isShowTooltipsWithItemInHand()) {
                 GridInventoryEntry entry = repoSlot.getEntry();
                 if (entry != null && entry.what() != null) {
-                    drawTooltipWithHeader(mouseX, mouseY, getGridInventoryEntryTooltip(entry));
+                    drawKeyTooltipWithImages(mouseX, mouseY, entry.what(), getGridInventoryEntryTooltip(entry));
                     return;
                 }
             }

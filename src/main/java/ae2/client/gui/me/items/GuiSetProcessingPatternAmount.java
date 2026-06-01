@@ -1,5 +1,6 @@
 package ae2.client.gui.me.items;
 
+import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.stacks.GenericStack;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
@@ -69,7 +70,7 @@ public class GuiSetProcessingPatternAmount extends AEBaseGui<AEBaseContainer> {
     }
 
     private long getMaxAmount() {
-        return 2147483647L;
+        return PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT;
     }
 
     private void removeDisplaySlot() {

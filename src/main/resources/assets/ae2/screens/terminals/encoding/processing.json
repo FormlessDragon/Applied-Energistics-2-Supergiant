@@ -87,6 +87,42 @@
     "processingClearPattern": {
       "left": 79,
       "bottom": 159
+    },
+    "processingAmountButton0": {
+      "left": 99,
+      "bottom": 158,
+      "width": 8,
+      "height": 8
+    },
+    "processingAmountButton1": {
+      "left": 128,
+      "bottom": 158,
+      "width": 8,
+      "height": 8
+    },
+    "processingAmountButton2": {
+      "left": 99,
+      "bottom": 148,
+      "width": 8,
+      "height": 8
+    },
+    "processingAmountButton3": {
+      "left": 128,
+      "bottom": 148,
+      "width": 8,
+      "height": 8
+    },
+    "processingAmountButton4": {
+      "left": 99,
+      "bottom": 123,
+      "width": 8,
+      "height": 8
+    },
+    "processingAmountButton5": {
+      "left": 128,
+      "bottom": 123,
+      "width": 8,
+      "height": 8
     }
   }
 }

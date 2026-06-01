@@ -23,6 +23,7 @@ import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.helpers.IPatternTerminalGuiHost;
 import ae2.parts.encoding.EncodingMode;
 import ae2.parts.encoding.PatternEncodingLogic;
+import ae2.parts.encoding.ProcessingPatternAmountHelper;
 import ae2.util.ConfigGuiInventory;
 import ae2.util.ConfigInventory;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
@@ -37,7 +38,9 @@ import net.minecraft.item.crafting.CraftingManager;
 import net.minecraft.item.crafting.IRecipe;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class ContainerPatternEncodingTerm extends ContainerMEStorage implements PatternModifierPanel.Host {
     private static final int CRAFTING_GRID_WIDTH = 3;
@@ -51,6 +54,12 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     private static final String ACTION_SET_SUBSTITUTION = "setSubstitution";
     private static final String ACTION_SET_FLUID_SUBSTITUTION = "setFluidSubstitution";
     private static final String ACTION_CYCLE_PROCESSING_OUTPUT = "cycleProcessingOutput";
+    private static final String ACTION_PROCESSING_MULTIPLY_2 = "processingMultiply2";
+    private static final String ACTION_PROCESSING_MULTIPLY_3 = "processingMultiply3";
+    private static final String ACTION_PROCESSING_MULTIPLY_5 = "processingMultiply5";
+    private static final String ACTION_PROCESSING_DIVIDE_2 = "processingDivide2";
+    private static final String ACTION_PROCESSING_DIVIDE_3 = "processingDivide3";
+    private static final String ACTION_PROCESSING_DIVIDE_5 = "processingDivide5";
 
     private static final Container DUMMY_CONTAINER = new Container() {
         @Override
@@ -130,6 +139,18 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         registerClientAction(ACTION_SET_SUBSTITUTION, Boolean.class, this::changeSubstitution);
         registerClientAction(ACTION_SET_FLUID_SUBSTITUTION, Boolean.class, this::changeFluidSubstitution);
         registerClientAction(ACTION_CYCLE_PROCESSING_OUTPUT, this::cycleProcessingOutput);
+        registerClientAction(ACTION_PROCESSING_MULTIPLY_2,
+            () -> modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation.MULTIPLY_2));
+        registerClientAction(ACTION_PROCESSING_MULTIPLY_3,
+            () -> modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation.MULTIPLY_3));
+        registerClientAction(ACTION_PROCESSING_MULTIPLY_5,
+            () -> modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation.MULTIPLY_5));
+        registerClientAction(ACTION_PROCESSING_DIVIDE_2,
+            () -> modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation.DIVIDE_2));
+        registerClientAction(ACTION_PROCESSING_DIVIDE_3,
+            () -> modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation.DIVIDE_3));
+        registerClientAction(ACTION_PROCESSING_DIVIDE_5,
+            () -> modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation.DIVIDE_5));
         this.patternModifierPanel = new PatternModifierPanel(this);
         this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
 
@@ -647,6 +668,51 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         for (int i = 0; i < newOutputs.length; i++) {
             this.processingOutputSlots[i].putStack(newOutputs[i]);
         }
+    }
+
+    private static String actionForProcessingAmountOperation(ProcessingPatternAmountHelper.Operation operation) {
+        return switch (operation) {
+            case MULTIPLY_2 -> ACTION_PROCESSING_MULTIPLY_2;
+            case MULTIPLY_3 -> ACTION_PROCESSING_MULTIPLY_3;
+            case MULTIPLY_5 -> ACTION_PROCESSING_MULTIPLY_5;
+            case DIVIDE_2 -> ACTION_PROCESSING_DIVIDE_2;
+            case DIVIDE_3 -> ACTION_PROCESSING_DIVIDE_3;
+            case DIVIDE_5 -> ACTION_PROCESSING_DIVIDE_5;
+        };
+    }
+
+    private static void collectProcessingStacks(ConfigInventory inventory, List<GenericStack> stacks) {
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            stacks.add(inventory.getStack(slot));
+        }
+    }
+
+    private static void applyProcessingAmountOperation(ConfigInventory inventory,
+                                                       ProcessingPatternAmountHelper.Operation operation) {
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            inventory.setStack(slot, ProcessingPatternAmountHelper.apply(inventory.getStack(slot), operation));
+        }
+    }
+
+    public void modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation operation) {
+        if (isClientSide()) {
+            sendClientAction(actionForProcessingAmountOperation(operation));
+            return;
+        }
+        if (this.mode != EncodingMode.PROCESSING) {
+            return;
+        }
+
+        List<GenericStack> stacks = new ArrayList<>(this.encodedInputsInv.size() + this.encodedOutputsInv.size());
+        collectProcessingStacks(this.encodedInputsInv, stacks);
+        collectProcessingStacks(this.encodedOutputsInv, stacks);
+        if (!ProcessingPatternAmountHelper.canApply(stacks, operation)) {
+            return;
+        }
+
+        applyProcessingAmountOperation(this.encodedInputsInv, operation);
+        applyProcessingAmountOperation(this.encodedOutputsInv, operation);
+        broadcastChanges();
     }
 
     public boolean canCycleProcessingOutputs() {
