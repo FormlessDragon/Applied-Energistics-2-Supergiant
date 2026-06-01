@@ -66,4 +66,5 @@ public class TileIngredientBuffer extends AEBaseTile {
         }
         return super.getCapability(capability, facing);
     }
+
 }

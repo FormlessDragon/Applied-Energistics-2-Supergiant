@@ -23,7 +23,6 @@ import ae2.block.AEBaseTileBlock;
 import ae2.container.GuiIds;
 import ae2.core.gui.GuiOpener;
 import ae2.tile.crafting.TileMolecularAssembler;
-import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.PropertyBool;
 import net.minecraft.block.state.BlockStateContainer;
@@ -95,13 +94,4 @@ public class MolecularAssemblerBlock extends AEBaseTileBlock<TileMolecularAssemb
         return false;
     }
 
-    @Override
-    @SuppressWarnings("deprecation")
-    public void neighborChanged(IBlockState state, World world, BlockPos pos, Block blockIn, BlockPos fromPos) {
-        super.neighborChanged(state, world, pos, blockIn, fromPos);
-        TileMolecularAssembler tile = this.getTileEntity(world, pos);
-        if (tile != null) {
-            tile.onNeighborChanged(world, pos, fromPos);
-        }
-    }
 }

@@ -7,6 +7,9 @@ import ae2.api.config.PatternProviderInsertionMode;
 import ae2.api.config.PatternProviderOutputSideMode;
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
+import ae2.api.crafting.IAssemblerPattern;
+import ae2.api.crafting.IPatternDetails;
+import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.util.IConfigManager;
@@ -129,8 +132,23 @@ public class ContainerPatternProvider extends AEBaseContainer
 
     @Override
     public boolean isValidForSlot(Slot slot, ItemStack stack) {
-        return !(slot instanceof AppEngSlot appEngSlot && this.patternSlots.contains(appEngSlot))
-            || isPatternSlotVisible(appEngSlot);
+        if (!(slot instanceof AppEngSlot appEngSlot && this.patternSlots.contains(appEngSlot))) {
+            return true;
+        }
+        return isPatternSlotVisible(appEngSlot)
+            && isProviderPattern(stack)
+            && !hasSamePatternInOtherSlot(appEngSlot, stack);
+    }
+
+    @Override
+    public ItemStack transferStackInSlot(EntityPlayer player, int index) {
+        if (!isClientSide() && index >= 0 && index < this.inventorySlots.size()) {
+            Slot sourceSlot = this.inventorySlots.get(index);
+            if (sourceSlot != null && isPlayerSideSlot(sourceSlot) && isProviderPattern(sourceSlot.getStack())) {
+                return moveSinglePatternFromPlayerSlot(sourceSlot, player);
+            }
+        }
+        return super.transferStackInSlot(player, index);
     }
 
     @Override
@@ -245,5 +263,59 @@ public class ContainerPatternProvider extends AEBaseContainer
     private boolean hasSamePattern(ItemStack stack) {
         AEItemKey pattern = AEItemKey.of(stack);
         return pattern != null && this.logic.containsPattern(pattern);
+    }
+
+    private ItemStack moveSinglePatternFromPlayerSlot(Slot sourceSlot, EntityPlayer player) {
+        if (!sourceSlot.canTakeStack(player) || sourceSlot.getStack().isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+
+        ItemStack sourceStack = sourceSlot.getStack();
+        ItemStack originalStack = sourceStack.copy();
+        for (AppEngSlot targetSlot : this.patternSlots) {
+            if (targetSlot.getHasStack() || !targetSlot.isItemValid(sourceStack)) {
+                continue;
+            }
+
+            ItemStack inserted = sourceStack.copy();
+            inserted.setCount(1);
+            targetSlot.putStack(inserted);
+            targetSlot.onSlotChanged();
+            sourceSlot.decrStackSize(1);
+            sourceSlot.onSlotChanged();
+            detectAndSendChanges();
+            return originalStack;
+        }
+
+        return ItemStack.EMPTY;
+    }
+
+    private boolean isProviderPattern(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+
+        IPatternDetails details = PatternDetailsHelper.decodePattern(stack, getPlayer().world);
+        return details != null && !(details instanceof IAssemblerPattern);
+    }
+
+    private boolean hasSamePatternInOtherSlot(AppEngSlot targetSlot, ItemStack stack) {
+        AEItemKey pattern = AEItemKey.of(stack);
+        if (pattern == null) {
+            return false;
+        }
+
+        for (AppEngSlot otherSlot : this.patternSlots) {
+            if (otherSlot == targetSlot) {
+                continue;
+            }
+
+            AEItemKey otherPattern = AEItemKey.of(otherSlot.getStack());
+            if (pattern.equals(otherPattern)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

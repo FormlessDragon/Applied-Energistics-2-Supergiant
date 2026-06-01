@@ -243,6 +243,7 @@ public final class AEItemIds {
     public static final ResourceLocation CRAFTING_CARD = id("crafting_card");
     public static final ResourceLocation PSEUDO_CRAFTING_CARD = id("pseudo_crafting_card");
     public static final ResourceLocation PATTERN_EXPANSION_CARD = id("pattern_expansion_card");
+    public static final ResourceLocation PARALLEL_CARD = id("parallel_card");
     public static final ResourceLocation ENERGY_CARD = id("energy_card");
     public static final ResourceLocation EQUAL_DISTRIBUTION_CARD = id("equal_distribution_card");
     public static final ResourceLocation STICKY_CARD = id("sticky_card");

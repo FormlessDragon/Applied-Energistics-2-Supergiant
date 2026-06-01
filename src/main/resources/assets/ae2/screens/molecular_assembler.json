@@ -1,27 +1,15 @@
 {
   "$schema": "schema.json",
-  "includes": [
-    "common/common.json",
-    "common/player_inventory.json",
-    "common/toolbox.json"
-  ],
+  "includes": ["common/common.json", "common/player_inventory.json", "common/toolbox.json"],
   "background": {
-    "texture": "guis/molecular_assembler.png",
-    "srcRect": [0, 0, 176, 199]
+    "texture": "guis/molecular_assembler_patterns.png",
+    "srcRect": [0, 0, 176, 245]
   },
   "slots": {
-    "MACHINE_CRAFTING_GRID": {
-      "left": 29,
-      "top": 31,
-      "grid": "BREAK_AFTER_3COLS"
-    },
     "ENCODED_PATTERN": {
-      "left": 126,
-      "top": 16
-    },
-    "MACHINE_OUTPUT": {
-      "left": 126,
-      "top": 49
+      "left": 8,
+      "top": 42,
+      "grid": "BREAK_AFTER_9COLS"
     }
   },
   "text": {
@@ -33,18 +21,93 @@
         "left": 8,
         "top": 6
       }
+    },
+    "interface_config": {
+      "text": {
+        "translate": "gui.ae2.Patterns"
+      },
+      "position": {
+        "left": 8,
+        "top": 31
+      }
     }
   },
   "images": {
     "progressBar": {
       "texture": "guis/molecular_assembler.png",
-      "srcRect": [176, 0, 6, 18]
+      "srcRect": [176, 0, 18, 6]
     }
   },
   "widgets": {
+    "openPriority": {
+      "left": 152,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "previousPage": {
+      "left": 116,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "nextPage": {
+      "left": 134,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
     "progressBar": {
-      "left": 148,
-      "top": 48
+      "left": 8,
+      "top": 116
+    },
+    "patternModifierPanel": {
+      "left": -126,
+      "top": 59,
+      "width": 86,
+      "height": 180
+    },
+    "patternModifierPanelAmount0": {
+      "left": -63,
+      "top": 67,
+      "width": 18,
+      "height": 20
+    },
+    "patternModifierPanelAmount1": {
+      "left": -63,
+      "top": 89,
+      "width": 18,
+      "height": 20
+    },
+    "patternModifierPanelAmount2": {
+      "left": -63,
+      "top": 111,
+      "width": 18,
+      "height": 20
+    },
+    "patternModifierPanelAmount3": {
+      "left": -63,
+      "top": 133,
+      "width": 18,
+      "height": 20
+    },
+    "patternModifierPanelAmount4": {
+      "left": -63,
+      "top": 155,
+      "width": 18,
+      "height": 20
+    },
+    "patternModifierPanelAmount5": {
+      "left": -63,
+      "top": 177,
+      "width": 18,
+      "height": 20
+    },
+    "patternModifierPanelClear": {
+      "left": -63,
+      "top": 199,
+      "width": 18,
+      "height": 20
     }
   }
 }

@@ -105,6 +105,11 @@ public interface PatternProviderTarget {
             public boolean containsAnyStack() {
                 return !storage.getAvailableStacks().isEmpty();
             }
+
+            @Override
+            public boolean hasEmptySlots() {
+                return false;
+            }
         };
     }
 
@@ -115,4 +120,6 @@ public interface PatternProviderTarget {
     boolean containsPatternInput(Set<AEKey> patternInputs);
 
     boolean containsAnyStack();
+
+    boolean hasEmptySlots();
 }

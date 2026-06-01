@@ -25,10 +25,15 @@ import ae2.api.config.PowerUnit;
 import ae2.api.config.Setting;
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
+import ae2.api.crafting.IPatternDetails;
 import ae2.api.implementations.blockentities.ICrankable;
+import ae2.api.implementations.blockentities.ICraftingMachine;
+import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.ISegmentedInventory;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGridNode;
+import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.KeyCounter;
 import ae2.api.networking.energy.IEnergySource;
 import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.networking.ticking.TickRateModulation;
@@ -45,8 +50,10 @@ import ae2.core.AELog;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.definitions.AEItems;
 import ae2.core.settings.TickRates;
+import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.recipes.handlers.InscriberProcessType;
 import ae2.recipes.handlers.InscriberRecipe;
+import net.minecraft.util.text.TextComponentTranslation;
 import ae2.tile.grid.AENetworkedPoweredTile;
 import ae2.util.ConfigManager;
 import ae2.util.inv.AppEngInternalInventory;
@@ -67,10 +74,10 @@ import java.util.EnumSet;
 import java.util.List;
 
 public class TileInscriber extends AENetworkedPoweredTile
-    implements IGridTickable, IUpgradeableObject, IConfigurableObject {
+    implements IGridTickable, IUpgradeableObject, IConfigurableObject, ICraftingMachine {
     private static final int MAX_PROCESSING_STEPS = 200;
     private static final int POWER_PER_CRANK_TURN = 160;
-    private final IUpgradeInventory upgrades = UpgradeInventories.forMachine(AEBlocks.INSCRIBER.item(), 4,
+    private final IUpgradeInventory upgrades = UpgradeInventories.forMachine(AEBlocks.INSCRIBER.item(), 5,
         this::saveChanges);
     private final AppEngInternalInventory topItemHandler = new AppEngInternalInventory(this, 1, 64, new BaseFilter());
     private final AppEngInternalInventory bottomItemHandler = new AppEngInternalInventory(this, 1, 64,
@@ -292,14 +299,17 @@ public class TileInscriber extends AENetworkedPoweredTile
             if (this.finalStep == 8) {
                 var task = this.getTask();
                 if (task != null) {
-                    var output = task.getResultItem().copy();
-                    if (this.sideItemHandler.insertItem(1, output, false).isEmpty()) {
+                    int runs = this.getParallelRuns(task);
+                    if (runs > 0) {
+                        var output = task.getResultItem().copy();
+                        output.setCount(output.getCount() * runs);
+                        this.sideItemHandler.insertItem(1, output, false);
                         this.processingTime = 0;
                         if (task.getProcessType() == InscriberProcessType.PRESS) {
-                            this.topItemHandler.extractItem(0, 1, false);
-                            this.bottomItemHandler.extractItem(0, 1, false);
+                            this.topItemHandler.extractItem(0, runs, false);
+                            this.bottomItemHandler.extractItem(0, runs, false);
                         }
-                        this.sideItemHandler.extractItem(0, 1, false);
+                        this.sideItemHandler.extractItem(0, runs, false);
                     }
                 }
                 this.saveChanges();
@@ -332,7 +342,7 @@ public class TileInscriber extends AENetworkedPoweredTile
             if (this.processingTime > MAX_PROCESSING_STEPS) {
                 this.processingTime = MAX_PROCESSING_STEPS;
                 var task = this.getTask();
-                if (task != null && this.sideItemHandler.insertItem(1, task.getResultItem().copy(), true).isEmpty()) {
+                if (task != null && this.getParallelRuns(task) > 0) {
                     this.smash = true;
                     this.finalStep = 0;
                     this.markForUpdate();
@@ -370,7 +380,7 @@ public class TileInscriber extends AENetworkedPoweredTile
     private boolean hasCraftWork() {
         var task = this.getTask();
         if (task != null) {
-            return this.sideItemHandler.insertItem(1, task.getResultItem().copy(), true).isEmpty();
+            return this.getParallelRuns(task) > 0;
         }
 
         this.processingTime = 0;
@@ -387,6 +397,97 @@ public class TileInscriber extends AENetworkedPoweredTile
             }
         }
         return this.cachedTask;
+    }
+
+    private int getParallelLimit() {
+        return switch (this.upgrades.getInstalledUpgrades(AEItems.PARALLEL_CARD.item())) {
+            case 1 -> 4;
+            case 2 -> 16;
+            case 3 -> 64;
+            default -> 1;
+        };
+    }
+
+    @Override
+    public PatternContainerGroup getCraftingMachineInfo() {
+        return new PatternContainerGroup(AEItemKey.of(AEBlocks.INSCRIBER.stack()),
+            new TextComponentTranslation("tile.ae2.inscriber.name"), List.of());
+    }
+
+    @Override
+    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputs, int multiplier,
+                               EnumFacing ejectionDirection) {
+        if (!(patternDetails instanceof AEProcessingPattern processingPattern) || multiplier <= 0) {
+            return false;
+        }
+        InscriberCraftingPush.Plan plan = createCraftingPushPlan(processingPattern, inputs, multiplier);
+        if (plan == null || plan.maxMultiplier() < multiplier) {
+            return false;
+        }
+
+        insertPlannedStack(this.topItemHandler, plan.top(), multiplier);
+        insertPlannedStack(this.sideItemHandler, plan.middle(), multiplier);
+        insertPlannedStack(this.bottomItemHandler, plan.bottom(), multiplier);
+        this.cachedTask = null;
+        this.processingTime = 0;
+        this.saveChanges();
+        this.getMainNode().ifPresent((grid, node) -> grid.getTickManager().wakeDevice(node));
+        return true;
+    }
+
+    @Override
+    public int getMaxPatternPushMultiplier(IPatternDetails patternDetails, KeyCounter[] inputs, int maxMultiplier,
+                                           EnumFacing ejectionDirection) {
+        if (!(patternDetails instanceof AEProcessingPattern processingPattern)) {
+            return 0;
+        }
+        InscriberCraftingPush.Plan plan = createCraftingPushPlan(processingPattern, inputs, maxMultiplier);
+        return plan == null ? 0 : plan.maxMultiplier();
+    }
+
+    @Override
+    public boolean acceptsPlans() {
+        return true;
+    }
+
+    private InscriberCraftingPush.Plan createCraftingPushPlan(AEProcessingPattern pattern, KeyCounter[] inputs,
+                                                              int maxMultiplier) {
+        return InscriberCraftingPush.plan(pattern, inputs, new InscriberCraftingPush.State(
+            this.topItemHandler.getStackInSlot(0),
+            this.sideItemHandler.getStackInSlot(0),
+            this.bottomItemHandler.getStackInSlot(0),
+            this.sideItemHandler.getStackInSlot(1),
+            this.configManager.getSetting(Settings.INSCRIBER_INPUT_CAPACITY).capacity,
+            this.smash), this.getParallelLimit(), maxMultiplier);
+    }
+
+    private void insertPlannedStack(AppEngInternalInventory inventory, InscriberCraftingPush.SlotPlan slotPlan,
+                                    int multiplier) {
+        ItemStack stack = slotPlan.stackForRuns(multiplier);
+        if (!stack.isEmpty()) {
+            inventory.insertItem(0, stack, false);
+        }
+    }
+
+    private int getParallelRuns(InscriberRecipe task) {
+        int runs = Math.min(this.getParallelLimit(), this.sideItemHandler.getStackInSlot(0).getCount());
+        if (task.getProcessType() == InscriberProcessType.PRESS) {
+            runs = Math.min(runs, this.topItemHandler.getStackInSlot(0).getCount());
+            runs = Math.min(runs, this.bottomItemHandler.getStackInSlot(0).getCount());
+        }
+        if (runs <= 0) {
+            return 0;
+        }
+
+        ItemStack output = task.getResultItem().copy();
+        int outputCount = output.getCount();
+        for (int i = runs; i > 0; i--) {
+            output.setCount(outputCount * i);
+            if (this.sideItemHandler.insertItem(1, output, true).isEmpty()) {
+                return i;
+            }
+        }
+        return 0;
     }
 
     private boolean pushOutResult() {
@@ -430,6 +531,9 @@ public class TileInscriber extends AENetworkedPoweredTile
 
     @Override
     public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+        if (capability == AECapabilities.CRAFTING_MACHINE) {
+            return true;
+        }
         if (capability == AECapabilities.CRANKABLE && getCrankable(facing) != null) {
             return true;
         }
@@ -439,6 +543,9 @@ public class TileInscriber extends AENetworkedPoweredTile
     @SuppressWarnings("unchecked")
     @Override
     public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+        if (capability == AECapabilities.CRAFTING_MACHINE) {
+            return (T) this;
+        }
         if (capability == AECapabilities.CRANKABLE) {
             return (T) getCrankable(facing);
         }

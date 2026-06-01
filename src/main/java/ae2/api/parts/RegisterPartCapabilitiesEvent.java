@@ -1,5 +1,8 @@
 package ae2.api.parts;
 
+import ae2.api.AECapabilities;
+import ae2.api.behaviors.GenericInternalInventory;
+import ae2.api.behaviors.GenericInternalInventoryAdapters;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
@@ -11,6 +14,8 @@ import net.minecraftforge.fml.common.eventhandler.Event;
 
 import javax.annotation.Nullable;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Map;
 import java.util.Objects;
 
 public class RegisterPartCapabilitiesEvent extends Event {
@@ -39,6 +44,46 @@ public class RegisterPartCapabilitiesEvent extends Event {
 
     public <T extends TileEntity & IPartHost> void addHostType(Class<T> hostType) {
         hostTypes.add(hostType);
+    }
+
+    public void registerGenericInternalInventoryAdapters() {
+        @SuppressWarnings("unchecked")
+        var genericRegistration = (PartCapabilityRegistration<GenericInternalInventory>) capabilityRegistrations
+            .get(AECapabilities.GENERIC_INTERNAL_INV);
+        if (genericRegistration == null) {
+            return;
+        }
+
+        var genericParts = new ArrayList<>(genericRegistration.parts.entrySet());
+        for (var adapterEntry : GenericInternalInventoryAdapters.getAdapters().entrySet()) {
+            Capability<?> capability = adapterEntry.getKey();
+            registerGenericInternalInventoryAdapter(capability, genericParts);
+        }
+    }
+
+    private <T> void registerGenericInternalInventoryAdapter(Capability<T> capability,
+                                                             Iterable<Map.Entry<Class<? extends IPart>,
+                                                                 PartCapabilityProvider<?, GenericInternalInventory>>> genericParts) {
+        for (var genericPart : genericParts) {
+            registerGenericInternalInventoryAdapter(capability, genericPart.getKey(), genericPart.getValue());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T, P extends IPart> void registerGenericInternalInventoryAdapter(Capability<T> capability,
+                                                                              Class<? extends IPart> partClass,
+                                                                              PartCapabilityProvider<?, GenericInternalInventory> genericProvider) {
+        @SuppressWarnings("unchecked")
+        var existingRegistration = (PartCapabilityRegistration<T>) capabilityRegistrations.get(capability);
+        if (existingRegistration != null && existingRegistration.parts.containsKey(partClass)) {
+            return;
+        }
+
+        register(capability, (part, side) -> {
+            GenericInternalInventory genericInv = ((PartCapabilityProvider<P, GenericInternalInventory>) genericProvider)
+                .getCapability(part, side);
+            return genericInv == null ? null : GenericInternalInventoryAdapters.getCapability(genericInv, capability);
+        }, (Class<P>) partClass);
     }
 
     @FunctionalInterface

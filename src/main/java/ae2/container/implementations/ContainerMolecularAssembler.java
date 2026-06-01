@@ -1,74 +1,119 @@
-/*
- * This file is part of Applied Energistics 2.
- * Copyright (c) 2013 - 2014, AlgorithmX2, All rights reserved.
- *
- * Applied Energistics 2 is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Applied Energistics 2 is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Applied Energistics 2.  If not, see <http://www.gnu.org/licenses/lgpl>.
- */
-
 package ae2.container.implementations;
 
-import ae2.api.inventories.InternalInventory;
+import ae2.api.config.Settings;
+import ae2.api.config.YesNo;
+import ae2.api.crafting.IAssemblerPattern;
+import ae2.api.crafting.IPatternDetails;
+import ae2.api.crafting.PatternDetailsHelper;
+import ae2.api.stacks.AEItemKey;
+import ae2.api.util.IConfigManager;
+import ae2.api.util.IConfigurableObject;
+import ae2.container.AEBaseContainer;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
 import ae2.container.interfaces.IProgressProvider;
 import ae2.container.slot.AppEngSlot;
-import ae2.container.slot.MolecularAssemblerPatternSlot;
-import ae2.container.slot.OutputSlot;
 import ae2.container.slot.RestrictedInputSlot;
-import ae2.tile.crafting.IMolecularAssemblerSupportedPattern;
+import ae2.helpers.patternprovider.PatternProviderCapacity;
 import ae2.tile.crafting.TileMolecularAssembler;
+import ae2.util.inv.AppEngInternalInventory;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
-import net.minecraft.world.World;
+import net.minecraft.item.ItemStack;
 
-public class ContainerMolecularAssembler extends UpgradeableContainer<TileMolecularAssembler>
-    implements MolecularAssemblerPatternSlot.Host, IProgressProvider {
+import java.util.List;
+
+public class ContainerMolecularAssembler extends AEBaseContainer
+    implements IProgressProvider, IConfigurableObject, PatternModifierPanel.Host {
+    public static final String ACTION_SET_PAGE = "setPage";
     private static final int MAX_CRAFT_PROGRESS = 100;
+
+    private final TileMolecularAssembler host;
+    private final List<AppEngSlot> patternSlots = new ObjectArrayList<>();
+    private final PatternModifierPanel patternModifierPanel;
 
     @GuiSync(4)
     public int craftProgress;
-
-    private Slot encodedPatternSlot;
+    @GuiSync(5)
+    public YesNo showInAccessTerminal = YesNo.YES;
+    @GuiSync(6)
+    public int activePatternSlots = 9;
+    @GuiSync(7)
+    public int currentPage;
+    @GuiSync(8)
+    public int pageCount = 1;
+    @GuiSync(9)
+    public boolean patternModifierPanelAvailable;
 
     public ContainerMolecularAssembler(InventoryPlayer playerInventory, TileMolecularAssembler host) {
         super(playerInventory, host);
+        this.host = host;
+        this.registerClientAction(ACTION_SET_PAGE, Integer.class, this::setPage);
+
+        AppEngInternalInventory patternInventory = host.getPatternInventory();
+        for (int index = 0; index < patternInventory.size(); index++) {
+            AppEngSlot slot = new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.MOLECULAR_ASSEMBLER_PATTERN,
+                patternInventory, index);
+            this.patternSlots.add(slot);
+            this.addSlot(slot, SlotSemantics.ENCODED_PATTERN);
+        }
+
+        this.setupUpgrades(host.getUpgrades());
+        this.addPlayerInventorySlots(8, 163);
+        this.patternModifierPanel = new PatternModifierPanel(this);
+        this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
+        this.updatePatternSlotState();
     }
 
-    @Override
-    protected void setupConfig() {
-        InternalInventory inventory = this.getHost().getSubInventory(TileMolecularAssembler.INV_MAIN);
-        if (inventory == null) {
-            return;
-        }
-
-        for (int slot = 0; slot < 9; slot++) {
-            this.addSlot(new MolecularAssemblerPatternSlot(this, inventory, slot), SlotSemantics.MACHINE_CRAFTING_GRID);
-        }
-
-        this.encodedPatternSlot = this.addSlot(
-            new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.MOLECULAR_ASSEMBLER_PATTERN, inventory,
-                10),
-            SlotSemantics.ENCODED_PATTERN);
-        this.addSlot(new OutputSlot(inventory, 9, 0, 0), SlotSemantics.MACHINE_OUTPUT);
+    public TileMolecularAssembler getHost() {
+        return this.host;
     }
 
     @Override
     public void broadcastChanges() {
         if (isServerSide()) {
-            this.craftProgress = this.getHost().getCraftingProgress();
+            this.craftProgress = this.host.getCraftingProgress();
+            this.showInAccessTerminal = this.host.getConfigManager().getSetting(Settings.PATTERN_ACCESS_TERMINAL);
+            this.activePatternSlots = this.host.getActivePatternSlots();
+            this.pageCount = this.host.getPatternPageCount();
+            this.currentPage = Math.min(this.currentPage, this.pageCount - 1);
+            this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
         }
+
+        this.updatePatternSlotState();
         super.broadcastChanges();
+    }
+
+    @Override
+    public boolean isValidForSlot(Slot slot, ItemStack stack) {
+        if (!(slot instanceof AppEngSlot appEngSlot && this.patternSlots.contains(appEngSlot))) {
+            return true;
+        }
+        return isPatternSlotVisible(appEngSlot)
+            && isAssemblerPattern(stack)
+            && !hasSamePatternInOtherSlot(appEngSlot, stack);
+    }
+
+    @Override
+    public ItemStack transferStackInSlot(EntityPlayer player, int index) {
+        if (!isClientSide() && index >= 0 && index < this.inventorySlots.size()) {
+            Slot sourceSlot = this.inventorySlots.get(index);
+            if (sourceSlot != null && isPlayerSideSlot(sourceSlot) && isAssemblerPattern(sourceSlot.getStack())) {
+                return moveSinglePatternFromPlayerSlot(sourceSlot, player);
+            }
+        }
+        return super.transferStackInSlot(player, index);
+    }
+
+    @Override
+    protected boolean isValidQuickMoveDestination(Slot candidateSlot, ItemStack stackToMove, boolean fromPlayerSide) {
+        if (fromPlayerSide && candidateSlot instanceof AppEngSlot appEngSlot && this.patternSlots.contains(appEngSlot)
+            && hasSamePattern(stackToMove)) {
+            return false;
+        }
+        return super.isValidQuickMoveDestination(candidateSlot, stackToMove, fromPlayerSide);
     }
 
     @Override
@@ -82,24 +127,129 @@ public class ContainerMolecularAssembler extends UpgradeableContainer<TileMolecu
     }
 
     @Override
-    public void onSlotChange(Slot slot) {
-        if (slot == this.encodedPatternSlot) {
-            for (Slot otherSlot : this.inventorySlots) {
-                if (otherSlot != slot && otherSlot instanceof AppEngSlot appEngSlot) {
-                    appEngSlot.resetCachedValidation();
-                }
+    public IConfigManager getConfigManager() {
+        return this.host.getConfigManager();
+    }
+
+    public YesNo getShowInAccessTerminal() {
+        return this.showInAccessTerminal;
+    }
+
+    public int getCurrentPage() {
+        return this.currentPage;
+    }
+
+    public int getPageCount() {
+        return this.pageCount;
+    }
+
+    public boolean isPatternModifierPanelAvailable() {
+        return this.patternModifierPanelAvailable;
+    }
+
+    public PatternModifierPanel getPatternModifierPanel() {
+        return this.patternModifierPanel;
+    }
+
+    public void setPage(int page) {
+        if (isClientSide()) {
+            sendClientAction(ACTION_SET_PAGE, page);
+            return;
+        }
+        this.currentPage = Math.clamp(page, 0, this.host.getPatternPageCount() - 1);
+        this.updatePatternSlotState();
+        this.detectAndSendChanges();
+    }
+
+    public void updatePatternModifierPanelVisibleSlots(boolean visible) {
+        this.patternModifierPanel.updateSlotState(visible && this.patternModifierPanelAvailable);
+    }
+
+    @Override
+    public void registerPatternModifierPanelAction(String action, Runnable runnable) {
+        registerClientAction(action, runnable);
+    }
+
+    @Override
+    public void sendPatternModifierPanelAction(String action) {
+        sendClientAction(action);
+    }
+
+    @Override
+    public void lockPatternModifierPlayerInventorySlot(int slot) {
+        lockPlayerInventorySlot(slot);
+    }
+
+    private void updatePatternSlotState() {
+        for (AppEngSlot slot : this.patternSlots) {
+            boolean enabled = isPatternSlotVisible(slot);
+            slot.setSlotEnabled(enabled);
+            slot.setActive(enabled);
+        }
+        this.patternModifierPanel.updateSlotState(this.patternModifierPanelAvailable);
+    }
+
+    private boolean isPatternSlotVisible(AppEngSlot slot) {
+        return slot.getSlotIndex() < this.activePatternSlots
+            && PatternProviderCapacity.isPatternSlotOnPage(slot.getSlotIndex(), this.currentPage);
+    }
+
+    private boolean hasSamePattern(ItemStack stack) {
+        AEItemKey pattern = AEItemKey.of(stack);
+        return pattern != null && this.host.containsPattern(pattern);
+    }
+
+    private ItemStack moveSinglePatternFromPlayerSlot(Slot sourceSlot, EntityPlayer player) {
+        if (!sourceSlot.canTakeStack(player) || sourceSlot.getStack().isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+
+        ItemStack sourceStack = sourceSlot.getStack();
+        ItemStack originalStack = sourceStack.copy();
+        for (AppEngSlot targetSlot : this.patternSlots) {
+            if (targetSlot.getHasStack() || !targetSlot.isItemValid(sourceStack)) {
+                continue;
+            }
+
+            ItemStack inserted = sourceStack.copy();
+            inserted.setCount(1);
+            targetSlot.putStack(inserted);
+            targetSlot.onSlotChanged();
+            sourceSlot.decrStackSize(1);
+            sourceSlot.onSlotChanged();
+            detectAndSendChanges();
+            return originalStack;
+        }
+
+        return ItemStack.EMPTY;
+    }
+
+    private boolean isAssemblerPattern(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+
+        IPatternDetails details = PatternDetailsHelper.decodePattern(stack, getPlayer().world);
+        return details instanceof IAssemblerPattern;
+    }
+
+    private boolean hasSamePatternInOtherSlot(AppEngSlot targetSlot, ItemStack stack) {
+        AEItemKey pattern = AEItemKey.of(stack);
+        if (pattern == null) {
+            return false;
+        }
+
+        for (AppEngSlot otherSlot : this.patternSlots) {
+            if (otherSlot == targetSlot) {
+                continue;
+            }
+
+            AEItemKey otherPattern = AEItemKey.of(otherSlot.getStack());
+            if (pattern.equals(otherPattern)) {
+                return true;
             }
         }
-    }
 
-    @Override
-    public IMolecularAssemblerSupportedPattern getCurrentPattern() {
-        return this.getHost().getCurrentPattern();
+        return false;
     }
-
-    @Override
-    public World getWorld() {
-        return this.getHost().getWorld();
-    }
-
 }

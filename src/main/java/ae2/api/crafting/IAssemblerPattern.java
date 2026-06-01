@@ -1,6 +1,5 @@
-package ae2.tile.crafting;
+package ae2.api.crafting;
 
-import ae2.api.crafting.IPatternDetails;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.KeyCounter;
 import net.minecraft.inventory.InventoryCrafting;
@@ -8,7 +7,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.NonNullList;
 import net.minecraft.world.World;
 
-public interface IMolecularAssemblerSupportedPattern extends IPatternDetails {
+public interface IAssemblerPattern extends IPatternDetails {
     ItemStack assemble(InventoryCrafting input, World level);
 
     default NonNullList<ItemStack> getRemainingItems(InventoryCrafting input) {
@@ -20,6 +19,10 @@ public interface IMolecularAssemblerSupportedPattern extends IPatternDetails {
     boolean isSlotEnabled(int slot);
 
     void fillCraftingGrid(KeyCounter[] table, CraftingGridAccessor gridAccessor);
+
+    boolean canSubstitute();
+
+    boolean canSubstituteFluids();
 
     @Override
     default boolean supportsPushInputsToExternalInventory() {

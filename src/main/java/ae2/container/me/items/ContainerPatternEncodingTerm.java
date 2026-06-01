@@ -123,7 +123,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
             this.encodingLogic.getEncodedPatternInv(), 0), SlotSemantics.ENCODED_PATTERN);
         this.encodedPatternSlot.setStackLimit(1);
 
-        registerClientAction(ACTION_ENCODE, this::encode);
+        registerClientAction(ACTION_ENCODE, Boolean.class, this::encode);
         registerClientAction(ACTION_CLEAR, this::clear);
         registerClientAction(ACTION_SET_CLEAR_ON_CLOSE, Boolean.class, this::setClearOnClose);
         registerClientAction(ACTION_SET_MODE, EncodingMode.class, this::changeMode);
@@ -274,8 +274,12 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     }
 
     public void encode() {
+        encode(false);
+    }
+
+    public void encode(boolean preferModifierAndInventory) {
         if (isClientSide()) {
-            sendClientAction(ACTION_ENCODE);
+            sendClientAction(ACTION_ENCODE, preferModifierAndInventory);
             return;
         }
 
@@ -293,17 +297,35 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
             return;
         }
 
+        boolean usedOutputPattern = !encodedOutput.isEmpty();
         if (encodedOutput.isEmpty()) {
             if (!consumeBlankPatternForEncoding()) {
                 return;
             }
         }
 
-        ItemStack remaining = this.patternModifierPanel.insertPattern(encodedPattern.copy(), false);
-        if (remaining.isEmpty()) {
+        if (preferModifierAndInventory && insertEncodedPatternIntoModifierOrInventory(encodedPattern.copy())) {
+            if (usedOutputPattern) {
+                this.encodedPatternSlot.putStack(ItemStack.EMPTY);
+            }
             return;
         }
-        this.encodedPatternSlot.putStack(remaining);
+
+        insertEncodedPatternIntoOutputSlot(encodedPattern.copy());
+    }
+
+    private boolean insertEncodedPatternIntoModifierOrInventory(ItemStack encodedPattern) {
+        ItemStack remaining = this.patternModifierPanel.insertPattern(encodedPattern, false);
+        if (remaining.isEmpty()) {
+            return true;
+        }
+
+        ItemStack inventoryRemainder = remaining.copy();
+        return this.getPlayerInventory().addItemStackToInventory(inventoryRemainder);
+    }
+
+    private void insertEncodedPatternIntoOutputSlot(ItemStack encodedPattern) {
+        this.encodedPatternSlot.putStack(encodedPattern);
     }
 
     private boolean consumeBlankPatternForEncoding() {

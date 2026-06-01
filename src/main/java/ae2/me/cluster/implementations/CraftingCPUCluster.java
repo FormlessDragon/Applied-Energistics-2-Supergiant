@@ -50,19 +50,19 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Iterator;
 import java.util.Objects;
 
-public final class CraftingCPUCluster implements IAECluster, ICraftingCPU {
+public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
 
     public final CraftingCpuLogic craftingLogic = new CraftingCpuLogic(this);
-    private final BlockPos boundsMin;
-    private final BlockPos boundsMax;
-    private final ObjectList<TileCraftingUnit> blockEntities = new ObjectArrayList<>();
-    private final ObjectList<TileCraftingMonitor> status = new ObjectArrayList<>();
-    private final IConfigManager configManager;
-    private ITextComponent myName;
-    private boolean destroyed;
-    private long storage;
-    private MachineSource machineSrc;
-    private int accelerator;
+    protected final BlockPos boundsMin;
+    protected final BlockPos boundsMax;
+    protected final ObjectList<TileCraftingUnit> blockEntities = new ObjectArrayList<>();
+    protected final ObjectList<TileCraftingMonitor> status = new ObjectArrayList<>();
+    protected final IConfigManager configManager;
+    protected ITextComponent myName;
+    protected boolean destroyed;
+    protected long storage;
+    protected MachineSource machineSrc;
+    protected int accelerator;
 
     public CraftingCPUCluster(BlockPos boundsMin, BlockPos boundsMax) {
         this.boundsMin = boundsMin;
@@ -185,7 +185,7 @@ public final class CraftingCPUCluster implements IAECluster, ICraftingCPU {
     }
 
     @Nullable
-    private TileCraftingUnit getCore() {
+    protected TileCraftingUnit getCore() {
         if (this.machineSrc == null) {
             return null;
         }

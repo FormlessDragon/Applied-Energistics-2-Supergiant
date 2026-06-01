@@ -5,6 +5,7 @@ import ae2.api.config.Actionable;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.implementations.blockentities.ICraftingMachine;
 import ae2.api.implementations.blockentities.ICrankable;
+import ae2.api.implementations.blockentities.IPatternProviderBatchTarget;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IInWorldGridNodeHost;
@@ -34,6 +35,8 @@ public final class Capabilities {
 
         CapabilityManager.INSTANCE.register(MEStorage.class, createNullStorage(), NullInventory::of);
         CapabilityManager.INSTANCE.register(ICraftingMachine.class, createNullStorage(), NullCraftingMachine::new);
+        CapabilityManager.INSTANCE.register(IPatternProviderBatchTarget.class, createNullStorage(),
+            NullPatternProviderBatchTarget::new);
         CapabilityManager.INSTANCE.register(GenericInternalInventory.class, createNullStorage(), EmptyGenericInternalInventory::new);
         CapabilityManager.INSTANCE.register(IInWorldGridNodeHost.class, createNullStorage(), EmptyInWorldGridNodeHost::new);
         CapabilityManager.INSTANCE.register(ICrankable.class, createNullStorage(), EmptyCrankable::new);
@@ -60,13 +63,28 @@ public final class Capabilities {
         }
 
         @Override
-        public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputs, EnumFacing ejectionDirection) {
+        public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputs, int multiplier,
+                                   EnumFacing ejectionDirection) {
             return false;
+        }
+
+        @Override
+        public int getMaxPatternPushMultiplier(IPatternDetails patternDetails, KeyCounter[] inputs, int maxMultiplier,
+                                               EnumFacing ejectionDirection) {
+            return 0;
         }
 
         @Override
         public boolean acceptsPlans() {
             return false;
+        }
+    }
+
+    private static final class NullPatternProviderBatchTarget implements IPatternProviderBatchTarget {
+        @Override
+        public int getMaxPatternPushMultiplier(IPatternDetails patternDetails, KeyCounter[] inputs, int maxMultiplier,
+                                               EnumFacing ejectionDirection) {
+            return 0;
         }
     }
 

@@ -171,6 +171,16 @@ class PatternProviderTargetCache {
                 }
                 return false;
             }
+
+            @Override
+            public boolean hasEmptySlots() {
+                for (PatternProviderTarget target : targets.values()) {
+                    if (target.hasEmptySlots()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
         };
     }
 
@@ -214,6 +224,16 @@ class PatternProviderTargetCache {
                 return false;
             }
 
+            @Override
+            public boolean hasEmptySlots() {
+                for (int slot = 0; slot < handler.getSlots(); slot++) {
+                    if (handler.getStackInSlot(slot).isEmpty()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
         };
     }
 
@@ -242,6 +262,11 @@ class PatternProviderTargetCache {
             @Override
             public boolean containsAnyStack() {
                 return !storage.getAvailableStacks().isEmpty();
+            }
+
+            @Override
+            public boolean hasEmptySlots() {
+                return false;
             }
         };
     }

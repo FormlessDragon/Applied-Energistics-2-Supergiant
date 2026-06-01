@@ -1,6 +1,7 @@
 package ae2.init;
 
 import ae2.api.AECapabilities;
+import ae2.api.behaviors.GenericInternalInventoryAdapters;
 import ae2.api.parts.RegisterPartCapabilitiesEvent;
 import ae2.api.parts.RegisterPartCapabilitiesEventInternal;
 import ae2.helpers.externalstorage.GenericStackFluidStorage;
@@ -32,6 +33,8 @@ public final class InitCapabilityProviders {
         if (initialized) {
             return;
         }
+        registerGenericInternalInventoryAdapters();
+
         RegisterPartCapabilitiesEvent partEvent = new RegisterPartCapabilitiesEvent();
         partEvent.addHostType(TileCableBus.class);
         partEvent.register(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY,
@@ -40,23 +43,11 @@ public final class InitCapabilityProviders {
         partEvent.register(AECapabilities.GENERIC_INTERNAL_INV,
             (part, side) -> ignoreSide(side, part.getLogic().getReturnInv()),
             PatternProviderPart.class);
-        partEvent.register(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY,
-            (part, side) -> ignoreSide(side, new GenericStackItemStorage(part.getLogic().getReturnInv())),
-            PatternProviderPart.class);
-        partEvent.register(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY,
-            (part, side) -> ignoreSide(side, new GenericStackFluidStorage(part.getLogic().getReturnInv())),
-            PatternProviderPart.class);
         partEvent.register(AECapabilities.GENERIC_INTERNAL_INV,
             (part, side) -> ignoreSide(side, part.getInterfaceLogic().getStorage()),
             InterfacePart.class);
         partEvent.register(AECapabilities.ME_STORAGE,
             (part, side) -> ignoreSide(side, part.getInterfaceLogic().getInventory()),
-            InterfacePart.class);
-        partEvent.register(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY,
-            (part, side) -> ignoreSide(side, new GenericStackItemStorage(part.getInterfaceLogic().getStorage())),
-            InterfacePart.class);
-        partEvent.register(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY,
-            (part, side) -> ignoreSide(side, new GenericStackFluidStorage(part.getInterfaceLogic().getStorage())),
             InterfacePart.class);
         partEvent.register(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY,
             (part, side) -> ignoreSide(side, part.getExposedApi()),
@@ -71,8 +62,16 @@ public final class InitCapabilityProviders {
             (part, side) -> ignoreSide(side, part.getExposedApi()),
             FluidP2PTunnelPart.class);
         MinecraftForge.EVENT_BUS.post(partEvent);
+        partEvent.registerGenericInternalInventoryAdapters();
         RegisterPartCapabilitiesEventInternal.register(partEvent);
         initialized = true;
+    }
+
+    private static void registerGenericInternalInventoryAdapters() {
+        GenericInternalInventoryAdapters.register(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY,
+            GenericStackItemStorage::new);
+        GenericInternalInventoryAdapters.register(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY,
+            GenericStackFluidStorage::new);
     }
 
     private static <T> T ignoreSide(EnumFacing side, T value) {

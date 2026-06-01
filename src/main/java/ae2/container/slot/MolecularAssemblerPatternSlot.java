@@ -1,9 +1,9 @@
 package ae2.container.slot;
 
+import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.stacks.AEItemKey;
 import ae2.client.Point;
-import ae2.tile.crafting.IMolecularAssemblerSupportedPattern;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 
@@ -56,7 +56,7 @@ public class MolecularAssemblerPatternSlot extends AppEngSlot implements IOption
     }
 
     public interface Host {
-        IMolecularAssemblerSupportedPattern getCurrentPattern();
+        IAssemblerPattern getCurrentPattern();
 
         World getWorld();
     }

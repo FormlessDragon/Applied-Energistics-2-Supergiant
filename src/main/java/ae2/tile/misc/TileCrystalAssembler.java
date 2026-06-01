@@ -66,7 +66,7 @@ public class TileCrystalAssembler extends AENetworkedPoweredTile
     private final InternalInventory exposedInventory = new CombinedInternalInventory(
         new FilteredInternalInventory(this.input, new AutomationFilter()),
         new FilteredInternalInventory(this.output, new OutputFilter()));
-    private final IUpgradeInventory upgrades = UpgradeInventories.forMachine(AEBlocks.CRYSTAL_ASSEMBLER.item(), 4,
+    private final IUpgradeInventory upgrades = UpgradeInventories.forMachine(AEBlocks.CRYSTAL_ASSEMBLER.item(), 5,
         this::saveChanges);
     private final ConfigManager configManager = new ConfigManager(this::onConfigChanged);
     private final EnumMap<EnumFacing, ItemTransfer> neighbors = new EnumMap<>(EnumFacing.class);
@@ -282,9 +282,12 @@ public class TileCrystalAssembler extends AENetworkedPoweredTile
             saveChanges();
         }
 
-        if (this.processingTime >= MAX_PROCESSING_TIME && canOutput(task.getResultItem())) {
-            task.consume(this.input, this.tank);
-            this.output.insertItem(0, task.getResultItem(), false);
+        if (this.processingTime >= MAX_PROCESSING_TIME) {
+            int runs = getParallelRuns(task);
+            ItemStack output = task.getResultItem();
+            output.setCount(output.getCount() * runs);
+            task.consume(this.input, this.tank, runs);
+            this.output.insertItem(0, output, false);
             this.processingTime = 0;
             this.cachedTask = null;
             saveChanges();
@@ -325,6 +328,28 @@ public class TileCrystalAssembler extends AENetworkedPoweredTile
 
     private boolean canOutput(ItemStack stack) {
         return this.output.insertItem(0, stack.copy(), true).isEmpty();
+    }
+
+    private int getParallelLimit() {
+        return switch (this.upgrades.getInstalledUpgrades(AEItems.PARALLEL_CARD.item())) {
+            case 1 -> 4;
+            case 2 -> 16;
+            case 3 -> 64;
+            default -> 1;
+        };
+    }
+
+    private int getParallelRuns(CrystalAssemblerRecipe task) {
+        int runs = task.getMaxRuns(this.input, this.tank, this.getParallelLimit());
+        ItemStack output = task.getResultItem();
+        int outputCount = output.getCount();
+        for (int i = runs; i > 0; i--) {
+            output.setCount(outputCount * i);
+            if (canOutput(output)) {
+                return i;
+            }
+        }
+        return 0;
     }
 
     private boolean pushOutResult() {

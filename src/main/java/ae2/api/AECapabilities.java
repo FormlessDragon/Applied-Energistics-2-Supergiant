@@ -21,6 +21,7 @@ package ae2.api;
 import ae2.api.behaviors.GenericInternalInventory;
 import ae2.api.implementations.blockentities.ICraftingMachine;
 import ae2.api.implementations.blockentities.ICrankable;
+import ae2.api.implementations.blockentities.IPatternProviderBatchTarget;
 import ae2.api.networking.IInWorldGridNodeHost;
 import ae2.api.storage.MEStorage;
 import net.minecraftforge.common.capabilities.Capability;
@@ -31,6 +32,8 @@ public final class AECapabilities {
     public static Capability<MEStorage> ME_STORAGE;
     @CapabilityInject(ICraftingMachine.class)
     public static Capability<ICraftingMachine> CRAFTING_MACHINE;
+    @CapabilityInject(IPatternProviderBatchTarget.class)
+    public static Capability<IPatternProviderBatchTarget> PATTERN_PROVIDER_BATCH_TARGET;
     @CapabilityInject(GenericInternalInventory.class)
     public static Capability<GenericInternalInventory> GENERIC_INTERNAL_INV;
     @CapabilityInject(ICrankable.class)

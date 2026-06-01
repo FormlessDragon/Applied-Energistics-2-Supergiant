@@ -105,6 +105,8 @@ public class UpgradeCardItem extends AEBaseItem {
         } else if (isPseudoCraftingCard(stack)) {
             lines.add(TextFormatting.GRAY + GuiText.PseudoCraftingCardLine1.getLocal());
             lines.add(TextFormatting.DARK_GRAY + GuiText.PseudoCraftingCardLine2.getLocal());
+        } else if (AEItemIds.PARALLEL_CARD.equals(stack.getItem().getRegistryName())) {
+            lines.add(TextFormatting.GRAY + net.minecraft.client.resources.I18n.format("item.ae2.parallel_card.tooltip"));
         }
 
         var supportedBy = Upgrades.getTooltipLinesForCard(this);

@@ -102,13 +102,37 @@ public class CraftingCpuHelper {
         return sum;
     }
 
+    public static double calculatePatternPower(IPatternDetails details, int multiplier) {
+        double sum = 0;
+        for (var input : details.getInputs()) {
+            double slotPower = 0;
+            for (var possibleInput : input.possibleInputs()) {
+                slotPower = Math.max(slotPower,
+                    ((double) possibleInput.amount()) / possibleInput.what().getAmountPerOperation());
+            }
+            sum += slotPower * input.getMultiplier() * multiplier;
+        }
+        return sum;
+    }
+
     @Nullable
-    public static KeyCounter @org.jspecify.annotations.Nullable [] extractPatternInputs(
+    public static KeyCounter @Nullable [] extractPatternInputs(
         IPatternDetails details,
         ICraftingInventory sourceInv,
         World level,
         KeyCounter expectedOutputs,
         KeyCounter expectedContainerItems) {
+        return extractPatternInputs(details, sourceInv, level, expectedOutputs, expectedContainerItems, 1);
+    }
+
+    @Nullable
+    public static KeyCounter @Nullable [] extractPatternInputs(
+        IPatternDetails details,
+        ICraftingInventory sourceInv,
+        World level,
+        KeyCounter expectedOutputs,
+        KeyCounter expectedContainerItems,
+        int multiplier) {
 
         // Extract inputs into the container.
         var inputs = details.getInputs();
@@ -117,7 +141,7 @@ public class CraftingCpuHelper {
 
         for (int x = 0; x < inputs.length; x++) {
             var list = inputHolder[x] = new KeyCounter();
-            long remainingMultiplier = inputs[x].getMultiplier();
+            long remainingMultiplier = inputs[x].getMultiplier() * multiplier;
             for (var template : getValidItemTemplates(sourceInv, inputs[x], level)) {
                 long extracted = extractTemplates(sourceInv, template, remainingMultiplier);
                 if (extracted <= 0) {
@@ -152,10 +176,60 @@ public class CraftingCpuHelper {
 
         // Add pattern outputs.
         for (var output : details.getOutputs()) {
-            expectedOutputs.add(output.what(), output.amount());
+            expectedOutputs.add(output.what(), output.amount() * multiplier);
         }
 
         return inputHolder;
+    }
+
+    public static int getMaxExtractablePatternMultiplier(IPatternDetails details, ICraftingInventory sourceInv,
+                                                         World level, int maxMultiplier) {
+        if (maxMultiplier <= 0) {
+            return 0;
+        }
+
+        if (!canExtractPatternInputs(details, sourceInv, level, 1)) {
+            return 0;
+        }
+        if (canExtractPatternInputs(details, sourceInv, level, maxMultiplier)) {
+            return maxMultiplier;
+        }
+
+        int low = 1;
+        int high = maxMultiplier;
+        while (low + 1 < high) {
+            int mid = low + (high - low) / 2;
+            if (canExtractPatternInputs(details, sourceInv, level, mid)) {
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+        return low;
+    }
+
+    private static boolean canExtractPatternInputs(IPatternDetails details, ICraftingInventory sourceInv,
+                                                   World level, int multiplier) {
+        var simulatedInv = new SimulatedExtractionInventory(sourceInv);
+        for (var input : details.getInputs()) {
+            long remainingMultiplier = input.getMultiplier() * multiplier;
+            for (var template : getValidItemTemplates(simulatedInv, input, level)) {
+                long extracted = extractTemplates(simulatedInv, template, remainingMultiplier);
+                if (extracted <= 0) {
+                    continue;
+                }
+
+                remainingMultiplier -= extracted;
+                if (remainingMultiplier == 0) {
+                    break;
+                }
+            }
+
+            if (remainingMultiplier > 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public static void reinjectPatternInputs(ICraftingInventory sourceInv,
@@ -261,6 +335,40 @@ public class CraftingCpuHelper {
     private record FuzzyInputKey(Object primaryKey, long amount) {
         private FuzzyInputKey(AEKey key, long amount) {
             this(key.getPrimaryKey(), amount);
+        }
+    }
+
+    private static final class SimulatedExtractionInventory implements ICraftingInventory {
+        private final ICraftingInventory parent;
+        private final KeyCounter reserved = new KeyCounter();
+
+        private SimulatedExtractionInventory(ICraftingInventory parent) {
+            this.parent = parent;
+        }
+
+        @Override
+        public void insert(AEKey what, long amount, Actionable mode) {
+            if (mode == Actionable.MODULATE) {
+                reserved.remove(what, amount);
+                reserved.removeZeros();
+            }
+        }
+
+        @Override
+        public long extract(AEKey what, long amount, Actionable mode) {
+            long reservedAmount = reserved.get(what);
+            long requested = Long.MAX_VALUE - reservedAmount < amount ? Long.MAX_VALUE : amount + reservedAmount;
+            long available = Math.max(0, parent.extract(what, requested, Actionable.SIMULATE) - reservedAmount);
+            long extracted = Math.min(available, amount);
+            if (mode == Actionable.MODULATE && extracted > 0) {
+                reserved.add(what, extracted);
+            }
+            return extracted;
+        }
+
+        @Override
+        public Iterable<AEKey> findFuzzyTemplates(AEKey input) {
+            return parent.findFuzzyTemplates(input);
         }
     }
 }

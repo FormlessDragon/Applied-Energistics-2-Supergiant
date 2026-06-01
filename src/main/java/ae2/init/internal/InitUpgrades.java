@@ -56,8 +56,13 @@ public final class InitUpgrades {
             patternProviderGroup);
 
         Upgrades.add(AEItems.SPEED_CARD.item(), AEBlocks.MOLECULAR_ASSEMBLER.item(), 5);
+        Upgrades.add(AEItems.PARALLEL_CARD.item(), AEBlocks.MOLECULAR_ASSEMBLER.item(), 3);
+        Upgrades.add(AEItems.PATTERN_EXPANSION_CARD.item(), AEBlocks.MOLECULAR_ASSEMBLER.item(),
+            AEConfig.instance().getMolecularAssemblerPatternExpansionCardLimit(), patternProviderGroup);
         Upgrades.add(AEItems.SPEED_CARD.item(), AEBlocks.INSCRIBER.item(), 4);
+        Upgrades.add(AEItems.PARALLEL_CARD.item(), AEBlocks.INSCRIBER.item(), 3);
         Upgrades.add(AEItems.SPEED_CARD.item(), AEBlocks.CRYSTAL_ASSEMBLER.item(), 4);
+        Upgrades.add(AEItems.PARALLEL_CARD.item(), AEBlocks.CRYSTAL_ASSEMBLER.item(), 3);
 
         Upgrades.add(AEItems.SPEED_CARD.item(), AEBlocks.IO_PORT.item(), 3);
         Upgrades.add(AEItems.REDSTONE_CARD.item(), AEBlocks.IO_PORT.item(), 1);

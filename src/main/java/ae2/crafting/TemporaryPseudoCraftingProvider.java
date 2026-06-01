@@ -40,9 +40,20 @@ public record TemporaryPseudoCraftingProvider(IPatternDetails pattern) implement
     }
 
     @Override
-    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder) {
+    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder, int multiplier) {
         return PseudoPatternDetails.unwrap(patternDetails).getDefinition().equals(
             PseudoPatternDetails.unwrap(this.pattern).getDefinition());
+    }
+
+    @Override
+    public boolean canMergePatternPush(IPatternDetails patternDetails) {
+        return true;
+    }
+
+    @Override
+    public int getMaxPatternPushMultiplier(IPatternDetails patternDetails, int maxMultiplier) {
+        return PseudoPatternDetails.unwrap(patternDetails).getDefinition().equals(
+            PseudoPatternDetails.unwrap(this.pattern).getDefinition()) ? maxMultiplier : 0;
     }
 
     @Override

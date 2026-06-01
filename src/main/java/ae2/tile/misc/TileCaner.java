@@ -384,9 +384,10 @@ public class TileCaner extends AENetworkedPoweredTile
     }
 
     @Override
-    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputs, EnumFacing ejectionDirection) {
+    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputs, int multiplier,
+                               EnumFacing ejectionDirection) {
         if (!(patternDetails instanceof AEProcessingPattern) || this.stuff.getStack(0) != null
-            || !this.container.getStackInSlot(0).isEmpty()) {
+            || !this.container.getStackInSlot(0).isEmpty() || multiplier != 1) {
             return false;
         }
         return this.mode == CanerMode.FILL
@@ -394,14 +395,49 @@ public class TileCaner extends AENetworkedPoweredTile
             : pushEmptyPattern(patternDetails, inputs, ejectionDirection);
     }
 
+    @Override
+    public int getMaxPatternPushMultiplier(IPatternDetails patternDetails, KeyCounter[] inputs, int maxMultiplier,
+                                           EnumFacing ejectionDirection) {
+        if (maxMultiplier <= 0 || !(patternDetails instanceof AEProcessingPattern) || this.stuff.getStack(0) != null
+            || !this.container.getStackInSlot(0).isEmpty()) {
+            return 0;
+        }
+        return this.mode == CanerMode.FILL
+            ? canAcceptFillPattern(patternDetails, inputs) ? 1 : 0
+            : canAcceptEmptyPattern(patternDetails, inputs) ? 1 : 0;
+    }
+
     private boolean pushFillPattern(IPatternDetails patternDetails, KeyCounter[] inputs, EnumFacing ejectionDirection) {
+        if (!canAcceptFillPattern(patternDetails, inputs)) {
+            return false;
+        }
+        var first = inputs[0].getFirstEntry();
+        var second = inputs[1].getFirstEntry();
+        GenericStack output = patternDetails.getPrimaryOutput();
+        var content = first;
+        var containerEntry = second;
+        if (content.getKey() instanceof AEItemKey) {
+            content = second;
+            containerEntry = first;
+        }
+        AEItemKey outputItem = (AEItemKey) output.what();
+        AEItemKey containerItem = (AEItemKey) containerEntry.getKey();
+
+        this.stuff.setStack(0, new GenericStack(content.getKey(), content.getLongValue()));
+        this.container.setItemDirect(0, containerItem.toStack());
+        this.target = outputItem.toStack();
+        this.ejectSide = ejectionDirection;
+        return true;
+    }
+
+    private boolean canAcceptFillPattern(IPatternDetails patternDetails, KeyCounter[] inputs) {
         if (inputs.length != 2) {
             return false;
         }
         var first = inputs[0].getFirstEntry();
         var second = inputs[1].getFirstEntry();
         GenericStack output = patternDetails.getPrimaryOutput();
-        if (first == null || second == null || !(output.what() instanceof AEItemKey outputItem)
+        if (first == null || second == null || !(output.what() instanceof AEItemKey)
             || output.amount() != 1) {
             return false;
         }
@@ -412,24 +448,41 @@ public class TileCaner extends AENetworkedPoweredTile
             content = second;
             containerEntry = first;
         }
-        if (!(containerEntry.getKey() instanceof AEItemKey containerItem) || containerEntry.getLongValue() != 1
-            || content.getKey() instanceof AEItemKey) {
+        return containerEntry.getKey() instanceof AEItemKey
+            && containerEntry.getLongValue() == 1
+            && !(content.getKey() instanceof AEItemKey);
+    }
+
+    private boolean pushEmptyPattern(IPatternDetails patternDetails, KeyCounter[] inputs, EnumFacing ejectionDirection) {
+        if (!canAcceptEmptyPattern(patternDetails, inputs)) {
             return false;
         }
+        var input = inputs[0].getFirstEntry();
+        AEItemKey inputItem = (AEItemKey) input.getKey();
 
-        this.stuff.setStack(0, new GenericStack(content.getKey(), content.getLongValue()));
-        this.container.setItemDirect(0, containerItem.toStack());
+        GenericStack firstOutput = patternDetails.getOutputs().get(0);
+        GenericStack secondOutput = patternDetails.getOutputs().get(1);
+        GenericStack content = firstOutput;
+        GenericStack output = secondOutput;
+        if (content.what() instanceof AEItemKey) {
+            content = secondOutput;
+            output = firstOutput;
+        }
+        AEItemKey outputItem = (AEItemKey) output.what();
+
+        this.container.setItemDirect(0, inputItem.toStack());
         this.target = outputItem.toStack();
+        this.emptyKey = content.what();
         this.ejectSide = ejectionDirection;
         return true;
     }
 
-    private boolean pushEmptyPattern(IPatternDetails patternDetails, KeyCounter[] inputs, EnumFacing ejectionDirection) {
+    private boolean canAcceptEmptyPattern(IPatternDetails patternDetails, KeyCounter[] inputs) {
         if (inputs.length != 1 || patternDetails.getOutputs().size() != 2) {
             return false;
         }
         var input = inputs[0].getFirstEntry();
-        if (input == null || !(input.getKey() instanceof AEItemKey inputItem) || input.getLongValue() != 1) {
+        if (input == null || !(input.getKey() instanceof AEItemKey) || input.getLongValue() != 1) {
             return false;
         }
 
@@ -441,16 +494,9 @@ public class TileCaner extends AENetworkedPoweredTile
             content = secondOutput;
             output = firstOutput;
         }
-        if (content.what() instanceof AEItemKey || !(output.what() instanceof AEItemKey outputItem)
-            || output.amount() != 1) {
-            return false;
-        }
-
-        this.container.setItemDirect(0, inputItem.toStack());
-        this.target = outputItem.toStack();
-        this.emptyKey = content.what();
-        this.ejectSide = ejectionDirection;
-        return true;
+        return !(content.what() instanceof AEItemKey)
+            && output.what() instanceof AEItemKey
+            && output.amount() == 1;
     }
 
     @Override
@@ -480,4 +526,5 @@ public class TileCaner extends AENetworkedPoweredTile
         }
         return super.getCapability(capability, facing);
     }
+
 }

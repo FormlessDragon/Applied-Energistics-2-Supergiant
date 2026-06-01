@@ -27,6 +27,7 @@ import ae2.api.config.PatternProviderOutputSideMode;
 import ae2.api.config.Setting;
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
+import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.IPatternDetails.IInput;
 import ae2.api.crafting.PatternDetailsHelper;
@@ -60,6 +61,8 @@ import ae2.core.localization.PlayerMessages;
 import ae2.core.settings.TickRates;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.helpers.InterfaceLogicHost;
+import ae2.helpers.patternprovider.PatternProviderMergeHelper.ExternalTarget;
+import ae2.helpers.patternprovider.PatternProviderMergeHelper.TargetMatch;
 import ae2.me.helpers.MachineSource;
 import ae2.util.inv.AppEngInternalInventory;
 import ae2.util.inv.InternalInventoryHost;
@@ -75,6 +78,8 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -136,6 +141,8 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     private boolean wasProviderActive;
     private boolean hasLastSuccessfulPatternHash;
     private int lastSuccessfulPatternHash;
+    @Nullable
+    private PendingMergePush pendingMergePush;
 
     public PatternProviderLogic(IManagedGridNode mainNode, PatternProviderLogicHost host) {
         this(mainNode, host, host.getMainContainerIcon().getItem(),
@@ -146,7 +153,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         this(mainNode, host, host.getMainContainerIcon().getItem(), patternInventorySize);
     }
 
-    public PatternProviderLogic(IManagedGridNode mainNode, PatternProviderLogicHost host, net.minecraft.item.Item machineType,
+    public PatternProviderLogic(IManagedGridNode mainNode, PatternProviderLogicHost host, Item machineType,
                                 int patternInventorySize) {
         this.host = host;
         this.mainNode = mainNode
@@ -176,7 +183,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         });
     }
 
-    private static int countItem(net.minecraft.entity.player.InventoryPlayer inventory, ItemStack needle) {
+    private static int countItem(InventoryPlayer inventory, ItemStack needle) {
         int total = 0;
         for (int i = 0; i < inventory.getSizeInventory(); i++) {
             ItemStack stack = inventory.getStackInSlot(i);
@@ -333,7 +340,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         for (int slot = 0; slot < this.getActivePatternSlots(); slot++) {
             ItemStack stack = this.patternInventory.getStackInSlot(slot);
             IPatternDetails details = PatternDetailsHelper.decodePattern(stack, this.host.getTileEntity().getWorld());
-            if (details == null) {
+            if (details == null || details instanceof IAssemblerPattern) {
                 continue;
             }
 
@@ -384,7 +391,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     }
 
     @Override
-    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder) {
+    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder, int multiplier) {
         var basePatternDetails = PseudoPatternDetails.unwrap(patternDetails);
         if (!this.pendingSendList.isEmpty() || !this.mainNode.isActive() || !this.patterns.contains(basePatternDetails)) {
             return false;
@@ -394,11 +401,107 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             return false;
         }
 
-        ObjectList<PushTarget> possibleTargets = new ObjectArrayList<>();
+        if (this.pendingMergePush != null && this.pendingMergePush.matches(basePatternDetails)) {
+            PendingMergePush mergePush = this.pendingMergePush;
+            this.pendingMergePush = null;
+            return mergePush.push(inputHolder, multiplier);
+        }
+
+        this.pendingMergePush = null;
+        PushTargetSet targetSet = collectPushTargets(basePatternDetails);
+        if (targetSet == null) {
+            return false;
+        }
+
+        for (MachinePushTarget machineTarget : targetSet.machineTargets) {
+            if (machineTarget.machine.pushPattern(basePatternDetails, inputHolder, 1,
+                machineTarget.ejectionDirection)) {
+                onPushPatternSuccess(basePatternDetails);
+                return true;
+            }
+        }
+
+        if (!basePatternDetails.supportsPushInputsToExternalInventory()) {
+            return false;
+        }
+
+        if (this.configManager.getSetting(Settings.PATTERN_PROVIDER_OUTPUT_SIDE_MODE)
+            == PatternProviderOutputSideMode.SPLIT_BY_INGREDIENTS_TYPE) {
+            return pushPatternSplitByIngredientsType(basePatternDetails, inputHolder, targetSet.externalTargets);
+        }
+
+        return pushPatternSingleSide(basePatternDetails, inputHolder, targetSet.externalTargets);
+    }
+
+    @Override
+    public boolean canMergePatternPush(IPatternDetails patternDetails) {
+        var basePatternDetails = PseudoPatternDetails.unwrap(patternDetails);
+        if (!this.mainNode.isActive() || !this.patterns.contains(basePatternDetails)
+            || !this.pendingSendList.isEmpty() || getCraftingLockedReason() != LockCraftingMode.NONE) {
+            return false;
+        }
+        if (!shouldBypassBlockingFor(basePatternDetails)
+            && this.configManager.getSetting(Settings.BLOCKING_MODE) != BlockingMode.NO) {
+            return false;
+        }
+        if (getInsertionMode() == PatternProviderInsertionMode.EMPTY_ONLY) {
+            return false;
+        }
+        return getInsertionMode() != PatternProviderInsertionMode.PREFER_EMPTY
+            || !shouldUseSinglePushForPreferEmpty(basePatternDetails);
+    }
+
+    @Override
+    public int getMaxPatternPushMultiplier(IPatternDetails patternDetails, int maxMultiplier) {
+        this.pendingMergePush = null;
+        if (maxMultiplier <= 0 || !canMergePatternPush(patternDetails)) {
+            return 0;
+        }
+
+        var basePatternDetails = PseudoPatternDetails.unwrap(patternDetails);
+        PushTargetSet targetSet = collectPushTargets(basePatternDetails);
+        if (targetSet == null) {
+            return 0;
+        }
+
+        for (MachinePushTarget machineTarget : targetSet.machineTargets) {
+            int definitionMultiplier = machineTarget.machine.getMaxPatternPushMultiplier(basePatternDetails,
+                buildPatternInputHolder(basePatternDetails, 1), maxMultiplier, machineTarget.ejectionDirection);
+            if (definitionMultiplier <= 0) {
+                continue;
+            }
+            int multiplier = Math.min(definitionMultiplier, maxMultiplier);
+            this.pendingMergePush = new MachineMergePush(basePatternDetails, machineTarget, multiplier);
+            return multiplier;
+        }
+
+        if (!basePatternDetails.supportsPushInputsToExternalInventory()) {
+            return 0;
+        }
+
+        PendingMergePush mergePush;
+        if (this.configManager.getSetting(Settings.PATTERN_PROVIDER_OUTPUT_SIDE_MODE)
+            == PatternProviderOutputSideMode.SPLIT_BY_INGREDIENTS_TYPE) {
+            mergePush = prepareSplitMergePush(basePatternDetails, targetSet.externalTargets, maxMultiplier);
+        } else {
+            mergePush = prepareSingleSideMergePush(basePatternDetails, targetSet.externalTargets, maxMultiplier);
+        }
+
+        if (mergePush == null || mergePush.multiplier() <= 0) {
+            return 0;
+        }
+        this.pendingMergePush = mergePush;
+        return mergePush.multiplier();
+    }
+
+    @Nullable
+    private PushTargetSet collectPushTargets(IPatternDetails patternDetails) {
+        ObjectList<MachinePushTarget> machineTargets = new ObjectArrayList<>();
+        ObjectList<ExternalTarget> externalTargets = new ObjectArrayList<>();
         TileEntity blockEntity = this.host.getTileEntity();
         World level = blockEntity.getWorld();
         if (level == null) {
-            return false;
+            return null;
         }
 
         for (EnumFacing direction : getActiveSides()) {
@@ -407,48 +510,37 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
             ICraftingMachine craftingMachine = ICraftingMachine.of(level, adjacentPos, adjacentSide);
             if (craftingMachine != null && craftingMachine.acceptsPlans()) {
-                if (craftingMachine.pushPattern(basePatternDetails, inputHolder, adjacentSide)) {
-                    onPushPatternSuccess(basePatternDetails);
-                    return true;
-                }
+                machineTargets.add(new MachinePushTarget(craftingMachine, adjacentSide));
                 continue;
             }
 
             PatternProviderTarget adapter = findAdapter(direction);
             if (adapter != null) {
-                possibleTargets.add(new PushTarget(direction, adapter));
+                externalTargets.add(new ExternalTarget(direction, adapter));
             }
         }
 
-        if (!basePatternDetails.supportsPushInputsToExternalInventory()) {
-            return false;
-        }
+        rearrangeRoundRobin(externalTargets);
+        return new PushTargetSet(machineTargets, externalTargets);
+    }
 
-        rearrangeRoundRobin(possibleTargets);
-        if (this.configManager.getSetting(Settings.PATTERN_PROVIDER_OUTPUT_SIDE_MODE)
-            == PatternProviderOutputSideMode.SPLIT_BY_INGREDIENTS_TYPE) {
-            return pushPatternSplitByIngredientsType(basePatternDetails, inputHolder, possibleTargets);
-        }
-
-        for (int i = 0; i < possibleTargets.size(); ++i) {
-            PushTarget target = possibleTargets.get(i);
-            if (this.isTargetBlocked(target.target, basePatternDetails)) {
-                continue;
-            }
-
-            if (this.adapterAcceptsAll(target.target, inputHolder)) {
-                basePatternDetails.pushInputsToExternalInventory(inputHolder, (what, amount) -> {
-                    long inserted = target.target.insert(what, amount, Actionable.MODULATE, getInsertionMode());
-                    if (inserted < amount) {
-                        this.addToSendList(what, amount - inserted, target.direction);
-                    }
-                });
-                onPushPatternSuccess(basePatternDetails);
-                this.saveChanges();
-                this.sendStacksOut();
-                this.roundRobinIndex += i + 1;
-                return true;
-            }
+    private boolean pushPatternSingleSide(IPatternDetails patternDetails, KeyCounter[] inputHolder,
+                                          ObjectList<ExternalTarget> possibleTargets) {
+        TargetMatch match = PatternProviderMergeHelper.findSinglePushTarget(possibleTargets, inputHolder,
+            getInsertionMode(), target -> this.isTargetBlocked(target.target(), patternDetails));
+        if (match != null) {
+            ExternalTarget target = match.target();
+            patternDetails.pushInputsToExternalInventory(inputHolder, (what, amount) -> {
+                long inserted = target.target().insert(what, amount, Actionable.MODULATE, getInsertionMode());
+                if (inserted < amount) {
+                    this.addToSendList(what, amount - inserted, target.direction());
+                }
+            });
+            onPushPatternSuccess(patternDetails);
+            this.saveChanges();
+            this.sendStacksOut();
+            this.roundRobinIndex += match.matchedTargetIndex() + 1;
+            return true;
         }
 
         return false;
@@ -564,37 +656,26 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     }
 
     private boolean pushPatternSplitByIngredientsType(IPatternDetails patternDetails, KeyCounter[] inputHolder,
-                                                      ObjectList<PushTarget> possibleTargets) {
+                                                      ObjectList<ExternalTarget> possibleTargets) {
         Reference2ObjectMap<AEKeyType, KeyCounter[]> inputsByType = splitInputsByType(inputHolder);
-        Reference2ObjectMap<AEKeyType, PushTarget> targetsByType = new Reference2ObjectOpenHashMap<>();
+        Reference2ObjectMap<AEKeyType, ExternalTarget> targetsByType = new Reference2ObjectOpenHashMap<>();
         int highestMatchedTargetIndex = -1;
 
         for (Entry<AEKeyType, KeyCounter[]> entry : inputsByType.entrySet()) {
-            PushTarget matchedTarget = null;
-            for (int i = 0; i < possibleTargets.size(); i++) {
-                PushTarget target = possibleTargets.get(i);
-                if (this.isTargetBlocked(target.target, patternDetails)) {
-                    continue;
-                }
-
-                if (this.adapterAcceptsAll(target.target, entry.getValue())) {
-                    matchedTarget = target;
-                    highestMatchedTargetIndex = Math.max(highestMatchedTargetIndex, i);
-                    break;
-                }
-            }
-
-            if (matchedTarget == null) {
+            TargetMatch match = PatternProviderMergeHelper.findSinglePushTarget(possibleTargets, entry.getValue(),
+                getInsertionMode(), target -> this.isTargetBlocked(target.target(), patternDetails));
+            if (match == null) {
                 return false;
             }
-            targetsByType.put(entry.getKey(), matchedTarget);
+            targetsByType.put(entry.getKey(), match.target());
+            highestMatchedTargetIndex = Math.max(highestMatchedTargetIndex, match.matchedTargetIndex());
         }
 
         patternDetails.pushInputsToExternalInventory(inputHolder, (what, amount) -> {
-            PushTarget target = targetsByType.get(what.getType());
-            long inserted = target.target.insert(what, amount, Actionable.MODULATE, getInsertionMode());
+            ExternalTarget target = targetsByType.get(what.getType());
+            long inserted = target.target().insert(what, amount, Actionable.MODULATE, getInsertionMode());
             if (inserted < amount) {
-                this.addToSendList(what, amount - inserted, target.direction);
+                this.addToSendList(what, amount - inserted, target.direction());
             }
         });
         onPushPatternSuccess(patternDetails);
@@ -602,6 +683,83 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         this.sendStacksOut();
         this.roundRobinIndex += highestMatchedTargetIndex + 1;
         return true;
+    }
+
+    @Nullable
+    private PendingMergePush prepareSingleSideMergePush(IPatternDetails patternDetails,
+                                                        ObjectList<ExternalTarget> possibleTargets,
+                                                        int maxMultiplier) {
+        TargetMatch match = PatternProviderMergeHelper.findMergedSinglePushTarget(possibleTargets,
+            buildPatternInputHolder(patternDetails, 1), maxMultiplier, getInsertionMode(),
+            target -> this.isTargetBlocked(target.target(), patternDetails) || shouldUseSinglePushForInsertionMode(target));
+        if (match != null) {
+            return new SingleTargetMergePush(patternDetails, match.target(), match.matchedTargetIndex(),
+                match.multiplier());
+        }
+        return null;
+    }
+
+    @Nullable
+    private PendingMergePush prepareSplitMergePush(IPatternDetails patternDetails,
+                                                   ObjectList<ExternalTarget> possibleTargets,
+                                                   int maxMultiplier) {
+        Reference2ObjectMap<AEKeyType, KeyCounter[]> inputsByType = splitPatternInputsByType(patternDetails);
+        Reference2ObjectMap<AEKeyType, ExternalTarget> targetsByType = new Reference2ObjectOpenHashMap<>();
+        int highestMatchedTargetIndex = -1;
+        int multiplier = maxMultiplier;
+
+        for (Entry<AEKeyType, KeyCounter[]> entry : inputsByType.entrySet()) {
+            TargetMatch match = PatternProviderMergeHelper.findMergedSinglePushTarget(possibleTargets, entry.getValue(),
+                multiplier, getInsertionMode(), target -> this.isTargetBlocked(target.target(), patternDetails)
+                    || shouldUseSinglePushForInsertionMode(target));
+            if (match == null) {
+                return null;
+            }
+            targetsByType.put(entry.getKey(), match.target());
+            multiplier = Math.min(multiplier, match.multiplier());
+            highestMatchedTargetIndex = Math.max(highestMatchedTargetIndex, match.matchedTargetIndex());
+        }
+
+        if (multiplier <= 0) {
+            return null;
+        }
+        return new SplitTargetMergePush(patternDetails, targetsByType, highestMatchedTargetIndex, multiplier);
+    }
+
+    private boolean shouldUseSinglePushForInsertionMode(ExternalTarget target) {
+        return getInsertionMode() == PatternProviderInsertionMode.PREFER_EMPTY && target.target().hasEmptySlots();
+    }
+
+    private boolean shouldUseSinglePushForPreferEmpty(IPatternDetails patternDetails) {
+        PushTargetSet targetSet = collectPushTargets(patternDetails);
+        if (targetSet == null || !patternDetails.supportsPushInputsToExternalInventory()) {
+            return false;
+        }
+
+        if (this.configManager.getSetting(Settings.PATTERN_PROVIDER_OUTPUT_SIDE_MODE)
+            == PatternProviderOutputSideMode.SPLIT_BY_INGREDIENTS_TYPE) {
+            Reference2ObjectMap<AEKeyType, KeyCounter[]> inputsByType = splitInputsByType(
+                buildPatternInputHolder(patternDetails, 1));
+            for (KeyCounter[] inputs : inputsByType.values()) {
+                ExternalTarget target = findFirstExternalTarget(patternDetails, inputs, targetSet.externalTargets);
+                if (target != null && target.target().hasEmptySlots()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        KeyCounter[] inputHolder = buildPatternInputHolder(patternDetails, 1);
+        ExternalTarget target = findFirstExternalTarget(patternDetails, inputHolder, targetSet.externalTargets);
+        return target != null && target.target().hasEmptySlots();
+    }
+
+    @Nullable
+    private ExternalTarget findFirstExternalTarget(IPatternDetails patternDetails, KeyCounter[] inputHolder,
+                                                   ObjectList<ExternalTarget> possibleTargets) {
+        TargetMatch match = PatternProviderMergeHelper.findSinglePushTarget(possibleTargets, inputHolder,
+            getInsertionMode(), target -> this.isTargetBlocked(target.target(), patternDetails));
+        return match == null ? null : match.target();
     }
 
     private Reference2ObjectMap<AEKeyType, KeyCounter[]> splitInputsByType(KeyCounter[] inputHolder) {
@@ -619,6 +777,24 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             }
         }
         return result;
+    }
+
+    private Reference2ObjectMap<AEKeyType, KeyCounter[]> splitPatternInputsByType(IPatternDetails patternDetails) {
+        return splitInputsByType(buildPatternInputHolder(patternDetails, 1));
+    }
+
+    private KeyCounter[] buildPatternInputHolder(IPatternDetails patternDetails, int multiplier) {
+        IInput[] inputs = patternDetails.getInputs();
+        KeyCounter[] inputHolder = new KeyCounter[inputs.length];
+        for (int slot = 0; slot < inputs.length; slot++) {
+            inputHolder[slot] = new KeyCounter();
+            GenericStack[] possibleInputs = inputs[slot].possibleInputs();
+            if (possibleInputs.length > 0) {
+                GenericStack input = possibleInputs[0];
+                inputHolder[slot].add(input.what(), input.amount() * inputs[slot].getMultiplier() * multiplier);
+            }
+        }
+        return inputHolder;
     }
 
     @Nullable
@@ -643,17 +819,6 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
     private PatternProviderInsertionMode getInsertionMode() {
         return this.configManager.getSetting(Settings.PATTERN_PROVIDER_INSERTION_MODE);
-    }
-
-    private boolean adapterAcceptsAll(PatternProviderTarget target, KeyCounter[] inputHolder) {
-        for (KeyCounter inputList : inputHolder) {
-            for (Object2LongMap.Entry<AEKey> input : inputList) {
-                if (target.insert(input.getKey(), input.getLongValue(), Actionable.SIMULATE, getInsertionMode()) == 0) {
-                    return false;
-                }
-            }
-        }
-        return true;
     }
 
     private void addToSendList(AEKey what, long amount, EnumFacing direction) {
@@ -1018,16 +1183,192 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         }
     }
 
-    private record PushTarget(EnumFacing direction, PatternProviderTarget target) {
+    private boolean hasSamePatternInOtherSlot(InternalInventory inv, int slot, ItemStack stack) {
+        AEItemKey pattern = AEItemKey.of(stack);
+        if (pattern == null) {
+            return false;
+        }
+
+        for (int i = 0; i < inv.size(); i++) {
+            if (i == slot) {
+                continue;
+            }
+
+            AEItemKey otherPattern = AEItemKey.of(inv.getStackInSlot(i));
+            if (pattern.equals(otherPattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private interface PendingMergePush {
+        boolean matches(IPatternDetails patternDetails);
+
+        int multiplier();
+
+        boolean push(KeyCounter[] inputHolder, int multiplier);
+    }
+
+    private record MachinePushTarget(ICraftingMachine machine, EnumFacing ejectionDirection) {
+    }
+
+    private record PushTargetSet(ObjectList<MachinePushTarget> machineTargets,
+                                 ObjectList<ExternalTarget> externalTargets) {
+    }
+
+    private final class MachineMergePush implements PendingMergePush {
+        private final IPatternDetails patternDetails;
+        private final MachinePushTarget target;
+        private final int multiplier;
+
+        private MachineMergePush(IPatternDetails patternDetails, MachinePushTarget target, int multiplier) {
+            this.patternDetails = patternDetails;
+            this.target = target;
+            this.multiplier = multiplier;
+        }
+
+        @Override
+        public boolean matches(IPatternDetails patternDetails) {
+            return this.patternDetails == patternDetails || this.patternDetails.getDefinition().equals(patternDetails.getDefinition());
+        }
+
+        @Override
+        public int multiplier() {
+            return this.multiplier;
+        }
+
+        @Override
+        public boolean push(KeyCounter[] inputHolder, int multiplier) {
+            int acceptedMultiplier = this.target.machine.getMaxPatternPushMultiplier(this.patternDetails, inputHolder,
+                multiplier, this.target.ejectionDirection);
+            if (acceptedMultiplier < multiplier) {
+                return false;
+            }
+            if (this.target.machine.pushPattern(this.patternDetails, inputHolder, multiplier,
+                this.target.ejectionDirection)) {
+                onPushPatternSuccess(this.patternDetails);
+                return true;
+            }
+            return false;
+        }
+    }
+
+    private final class SingleTargetMergePush implements PendingMergePush {
+        private final IPatternDetails patternDetails;
+        private final ExternalTarget target;
+        private final int matchedTargetIndex;
+        private final int multiplier;
+
+        private SingleTargetMergePush(IPatternDetails patternDetails, ExternalTarget target, int matchedTargetIndex,
+                                      int multiplier) {
+            this.patternDetails = patternDetails;
+            this.target = target;
+            this.matchedTargetIndex = matchedTargetIndex;
+            this.multiplier = multiplier;
+        }
+
+        @Override
+        public boolean matches(IPatternDetails patternDetails) {
+            return this.patternDetails == patternDetails || this.patternDetails.getDefinition().equals(patternDetails.getDefinition());
+        }
+
+        @Override
+        public int multiplier() {
+            return this.multiplier;
+        }
+
+        @Override
+        public boolean push(KeyCounter[] inputHolder, int multiplier) {
+            if (multiplier > this.multiplier) {
+                return false;
+            }
+            if (!PatternProviderMergeHelper.acceptsAllFully(this.target.target(), inputHolder, 1,
+                getInsertionMode())) {
+                return false;
+            }
+            this.patternDetails.pushInputsToExternalInventory(inputHolder, (what, amount) -> {
+                if (amount > 0) {
+                    this.target.target().insert(what, amount, Actionable.MODULATE, getInsertionMode());
+                }
+            });
+            onPushPatternSuccess(this.patternDetails);
+            saveChanges();
+            sendStacksOut();
+            roundRobinIndex += this.matchedTargetIndex + 1;
+            return true;
+        }
     }
 
     private record PendingSend(GenericStack stack, EnumFacing direction) {
     }
 
-    private static class PatternInventoryFilter implements IAEItemFilter {
+    private final class SplitTargetMergePush implements PendingMergePush {
+        private final IPatternDetails patternDetails;
+        private final Reference2ObjectMap<AEKeyType, ExternalTarget> targetsByType;
+        private final int highestMatchedTargetIndex;
+        private final int multiplier;
+
+        private SplitTargetMergePush(IPatternDetails patternDetails,
+                                     Reference2ObjectMap<AEKeyType, ExternalTarget> targetsByType,
+                                     int highestMatchedTargetIndex,
+                                     int multiplier) {
+            this.patternDetails = patternDetails;
+            this.targetsByType = targetsByType;
+            this.highestMatchedTargetIndex = highestMatchedTargetIndex;
+            this.multiplier = multiplier;
+        }
+
         @Override
-        public boolean allowInsert(ae2.api.inventories.InternalInventory inv, int slot, ItemStack stack) {
-            return PatternDetailsHelper.isEncodedPattern(stack);
+        public boolean matches(IPatternDetails patternDetails) {
+            return this.patternDetails == patternDetails || this.patternDetails.getDefinition().equals(patternDetails.getDefinition());
+        }
+
+        @Override
+        public int multiplier() {
+            return this.multiplier;
+        }
+
+        @Override
+        public boolean push(KeyCounter[] inputHolder, int multiplier) {
+            if (multiplier > this.multiplier) {
+                return false;
+            }
+            Reference2ObjectMap<AEKeyType, KeyCounter[]> inputsByType = splitInputsByType(inputHolder);
+            for (Entry<AEKeyType, KeyCounter[]> entry : inputsByType.entrySet()) {
+                ExternalTarget target = this.targetsByType.get(entry.getKey());
+                if (target == null || !PatternProviderMergeHelper.acceptsAllFully(target.target(), entry.getValue(),
+                    1, getInsertionMode())) {
+                    return false;
+                }
+            }
+            this.patternDetails.pushInputsToExternalInventory(inputHolder, (what, amount) -> {
+                ExternalTarget target = this.targetsByType.get(what.getType());
+                if (amount > 0) {
+                    target.target().insert(what, amount, Actionable.MODULATE, getInsertionMode());
+                }
+            });
+            onPushPatternSuccess(this.patternDetails);
+            saveChanges();
+            sendStacksOut();
+            roundRobinIndex += this.highestMatchedTargetIndex + 1;
+            return true;
+        }
+    }
+
+    private class PatternInventoryFilter implements IAEItemFilter {
+        @Override
+        public boolean allowInsert(InternalInventory inv, int slot, ItemStack stack) {
+            if (stack.isEmpty() || PatternProviderLogic.this.host.getTileEntity().getWorld() == null) {
+                return false;
+            }
+
+            IPatternDetails details = PatternDetailsHelper.decodePattern(stack,
+                PatternProviderLogic.this.host.getTileEntity().getWorld());
+            return details != null
+                && !(details instanceof IAssemblerPattern)
+                && !hasSamePatternInOtherSlot(inv, slot, stack);
         }
     }
 
@@ -1100,21 +1441,21 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     }
 
     private class PatternProviderUpgradeInventory extends AppEngInternalInventory implements IUpgradeInventory {
-        private final net.minecraft.item.Item item;
+        private final Item item;
 
-        PatternProviderUpgradeInventory(net.minecraft.item.Item item, int slots) {
+        PatternProviderUpgradeInventory(Item item, int slots) {
             super(PatternProviderLogic.this, slots, 1);
             this.item = item;
             this.setFilter(new UpgradeInvFilter());
         }
 
         @Override
-        public net.minecraft.item.Item getUpgradableItem() {
+        public Item getUpgradableItem() {
             return this.item;
         }
 
         @Override
-        public int getInstalledUpgrades(net.minecraft.item.Item upgradeCard) {
+        public int getInstalledUpgrades(Item upgradeCard) {
             int installed = 0;
             for (ItemStack stack : this) {
                 if (!stack.isEmpty() && stack.getItem() == upgradeCard) {
@@ -1125,7 +1466,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         }
 
         @Override
-        public int getMaxInstalled(net.minecraft.item.Item upgradeCard) {
+        public int getMaxInstalled(Item upgradeCard) {
             return Upgrades.getMaxInstallable(upgradeCard, this.item);
         }
 

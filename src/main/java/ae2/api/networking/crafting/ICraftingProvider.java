@@ -50,7 +50,7 @@ public interface ICraftingProvider extends IGridNodeService {
     /**
      * Return the patterns offered by this provider. {@link #pushPattern} will be called if they need to be crafted.
      */
-    List<IPatternDetails> getAvailablePatterns();
+    List<? extends IPatternDetails> getAvailablePatterns();
 
     /**
      * Return the priority for the patterns offered by this provider. The crafting calculation will prioritize patterns
@@ -65,9 +65,25 @@ public interface ICraftingProvider extends IGridNodeService {
      *
      * @param patternDetails details
      * @param inputHolder    the requested stacks, for each input slot of the pattern
+     * @param multiplier     the number of pattern pushes merged into this request
      * @return if the pattern was successfully pushed.
      */
-    boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder);
+    boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder, int multiplier);
+
+    /**
+     * Return true if this provider wants to use the merged pattern push path for the given pattern.
+     * Returning false does not mean the pattern cannot be pushed; it means the crafting CPU must use the normal
+     * one-pattern push path instead.
+     */
+    boolean canMergePatternPush(IPatternDetails patternDetails);
+
+    /**
+     * Return the maximum number of pattern pushes that can currently be merged for the given pattern.
+     * This method may only be called after {@link #canMergePatternPush(IPatternDetails)} returned true for the same
+     * pattern. Returning 0 means this provider is currently unavailable for this pattern and no normal one-pattern
+     * fallback should be attempted for this provider in the current pass.
+     */
+    int getMaxPatternPushMultiplier(IPatternDetails patternDetails, int maxMultiplier);
 
     /**
      * @return if this is true, the crafting engine will refuse to send patterns to this provider.

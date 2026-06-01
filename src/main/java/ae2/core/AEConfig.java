@@ -203,6 +203,10 @@ public final class AEConfig {
         return Math.max(0, AUTOMATION.patternProviderExpansionCardLimit);
     }
 
+    public int getMolecularAssemblerPatternExpansionCardLimit() {
+        return Math.max(0, AUTOMATION.molecularAssemblerPatternExpansionCardLimit);
+    }
+
     public int getGrowthAcceleratorSpeed() {
         return CRAFTING.growthAccelerator;
     }
@@ -556,6 +560,13 @@ public final class AEConfig {
         @Config.RequiresWorldRestart
         @Config.RequiresMcRestart
         public final int patternProviderExpansionCardLimit = 3;
+
+        @Config.Name("MolecularAssemblerPatternExpansionCardLimit")
+        @Config.Comment("Maximum number of Pattern Expansion Cards that can be installed in one Molecular Assembler.")
+        @Config.RangeInt(min = 0)
+        @Config.RequiresWorldRestart
+        @Config.RequiresMcRestart
+        public final int molecularAssemblerPatternExpansionCardLimit = 3;
 
         @Config.Name("annihilationPlaneSkyDustGeneration")
         @Config.Comment("If enabled, an annihilation placed face up at the maximum world height will generate sky stone passively.")

@@ -223,6 +223,8 @@ public final class AEItems {
         Upgrades.createUpgradeCardItem());
     public static final ItemDefinition<Item> PATTERN_EXPANSION_CARD = new ItemDefinition<>(
         AEItemIds.PATTERN_EXPANSION_CARD, Upgrades.createUpgradeCardItem());
+    public static final ItemDefinition<Item> PARALLEL_CARD = new ItemDefinition<>(AEItemIds.PARALLEL_CARD,
+        Upgrades.createUpgradeCardItem());
     public static final ItemDefinition<Item> EQUAL_DISTRIBUTION_CARD = new ItemDefinition<>(
         AEItemIds.EQUAL_DISTRIBUTION_CARD, Upgrades.createUpgradeCardItem());
     public static final ItemDefinition<Item> STICKY_CARD = new ItemDefinition<>(AEItemIds.STICKY_CARD,
@@ -458,6 +460,7 @@ public final class AEItems {
         CRAFTING_CARD,
         PSEUDO_CRAFTING_CARD,
         PATTERN_EXPANSION_CARD,
+        PARALLEL_CARD,
         EQUAL_DISTRIBUTION_CARD,
         STICKY_CARD,
         ENERGY_CARD,

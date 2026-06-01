@@ -31,8 +31,6 @@ import ae2.core.definitions.AEBlocks;
 import ae2.helpers.IPriorityHost;
 import ae2.helpers.InterfaceLogic;
 import ae2.helpers.InterfaceLogicHost;
-import ae2.helpers.externalstorage.GenericStackFluidStorage;
-import ae2.helpers.externalstorage.GenericStackItemStorage;
 import ae2.tile.grid.AENetworkedInvTile;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -40,10 +38,6 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
-import net.minecraftforge.fluids.capability.IFluidHandler;
-import net.minecraftforge.items.CapabilityItemHandler;
-import net.minecraftforge.items.IItemHandler;
 
 import javax.annotation.Nullable;
 import java.util.List;
@@ -69,8 +63,6 @@ public class TileInterface extends AENetworkedInvTile
     };
 
     private final InterfaceLogic logic = new InterfaceLogic(this.getMainNode(), this, AEBlocks.INTERFACE.item());
-    private final IItemHandler itemHandler = new GenericStackItemStorage(this.logic.getStorage());
-    private final IFluidHandler fluidHandler = new GenericStackFluidStorage(this.logic.getStorage());
 
     @Override
     protected IManagedGridNode createMainNode() {
@@ -150,12 +142,6 @@ public class TileInterface extends AENetworkedInvTile
         if (capability == AECapabilities.GENERIC_INTERNAL_INV) {
             return (T) this.logic.getStorage();
         }
-        if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {
-            return (T) this.itemHandler;
-        }
-        if (capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY) {
-            return (T) this.fluidHandler;
-        }
         return super.getCapability(capability, facing);
     }
 
@@ -167,10 +153,7 @@ public class TileInterface extends AENetworkedInvTile
         if (capability == AECapabilities.GENERIC_INTERNAL_INV) {
             return true;
         }
-        if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY
-            || capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY) {
-            return true;
-        }
         return super.hasCapability(capability, facing);
     }
+
 }

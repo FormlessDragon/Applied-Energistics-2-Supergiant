@@ -1,5 +1,6 @@
 package ae2.container.slot;
 
+import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.features.GridLinkables;
 import ae2.api.features.IGridLinkableHandler;
@@ -13,7 +14,6 @@ import ae2.api.storage.cells.ICellWorkbenchItem;
 import ae2.api.upgrades.Upgrades;
 import ae2.core.definitions.AEItems;
 import ae2.crafting.pattern.EncodedPatternItem;
-import ae2.tile.crafting.IMolecularAssemblerSupportedPattern;
 import ae2.tile.misc.InscriberRecipes;
 import ae2.tile.qnb.TileQuantumBridge;
 import net.minecraft.entity.player.EntityPlayer;
@@ -69,7 +69,7 @@ public class RestrictedInputSlot extends AppEngSlot {
 
         try {
             Object pattern = PatternDetailsHelper.decodePattern(stack, getContainer().getPlayer().world);
-            return pattern instanceof IMolecularAssemblerSupportedPattern;
+            return pattern instanceof IAssemblerPattern;
         } catch (RuntimeException e) {
             return false;
         }

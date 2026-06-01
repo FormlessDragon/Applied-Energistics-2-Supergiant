@@ -160,8 +160,18 @@ public class ThresholdLevelEmitterPart extends AbstractLevelEmitterPart
     }
 
     @Override
-    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder) {
+    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder, int multiplier) {
         return false;
+    }
+
+    @Override
+    public boolean canMergePatternPush(IPatternDetails patternDetails) {
+        return false;
+    }
+
+    @Override
+    public int getMaxPatternPushMultiplier(IPatternDetails patternDetails, int maxMultiplier) {
+        return 0;
     }
 
     @Override

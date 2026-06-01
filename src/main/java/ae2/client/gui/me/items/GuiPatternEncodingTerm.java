@@ -33,6 +33,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
 import java.util.EnumMap;
@@ -51,7 +52,9 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
             new ServerSettingToggleButton<>(Settings.PATTERN_AUTO_FILL, YesNo.NO));
         addMode(EncodingMode.CRAFTING, new CraftingEncodingPanel(this, widgets), 0);
         addMode(EncodingMode.PROCESSING, new ProcessingEncodingPanel(this, widgets), 1);
-        widgets.add("encodePattern", new ActionButton(ActionItems.ENCODE, container::encode));
+        widgets.add("encodePattern", new ActionButton(ActionItems.ENCODE,
+            () -> container.encode(Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)
+                || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT))));
         if (Integrations.hei().isEnabled()) {
             addToLeftToolbar(new IconButton(this::openImportPrioritySettings) {
                 {

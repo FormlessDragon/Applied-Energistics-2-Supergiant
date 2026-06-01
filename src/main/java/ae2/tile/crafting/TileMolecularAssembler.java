@@ -1,109 +1,159 @@
-/*
- * This file is part of Applied Energistics 2.
- * Copyright (c) 2013 - 2014, AlgorithmX2, All rights reserved.
- *
- * Applied Energistics 2 is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Applied Energistics 2 is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Applied Energistics 2.  If not, see <http://www.gnu.org/licenses/lgpl>.
- */
-
 package ae2.tile.crafting;
 
-import ae2.api.AECapabilities;
 import ae2.api.config.Actionable;
 import ae2.api.config.PowerMultiplier;
+import ae2.api.config.Settings;
+import ae2.api.config.YesNo;
+import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.PatternDetailsHelper;
-import ae2.api.implementations.IPowerChannelState;
-import ae2.api.implementations.blockentities.ICraftingMachine;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
-import ae2.api.inventories.ISegmentedInventory;
+import ae2.api.inventories.BaseInternalInventory;
 import ae2.api.inventories.InternalInventory;
-import ae2.api.inventories.ItemTransfer;
+import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridNodeListener;
+import ae2.api.networking.crafting.ICraftingProvider;
+import ae2.api.networking.security.IActionSource;
 import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.networking.ticking.TickRateModulation;
 import ae2.api.networking.ticking.TickingRequest;
 import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.AEKey;
+import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.api.storage.MEStorage;
 import ae2.api.upgrades.IUpgradeInventory;
 import ae2.api.upgrades.IUpgradeableObject;
-import ae2.api.upgrades.UpgradeInventories;
 import ae2.api.util.AECableType;
+import ae2.api.util.IConfigManager;
+import ae2.api.util.IConfigurableObject;
 import ae2.client.render.crafting.AssemblerAnimationStatus;
-import ae2.core.AppEng;
+import ae2.container.GuiIds;
+import ae2.container.ISubGui;
+import ae2.core.AEConfig;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.definitions.AEItems;
-import ae2.core.localization.GuiText;
-import ae2.core.localization.Tooltips;
+import ae2.core.gui.GuiOpener;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.clientbound.AssemblerAnimationPacket;
+import ae2.helpers.IPriorityHost;
+import ae2.helpers.externalstorage.GenericStackInv;
+import ae2.helpers.patternprovider.PatternContainer;
+import ae2.helpers.patternprovider.PatternProviderCapacity;
+import ae2.me.helpers.MachineSource;
 import ae2.text.TextComponentItemStack;
-import ae2.tile.grid.AENetworkedInvTile;
+import ae2.tile.grid.AENetworkedTile;
 import ae2.util.inv.AppEngInternalInventory;
-import ae2.util.inv.CombinedInternalInventory;
-import ae2.util.inv.FilteredInternalInventory;
+import ae2.util.inv.InternalInventoryHost;
 import ae2.util.inv.filter.IAEItemFilter;
-import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
-import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraftforge.common.capabilities.Capability;
+import net.minecraft.world.World;
+import net.minecraftforge.common.util.Constants;
 
 import javax.annotation.Nullable;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.List;
+import java.util.Objects;
 
-public class TileMolecularAssembler extends AENetworkedInvTile
-    implements IUpgradeableObject, IGridTickable, ICraftingMachine, IPowerChannelState, ISegmentedInventory {
-    public static final ResourceLocation INV_MAIN = AppEng.makeId("molecular_assembler");
+public class TileMolecularAssembler extends AENetworkedTile implements IUpgradeableObject, IGridTickable,
+    ICraftingProvider, PatternContainer, IPriorityHost, IConfigurableObject, InternalInventoryHost {
+
+    private static final String NBT_PATTERNS = "patterns";
+    private static final String NBT_UPGRADES = "upgrades";
+    private static final String NBT_PRIORITY = "priority";
+    private static final String NBT_CACHED_OUTPUTS = "cachedOutputs";
+    private static final String NBT_PENDING_CRAFTS = "pendingCrafts";
+    private static final String NBT_MAIN_OUTPUT = "mainOutput";
+    private static final String NBT_OUTPUT_BUFFER = "outputBuffer";
+    private static final String NBT_CURRENT_PATTERN = "currentPattern";
+    private static final String NBT_PROGRESS = "progress";
+    private static final int BASE_INPUT_BUFFER_SLOTS = 9;
+    private static final int OUTPUT_BUFFER_SLOTS = BASE_INPUT_BUFFER_SLOTS + 1;
+    private static final int MAX_CRAFT_PROGRESS = 100;
 
     private static final Container NULL_CONTAINER = new Container() {
         @Override
-        public boolean canInteractWith(net.minecraft.entity.player.EntityPlayer playerIn) {
+        public boolean canInteractWith(EntityPlayer playerIn) {
             return false;
         }
     };
 
     private final InventoryCrafting craftingInv = new InventoryCrafting(NULL_CONTAINER, 3, 3);
-    private final AppEngInternalInventory gridInv = new AppEngInternalInventory(this, 10, 1);
-    private final AppEngInternalInventory patternInv = new AppEngInternalInventory(this, 1, 1, new PatternFilter());
-    private final InternalInventory gridInvExt = new FilteredInternalInventory(this.gridInv, new CraftingGridFilter());
-    private final InternalInventory internalInv = new CombinedInternalInventory(this.gridInv, this.patternInv);
-    private final IUpgradeInventory upgrades = UpgradeInventories.forMachine(AEBlocks.MOLECULAR_ASSEMBLER.item(), 5,
-        this::saveChanges);
-    private final EnumMap<EnumFacing, ItemTransfer> neighbors = new EnumMap<>(EnumFacing.class);
+    private final IConfigManager configManager = IConfigManager.builder(this::onConfigChanged)
+                                                               .registerSetting(Settings.PATTERN_ACCESS_TERMINAL,
+                                                                   YesNo.YES)
+                                                               .build();
+    private final AppEngInternalInventory patternInventory = new AppEngInternalInventory(this,
+        PatternProviderCapacity.getMaxPatternSlots(AEConfig.instance().getMolecularAssemblerPatternExpansionCardLimit()),
+        1,
+        new PatternFilter());
+    private final InternalInventory terminalPatternInventory = new ActivePatternInventory();
+    private final IUpgradeInventory upgrades = new MolecularAssemblerUpgradeInventory(this);
+    private final ObjectList<GenericStack> cachedOutputs = new ObjectArrayList<>();
+    private final ObjectList<IAssemblerPattern> patterns = new ObjectArrayList<>();
+    private final GenericStackInv outputBuffer = new GenericStackInv(this::onBufferChanged, OUTPUT_BUFFER_SLOTS);
+    private final ObjectOpenHashSet<AEItemKey> patternKeys = new ObjectOpenHashSet<>();
+    private final IActionSource actionSource = new MachineSource(this::getGridNode);
+    private int priority;
+    @Nullable
+    private IAssemblerPattern currentPattern;
+    private ItemStack currentPatternStack = ItemStack.EMPTY;
+    @Nullable
+    private GenericStack currentMainOutput;
+    private int pendingCrafts;
     private boolean powered;
-    @Nullable
-    private EnumFacing pushDirection;
-    private ItemStack myPattern = ItemStack.EMPTY;
-    @Nullable
-    private IMolecularAssemblerSupportedPattern myPlan;
+
+    public TileMolecularAssembler() {
+        this.getMainNode()
+            .setIdlePowerUsage(0.0)
+            .addService(IGridTickable.class, this)
+            .addService(ICraftingProvider.class, this);
+    }
+
     private double progress;
+
+    @Override
+    public void onReady() {
+        super.onReady();
+        if (this.world != null && !this.world.isRemote) {
+            this.updatePatterns();
+            this.updatePoweredState();
+            this.updateSleepiness();
+        }
+    }
+
     private boolean awake;
-    private boolean forcePlan;
     private boolean reboot = true;
     @Nullable
     private AssemblerAnimationStatus animationStatus;
 
-    public TileMolecularAssembler() {
-        this.getMainNode().setIdlePowerUsage(0.0).addService(IGridTickable.class, this);
+    @Override
+    public void saveAdditional(NBTTagCompound data) {
+        super.saveAdditional(data);
+        this.configManager.writeToNBT(data);
+        this.patternInventory.writeToNBT(data, NBT_PATTERNS);
+        this.upgrades.writeToNBT(data, NBT_UPGRADES);
+        data.setInteger(NBT_PRIORITY, this.priority);
+        this.writeCachedOutputs(data);
+        data.setInteger(NBT_PENDING_CRAFTS, this.pendingCrafts);
+        data.setTag(NBT_MAIN_OUTPUT, GenericStack.writeTag(this.currentMainOutput));
+        this.outputBuffer.writeToChildTag(data, NBT_OUTPUT_BUFFER);
+        data.setDouble(NBT_PROGRESS, this.progress);
+        if (!this.currentPatternStack.isEmpty()) {
+            data.setTag(NBT_CURRENT_PATTERN, this.currentPatternStack.writeToNBT(new NBTTagCompound()));
+        } else {
+            data.removeTag(NBT_CURRENT_PATTERN);
+        }
     }
 
     @Override
@@ -117,122 +167,39 @@ public class TileMolecularAssembler extends AENetworkedInvTile
     }
 
     @Override
-    public PatternContainerGroup getCraftingMachineInfo() {
-        ITextComponent name;
-        name = hasCustomName() ? getCustomName() : TextComponentItemStack.of(AEBlocks.MOLECULAR_ASSEMBLER.stack());
-        List<ITextComponent> tooltip;
-        int accelerationCards = this.upgrades.getInstalledUpgrades(AEItems.SPEED_CARD.item());
-        if (accelerationCards == 0) {
-            tooltip = Collections.emptyList();
-        } else {
-            tooltip = new ObjectArrayList<>(1);
-            tooltip.add(Tooltips.of(GuiText.CompatibleUpgrade.text(
-                Tooltips.of(TextComponentItemStack.of(AEItems.SPEED_CARD.stack())),
-                Tooltips.ofUnformattedNumber(accelerationCards))));
-        }
-        return new PatternContainerGroup(AEItemKey.of(AEBlocks.MOLECULAR_ASSEMBLER.item()), name, tooltip);
-    }
-
-    @Override
-    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputs, EnumFacing ejectionDirection) {
-        if (this.forcePlan || !this.myPattern.isEmpty()) {
-            return false;
-        }
-
-        boolean isEmpty = this.gridInv.isEmpty() && this.patternInv.isEmpty();
-        if (isEmpty && patternDetails instanceof IMolecularAssemblerSupportedPattern pattern) {
-            this.forcePlan = true;
-            this.myPattern = patternDetails.getDefinition().toStack();
-            this.myPlan = pattern;
-            this.pushDirection = ejectionDirection;
-            this.fillGrid(inputs, pattern);
-            this.updateSleepiness();
-            this.saveChanges();
-            return true;
-        }
-        return false;
-    }
-
-    private void fillGrid(KeyCounter[] table, IMolecularAssemblerSupportedPattern pattern) {
-        pattern.fillCraftingGrid(table, this.gridInv::setItemDirect);
-        for (KeyCounter inputs : table) {
-            inputs.removeZeros();
-            if (!inputs.isEmpty()) {
-                throw new IllegalStateException("Could not fill crafting grid for molecular assembler.");
-            }
-        }
-    }
-
-    @Override
-    public boolean acceptsPlans() {
-        return !this.forcePlan && this.patternInv.isEmpty();
-    }
-
-    @Override
-    public void saveAdditional(NBTTagCompound data) {
-        super.saveAdditional(data);
-        this.gridInv.writeToNBT(data, "gridInv");
-        this.patternInv.writeToNBT(data, "patternInv");
-        if (this.forcePlan) {
-            ItemStack pattern = this.myPlan != null ? this.myPlan.getDefinition().toStack() : this.myPattern;
-            if (!pattern.isEmpty()) {
-                data.setTag("myPlan", pattern.writeToNBT(new NBTTagCompound()));
-                data.setInteger("pushDirection", this.pushDirection == null ? -1 : this.pushDirection.ordinal());
-            }
-        }
-        this.upgrades.writeToNBT(data, "upgrades");
-    }
-
-    @Override
     public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
-        this.gridInv.readFromNBT(data, "gridInv");
-        this.patternInv.readFromNBT(data, "patternInv");
-
-        this.forcePlan = false;
-        this.myPattern = ItemStack.EMPTY;
-        this.myPlan = null;
-        this.pushDirection = null;
-
-        if (data.hasKey("myPlan", 10)) {
-            this.forcePlan = true;
-            this.myPattern = new ItemStack(data.getCompoundTag("myPlan"));
-            int pushDirectionOrdinal = data.getInteger("pushDirection");
-            if (pushDirectionOrdinal >= 0 && pushDirectionOrdinal < EnumFacing.values().length) {
-                this.pushDirection = EnumFacing.values()[pushDirectionOrdinal];
-            }
-        }
-
-        this.upgrades.readFromNBT(data, "upgrades");
-        this.recalculatePlan();
+        this.configManager.readFromNBT(data);
+        this.patternInventory.readFromNBT(data, NBT_PATTERNS);
+        this.upgrades.readFromNBT(data, NBT_UPGRADES);
+        this.priority = data.getInteger(NBT_PRIORITY);
+        this.readCachedOutputs(data);
+        this.pendingCrafts = Math.max(0, data.getInteger(NBT_PENDING_CRAFTS));
+        this.currentMainOutput = data.hasKey(NBT_MAIN_OUTPUT, Constants.NBT.TAG_COMPOUND)
+            ? GenericStack.readTag(data.getCompoundTag(NBT_MAIN_OUTPUT))
+            : null;
+        this.outputBuffer.readFromChildTag(data, NBT_OUTPUT_BUFFER);
+        this.progress = data.getDouble(NBT_PROGRESS);
+        this.currentPatternStack = data.hasKey(NBT_CURRENT_PATTERN, Constants.NBT.TAG_COMPOUND)
+            ? new ItemStack(data.getCompoundTag(NBT_CURRENT_PATTERN))
+            : ItemStack.EMPTY;
+        this.currentPattern = null;
+        this.reboot = true;
+        this.updatePatterns();
+        this.recalculateCurrentPattern();
     }
 
     @Override
-    public void onReady() {
-        super.onReady();
-        if (this.world != null && !this.world.isRemote) {
-            this.updateNeighbors();
-            this.updatePoweredState();
-        }
+    public void onMainNodeStateChanged(IGridNodeListener.State reason) {
+        this.updatePoweredState();
+        ICraftingProvider.requestUpdate(this.getMainNode());
+        this.updateSleepiness();
     }
 
-    public void onNeighborChanged(net.minecraft.world.World world, net.minecraft.util.math.BlockPos pos,
-                                  net.minecraft.util.math.BlockPos neighbor) {
-        if (world == null || pos == null || neighbor == null) {
-            return;
-        }
-
-        EnumFacing side = null;
-        for (EnumFacing candidate : EnumFacing.values()) {
-            if (pos.offset(candidate).equals(neighbor)) {
-                side = candidate;
-                break;
-            }
-        }
-
-        if (side != null) {
-            this.updateNeighbor(side);
-        }
+    @Override
+    public TickingRequest getTickingRequest(IGridNode node) {
+        this.updateSleepiness();
+        return new TickingRequest(1, 1, !this.awake);
     }
 
     @Override
@@ -250,120 +217,221 @@ public class TileMolecularAssembler extends AENetworkedInvTile
     }
 
     @Override
-    protected void writeToStream(ByteBuf data) {
-        super.writeToStream(data);
-        data.writeBoolean(this.powered);
-    }
+    public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
+        if (!this.getMainNode().isActive()) {
+            return TickRateModulation.SLEEP;
+        }
 
-    @Override
-    protected boolean readFromStream(ByteBuf data) {
-        boolean changed = super.readFromStream(data);
-        boolean oldPowered = this.powered;
-        this.powered = data.readBoolean();
-        return changed || oldPowered != this.powered;
-    }
-
-    private void recalculatePlan() {
-        this.reboot = true;
-
-        if (this.forcePlan) {
-            if (this.myPlan == null && this.world != null && !this.myPattern.isEmpty()) {
-                IPatternDetails details = PatternDetailsHelper.decodePattern(this.myPattern, this.world);
-                if (details instanceof IMolecularAssemblerSupportedPattern) {
-                    this.myPlan = (IMolecularAssemblerSupportedPattern) details;
-                } else {
-                    this.forcePlan = false;
-                    this.myPattern = ItemStack.EMPTY;
-                    this.pushDirection = null;
-                }
-            }
+        boolean didOutputWork = this.injectOutputBuffer();
+        if (this.currentPattern == null) {
             this.updateSleepiness();
-            return;
+            return didOutputWork ? TickRateModulation.URGENT : TickRateModulation.SLEEP;
         }
 
-        ItemStack pattern = this.patternInv.getStackInSlot(0);
-        boolean reset = true;
+        if (this.reboot) {
+            ticksSinceLastCall = 1;
+            this.reboot = false;
+        }
 
-        if (!pattern.isEmpty()) {
-            if (ItemStack.areItemStacksEqual(pattern, this.myPattern)) {
-                reset = false;
-            } else if (this.world != null) {
-                IPatternDetails details = PatternDetailsHelper.decodePattern(pattern, this.world);
-                if (details instanceof IMolecularAssemblerSupportedPattern) {
-                    reset = false;
-                    this.progress = 0;
-                    this.myPattern = pattern.copy();
-                    this.myPlan = (IMolecularAssemblerSupportedPattern) details;
-                }
+        int speed = this.getSpeedPerTick();
+        this.progress += this.usePower(ticksSinceLastCall, speed, this.getPowerMultiplier());
+        if (this.progress < MAX_CRAFT_PROGRESS) {
+            return TickRateModulation.FASTER;
+        }
+
+        this.progress = 0;
+        if (this.tryCompleteCraft(speed)) {
+            if (this.pendingCrafts <= 0) {
+                this.clearCurrentCraft();
             }
-        }
-
-        if (reset) {
-            this.progress = 0;
-            this.forcePlan = false;
-            this.myPlan = null;
-            this.myPattern = ItemStack.EMPTY;
-            this.pushDirection = null;
+            this.saveChanges();
+            this.updateSleepiness();
+            return this.awake ? TickRateModulation.IDLE : TickRateModulation.SLEEP;
         }
 
         this.updateSleepiness();
+        return TickRateModulation.SLOWER;
     }
 
-    private void updateSleepiness() {
-        boolean previousAwake = this.awake;
-        this.awake = this.canPush() || this.myPlan != null && this.hasMats();
-        if (previousAwake != this.awake) {
-            this.getMainNode().ifPresent((grid, node) -> {
-                if (this.awake) {
-                    grid.getTickManager().wakeDevice(node);
-                } else {
-                    grid.getTickManager().sleepDevice(node);
-                }
-            });
+    @Override
+    public List<IAssemblerPattern> getAvailablePatterns() {
+        if (!this.getMainNode().isActive()) {
+            return Collections.emptyList();
         }
+        return this.patterns;
     }
 
-    private boolean canPush() {
-        return !this.gridInv.getStackInSlot(9).isEmpty();
+    @Override
+    public int getPatternPriority() {
+        return this.priority;
     }
 
-    private boolean hasMats() {
-        if (this.myPlan == null || this.world == null) {
+    @Override
+    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder, int multiplier) {
+        if (!this.getMainNode().isActive()
+            || !(patternDetails instanceof IAssemblerPattern assemblerPattern)
+            || !this.patterns.contains(assemblerPattern)
+            || multiplier <= 0) {
             return false;
         }
 
-        for (int slot = 0; slot < this.craftingInv.getSizeInventory(); slot++) {
-            this.craftingInv.setInventorySlotContents(slot, this.gridInv.getStackInSlot(slot));
+        if (this.pendingCrafts + multiplier > this.getParallelLimit()) {
+            return false;
         }
 
-        return !this.myPlan.assemble(this.craftingInv, this.world).isEmpty();
-    }
-
-    @Override
-    public InternalInventory getSubInventory(ResourceLocation id) {
-        if (ISegmentedInventory.UPGRADES.equals(id)) {
-            return this.upgrades;
-        } else if (INV_MAIN.equals(id)) {
-            return this.internalInv;
+        KeyCounter[] representativeInput = copyInputHolder(inputHolder);
+        ItemStack[] sparseInputs = new ItemStack[BASE_INPUT_BUFFER_SLOTS];
+        assemblerPattern.fillCraftingGrid(representativeInput, (slot, stack) -> sparseInputs[slot] = stack);
+        ObjectList<GenericStack> newOutputs = collectOutputs(assemblerPattern, sparseInputs, inputHolder, multiplier);
+        GenericStack newMainOutput = newOutputs.isEmpty() ? null : newOutputs.getFirst();
+        if (newOutputs.isEmpty()) {
+            return false;
         }
-        return null;
+        if (this.currentPattern != null && !canMergePattern(assemblerPattern, newMainOutput, multiplier)) {
+            return false;
+        }
+        for (KeyCounter counter : inputHolder) {
+            counter.clear();
+        }
+        if (this.currentPattern == null) {
+            this.currentPattern = assemblerPattern;
+            this.currentPatternStack = patternDetails.getDefinition().toStack();
+            this.currentMainOutput = new GenericStack(newMainOutput.what(), newMainOutput.amount() / multiplier);
+            this.progress = 0;
+            this.reboot = true;
+        }
+        mergeCachedOutputs(newOutputs);
+        this.pendingCrafts += multiplier;
+        this.saveChanges();
+        this.updateSleepiness();
+        return true;
     }
 
     @Override
-    public InternalInventory getInternalInventory() {
-        return this.internalInv;
+    public boolean canMergePatternPush(IPatternDetails patternDetails) {
+        return this.getMainNode().isActive() && patternDetails instanceof IAssemblerPattern
+            && this.patterns.contains(patternDetails);
     }
 
     @Override
-    protected InternalInventory getExposedInventoryForSide(EnumFacing side) {
-        return this.gridInvExt;
+    public int getMaxPatternPushMultiplier(IPatternDetails patternDetails, int maxMultiplier) {
+        if (!this.canMergePatternPush(patternDetails) || maxMultiplier <= 0) {
+            return 0;
+        }
+        return MolecularAssemblerPushLimits.maxPushMultiplier(this.getParallelLimit(), this.pendingCrafts,
+            maxMultiplier);
+    }
+
+    @Override
+    public boolean isBusy() {
+        return MolecularAssemblerPushLimits.isBusy(this.getParallelLimit(), this.pendingCrafts);
+    }
+
+    @Nullable
+    @Override
+    public IGrid getGrid() {
+        return this.getMainNode().getGrid();
+    }
+
+    @Override
+    public boolean isVisibleInTerminal() {
+        return this.configManager.getSetting(Settings.PATTERN_ACCESS_TERMINAL) == YesNo.YES;
+    }
+
+    @Override
+    public boolean isAssemblerPatternContainer() {
+        return true;
+    }
+
+    @Override
+    public InternalInventory getTerminalPatternInventory() {
+        return this.terminalPatternInventory;
+    }
+
+    public AppEngInternalInventory getPatternInventory() {
+        return this.patternInventory;
+    }
+
+    @Override
+    public boolean containsPattern(AEItemKey pattern) {
+        return this.patternKeys.contains(pattern);
+    }
+
+    @Override
+    public long getTerminalSortOrder() {
+        return ((long) this.pos.getZ() << 24) ^ ((long) this.pos.getX() << 8) ^ this.pos.getY();
+    }
+
+    @Override
+    public void openTerminalPatternContainerGui(EntityPlayer player) {
+        GuiOpener.openGui(player, GuiIds.GuiKey.MOLECULAR_ASSEMBLER, this);
+    }
+
+    @Override
+    public PatternContainerGroup getTerminalGroup() {
+        ITextComponent name = hasCustomName() ? getCustomName() : TextComponentItemStack.of(AEBlocks.MOLECULAR_ASSEMBLER.stack());
+        return new PatternContainerGroup(
+            AEItemKey.of(AEBlocks.MOLECULAR_ASSEMBLER.item()),
+            name,
+            Collections.emptyList());
+    }
+
+    @Override
+    public int getPriority() {
+        return this.priority;
+    }
+
+    @Override
+    public void setPriority(int newValue) {
+        this.priority = newValue;
+        this.saveChanges();
+        ICraftingProvider.requestUpdate(this.getMainNode());
+    }
+
+    @Override
+    public void returnToMainContainer(EntityPlayer player, ISubGui subGui) {
+        GuiOpener.openGui(player, GuiIds.GuiKey.MOLECULAR_ASSEMBLER, this, true);
+    }
+
+    @Override
+    public ItemStack getMainContainerIcon() {
+        return AEBlocks.MOLECULAR_ASSEMBLER.stack();
+    }
+
+    @Override
+    public IConfigManager getConfigManager() {
+        return this.configManager;
+    }
+
+    @Override
+    public IUpgradeInventory getUpgrades() {
+        return this.upgrades;
+    }
+
+    @Override
+    public void saveChangedInventory(AppEngInternalInventory inv) {
+        this.saveChanges();
     }
 
     @Override
     public void onChangeInventory(AppEngInternalInventory inv, int slot) {
-        if (inv == this.gridInv || inv == this.patternInv) {
-            this.recalculatePlan();
+        if (inv == this.patternInventory) {
+            this.updatePatterns();
         }
+        this.saveChanges();
+    }
+
+    @Override
+    public boolean isClientSide() {
+        return this.world == null || this.world.isRemote;
+    }
+
+    public boolean isPowered() {
+        return this.powered;
+    }
+
+    public boolean isActive() {
+        return this.powered;
     }
 
     public int getCraftingProgress() {
@@ -373,230 +441,26 @@ public class TileMolecularAssembler extends AENetworkedInvTile
     @Override
     public void addAdditionalDrops(List<ItemStack> drops) {
         super.addAdditionalDrops(drops);
+        for (ItemStack pattern : this.patternInventory) {
+            if (!pattern.isEmpty()) {
+                drops.add(pattern.copy());
+            }
+        }
         for (ItemStack upgrade : this.upgrades) {
             if (!upgrade.isEmpty()) {
                 drops.add(upgrade.copy());
             }
         }
+        this.addGenericStackDrops(this.outputBuffer, drops);
     }
 
     @Override
     public void clearContent() {
         super.clearContent();
+        this.patternInventory.clear();
         this.upgrades.clear();
-    }
-
-    @Override
-    public TickingRequest getTickingRequest(IGridNode node) {
-        this.recalculatePlan();
-        this.updateSleepiness();
-        return new TickingRequest(1, 1, !this.awake);
-    }
-
-    @Override
-    public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
-        if (!this.gridInv.getStackInSlot(9).isEmpty()) {
-            this.pushOut(this.gridInv.getStackInSlot(9));
-            if (this.gridInv.getStackInSlot(9).isEmpty()) {
-                this.saveChanges();
-            }
-
-            this.ejectHeldItems();
-            this.updateSleepiness();
-            this.progress = 0;
-            return this.awake ? TickRateModulation.IDLE : TickRateModulation.SLEEP;
-        }
-
-        if (this.myPlan == null) {
-            this.updateSleepiness();
-            return TickRateModulation.SLEEP;
-        }
-
-        if (this.reboot) {
-            ticksSinceLastCall = 1;
-        }
-
-        if (!this.awake) {
-            return TickRateModulation.SLEEP;
-        }
-
-        this.reboot = false;
-        int speed = 10;
-        switch (this.upgrades.getInstalledUpgrades(AEItems.SPEED_CARD.item())) {
-            case 0 -> this.progress += this.usePower(ticksSinceLastCall, speed, 1.0);
-            case 1 -> {
-                speed = 13;
-                this.progress += this.usePower(ticksSinceLastCall, speed, 1.3);
-            }
-            case 2 -> {
-                speed = 17;
-                this.progress += this.usePower(ticksSinceLastCall, speed, 1.7);
-            }
-            case 3 -> {
-                speed = 20;
-                this.progress += this.usePower(ticksSinceLastCall, speed, 2.0);
-            }
-            case 4 -> {
-                speed = 25;
-                this.progress += this.usePower(ticksSinceLastCall, speed, 2.5);
-            }
-            case 5 -> this.progress += this.usePower(ticksSinceLastCall, speed = 50, 5.0);
-            default -> {
-            }
-        }
-
-        if (this.progress >= 100 && this.world != null) {
-            for (int slot = 0; slot < this.craftingInv.getSizeInventory(); slot++) {
-                this.craftingInv.setInventorySlotContents(slot, this.gridInv.getStackInSlot(slot));
-            }
-
-            this.progress = 0;
-            ItemStack output = this.myPlan.assemble(this.craftingInv, this.world);
-            if (!output.isEmpty()) {
-                ItemStack result = output.copy();
-                List<ItemStack> remainingItems = this.myPlan.getRemainingItems(this.craftingInv);
-                this.pushOut(result);
-
-                for (int slot = 0; slot < this.craftingInv.getSizeInventory(); slot++) {
-                    ItemStack remainder = remainingItems.get(slot);
-                    this.gridInv.setItemDirect(slot, remainder);
-                }
-
-                if (this.patternInv.isEmpty()) {
-                    this.forcePlan = false;
-                    this.myPlan = null;
-                    this.pushDirection = null;
-                }
-
-                this.ejectHeldItems();
-                AEItemKey item = AEItemKey.of(output);
-                if (item != null) {
-                    InitNetwork.sendToAllNearExcept(null, this.pos.getX(), this.pos.getY(), this.pos.getZ(), 32,
-                        this.world, new AssemblerAnimationPacket(this.pos, (byte) speed, item));
-                }
-                this.saveChanges();
-                this.updateSleepiness();
-                return this.awake ? TickRateModulation.IDLE : TickRateModulation.SLEEP;
-            }
-        }
-
-        return TickRateModulation.FASTER;
-    }
-
-    private void ejectHeldItems() {
-        if (this.gridInv.getStackInSlot(9).isEmpty()) {
-            for (int slot = 0; slot < 9; slot++) {
-                ItemStack stack = this.gridInv.getStackInSlot(slot);
-                if (!stack.isEmpty() && (this.myPlan == null
-                    || !this.myPlan.isItemValid(slot, AEItemKey.of(stack), this.world))) {
-                    this.gridInv.setItemDirect(9, stack);
-                    this.gridInv.setItemDirect(slot, ItemStack.EMPTY);
-                    this.saveChanges();
-                    return;
-                }
-            }
-        }
-    }
-
-    private int usePower(int ticksPassed, int bonusValue, double acceleratorTax) {
-        ae2.api.networking.IGrid grid = this.getMainNode().getGrid();
-        if (grid != null) {
-            return (int) (grid.getEnergyService().extractAEPower(ticksPassed * bonusValue * acceleratorTax,
-                Actionable.MODULATE, PowerMultiplier.CONFIG) / acceleratorTax);
-        }
-        return 0;
-    }
-
-    private void pushOut(ItemStack output) {
-        if (this.pushDirection == null) {
-            for (EnumFacing side : this.neighbors.keySet()) {
-                output = this.pushTo(output, side);
-                if (output.isEmpty()) {
-                    break;
-                }
-            }
-        } else {
-            output = this.pushTo(output, this.pushDirection);
-        }
-
-        if (output.isEmpty() && this.forcePlan) {
-            this.forcePlan = false;
-            this.recalculatePlan();
-        }
-
-        this.gridInv.setItemDirect(9, output);
-    }
-
-    private ItemStack pushTo(ItemStack output, EnumFacing side) {
-        if (output.isEmpty() || this.world == null) {
-            return output;
-        }
-
-        var target = this.neighbors.get(side);
-        if (target == null) {
-            return output;
-        }
-
-        int before = output.getCount();
-        output = target.addItems(output);
-        if ((output.isEmpty() ? 0 : output.getCount()) != before) {
-            this.saveChanges();
-        }
-        return output;
-    }
-
-    private void updateNeighbors() {
-        for (EnumFacing side : EnumFacing.values()) {
-            this.updateNeighbor(side);
-        }
-    }
-
-    private void updateNeighbor(EnumFacing side) {
-        if (this.world == null || this.pos == null) {
-            this.neighbors.remove(side);
-            return;
-        }
-
-        ItemTransfer target = InternalInventory.wrapExternal(this.world, this.pos.offset(side), side.getOpposite());
-        if (target != null) {
-            this.neighbors.put(side, target);
-        } else {
-            this.neighbors.remove(side);
-        }
-    }
-
-    @Override
-    public void onMainNodeStateChanged(IGridNodeListener.State reason) {
-        updatePoweredState();
-    }
-
-    private void updatePoweredState() {
-        if (this.world == null || this.world.isRemote) {
-            return;
-        }
-
-        boolean newPowered = false;
-        ae2.api.networking.IGrid grid = this.getMainNode().getGrid();
-        if (grid != null) {
-            newPowered = this.getMainNode().isPowered()
-                && grid.getEnergyService().extractAEPower(1, Actionable.SIMULATE,
-                PowerMultiplier.CONFIG) > 0.0001;
-        }
-
-        if (this.powered != newPowered) {
-            this.powered = newPowered;
-            this.markForUpdate();
-        }
-    }
-
-    @Override
-    public boolean isPowered() {
-        return this.powered;
-    }
-
-    @Override
-    public boolean isActive() {
-        return this.powered;
+        this.outputBuffer.clear();
+        this.clearCurrentCraft();
     }
 
     @Nullable
@@ -608,74 +472,424 @@ public class TileMolecularAssembler extends AENetworkedInvTile
         this.animationStatus = animationStatus;
     }
 
-    @Override
-    public IUpgradeInventory getUpgrades() {
-        return this.upgrades;
+    public int getInstalledCapacityCards() {
+        return this.upgrades.getInstalledUpgrades(AEItems.PATTERN_EXPANSION_CARD.item());
     }
 
-    @Nullable
-    public IMolecularAssemblerSupportedPattern getCurrentPattern() {
-        if (this.isClientSide()) {
-            if (this.world == null) {
-                return null;
-            }
-            ItemStack pattern = this.patternInv.getStackInSlot(0);
-            if (pattern.isEmpty()) {
-                pattern = this.myPattern;
-            }
-            if (pattern.isEmpty()) {
-                return null;
-            }
-            IPatternDetails details = PatternDetailsHelper.decodePattern(pattern, this.world);
-            if (details instanceof IMolecularAssemblerSupportedPattern) {
-                return (IMolecularAssemblerSupportedPattern) details;
-            }
-            return null;
-        }
-        return this.myPlan;
+    public int getActivePatternSlots() {
+        return Math.min(this.patternInventory.size(),
+            PatternProviderCapacity.getActivePatternSlots(this.getInstalledCapacityCards(),
+                AEConfig.instance().getMolecularAssemblerPatternExpansionCardLimit()));
     }
 
-    @Override
-    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
-        if (capability == AECapabilities.CRAFTING_MACHINE) {
-            return true;
-        }
-        return super.hasCapability(capability, facing);
+    public boolean isPatternSlotEnabled(int slot) {
+        return slot >= 0 && slot < this.getActivePatternSlots();
     }
 
-    @SuppressWarnings("unchecked")
-    @Override
-    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
-        if (capability == AECapabilities.CRAFTING_MACHINE) {
-            return (T) this;
-        }
-        return super.getCapability(capability, facing);
+    public int getPatternPageCount() {
+        return PatternProviderCapacity.getPageCount(this.getActivePatternSlots());
     }
 
-    private class CraftingGridFilter implements IAEItemFilter {
-        @Override
-        public boolean allowExtract(InternalInventory inv, int slot, int amount) {
-            return slot == 9;
+    private void updatePatterns() {
+        this.patterns.clear();
+        this.patternKeys.clear();
+        World level = this.world;
+        if (level == null) {
+            return;
         }
 
-        @Override
-        public boolean allowInsert(InternalInventory inv, int slot, ItemStack stack) {
-            return slot < 9 && TileMolecularAssembler.this.myPlan != null
-                && !TileMolecularAssembler.this.patternInv.isEmpty()
-                && TileMolecularAssembler.this.world != null
-                && TileMolecularAssembler.this.myPlan.isItemValid(slot, AEItemKey.of(stack),
-                TileMolecularAssembler.this.world);
+        for (int slot = 0; slot < this.getActivePatternSlots(); slot++) {
+            ItemStack stack = this.patternInventory.getStackInSlot(slot);
+            IPatternDetails details = PatternDetailsHelper.decodePattern(stack, level);
+            if (!(details instanceof IAssemblerPattern pattern)) {
+                continue;
+            }
+            this.patterns.add(pattern);
+            AEItemKey key = AEItemKey.of(stack);
+            if (key != null) {
+                this.patternKeys.add(key);
+            }
         }
+
+        ICraftingProvider.requestUpdate(this.getMainNode());
+    }
+
+    private void recalculateCurrentPattern() {
+        if (this.currentPatternStack.isEmpty() || this.world == null) {
+            this.clearCurrentCraft();
+            return;
+        }
+
+        IPatternDetails details = PatternDetailsHelper.decodePattern(this.currentPatternStack, this.world);
+        if (details instanceof IAssemblerPattern assemblerPattern) {
+            this.currentPattern = assemblerPattern;
+        } else {
+            this.clearCurrentCraft();
+        }
+    }
+
+    private boolean tryCompleteCraft(int speed) {
+        Objects.requireNonNull(this.currentPattern);
+        int runs = this.pendingCrafts;
+        if (runs <= 0) {
+            return false;
+        }
+
+        ObjectList<GenericStack> results = new ObjectArrayList<>();
+        ItemStack animationOutput = ItemStack.EMPTY;
+        if (this.currentMainOutput != null && this.currentMainOutput.what() instanceof AEItemKey itemKey) {
+            animationOutput = itemKey.toStack((int) Math.min(this.currentMainOutput.amount(), Integer.MAX_VALUE));
+        }
+        for (GenericStack cachedOutput : this.cachedOutputs) {
+            results.add(cachedOutput);
+        }
+
+        if (!canFitOutputs(results)) {
+            return false;
+        }
+
+        this.pendingCrafts = 0;
+        this.cachedOutputs.clear();
+        for (GenericStack result : results) {
+            this.outputBuffer.insert(result.what(), result.amount(), Actionable.MODULATE, this.actionSource);
+        }
+
+        AEItemKey item = AEItemKey.of(animationOutput);
+        if (item != null && this.world != null) {
+            InitNetwork.sendToAllNearExcept(null, this.pos.getX(), this.pos.getY(), this.pos.getZ(), 32,
+                this.world, new AssemblerAnimationPacket(this.pos, (byte) speed, item));
+        }
+        this.injectOutputBuffer();
+        return true;
+    }
+
+    private boolean canFitOutputs(List<GenericStack> results) {
+        GenericStackInv simulated = new GenericStackInv(null, this.outputBuffer.size());
+        simulated.readFromList(this.outputBuffer.toList());
+        for (GenericStack result : results) {
+            if (simulated.insert(result.what(), result.amount(), Actionable.MODULATE, this.actionSource) < result.amount()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean injectOutputBuffer() {
+        IGrid grid = this.getMainNode().getGrid();
+        if (grid == null) {
+            return false;
+        }
+
+        return this.injectIntoNetwork(this.outputBuffer, grid.getStorageService().getInventory());
+    }
+
+    private int usePower(int ticksPassed, int bonusValue, double acceleratorTax) {
+        IGrid grid = this.getMainNode().getGrid();
+        if (grid != null) {
+            return (int) (grid.getEnergyService().extractAEPower(ticksPassed * bonusValue * acceleratorTax,
+                Actionable.MODULATE, PowerMultiplier.CONFIG) / acceleratorTax);
+        }
+        return 0;
+    }
+
+    private int getSpeedPerTick() {
+        return switch (this.upgrades.getInstalledUpgrades(AEItems.SPEED_CARD.item())) {
+            case 1 -> 13;
+            case 2 -> 17;
+            case 3 -> 20;
+            case 4 -> 25;
+            case 5 -> 50;
+            default -> 10;
+        };
+    }
+
+    private double getPowerMultiplier() {
+        return switch (this.upgrades.getInstalledUpgrades(AEItems.SPEED_CARD.item())) {
+            case 1 -> 1.3;
+            case 2 -> 1.7;
+            case 3 -> 2.0;
+            case 4 -> 2.5;
+            case 5 -> 5.0;
+            default -> 1.0;
+        };
+    }
+
+    private int getParallelLimit() {
+        return MolecularAssemblerPushLimits.parallelLimit(
+            this.upgrades.getInstalledUpgrades(AEItems.PARALLEL_CARD.item()));
+    }
+
+    private void updateSleepiness() {
+        boolean previousAwake = this.awake;
+        this.awake = this.currentPattern != null || !this.outputBuffer.isEmpty();
+        if (previousAwake != this.awake) {
+            this.getMainNode().ifPresent((grid, node) -> {
+                if (this.awake) {
+                    grid.getTickManager().wakeDevice(node);
+                } else {
+                    grid.getTickManager().sleepDevice(node);
+                }
+            });
+        }
+    }
+
+    private void updatePoweredState() {
+        if (this.world == null || this.world.isRemote) {
+            return;
+        }
+
+        IGrid grid = this.getMainNode().getGrid();
+        boolean newPowered = grid != null && this.getMainNode().isPowered()
+            && grid.getEnergyService().extractAEPower(1, Actionable.SIMULATE, PowerMultiplier.CONFIG) > 0.0001;
+        if (this.powered != newPowered) {
+            this.powered = newPowered;
+            this.markForUpdate();
+        }
+    }
+
+    private void clearCurrentCraft() {
+        this.currentPattern = null;
+        this.currentPatternStack = ItemStack.EMPTY;
+        this.currentMainOutput = null;
+        this.cachedOutputs.clear();
+        this.pendingCrafts = 0;
+        this.progress = 0;
+    }
+
+    private void onConfigChanged() {
+        this.saveChanges();
+    }
+
+    void onUpgradesChanged() {
+        this.saveChanges();
+        this.updatePatterns();
+    }
+
+    boolean isPatternSlotOccupied(int slot) {
+        return slot >= 0 && slot < this.patternInventory.size() && !this.patternInventory.getStackInSlot(slot).isEmpty();
+    }
+
+    private void onBufferChanged() {
+        this.saveChanges();
+        this.updateSleepiness();
+    }
+
+    private boolean canMergePattern(IAssemblerPattern assemblerPattern, GenericStack newMainOutput, int multiplier) {
+        if (this.currentPattern == null || this.pendingCrafts >= this.getParallelLimit()) {
+            return false;
+        }
+        if (this.currentMainOutput == null || newMainOutput == null) {
+            return false;
+        }
+        if (!this.currentPattern.getDefinition().equals(assemblerPattern.getDefinition())) {
+            return false;
+        }
+
+        return this.currentMainOutput.what().equals(newMainOutput.what())
+            && this.currentMainOutput.amount() == newMainOutput.amount() / multiplier;
+    }
+
+    private ObjectList<GenericStack> collectOutputs(IAssemblerPattern assemblerPattern, ItemStack[] sparseInputs,
+                                                    KeyCounter[] inputHolder, int multiplier) {
+        for (int slot = 0; slot < sparseInputs.length; slot++) {
+            this.craftingInv.setInventorySlotContents(slot,
+                sparseInputs[slot] == null ? ItemStack.EMPTY : sparseInputs[slot]);
+        }
+        ItemStack output = assemblerPattern.assemble(this.craftingInv, this.world);
+        GenericStack outputStack = GenericStack.fromItemStack(output);
+        if (outputStack == null) {
+            return new ObjectArrayList<>();
+        }
+        ObjectList<GenericStack> result = new ObjectArrayList<>();
+        result.add(new GenericStack(outputStack.what(), outputStack.amount() * multiplier));
+        KeyCounter remainders = new KeyCounter();
+        var inputs = assemblerPattern.getInputs();
+        for (int i = 0; i < Math.min(inputs.length, inputHolder.length); i++) {
+            for (var entry : inputHolder[i]) {
+                var remainder = inputs[i].getRemainingKey(entry.getKey());
+                if (remainder == null) {
+                    continue;
+                }
+                long templateAmount = getTemplateAmount(inputs[i], entry.getKey());
+                if (templateAmount > 0) {
+                    remainders.add(remainder, entry.getLongValue() / templateAmount);
+                }
+            }
+        }
+        for (var entry : remainders) {
+            result.add(new GenericStack(entry.getKey(), entry.getLongValue()));
+        }
+        return result;
+    }
+
+    private long getTemplateAmount(IPatternDetails.IInput input, AEKey key) {
+        for (GenericStack possibleInput : input.possibleInputs()) {
+            if (possibleInput.what().equals(key)) {
+                return possibleInput.amount();
+            }
+        }
+        return 1;
+    }
+
+    private void mergeCachedOutputs(List<GenericStack> outputs) {
+        KeyCounter merged = new KeyCounter();
+        for (GenericStack cachedOutput : this.cachedOutputs) {
+            merged.add(cachedOutput.what(), cachedOutput.amount());
+        }
+        for (GenericStack output : outputs) {
+            merged.add(output.what(), output.amount());
+        }
+        this.cachedOutputs.clear();
+        for (var entry : merged) {
+            this.cachedOutputs.add(new GenericStack(entry.getKey(), entry.getLongValue()));
+        }
+    }
+
+    private KeyCounter[] copyInputHolder(KeyCounter[] inputHolder) {
+        KeyCounter[] copy = new KeyCounter[inputHolder.length];
+        for (int i = 0; i < inputHolder.length; i++) {
+            copy[i] = new KeyCounter();
+            copy[i].addAll(inputHolder[i]);
+        }
+        return copy;
+    }
+
+    private void writeCachedOutputs(NBTTagCompound data) {
+        if (this.cachedOutputs.isEmpty()) {
+            data.removeTag(NBT_CACHED_OUTPUTS);
+            return;
+        }
+
+        data.setTag(NBT_CACHED_OUTPUTS, GenericStack.writeList(this.cachedOutputs));
+    }
+
+    private void readCachedOutputs(NBTTagCompound data) {
+        this.cachedOutputs.clear();
+        if (!data.hasKey(NBT_CACHED_OUTPUTS, Constants.NBT.TAG_LIST)) {
+            return;
+        }
+
+        for (GenericStack stack : GenericStack.readList(data.getTagList(NBT_CACHED_OUTPUTS, Constants.NBT.TAG_COMPOUND))) {
+            if (stack != null) {
+                this.cachedOutputs.add(stack);
+            }
+        }
+    }
+
+    private void addGenericStackDrops(GenericStackInv inv, List<ItemStack> drops) {
+        for (int i = 0; i < inv.size(); i++) {
+            GenericStack stack = inv.getStack(i);
+            if (stack != null && this.world != null) {
+                stack.what().addDrops(stack.amount(), drops, this.world, this.pos);
+            }
+        }
+    }
+
+    public IGridNode getGridNode() {
+        return this.getMainNode().getNode();
+    }
+
+    private boolean hasSamePatternInOtherSlot(InternalInventory inv, int slot, ItemStack stack) {
+        AEItemKey pattern = AEItemKey.of(stack);
+        if (pattern == null) {
+            return false;
+        }
+
+        for (int i = 0; i < inv.size(); i++) {
+            if (i == slot) {
+                continue;
+            }
+
+            AEItemKey otherPattern = AEItemKey.of(inv.getStackInSlot(i));
+            if (pattern.equals(otherPattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean injectIntoNetwork(GenericStackInv inv, MEStorage storage) {
+        boolean didSomething = false;
+        boolean changed = false;
+        for (int i = 0; i < inv.size(); i++) {
+            GenericStack stack = inv.getStack(i);
+            if (stack == null) {
+                continue;
+            }
+
+            long inserted = storage.insert(stack.what(), stack.amount(), Actionable.MODULATE, this.actionSource);
+            if (inserted <= 0) {
+                continue;
+            }
+
+            long remaining = stack.amount() - inserted;
+            inv.setStack(i, remaining <= 0 ? null : new GenericStack(stack.what(), remaining));
+            didSomething = true;
+            changed = true;
+        }
+
+        if (changed) {
+            this.saveChanges();
+        }
+        return didSomething;
     }
 
     private class PatternFilter implements IAEItemFilter {
         @Override
         public boolean allowInsert(InternalInventory inv, int slot, ItemStack stack) {
-            if (TileMolecularAssembler.this.world == null) {
-                return true;
-            }
-            return PatternDetailsHelper.decodePattern(stack, TileMolecularAssembler.this.world)
-                instanceof IMolecularAssemblerSupportedPattern;
+            return TileMolecularAssembler.this.world != null
+                && PatternDetailsHelper.decodePattern(stack, TileMolecularAssembler.this.world) instanceof IAssemblerPattern
+                && !hasSamePatternInOtherSlot(inv, slot, stack);
         }
     }
+
+    private class ActivePatternInventory extends BaseInternalInventory {
+        @Override
+        public int size() {
+            return getActivePatternSlots();
+        }
+
+        @Override
+        public ItemStack getStackInSlot(int slotIndex) {
+            if (!isPatternSlotEnabled(slotIndex)) {
+                return ItemStack.EMPTY;
+            }
+            return patternInventory.getStackInSlot(slotIndex);
+        }
+
+        @Override
+        public void setItemDirect(int slotIndex, ItemStack stack) {
+            if (isPatternSlotEnabled(slotIndex)) {
+                patternInventory.setItemDirect(slotIndex, stack);
+            }
+        }
+
+        @Override
+        public boolean isItemValid(int slot, ItemStack stack) {
+            return isPatternSlotEnabled(slot) && patternInventory.isItemValid(slot, stack);
+        }
+
+        @Override
+        public int getSlotLimit(int slot) {
+            return patternInventory.getSlotLimit(slot);
+        }
+
+        @Override
+        public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
+            if (!isPatternSlotEnabled(slot)) {
+                return stack;
+            }
+            return super.insertItem(slot, stack, simulate);
+        }
+
+        @Override
+        public ItemStack extractItem(int slot, int amount, boolean simulate) {
+            if (!isPatternSlotEnabled(slot)) {
+                return ItemStack.EMPTY;
+            }
+            return super.extractItem(slot, amount, simulate);
+        }
+    }
+
 }

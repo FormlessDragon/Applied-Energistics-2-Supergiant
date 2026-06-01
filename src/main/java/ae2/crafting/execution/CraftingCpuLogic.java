@@ -52,10 +52,12 @@ import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Stores the crafting logic of a crafting CPU.
@@ -228,7 +230,7 @@ public class CraftingCpuLogic {
     }
 
     int executeCraftingWithProviderLookup(int maxPatterns, IEnergyService energyService, World level,
-                                          java.util.function.Function<IPatternDetails, Iterable<ICraftingProvider>> providersForPattern) {
+                                          Function<IPatternDetails, Iterable<ICraftingProvider>> providersForPattern) {
         var job = this.job;
         if (job == null)
             return 0;
@@ -246,73 +248,149 @@ public class CraftingCpuLogic {
 
             var details = task.getKey();
             var finalOutputPseudoPattern = isFinalOutputPseudoPattern(job, details);
-            var expectedOutputs = new KeyCounter();
-            var expectedContainerItems = new KeyCounter();
-            ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
-                ? new RealInputTrackingInventoryView(inventory)
-                : inventory;
-            // Contains the inputs for the pattern.
-            @Nullable
-            var craftingContainer = CraftingCpuHelper.extractPatternInputs(details, taskInventory, level,
-                expectedOutputs, expectedContainerItems);
-
             // Try to push to each provider.
             for (var provider : providersForPattern.apply(details)) {
-                if (craftingContainer == null)
-                    break;
-                if (provider.isBusy())
+                if (provider.isBusy()) {
                     continue;
-
-                var patternPower = CraftingCpuHelper.calculatePatternPower(craftingContainer);
-
-                if (energyService.extractAEPower(patternPower, Actionable.SIMULATE,
-                    PowerMultiplier.CONFIG) < patternPower - 0.01)
-                    break;
-
-                if (provider.pushPattern(details, craftingContainer)) {
-                    energyService.extractAEPower(patternPower, Actionable.MODULATE, PowerMultiplier.CONFIG);
-                    pushedPatterns++;
-                    recordPushedPattern(job, details, taskInventory, expectedOutputs, expectedContainerItems);
-
-                    cluster.markDirty();
-
-                    task.getValue().value--;
-                    if (finalOutputPseudoPattern) {
-                        completePseudoOutputs(job, expectedOutputs);
-                        if (job != this.job) {
-                            break taskLoop;
-                        }
-                    }
-                    if (task.getValue().value <= 0) {
-                        it.remove();
-                        if (job != this.job) {
-                            break taskLoop;
-                        }
-                        continue taskLoop;
-                    }
-
-                    if (pushedPatterns == maxPatterns) {
-                        break taskLoop;
-                    }
-
-                    // Prepare next inputs.
-                    expectedOutputs.reset();
-                    expectedContainerItems.reset();
-                    taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
-                        ? new RealInputTrackingInventoryView(inventory)
-                        : inventory;
-                    craftingContainer = CraftingCpuHelper.extractPatternInputs(details, taskInventory, level,
-                        expectedOutputs, expectedContainerItems);
                 }
-            }
 
-            // Failed to push this pattern, reinject the inputs.
-            if (craftingContainer != null) {
-                CraftingCpuHelper.reinjectPatternInputs(taskInventory, craftingContainer);
+                boolean mergePush = provider.canMergePatternPush(details);
+                int pushedMultiplier = tryPushPatternToProvider(job, provider, details, finalOutputPseudoPattern,
+                    energyService, level, task, maxPatterns - pushedPatterns, mergePush);
+                if (pushedMultiplier <= 0) {
+                    continue;
+                }
+
+                pushedPatterns += pushedMultiplier;
+                if (job != this.job) {
+                    break taskLoop;
+                }
+                if (task.getValue().value <= 0) {
+                    it.remove();
+                    continue taskLoop;
+                }
+                if (pushedPatterns == maxPatterns) {
+                    break taskLoop;
+                }
+                continue taskLoop;
             }
         }
 
         return pushedPatterns;
+    }
+
+    private int tryPushPatternToProvider(ExecutingCraftingJob job, ICraftingProvider provider, IPatternDetails details,
+                                         boolean finalOutputPseudoPattern, IEnergyService energyService, World level,
+                                         Map.Entry<IPatternDetails, ExecutingCraftingJob.TaskProgress> task,
+                                         int remainingPatternBudget, boolean mergePush) {
+        if (!mergePush) {
+            return tryPushPattern(job, provider, details, finalOutputPseudoPattern, energyService, level, task, 1,
+                false);
+        }
+
+        int maxMultiplier = (int) Math.min(task.getValue().value, remainingPatternBudget);
+        maxMultiplier = provider.getMaxPatternPushMultiplier(details, maxMultiplier);
+        ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
+            ? new RealInputTrackingInventoryView(inventory)
+            : inventory;
+        maxMultiplier = CraftingCpuHelper.getMaxExtractablePatternMultiplier(details, taskInventory, level,
+            maxMultiplier);
+        if (maxMultiplier <= 0) {
+            return 0;
+        }
+
+        maxMultiplier = getMaxEnergyAffordableMultiplier(
+            CraftingCpuHelper.calculatePatternPower(details, 1),
+            energyService,
+            maxMultiplier);
+        if (maxMultiplier <= 0) {
+            return 0;
+        }
+
+        return tryPushPattern(job, provider, details, finalOutputPseudoPattern, energyService, level, task,
+            maxMultiplier, true);
+    }
+
+    private int tryPushPattern(ExecutingCraftingJob job, ICraftingProvider provider, IPatternDetails details,
+                               boolean finalOutputPseudoPattern, IEnergyService energyService, World level,
+                               Map.Entry<IPatternDetails, ExecutingCraftingJob.TaskProgress> task,
+                               int multiplier, boolean mergePush) {
+        if (multiplier <= 0) {
+            return 0;
+        }
+
+        if (!canAttemptMultiplier(CraftingCpuHelper.calculatePatternPower(details, 1), energyService, multiplier)) {
+            return 0;
+        }
+        if (mergePush && provider.getMaxPatternPushMultiplier(details, multiplier) < multiplier) {
+            return 0;
+        }
+
+        var expectedOutputs = new KeyCounter();
+        var expectedContainerItems = new KeyCounter();
+        ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
+            ? new RealInputTrackingInventoryView(inventory)
+            : inventory;
+        @Nullable
+        var craftingContainer = CraftingCpuHelper.extractPatternInputs(details, taskInventory, level,
+            expectedOutputs, expectedContainerItems, multiplier);
+        if (craftingContainer == null) {
+            return 0;
+        }
+
+        var patternPower = CraftingCpuHelper.calculatePatternPower(craftingContainer);
+        if (energyService.extractAEPower(patternPower, Actionable.SIMULATE,
+            PowerMultiplier.CONFIG) < patternPower - 0.01) {
+            CraftingCpuHelper.reinjectPatternInputs(taskInventory, craftingContainer);
+            return 0;
+        }
+
+        if (!provider.pushPattern(details, craftingContainer, multiplier)) {
+            CraftingCpuHelper.reinjectPatternInputs(taskInventory, craftingContainer);
+            return 0;
+        }
+
+        energyService.extractAEPower(patternPower, Actionable.MODULATE, PowerMultiplier.CONFIG);
+        recordPushedPattern(job, details, taskInventory, expectedOutputs, expectedContainerItems);
+
+        cluster.markDirty();
+
+        task.getValue().value -= multiplier;
+        if (finalOutputPseudoPattern) {
+            completePseudoOutputs(job, expectedOutputs);
+        }
+        return multiplier;
+    }
+
+    private boolean canAttemptMultiplier(double singlePatternPower, IEnergyService energyService, int multiplier) {
+        if (multiplier <= 0) {
+            return false;
+        }
+
+        double estimatedPower = singlePatternPower * multiplier;
+        return energyService.extractAEPower(estimatedPower, Actionable.SIMULATE,
+            PowerMultiplier.CONFIG) >= estimatedPower - 0.01;
+    }
+
+    private int getMaxEnergyAffordableMultiplier(double singlePatternPower, IEnergyService energyService,
+                                                 int maxMultiplier) {
+        if (maxMultiplier <= 0) {
+            return 0;
+        }
+        if (singlePatternPower <= 0) {
+            return maxMultiplier;
+        }
+
+        double requestedPower = singlePatternPower * maxMultiplier;
+        double availablePower = energyService.extractAEPower(requestedPower, Actionable.SIMULATE,
+            PowerMultiplier.CONFIG);
+        if (availablePower < singlePatternPower - 0.01) {
+            return 0;
+        }
+        if (availablePower >= requestedPower - 0.01) {
+            return maxMultiplier;
+        }
+        return Math.clamp((int) Math.floor((availablePower + 0.01) / singlePatternPower), 0, maxMultiplier);
     }
 
     private void recordPushedPattern(ExecutingCraftingJob job, IPatternDetails details,

@@ -16,6 +16,10 @@ public interface PatternContainer {
         return true;
     }
 
+    default boolean isAssemblerPatternContainer() {
+        return false;
+    }
+
     InternalInventory getTerminalPatternInventory();
 
     boolean containsPattern(AEItemKey pattern);

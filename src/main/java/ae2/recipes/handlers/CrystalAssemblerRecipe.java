@@ -95,18 +95,48 @@ public class CrystalAssemblerRecipe {
     }
 
     public void consume(Iterable<ItemStack> input, GenericStackInv tank) {
+        this.consume(input, tank, 1);
+    }
+
+    public void consume(Iterable<ItemStack> input, GenericStackInv tank, int runs) {
         List<ItemStack> live = new ObjectArrayList<>();
         for (ItemStack stack : input) {
             live.add(stack);
         }
         for (var ingredient : this.inputs) {
-            consume(live, ingredient, true);
+            consume(live, new SizedIngredient(ingredient.ingredient(), ingredient.amount() * runs), true);
         }
         if (this.fluid != null && tank.getStack(0) != null) {
             var stack = tank.getStack(0);
-            long remaining = stack.amount() - this.fluid.amount();
+            long remaining = stack.amount() - this.fluid.amount() * runs;
             tank.setStack(0, remaining <= 0 ? null : new GenericStack(stack.what(), remaining));
         }
+    }
+
+    public int getMaxRuns(Iterable<ItemStack> input, GenericStackInv tank, int limit) {
+        int runs = Math.max(0, limit);
+        if (this.fluid != null) {
+            GenericStack fluidStack = tank.getStack(0);
+            if (fluidStack == null || !fluidStack.what().equals(this.fluid.fluid())) {
+                return 0;
+            }
+            runs = Math.min(runs, (int) (fluidStack.amount() / this.fluid.amount()));
+        }
+
+        for (int i = runs; i > 0; i--) {
+            List<ItemStack> remaining = copyInput(input);
+            boolean matches = true;
+            for (var ingredient : this.inputs) {
+                if (!consume(remaining, new SizedIngredient(ingredient.ingredient(), ingredient.amount() * i), false)) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                return i;
+            }
+        }
+        return 0;
     }
 
     public interface InternalOutput {

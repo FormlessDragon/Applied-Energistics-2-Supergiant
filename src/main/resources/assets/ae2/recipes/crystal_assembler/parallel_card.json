@@ -1,0 +1,25 @@
+{
+  "type": "ae2:crystal_assembler",
+  "input_items": [
+    {
+      "ingredient": {
+        "item": "ae2:advanced_card"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "ae2:concurrent_processor"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "ae2:speed_card"
+      },
+      "amount": 4
+    }
+  ],
+  "output": {
+    "item": "ae2:parallel_card",
+    "count": 1
+  }
+}

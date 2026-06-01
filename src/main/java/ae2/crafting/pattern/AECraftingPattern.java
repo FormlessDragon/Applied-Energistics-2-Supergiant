@@ -1,7 +1,7 @@
 package ae2.crafting.pattern;
 
 import ae2.api.behaviors.ContainerItemStrategies;
-import ae2.api.crafting.IPatternDetails;
+import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.PatternDetailsTooltip;
 import ae2.api.stacks.AEFluidKey;
 import ae2.api.stacks.AEItemKey;
@@ -10,7 +10,6 @@ import ae2.api.stacks.AEKeyType;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.core.localization.GuiText;
-import ae2.tile.crafting.IMolecularAssemblerSupportedPattern;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.init.Items;
@@ -35,7 +34,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-public class AECraftingPattern implements IPatternDetails, IMolecularAssemblerSupportedPattern {
+public class AECraftingPattern implements IAssemblerPattern {
     public static final int CRAFTING_GRID_DIMENSION = 3;
     public static final int CRAFTING_GRID_SLOTS = CRAFTING_GRID_DIMENSION * CRAFTING_GRID_DIMENSION;
     private static final String ENCODED_CRAFTING_PATTERN = "encoded_crafting_pattern";

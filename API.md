@@ -29,6 +29,7 @@ relevant during normal Forge mod initialization:
 | `ae2.api.client.StorageCellModels`          | For customizing the models of storage cells when they are inserted into drives or ME chests.        |
 | `ae2.api.upgrades.Upgrades`                 | For managing upgrade cards and associating them with upgradable items, parts, or blocks.            |
 | `ae2.api.upgrades.UpgradeInventories`       | For creating upgrade inventories for upgradable machines and item-backed hosts.                     |
+| `ae2.api.behaviors.GenericInternalInventoryAdapters` | Allows addons to expose AE2 generic inventories through Forge capabilities.                         |
 
 In general, these registries are synchronized and may be used during mod loading. Finish registration before gameplay
 starts using the affected systems. Changes after mod initialization can leave already-created grids, storage cells,
@@ -78,6 +79,44 @@ if (key instanceof AEFluidKey) {
     AEFluidKey fluidKey = (AEFluidKey) key;
     FluidStack stack = fluidKey.toStack(1000);
     // [...]
+}
+```
+
+## Custom Key Type Machine Integration
+
+Registering an `AEKeyType` makes AE2 able to serialize, store, display, and route that family of keys internally. It
+does not automatically teach Forge item or fluid pipes, or another mod's custom capability, how to move that resource.
+Addon resource types normally need the following registrations during mod initialization:
+
+* `AEKeyTypes.register(...)` for the key family.
+* `GenericSlotCapacities.register(...)` for interface and pattern provider slot limits.
+* `ExternalStorageStrategy.register(...)` so AE2 storage buses and pattern providers can wrap external inventories as
+  `MEStorage`.
+* `GenericInternalInventoryAdapters.register(...)` so AE2's own generic inventories, such as the ME interface and
+  pattern provider return inventory, can be exposed through the addon's Forge capability.
+* Optional behavior strategies such as `StackImportStrategy`, `StackExportStrategy`, `PlacementStrategy`,
+  `PickupStrategy`, and `ContainerItemStrategy` when the key type should work with buses, planes, or container items.
+
+AE2 automatically applies registered `GenericInternalInventoryAdapters` to AE2-owned hosts that expose
+`AECapabilities.GENERIC_INTERNAL_INV`. This includes AE2's ME interfaces, pattern providers, and other generic
+inventory hosts in this branch. It does not automatically modify another mod's tile entities or parts. If your mod owns
+the external machine or capability provider, your mod remains responsible for exposing its own Forge capability or AE2
+storage wrapper there.
+
+Minimal adapter shape:
+
+```java
+GenericInternalInventoryAdapters.register(MY_CAPABILITY, MyCapabilityHandler::new);
+
+final class MyCapabilityHandler implements IMyCapability {
+    private final GenericInternalInventory inv;
+
+    MyCapabilityHandler(GenericInternalInventory inv) {
+        this.inv = inv;
+    }
+
+    // Convert between your resource stack and your custom AEKey,
+    // then call inv.insert(...), inv.extract(...), inv.getKey(...), and inv.getAmount(...).
 }
 ```
 
@@ -242,6 +281,48 @@ providers.
 This service provides access to craftable patterns, crafting CPUs, job calculation, job simulation, job submission,
 and active-request tracking. Craftable keys are queried through this service rather than being reported as ordinary
 stored network contents.
+
+#### Merged Pattern Push
+
+Crafting providers can opt a pattern into a merged push path through
+`ICraftingProvider.canMergePatternPush(IPatternDetails)`. This method only decides whether the CPU may use the special
+batch path. If it returns `false`, the CPU must use the normal one-pattern dispatch attempt and must not call
+`getMaxPatternPushMultiplier(...)`.
+
+When `canMergePatternPush(...)` returns `true`, the CPU calls
+`ICraftingProvider.getMaxPatternPushMultiplier(IPatternDetails, int maxMultiplier)`. Implementations must return a
+value from `0` to `maxMultiplier`. Returning `0` means this provider is currently unavailable for that pattern in this
+pass: the CPU will not extract inputs, will not spend energy, and will not fall back to a single-pattern push for that
+provider during that pass.
+
+Pushing `N` merged copies is equivalent to `N` consecutive successful one-pattern pushes for inputs, expected outputs,
+and crafting CPU operation cost. Addon providers that cannot guarantee this equivalence should return `false` from
+`canMergePatternPush(...)`.
+
+Pattern providers that dispatch into adjacent machines may use
+`ae2.api.implementations.blockentities.IPatternProviderBatchTarget` on the adjacent crafting machine to ask for a
+direction-specific maximum receive count. Without that interface, AE2 falls back to the normal one-pattern crafting
+machine path. For external inventories, AE2 probes the selected target group with simulated inserts and does not split
+one merged dispatch across unrelated fallback directions.
+
+#### Pattern Containers and Assembler Patterns
+
+Pattern access terminal providers expose their pattern inventory through the public
+`ae2.helpers.patternprovider.PatternContainer` type. The method `PatternContainer.isAssemblerPatternContainer()` is a
+type boundary, not just a UI hint. Containers returning `true` accept and expose only assembler patterns. Containers
+returning `false` accept and expose only non-assembler patterns. AE2 uses this boundary when collecting provider
+inventories for the pattern access terminal, inserting patterns through the terminal, quick-moving patterns, checking
+duplicate patterns, and publishing patterns to the crafting service.
+
+Assembler patterns implement `ae2.api.crafting.IAssemblerPattern`. They are patterns that are executed internally by
+assembler-style machines such as the molecular assembler instead of being pushed into an external inventory. An
+assembler pattern can describe item substitution and direct fluid use through `canSubstitute()` and
+`canSubstituteFluids()`. These properties belong to assembler patterns only. Non-assembler patterns are fixed-input
+patterns and should not expose substitution or direct-fluid behavior.
+
+This distinction matters for addon providers: ordinary pattern providers can assume non-assembler pattern inputs are
+fixed keys and fixed key types when dispatching materials. If an addon pattern can substitute inputs, use an assembler
+pattern implementation and expose it through an assembler pattern container.
 
 ### Forced Start for Missing Crafting Ingredients
 

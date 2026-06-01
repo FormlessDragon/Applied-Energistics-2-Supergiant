@@ -1,6 +1,6 @@
 {
   "$schema": "../schema.json",
-  "includes": ["../common/common.json", "../common/player_inventory.json"],
+  "includes": ["../common/common.json", "../common/player_inventory.json", "../common/toolbox.json"],
   "text": {
     "dialog_title": {
       "text": {
@@ -34,6 +34,54 @@
       "top": 17,
       "width": 12,
       "height": 12
+    },
+    "patternModifierPanel": {
+      "left": -126,
+      "top": 59,
+      "width": 86,
+      "height": 180
+    },
+    "patternModifierPanelAmount0": {
+      "left": -63,
+      "top": 67,
+      "width": 18,
+      "height": 20
+    },
+    "patternModifierPanelAmount1": {
+      "left": -63,
+      "top": 89,
+      "width": 18,
+      "height": 20
+    },
+    "patternModifierPanelAmount2": {
+      "left": -63,
+      "top": 111,
+      "width": 18,
+      "height": 20
+    },
+    "patternModifierPanelAmount3": {
+      "left": -63,
+      "top": 133,
+      "width": 18,
+      "height": 20
+    },
+    "patternModifierPanelAmount4": {
+      "left": -63,
+      "top": 155,
+      "width": 18,
+      "height": 20
+    },
+    "patternModifierPanelAmount5": {
+      "left": -63,
+      "top": 177,
+      "width": 18,
+      "height": 20
+    },
+    "patternModifierPanelClear": {
+      "left": -63,
+      "top": 199,
+      "width": 18,
+      "height": 20
     }
   }
 }

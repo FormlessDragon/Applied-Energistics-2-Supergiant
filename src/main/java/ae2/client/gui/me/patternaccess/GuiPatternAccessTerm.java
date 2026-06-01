@@ -38,6 +38,7 @@ import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.ITooltip;
 import ae2.client.gui.widgets.ItemStackButton;
+import ae2.client.gui.widgets.PatternModifierPanelWidget;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
@@ -143,6 +144,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     private final AETextField providerSearchField;
     private final SearchModeButton searchModeButton;
     private final ServerSettingToggleButton<ShowPatternProviders> showPatternProviders;
+    private final PatternModifierPanelWidget patternModifierPanel;
 
     private int visibleRows = MIN_VISIBLE_ROWS;
     private int lastScroll = Integer.MIN_VALUE;
@@ -165,6 +167,8 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             new TextComponentTranslation("gui.ae2.PatternAccessTerminalProviderSearchTooltip")));
         this.searchModeButton = new SearchModeButton(this::cycleSearchMode);
         this.widgets.add("searchMode", this.searchModeButton);
+        this.patternModifierPanel = new PatternModifierPanelWidget(this, new PatternAccessPanelHost());
+        this.patternModifierPanel.addButtons();
 
         this.addToLeftToolbar(new SettingToggleButton<>(
             Settings.TERMINAL_STYLE,
@@ -278,6 +282,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
             currentY += ROW_HEIGHT;
         }
+        this.patternModifierPanel.drawBackground();
     }
 
     private static void appendStackName(StringBuilder text, @Nullable GenericStack stack) {
@@ -355,6 +360,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         super.updateBeforeRender();
 
         this.showPatternProviders.set(this.container.getShownProviders());
+        this.patternModifierPanel.update();
 
         String text = this.searchField.getText();
         String providerText = this.providerSearchField.getText();
@@ -1095,6 +1101,28 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         @Override
         public boolean isTooltipAreaVisible() {
             return this.visible;
+        }
+    }
+
+    private final class PatternAccessPanelHost implements PatternModifierPanelWidget.PanelHost {
+        @Override
+        public boolean isPatternModifierPanelAvailable() {
+            return container.isPatternModifierPanelAvailable();
+        }
+
+        @Override
+        public void updatePatternModifierPanelVisibleSlots(boolean visible) {
+            container.updatePatternModifierPanelVisibleSlots(visible);
+        }
+
+        @Override
+        public void clearPatternModifierPanel() {
+            container.getPatternModifierPanel().clearPatterns();
+        }
+
+        @Override
+        public void modifyPatternModifierPanelAmounts(int factor, boolean divide) {
+            container.getPatternModifierPanel().modifyAmounts(factor, divide);
         }
     }
 }

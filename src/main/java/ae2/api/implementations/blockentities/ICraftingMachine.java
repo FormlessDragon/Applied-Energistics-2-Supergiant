@@ -32,7 +32,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
-public interface ICraftingMachine {
+public interface ICraftingMachine extends IPatternProviderBatchTarget {
 
     @Nullable
     static ICraftingMachine of(@Nullable TileEntity blockEntity, EnumFacing side) {
@@ -50,7 +50,7 @@ public interface ICraftingMachine {
 
     PatternContainerGroup getCraftingMachineInfo();
 
-    boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputs, EnumFacing ejectionDirection);
+    boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputs, int multiplier, EnumFacing ejectionDirection);
 
     boolean acceptsPlans();
 }

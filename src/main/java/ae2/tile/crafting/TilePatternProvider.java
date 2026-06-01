@@ -27,8 +27,6 @@ import ae2.block.crafting.PatternProviderBlock;
 import ae2.block.crafting.PushDirection;
 import ae2.core.AEConfig;
 import ae2.core.definitions.AEBlocks;
-import ae2.helpers.externalstorage.GenericStackFluidStorage;
-import ae2.helpers.externalstorage.GenericStackItemStorage;
 import ae2.helpers.patternprovider.PatternProviderCapacity;
 import ae2.helpers.patternprovider.PatternProviderLogic;
 import ae2.helpers.patternprovider.PatternProviderLogicHost;
@@ -43,10 +41,6 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.util.Constants;
-import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
-import net.minecraftforge.fluids.capability.IFluidHandler;
-import net.minecraftforge.items.CapabilityItemHandler;
-import net.minecraftforge.items.IItemHandler;
 
 import javax.annotation.Nullable;
 import java.util.EnumSet;
@@ -58,8 +52,6 @@ public class TilePatternProvider extends AENetworkedTile implements PatternProvi
     private final PatternProviderLogic logic = new PatternProviderLogic(this.getMainNode(), this,
         AEBlocks.PATTERN_PROVIDER.item(),
         PatternProviderCapacity.getMaxPatternSlots(AEConfig.instance().getPatternProviderExpansionCardLimit()));
-    private final IItemHandler itemHandler = new GenericStackItemStorage(this.logic.getReturnInv());
-    private final IFluidHandler fluidHandler = new GenericStackFluidStorage(this.logic.getReturnInv());
 
     @Override
     public void onReady() {
@@ -181,25 +173,16 @@ public class TilePatternProvider extends AENetworkedTile implements PatternProvi
 
     @Override
     public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
-        if (capability == AECapabilities.GENERIC_INTERNAL_INV
-            || capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY
-            || capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY) {
+        if (capability == AECapabilities.GENERIC_INTERNAL_INV) {
             return true;
         }
         return super.hasCapability(capability, facing);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.GENERIC_INTERNAL_INV) {
-            return (T) this.logic.getReturnInv();
-        }
-        if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {
-            return (T) this.itemHandler;
-        }
-        if (capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY) {
-            return (T) this.fluidHandler;
+            return AECapabilities.GENERIC_INTERNAL_INV.cast(this.logic.getReturnInv());
         }
         return super.getCapability(capability, facing);
     }

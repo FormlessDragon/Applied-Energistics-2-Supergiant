@@ -20,13 +20,13 @@ package ae2.container.implementations;
 
 import ae2.api.config.Settings;
 import ae2.api.config.ShowPatternProviders;
+import ae2.api.crafting.IAssemblerPattern;
+import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
-import ae2.api.implementations.items.ICraftingPatternQuickMoveHost;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
-import ae2.api.parts.IPartItem;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.storage.ILinkStatus;
 import ae2.api.storage.IPatternAccessTermContainerHost;
@@ -44,7 +44,6 @@ import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.helpers.patternprovider.PatternContainer;
 import ae2.parts.AEBasePart;
-import ae2.tile.crafting.IMolecularAssemblerSupportedPattern;
 import ae2.util.inv.AppEngInternalInventory;
 import ae2.util.inv.FilteredInternalInventory;
 import ae2.util.inv.filter.IAEItemFilter;
@@ -61,18 +60,18 @@ import it.unimi.dsi.fastutil.objects.ReferenceSet;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
 
-public class ContainerPatternAccessTerm extends AEBaseContainer implements ILinkStatusAwareContainer {
+public class ContainerPatternAccessTerm extends AEBaseContainer
+    implements ILinkStatusAwareContainer, PatternModifierPanel.Host {
 
     private static final String ACTION_OPEN_PROVIDER = "openProvider";
     private static long inventorySerial = Long.MIN_VALUE;
@@ -81,8 +80,11 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
     private final Reference2ObjectMap<PatternContainer, ContainerTracker> diList = new Reference2ObjectLinkedOpenHashMap<>();
     private final Long2ObjectOpenHashMap<ContainerTracker> byId = new Long2ObjectOpenHashMap<>();
     private final ReferenceSet<PatternContainer> pinnedHosts = new ReferenceOpenHashSet<>();
+    private final PatternModifierPanel patternModifierPanel;
     @GuiSync(1)
     public ShowPatternProviders showPatternProviders = ShowPatternProviders.VISIBLE;
+    @GuiSync(2)
+    public boolean patternModifierPanelAvailable;
     private ILinkStatus linkStatus = ILinkStatus.ofDisconnected();
 
     public ContainerPatternAccessTerm(InventoryPlayer playerInventory, IPatternAccessTermContainerHost host) {
@@ -97,6 +99,8 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
             this.addSlot(slot, SlotSemantics.WIRELESS_SINGULARITY);
         }
         this.addPlayerInventorySlots(0, 0);
+        this.patternModifierPanel = new PatternModifierPanel(this);
+        this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
     }
 
     public void openPatternProvider(long inventoryId) {
@@ -127,50 +131,21 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
         return this.linkStatus;
     }
 
+    private static boolean isAcceptedByContainer(PatternContainer container, @Nullable IPatternDetails details) {
+        return details != null && (details instanceof IAssemblerPattern) == container.isAssemblerPatternContainer();
+    }
+
+    public boolean isPatternModifierPanelAvailable() {
+        return this.patternModifierPanelAvailable;
+    }
+
     @Override
     public void setLinkStatus(ILinkStatus linkStatus) {
         this.linkStatus = linkStatus;
     }
 
-    @Override
-    public void broadcastChanges() {
-        if (isClientSide()) {
-            return;
-        }
-
-        this.showPatternProviders = this.host.getConfigManager().getSetting(Settings.TERMINAL_SHOW_PATTERN_PROVIDERS);
-
-        super.broadcastChanges();
-
-        updateLinkStatus();
-
-        if (this.showPatternProviders != ShowPatternProviders.NOT_FULL) {
-            this.pinnedHosts.clear();
-        }
-
-        IGrid grid = getGrid();
-        VisitorState state = new VisitorState();
-        if (grid != null) {
-            for (Class<?> machineClass : grid.getMachineClasses()) {
-                if (PatternContainer.class.isAssignableFrom(machineClass)) {
-                    visitPatternProviderHosts(grid, machineClass.asSubclass(PatternContainer.class), state);
-                }
-            }
-
-            this.pinnedHosts.removeIf(container -> container.getGrid() != grid);
-        } else {
-            this.pinnedHosts.clear();
-        }
-
-        if (!hasSameVisibleContainers(state.visibleContainers)) {
-            state.forceFullUpdate = true;
-        }
-
-        if (state.total != this.diList.size() || state.forceFullUpdate) {
-            sendFullUpdate(grid);
-        } else {
-            sendIncrementalUpdate();
-        }
+    public PatternModifierPanel getPatternModifierPanel() {
+        return this.patternModifierPanel;
     }
 
     @Nullable
@@ -238,6 +213,48 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
     }
 
     @Override
+    public void broadcastChanges() {
+        if (isClientSide()) {
+            return;
+        }
+
+        this.showPatternProviders = this.host.getConfigManager().getSetting(Settings.TERMINAL_SHOW_PATTERN_PROVIDERS);
+        this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
+
+        super.broadcastChanges();
+
+        updateLinkStatus();
+
+        if (this.showPatternProviders != ShowPatternProviders.NOT_FULL) {
+            this.pinnedHosts.clear();
+        }
+
+        IGrid grid = getGrid();
+        VisitorState state = new VisitorState();
+        if (grid != null) {
+            for (Class<?> machineClass : grid.getMachineClasses()) {
+                if (PatternContainer.class.isAssignableFrom(machineClass)) {
+                    visitPatternProviderHosts(grid, machineClass.asSubclass(PatternContainer.class), state);
+                }
+            }
+
+            this.pinnedHosts.removeIf(container -> container.getGrid() != grid);
+        } else {
+            this.pinnedHosts.clear();
+        }
+
+        if (!hasSameVisibleContainers(state.visibleContainers)) {
+            state.forceFullUpdate = true;
+        }
+
+        if (state.total != this.diList.size() || state.forceFullUpdate) {
+            sendFullUpdate(grid);
+        } else {
+            sendIncrementalUpdate();
+        }
+    }
+
+    @Override
     public void doAction(EntityPlayerMP player, InventoryAction action, int slot, long id) {
         final ContainerTracker inv = this.byId.get(id);
         if (inv == null) {
@@ -249,7 +266,8 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
         }
 
         final ItemStack stackInSlot = inv.server.getStackInSlot(slot);
-        FilteredInternalInventory patternSlot = new FilteredInternalInventory(inv.server.getSlotInv(slot), new PatternSlotFilter());
+        FilteredInternalInventory patternSlot = new FilteredInternalInventory(inv.server.getSlotInv(slot),
+            new PatternSlotFilter(inv.container, getPlayer().world));
         ItemStack carried = getCarried();
 
         switch (action) {
@@ -302,7 +320,8 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
             }
             case MOVE_REGION -> {
                 for (int x = 0; x < inv.server.size(); x++) {
-                    FilteredInternalInventory slotInventory = new FilteredInternalInventory(inv.server.getSlotInv(x), new PatternSlotFilter());
+                    FilteredInternalInventory slotInventory = new FilteredInternalInventory(inv.server.getSlotInv(x),
+                        new PatternSlotFilter(inv.container, getPlayer().world));
                     ItemStack slotStack = slotInventory.getStackInSlot(0);
                     if (!player.inventory.addItemStackToInventory(slotStack)) {
                         slotInventory.setItemDirect(0, slotStack);
@@ -321,6 +340,10 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
         }
     }
 
+    private boolean containsPattern(ContainerTracker container, AEItemKey pattern) {
+        return container.container.containsPattern(pattern);
+    }
+
     public void quickMovePattern(EntityPlayerMP player, int clickedSlot, LongList allowedPatternContainerIds,
                                  LongList allowedPatternSlots) {
         if (clickedSlot < 0 || clickedSlot >= this.inventorySlots.size()) {
@@ -333,7 +356,7 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
         }
 
         ItemStack sourceStack = sourceSlot.getStack();
-        Object pattern = PatternDetailsHelper.decodePattern(sourceStack, player.world);
+        IPatternDetails pattern = PatternDetailsHelper.decodePattern(sourceStack, player.world);
         if (pattern == null) {
             return;
         }
@@ -342,12 +365,13 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
             return;
         }
 
-        boolean craftingPattern = pattern instanceof IMolecularAssemblerSupportedPattern;
+        boolean assemblerPattern = pattern instanceof IAssemblerPattern;
 
         List<QuickMoveTarget> targets = new ObjectArrayList<>();
-        if (craftingPattern) {
+        if (assemblerPattern) {
             for (ContainerTracker targetInventory : this.diList.values()) {
-                if (!isVisible(targetInventory.container) || !acceptsCraftingPatterns(targetInventory.group.icon())) {
+                if (!isVisible(targetInventory.container)
+                    || targetInventory.container.isAssemblerPatternContainer() != assemblerPattern) {
                     continue;
                 }
                 for (int slot = 0; slot < targetInventory.server.size(); slot++) {
@@ -359,18 +383,22 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
             for (int i = 0; i < targetCount; i++) {
                 ContainerTracker targetInventory = this.byId.get(allowedPatternContainerIds.getLong(i));
                 if (targetInventory != null && isVisible(targetInventory.container)
-                    && !acceptsCraftingPatterns(targetInventory.group.icon())) {
+                    && targetInventory.container.isAssemblerPatternContainer() == assemblerPattern) {
                     targets.add(new QuickMoveTarget(targetInventory, (int) allowedPatternSlots.getLong(i)));
                 }
             }
         }
 
-        if (!craftingPattern && targets.stream().map(target -> target.container().group).distinct().count() != 1) {
+        if (!assemblerPattern && targets.stream().map(target -> target.container().group).distinct().count() != 1) {
             return;
         }
 
+        ReferenceSet<ContainerTracker> usedContainers = new ReferenceOpenHashSet<>();
         for (QuickMoveTarget target : targets) {
             ContainerTracker container = target.container();
+            if (usedContainers.contains(container)) {
+                continue;
+            }
             if (containsPattern(container, sourcePattern)) {
                 continue;
             }
@@ -382,69 +410,17 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
 
             FilteredInternalInventory targetSlot = new FilteredInternalInventory(
                 container.server.getSlotInv(slot),
-                new PatternSlotFilter());
-            ItemStack movedPattern = sourceStack.copy();
+                new PatternSlotFilter(container.container, player.world));
+            ItemStack movedPattern = sourceSlot.getStack().copy();
             movedPattern.setCount(1);
             if (!targetSlot.addItems(movedPattern).isEmpty()) {
                 continue;
             }
 
             sourceSlot.decrStackSize(1);
-            return;
-        }
-    }
-
-    private boolean containsPattern(ContainerTracker container, AEItemKey pattern) {
-        return container.container.containsPattern(pattern);
-    }
-
-    private boolean acceptsCraftingPatterns(@Nullable AEItemKey icon) {
-        if (icon == null) {
-            return false;
-        }
-
-        Item item = icon.getItem();
-        if (item instanceof ItemBlock itemBlock && itemBlock.getBlock() instanceof ICraftingPatternQuickMoveHost) {
-            return true;
-        }
-
-        if (item instanceof IPartItem<?> partItem && partItem instanceof ICraftingPatternQuickMoveHost) {
-            return true;
-        }
-
-        return item instanceof ICraftingPatternQuickMoveHost;
-    }
-
-    private void sendFullUpdate(@Nullable IGrid grid) {
-        this.byId.clear();
-        this.diList.clear();
-
-        sendPacketToClient(new ClearPatternAccessTerminalPacket());
-
-        if (grid == null) {
-            return;
-        }
-
-        for (Class<?> machineClass : grid.getMachineClasses()) {
-            Class<? extends PatternContainer> containerClass = tryCastMachineToContainer(machineClass);
-            if (containerClass == null) {
-                continue;
-            }
-
-            for (PatternContainer container : grid.getActiveMachines(containerClass)) {
-                if (isVisible(container)) {
-                    this.diList.put(container, new ContainerTracker(container, container.getTerminalPatternInventory(),
-                        container.getTerminalGroup()));
-                }
-            }
-        }
-
-        for (ContainerTracker inv : this.diList.values()) {
-            this.byId.put(inv.serverId, inv);
-            sendPacketToClient(inv.createFullPacket());
-            PatternAccessTerminalInfoPacket infoPacket = inv.createInfoPacket();
-            if (infoPacket != null) {
-                sendPacketToClient(infoPacket);
+            usedContainers.add(container);
+            if (sourceSlot.getStack().isEmpty()) {
+                return;
             }
         }
     }
@@ -466,6 +442,54 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
         }
     }
 
+    private void sendFullUpdate(@Nullable IGrid grid) {
+        this.byId.clear();
+        this.diList.clear();
+
+        sendPacketToClient(new ClearPatternAccessTerminalPacket());
+
+        if (grid == null) {
+            return;
+        }
+
+        for (Class<?> machineClass : grid.getMachineClasses()) {
+            Class<? extends PatternContainer> containerClass = tryCastMachineToContainer(machineClass);
+            if (containerClass == null) {
+                continue;
+            }
+
+            for (PatternContainer container : grid.getActiveMachines(containerClass)) {
+                if (isVisible(container)) {
+                    this.diList.put(container, new ContainerTracker(container, container.getTerminalPatternInventory(),
+                        container.getTerminalGroup(), getPlayer().world));
+                }
+            }
+        }
+
+        for (ContainerTracker inv : this.diList.values()) {
+            this.byId.put(inv.serverId, inv);
+            sendPacketToClient(inv.createFullPacket());
+            PatternAccessTerminalInfoPacket infoPacket = inv.createInfoPacket();
+            if (infoPacket != null) {
+                sendPacketToClient(infoPacket);
+            }
+        }
+    }
+
+    public void updatePatternModifierPanelVisibleSlots(boolean visible) {
+        this.patternModifierPanel.updateSlotState(visible && this.patternModifierPanelAvailable);
+    }
+
+    @Override
+    public void registerPatternModifierPanelAction(String action, Runnable runnable) {
+        registerClientAction(action, runnable);
+    }
+
+    @Override
+    public void sendPatternModifierPanelAction(String action) {
+        sendClientAction(action);
+    }
+
     private static final class VisitorState {
         private final ReferenceSet<PatternContainer> visibleContainers = new ReferenceOpenHashSet<>();
         private int total;
@@ -475,6 +499,14 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
     private record QuickMoveTarget(ContainerTracker container, int slot) {
     }
 
+    @Override
+    public void lockPatternModifierPlayerInventorySlot(int slot) {
+        lockPlayerInventorySlot(slot);
+    }
+
+    private record ProviderLocation(int dimensionId, BlockPos pos, @Nullable EnumFacing face) {
+    }
+
     private static final class ContainerTracker {
         private final PatternContainer container;
         private final long sortBy;
@@ -482,13 +514,16 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
         private final PatternContainerGroup group;
         private final InternalInventory client;
         private final InternalInventory server;
+        private final World level;
 
-        private ContainerTracker(PatternContainer container, InternalInventory patterns, PatternContainerGroup group) {
+        private ContainerTracker(PatternContainer container, InternalInventory patterns, PatternContainerGroup group,
+                                 World level) {
             this.container = container;
             this.server = patterns;
             this.client = new AppEngInternalInventory(this.server.size());
             this.group = group;
             this.sortBy = container.getTerminalSortOrder();
+            this.level = level;
         }
 
         private static boolean isDifferent(ItemStack a, ItemStack b) {
@@ -506,7 +541,7 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
         private PatternAccessTerminalPacket createFullPacket() {
             Int2ObjectArrayMap<ItemStack> slots = new Int2ObjectArrayMap<>(this.server.size());
             for (int i = 0; i < this.server.size(); i++) {
-                ItemStack stack = this.server.getStackInSlot(i);
+                ItemStack stack = this.getVisibleStack(i);
                 if (!stack.isEmpty()) {
                     slots.put(i, stack);
                 }
@@ -526,7 +561,7 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
             Int2ObjectArrayMap<ItemStack> slots = new Int2ObjectArrayMap<>(changedSlots.size());
             for (int i = 0; i < changedSlots.size(); i++) {
                 int slot = changedSlots.getInt(i);
-                ItemStack stack = this.server.getStackInSlot(slot);
+                ItemStack stack = this.getVisibleStack(slot);
                 this.client.setItemDirect(slot, stack.isEmpty() ? ItemStack.EMPTY : stack.copy());
                 slots.put(slot, stack);
             }
@@ -564,7 +599,7 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
         private IntList detectChangedSlots() {
             IntList changedSlots = null;
             for (int i = 0; i < this.server.size(); i++) {
-                if (isDifferent(this.server.getStackInSlot(i), this.client.getStackInSlot(i))) {
+                if (isDifferent(this.getVisibleStack(i), this.client.getStackInSlot(i))) {
                     if (changedSlots == null) {
                         changedSlots = new IntArrayList();
                     }
@@ -573,15 +608,21 @@ public class ContainerPatternAccessTerm extends AEBaseContainer implements ILink
             }
             return changedSlots;
         }
+
+        private ItemStack getVisibleStack(int slot) {
+            ItemStack stack = this.server.getStackInSlot(slot);
+            return isAcceptedByContainer(this.container, PatternDetailsHelper.decodePattern(stack, this.level))
+                ? stack
+                : ItemStack.EMPTY;
+        }
     }
 
-    private record ProviderLocation(int dimensionId, BlockPos pos, @Nullable EnumFacing face) {
-    }
+    private record PatternSlotFilter(PatternContainer container, World level) implements IAEItemFilter {
 
-    private static final class PatternSlotFilter implements IAEItemFilter {
         @Override
         public boolean allowInsert(InternalInventory inv, int slot, ItemStack stack) {
-            return !stack.isEmpty() && PatternDetailsHelper.isEncodedPattern(stack);
+            return !stack.isEmpty()
+                && isAcceptedByContainer(this.container, PatternDetailsHelper.decodePattern(stack, this.level));
         }
     }
 }

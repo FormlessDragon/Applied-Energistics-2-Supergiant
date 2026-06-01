@@ -132,13 +132,14 @@ public class AEProcessingPattern implements IPatternDetails {
             allInputs.addAll(counter);
         }
 
+        long multiplier = getInputPushMultiplier(inputHolder);
         for (var sparseInput : sparseInputs) {
             if (sparseInput == null) {
                 continue;
             }
 
             var key = sparseInput.what();
-            var amount = sparseInput.amount();
+            var amount = sparseInput.amount() * multiplier;
             long available = allInputs.get(key);
 
             if (available < amount) {
@@ -149,6 +150,23 @@ public class AEProcessingPattern implements IPatternDetails {
             inputSink.pushInput(key, amount);
             allInputs.remove(key, amount);
         }
+    }
+
+    private long getInputPushMultiplier(KeyCounter[] inputHolder) {
+        long multiplier = Long.MAX_VALUE;
+        for (int i = 0; i < inputs.length; i++) {
+            long expectedAmount = inputs[i].getMultiplier();
+            if (expectedAmount <= 0) {
+                continue;
+            }
+
+            long actualAmount = 0;
+            for (var input : inputHolder[i]) {
+                actualAmount += input.getLongValue();
+            }
+            multiplier = Math.min(multiplier, actualAmount / expectedAmount);
+        }
+        return multiplier == Long.MAX_VALUE ? 1 : multiplier;
     }
 
     private static class Input implements IInput {

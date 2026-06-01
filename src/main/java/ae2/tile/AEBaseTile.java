@@ -18,6 +18,9 @@
 
 package ae2.tile;
 
+import ae2.api.AECapabilities;
+import ae2.api.behaviors.GenericInternalInventory;
+import ae2.api.behaviors.GenericInternalInventoryAdapters;
 import ae2.api.networking.GridHelper;
 import ae2.api.orientation.BlockOrientation;
 import ae2.api.orientation.IOrientableBlock;
@@ -43,6 +46,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
+import net.minecraftforge.common.capabilities.Capability;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -66,10 +70,6 @@ public class AEBaseTile extends TileEntity implements ITickable {
     private BlockOrientation lastOrientation = BlockOrientation.NORTH_UP;
     private boolean orientationInitialized = false;
     private boolean pendingVisualStateUpdate = false;
-
-    public AEBaseTile() {
-        super();
-    }
 
     @Override
     public final void readFromNBT(NBTTagCompound compound) {
@@ -316,6 +316,35 @@ public class AEBaseTile extends TileEntity implements ITickable {
     }
 
     public void clearContent() {
+    }
+
+    @Override
+    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+        return capability != AECapabilities.GENERIC_INTERNAL_INV
+            && GenericInternalInventoryAdapters.hasAdapter(capability)
+            && this.getGenericInternalInventoryForAdapter(facing) != null
+            || super.hasCapability(capability, facing);
+    }
+
+    @Nullable
+    @Override
+    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+        if (capability != AECapabilities.GENERIC_INTERNAL_INV) {
+            GenericInternalInventory genericInv = this.getGenericInternalInventoryForAdapter(facing);
+            if (genericInv == null) {
+                return super.getCapability(capability, facing);
+            }
+            T result = GenericInternalInventoryAdapters.getCapability(genericInv, capability);
+            if (result != null) {
+                return result;
+            }
+        }
+        return super.getCapability(capability, facing);
+    }
+
+    @Nullable
+    private GenericInternalInventory getGenericInternalInventoryForAdapter(@Nullable EnumFacing side) {
+        return AECapabilities.GENERIC_INTERNAL_INV.cast(this.getCapability(AECapabilities.GENERIC_INTERNAL_INV, side));
     }
 
     public boolean canBeRotated() {
