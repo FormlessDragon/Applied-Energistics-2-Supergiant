@@ -40,11 +40,11 @@ public class ContainerPatternProvider extends AEBaseContainer
     implements IConfigurableObject, PatternModifierPanel.Host {
 
     public static final String ACTION_SET_PAGE = "setPage";
-    private final PatternProviderLogic logic;
     @GuiSync(12)
     public final boolean remote;
+    private final PatternProviderLogic logic;
     private final List<AppEngSlot> patternSlots = new ObjectArrayList<>();
-
+    private final PatternModifierPanel patternModifierPanel;
     @GuiSync(3)
     public BlockingMode blockingMode = BlockingMode.NO;
     @GuiSync(4)
@@ -61,7 +61,6 @@ public class ContainerPatternProvider extends AEBaseContainer
     public PatternProviderInsertionMode insertionMode = PatternProviderInsertionMode.DEFAULT;
     @GuiSync(15)
     public PatternProviderOutputSideMode outputSideMode = PatternProviderOutputSideMode.SINGLE_SIDE;
-    private final PatternModifierPanel patternModifierPanel;
     @GuiSync(9)
     public int activePatternSlots = 9;
     @GuiSync(10)

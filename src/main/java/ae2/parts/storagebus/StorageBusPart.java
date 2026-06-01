@@ -103,11 +103,11 @@ public class StorageBusPart extends UpgradeablePart
     protected final StorageBusInventory handler = createHandler();
     private final PartAdjacentApi<MEStorage> adjacentStorageAccessor;
     @Nullable
-    private ITextComponent handlerDescription;    private final ConfigInventory config = ConfigInventory.configTypes(63)
+    private ITextComponent handlerDescription;
+    @Nullable
+    private Map<AEKeyType, ExternalStorageStrategy> externalStorageStrategies;    private final ConfigInventory config = ConfigInventory.configTypes(63)
                                                           .changeListener(this::onConfigurationChanged)
                                                           .build();
-    @Nullable
-    private Map<AEKeyType, ExternalStorageStrategy> externalStorageStrategies;
     private boolean wasOnline;
     private int priority;
     private PendingUpdateStatus updateStatus = PendingUpdateStatus.FAST_UPDATE;

@@ -192,6 +192,14 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         return autoStart && !result.simulation() && result.missingItems().isEmpty();
     }
 
+    private static ITextComponent getCraftingErrorText(Throwable error) {
+        Throwable cause = error instanceof ExecutionException && error.getCause() != null ? error.getCause() : error;
+        if (cause instanceof CraftingCalculationFailure calculationFailure) {
+            return calculationFailure.getLocalizedMessageComponent();
+        }
+        return PlayerMessages.CraftingNoPlan.text();
+    }
+
     public boolean planJob(AEKey what, long amount, CalculationStrategy strategy) {
         if (this.job != null) {
             this.job.cancel(true);
@@ -239,14 +247,6 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         } else {
             this.cpuCycler.cycleCpu(next);
         }
-    }
-
-    private static ITextComponent getCraftingErrorText(Throwable error) {
-        Throwable cause = error instanceof ExecutionException && error.getCause() != null ? error.getCause() : error;
-        if (cause instanceof CraftingCalculationFailure calculationFailure) {
-            return calculationFailure.getLocalizedMessageComponent();
-        }
-        return PlayerMessages.CraftingNoPlan.text();
     }
 
     @Override

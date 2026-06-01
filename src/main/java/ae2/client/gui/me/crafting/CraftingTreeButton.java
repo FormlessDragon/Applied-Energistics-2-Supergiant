@@ -17,12 +17,12 @@ final class CraftingTreeButton extends IconButton {
         setMessage(tooltip);
     }
 
-    void setIcon(Icon icon) {
-        this.icon = icon;
-    }
-
     @Override
     protected Icon getIcon() {
         return icon;
+    }
+
+    void setIcon(Icon icon) {
+        this.icon = icon;
     }
 }

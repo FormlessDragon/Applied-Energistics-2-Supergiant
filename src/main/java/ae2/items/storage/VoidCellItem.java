@@ -38,9 +38,9 @@ import java.util.List;
 import java.util.Optional;
 
 public class VoidCellItem extends AEBaseItem implements ICellWorkbenchItem, IStackTooltipDataProvider, IGuiItem {
-    private static final String STORAGE_CELL_FUZZY_MODE = "storage_cell_fuzzy_mode";
     public static final String VOID_CELL_MODE = "void_cell_mode";
     public static final String VOID_CELL_ENERGY = "void_cell_energy";
+    private static final String STORAGE_CELL_FUZZY_MODE = "storage_cell_fuzzy_mode";
 
     public VoidCellItem() {
         this.setMaxStackSize(1);

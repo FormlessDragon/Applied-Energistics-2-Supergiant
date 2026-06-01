@@ -26,20 +26,20 @@ import ae2.api.config.Setting;
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
 import ae2.api.crafting.IPatternDetails;
-import ae2.api.implementations.blockentities.ICrankable;
 import ae2.api.implementations.blockentities.ICraftingMachine;
+import ae2.api.implementations.blockentities.ICrankable;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.ISegmentedInventory;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGridNode;
-import ae2.api.stacks.AEItemKey;
-import ae2.api.stacks.KeyCounter;
 import ae2.api.networking.energy.IEnergySource;
 import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.networking.ticking.TickRateModulation;
 import ae2.api.networking.ticking.TickingRequest;
 import ae2.api.orientation.BlockOrientation;
 import ae2.api.orientation.RelativeSide;
+import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.KeyCounter;
 import ae2.api.upgrades.IUpgradeInventory;
 import ae2.api.upgrades.IUpgradeableObject;
 import ae2.api.upgrades.UpgradeInventories;
@@ -53,7 +53,6 @@ import ae2.core.settings.TickRates;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.recipes.handlers.InscriberProcessType;
 import ae2.recipes.handlers.InscriberRecipe;
-import net.minecraft.util.text.TextComponentTranslation;
 import ae2.tile.grid.AENetworkedPoweredTile;
 import ae2.util.ConfigManager;
 import ae2.util.inv.AppEngInternalInventory;
@@ -66,6 +65,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.common.capabilities.Capability;
 
 import javax.annotation.Nullable;
@@ -81,8 +81,8 @@ public class TileInscriber extends AENetworkedPoweredTile
         this::saveChanges);
     private final AppEngInternalInventory topItemHandler = new AppEngInternalInventory(this, 1, 64, new BaseFilter());
     private final AppEngInternalInventory bottomItemHandler = new AppEngInternalInventory(this, 1, 64,
-        new BaseFilter());    private final ConfigManager configManager = new ConfigManager(this::onConfigChanged);
-    private final AppEngInternalInventory sideItemHandler = new AppEngInternalInventory(this, 2, 64, new BaseFilter());
+        new BaseFilter());
+    private final AppEngInternalInventory sideItemHandler = new AppEngInternalInventory(this, 2, 64, new BaseFilter());    private final ConfigManager configManager = new ConfigManager(this::onConfigChanged);
     private final InternalInventory inv = new CombinedInternalInventory(this.topItemHandler, this.bottomItemHandler,
         this.sideItemHandler);
     private final InternalInventory topItemHandlerExtern = new FilteredInternalInventory(this.topItemHandler,

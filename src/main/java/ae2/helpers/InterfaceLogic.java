@@ -76,10 +76,6 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
         this(gridNode, host, machineType, AEConfig.instance().getInterfacePageLimit() * SLOTS_PER_PAGE);
     }
 
-    public int getPageCount() {
-        return Math.max(1, (this.config.size() + SLOTS_PER_PAGE - 1) / SLOTS_PER_PAGE);
-    }
-
     public InterfaceLogic(IManagedGridNode gridNode, InterfaceLogicHost host, Item machineType, int slots) {
         this.host = host;
         this.config = ConfigInventory.configStacks(slots).changeListener(this::onConfigRowChanged)
@@ -112,6 +108,10 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
             }
         }
         return false;
+    }
+
+    public int getPageCount() {
+        return Math.max(1, (this.config.size() + SLOTS_PER_PAGE - 1) / SLOTS_PER_PAGE);
     }
 
     private void applyInterfaceSlotCapacities() {

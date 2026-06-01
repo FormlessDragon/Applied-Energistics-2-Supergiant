@@ -1,8 +1,5 @@
 package ae2.helpers.patternprovider;
 
-import java.util.List;
-import java.util.function.Predicate;
-
 import ae2.api.config.Actionable;
 import ae2.api.config.PatternProviderInsertionMode;
 import ae2.api.stacks.AEKey;
@@ -10,6 +7,9 @@ import ae2.api.stacks.KeyCounter;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import net.minecraft.util.EnumFacing;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+import java.util.function.Predicate;
 
 final class PatternProviderMergeHelper {
     private PatternProviderMergeHelper() {

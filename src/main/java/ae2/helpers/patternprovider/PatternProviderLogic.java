@@ -1218,6 +1218,9 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
                                  ObjectList<ExternalTarget> externalTargets) {
     }
 
+    private record PendingSend(GenericStack stack, EnumFacing direction) {
+    }
+
     private final class MachineMergePush implements PendingMergePush {
         private final IPatternDetails patternDetails;
         private final MachinePushTarget target;
@@ -1299,9 +1302,6 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             roundRobinIndex += this.matchedTargetIndex + 1;
             return true;
         }
-    }
-
-    private record PendingSend(GenericStack stack, EnumFacing direction) {
     }
 
     private final class SplitTargetMergePush implements PendingMergePush {

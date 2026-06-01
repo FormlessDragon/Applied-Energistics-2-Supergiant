@@ -202,6 +202,39 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
+    private static void appendOutputs(IPatternDetails pattern, StringBuilder text) {
+        for (GenericStack output : pattern.getOutputs()) {
+            appendStackName(text, output);
+        }
+    }
+
+    private static void appendInputs(IPatternDetails pattern, StringBuilder text) {
+        for (IPatternDetails.IInput input : pattern.getInputs()) {
+            for (GenericStack possibleInput : input.possibleInputs()) {
+                appendStackName(text, possibleInput);
+            }
+        }
+    }
+
+    private static void appendStackName(StringBuilder text, @Nullable GenericStack stack) {
+        if (stack == null || stack.what() == null) {
+            return;
+        }
+        text.append(stack.what().getDisplayName().getFormattedText().toLowerCase(Locale.ROOT));
+        text.append('\n');
+    }
+
+    private static void highlightProvider(PatternProviderInfo info) {
+        CraftingSupplierHighlightHandler.INSTANCE.showLocations(Minecraft.getMinecraft(), List.of(
+            new CraftingSupplierLocation(info.dimensionId(), info.pos().getX(), info.pos().getY(),
+                info.pos().getZ())));
+    }
+
+    private static void highlightProviderAndClose(PatternProviderInfo info) {
+        highlightProvider(info);
+        Minecraft.getMinecraft().displayGuiScreen(null);
+    }
+
     private void addWirelessUniversalTerminalButton() {
         if (!(this.container.getItemGuiHost() instanceof WirelessTerminalGuiHost<?> wirelessHost)) {
             return;
@@ -233,25 +266,11 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
                 true))));
     }
 
-    private static void appendOutputs(IPatternDetails pattern, StringBuilder text) {
-        for (GenericStack output : pattern.getOutputs()) {
-            appendStackName(text, output);
-        }
-    }
-
     private int getConfiguredRows() {
         int availableHeight = Math.max(this.height, this.ySize) - 2 * AEConfig.instance().getTerminalMargin();
         int possibleRows = Math.max(MIN_VISIBLE_ROWS,
             (availableHeight - GUI_HEADER_HEIGHT - GUI_FOOTER_HEIGHT) / ROW_HEIGHT);
         return Math.max(MIN_VISIBLE_ROWS, AEConfig.instance().getTerminalStyle().getRows(possibleRows));
-    }
-
-    private static void appendInputs(IPatternDetails pattern, StringBuilder text) {
-        for (IPatternDetails.IInput input : pattern.getInputs()) {
-            for (GenericStack possibleInput : input.possibleInputs()) {
-                appendStackName(text, possibleInput);
-            }
-        }
     }
 
     @Override
@@ -285,14 +304,6 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         this.patternModifierPanel.drawBackground();
     }
 
-    private static void appendStackName(StringBuilder text, @Nullable GenericStack stack) {
-        if (stack == null || stack.what() == null) {
-            return;
-        }
-        text.append(stack.what().getDisplayName().getFormattedText().toLowerCase(Locale.ROOT));
-        text.append('\n');
-    }
-
     private void drawGroupHeader(PatternContainerGroup group, int rowIndex) {
         if (group.icon() != null) {
             AEKeyRendering.drawInGui(this.mc,
@@ -314,12 +325,6 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             GUI_PADDING_X + PATTERN_PROVIDER_NAME_MARGIN_X + 18,
             GUI_HEADER_HEIGHT + GUI_PADDING_Y + rowIndex * ROW_HEIGHT,
             4210752);
-    }
-
-    private static void highlightProvider(PatternProviderInfo info) {
-        CraftingSupplierHighlightHandler.INSTANCE.showLocations(Minecraft.getMinecraft(), List.of(
-            new CraftingSupplierLocation(info.dimensionId(), info.pos().getX(), info.pos().getY(),
-                info.pos().getZ())));
     }
 
     private void renderLinkStatus(ILinkStatus linkStatus) {
@@ -348,11 +353,6 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             this.fontRenderer.drawStringWithShadow(line, x, y, 0xFFFFFF);
             y += this.fontRenderer.FONT_HEIGHT;
         }
-    }
-
-    private static void highlightProviderAndClose(PatternProviderInfo info) {
-        highlightProvider(info);
-        Minecraft.getMinecraft().displayGuiScreen(null);
     }
 
     @Override
@@ -893,15 +893,6 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         return List.of(this.searchField, this.providerSearchField);
     }
 
-    private interface Row {
-    }
-
-    private record GroupHeaderRow(PatternContainerGroup group) implements Row {
-    }
-
-    private record SlotsRow(PatternContainerEntry container, int offset, int slots) implements Row {
-    }
-
     private void cycleSearchMode() {
         this.searchMode = this.searchMode.next();
         this.searchModeButton.updateLabel();
@@ -955,6 +946,15 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         ITextComponent tooltip() {
             return new TextComponentTranslation(this.tooltipKey);
         }
+    }
+
+    private interface Row {
+    }
+
+    private record GroupHeaderRow(PatternContainerGroup group) implements Row {
+    }
+
+    private record SlotsRow(PatternContainerEntry container, int offset, int slots) implements Row {
     }
 
     private record PatternSearchData(String inputs, String outputs) {

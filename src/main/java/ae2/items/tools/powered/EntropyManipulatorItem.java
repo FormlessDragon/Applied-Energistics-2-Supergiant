@@ -140,6 +140,18 @@ public class EntropyManipulatorItem extends AEBasePoweredItem implements IBlockT
         return null;
     }
 
+    @Nullable
+    private static RayTraceResult selectNearestTarget(Vec3d from, @Nullable RayTraceResult blockHit,
+                                                      @Nullable RayTraceResult liquidHit) {
+        if (blockHit == null) {
+            return liquidHit;
+        }
+        if (liquidHit == null) {
+            return blockHit;
+        }
+        return from.squareDistanceTo(liquidHit.hitVec) < from.squareDistanceTo(blockHit.hitVec) ? liquidHit : blockHit;
+    }
+
     @Override
     protected void addCheckedInformation(final ItemStack stack, final World world, final List<String> lines,
                                          final ITooltipFlag advancedTooltips) {
@@ -331,18 +343,6 @@ public class EntropyManipulatorItem extends AEBasePoweredItem implements IBlockT
             }
         }
         return null;
-    }
-
-    @Nullable
-    private static RayTraceResult selectNearestTarget(Vec3d from, @Nullable RayTraceResult blockHit,
-                                                      @Nullable RayTraceResult liquidHit) {
-        if (blockHit == null) {
-            return liquidHit;
-        }
-        if (liquidHit == null) {
-            return blockHit;
-        }
-        return from.squareDistanceTo(liquidHit.hitVec) < from.squareDistanceTo(blockHit.hitVec) ? liquidHit : blockHit;
     }
 
     @Nullable

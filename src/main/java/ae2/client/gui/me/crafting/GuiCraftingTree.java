@@ -99,22 +99,6 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
         return BACKGROUNDS[0];
     }
 
-    @Override
-    public void initGui() {
-        this.background = getLargestBackground(width, height);
-        this.xSize = background.width();
-        this.ySize = background.height();
-        super.initGui();
-        layoutWidgets();
-    }
-
-    @Override
-    public void drawBG(int offsetX, int offsetY, int mouseX, int mouseY, float partialTicks) {
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        drawBackgroundTexture(offsetX, offsetY, background.width(), background.height());
-        fontRenderer.drawString(GuiText.CraftingTreeTitle.getLocal(), offsetX + 6, offsetY + 9, 0x404040);
-    }
-
     private static void drawBackgroundTexture(int x, int y, int width, int height) {
         int sourceCenterWidth = BACKGROUND_TEXTURE_WIDTH - BACKGROUND_LEFT_BORDER - BACKGROUND_RIGHT_BORDER;
         int sourceCenterHeight = BACKGROUND_TEXTURE_HEIGHT - BACKGROUND_TOP_BORDER - BACKGROUND_BOTTOM_BORDER;
@@ -159,6 +143,22 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
                        .blit();
             }
         }
+    }
+
+    @Override
+    public void initGui() {
+        this.background = getLargestBackground(width, height);
+        this.xSize = background.width();
+        this.ySize = background.height();
+        super.initGui();
+        layoutWidgets();
+    }
+
+    @Override
+    public void drawBG(int offsetX, int offsetY, int mouseX, int mouseY, float partialTicks) {
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        drawBackgroundTexture(offsetX, offsetY, background.width(), background.height());
+        fontRenderer.drawString(GuiText.CraftingTreeTitle.getLocal(), offsetX + 6, offsetY + 9, 0x404040);
     }
 
     public void onDataUpdate(LiteCraftTreeNode root) {

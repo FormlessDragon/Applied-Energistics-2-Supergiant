@@ -103,6 +103,18 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
         this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
     }
 
+    @Nullable
+    private static Class<? extends PatternContainer> tryCastMachineToContainer(Class<?> machineClass) {
+        if (PatternContainer.class.isAssignableFrom(machineClass)) {
+            return machineClass.asSubclass(PatternContainer.class);
+        }
+        return null;
+    }
+
+    private static boolean isAcceptedByContainer(PatternContainer container, @Nullable IPatternDetails details) {
+        return details != null && (details instanceof IAssemblerPattern) == container.isAssemblerPatternContainer();
+    }
+
     public void openPatternProvider(long inventoryId) {
         if (isClientSide()) {
             sendClientAction(ACTION_OPEN_PROVIDER, inventoryId);
@@ -115,14 +127,6 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
         }
     }
 
-    @Nullable
-    private static Class<? extends PatternContainer> tryCastMachineToContainer(Class<?> machineClass) {
-        if (PatternContainer.class.isAssignableFrom(machineClass)) {
-            return machineClass.asSubclass(PatternContainer.class);
-        }
-        return null;
-    }
-
     public ShowPatternProviders getShownProviders() {
         return this.showPatternProviders;
     }
@@ -131,17 +135,13 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
         return this.linkStatus;
     }
 
-    private static boolean isAcceptedByContainer(PatternContainer container, @Nullable IPatternDetails details) {
-        return details != null && (details instanceof IAssemblerPattern) == container.isAssemblerPatternContainer();
+    @Override
+    public void setLinkStatus(ILinkStatus linkStatus) {
+        this.linkStatus = linkStatus;
     }
 
     public boolean isPatternModifierPanelAvailable() {
         return this.patternModifierPanelAvailable;
-    }
-
-    @Override
-    public void setLinkStatus(ILinkStatus linkStatus) {
-        this.linkStatus = linkStatus;
     }
 
     public PatternModifierPanel getPatternModifierPanel() {
@@ -490,6 +490,11 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
         sendClientAction(action);
     }
 
+    @Override
+    public void lockPatternModifierPlayerInventorySlot(int slot) {
+        lockPlayerInventorySlot(slot);
+    }
+
     private static final class VisitorState {
         private final ReferenceSet<PatternContainer> visibleContainers = new ReferenceOpenHashSet<>();
         private int total;
@@ -497,11 +502,6 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
     }
 
     private record QuickMoveTarget(ContainerTracker container, int slot) {
-    }
-
-    @Override
-    public void lockPatternModifierPlayerInventorySlot(int slot) {
-        lockPlayerInventorySlot(slot);
     }
 
     private record ProviderLocation(int dimensionId, BlockPos pos, @Nullable EnumFacing face) {
@@ -538,6 +538,22 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
             return !ItemStack.areItemsEqual(a, b) || !ItemStack.areItemStackTagsEqual(a, b);
         }
 
+        @Nullable
+        private static ProviderLocation resolveLocation(PatternContainer container) {
+            if (container instanceof TileEntity tile) {
+                if (tile.getWorld() == null) {
+                    return null;
+                }
+                return new ProviderLocation(tile.getWorld().provider.getDimension(), tile.getPos(), null);
+            }
+            if (container instanceof AEBasePart part && part.getTileEntity() != null
+                && part.getTileEntity().getWorld() != null) {
+                TileEntity tile = part.getTileEntity();
+                return new ProviderLocation(tile.getWorld().provider.getDimension(), tile.getPos(), part.getSide());
+            }
+            return null;
+        }
+
         private PatternAccessTerminalPacket createFullPacket() {
             Int2ObjectArrayMap<ItemStack> slots = new Int2ObjectArrayMap<>(this.server.size());
             for (int i = 0; i < this.server.size(); i++) {
@@ -567,22 +583,6 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
             }
 
             return PatternAccessTerminalPacket.incrementalUpdate(this.serverId, slots);
-        }
-
-        @Nullable
-        private static ProviderLocation resolveLocation(PatternContainer container) {
-            if (container instanceof TileEntity tile) {
-                if (tile.getWorld() == null) {
-                    return null;
-                }
-                return new ProviderLocation(tile.getWorld().provider.getDimension(), tile.getPos(), null);
-            }
-            if (container instanceof AEBasePart part && part.getTileEntity() != null
-                && part.getTileEntity().getWorld() != null) {
-                TileEntity tile = part.getTileEntity();
-                return new ProviderLocation(tile.getWorld().provider.getDimension(), tile.getPos(), part.getSide());
-            }
-            return null;
         }
 
         @Nullable

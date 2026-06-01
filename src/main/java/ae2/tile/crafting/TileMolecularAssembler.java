@@ -101,8 +101,7 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     private final IUpgradeInventory upgrades = new MolecularAssemblerUpgradeInventory(this);
     private final ObjectList<GenericStack> cachedOutputs = new ObjectArrayList<>();
     private final ObjectList<IAssemblerPattern> patterns = new ObjectArrayList<>();
-    private final GenericStackInv outputBuffer = new GenericStackInv(this::onBufferChanged, OUTPUT_BUFFER_SLOTS);
-    private final ObjectOpenHashSet<AEItemKey> patternKeys = new ObjectOpenHashSet<>();
+    private final ObjectOpenHashSet<AEItemKey> patternKeys = new ObjectOpenHashSet<>();    private final GenericStackInv outputBuffer = new GenericStackInv(this::onBufferChanged, OUTPUT_BUFFER_SLOTS);
     private final IActionSource actionSource = new MachineSource(this::getGridNode);
     private int priority;
     @Nullable
@@ -112,6 +111,11 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     private GenericStack currentMainOutput;
     private int pendingCrafts;
     private boolean powered;
+    private double progress;
+    private boolean awake;
+    private boolean reboot = true;
+    @Nullable
+    private AssemblerAnimationStatus animationStatus;
 
     public TileMolecularAssembler() {
         this.getMainNode()
@@ -119,8 +123,6 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
             .addService(IGridTickable.class, this)
             .addService(ICraftingProvider.class, this);
     }
-
-    private double progress;
 
     @Override
     public void onReady() {
@@ -131,11 +133,6 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
             this.updateSleepiness();
         }
     }
-
-    private boolean awake;
-    private boolean reboot = true;
-    @Nullable
-    private AssemblerAnimationStatus animationStatus;
 
     @Override
     public void saveAdditional(NBTTagCompound data) {
@@ -891,5 +888,7 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
             return super.extractItem(slot, amount, simulate);
         }
     }
+
+
 
 }
