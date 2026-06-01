@@ -23,6 +23,7 @@ import ae2.core.network.clientbound.NetworkStatusPacket;
 import ae2.core.network.clientbound.OpenGuiPacket;
 import ae2.core.network.clientbound.PatternAccessTerminalInfoPacket;
 import ae2.core.network.clientbound.PatternAccessTerminalPacket;
+import ae2.core.network.clientbound.RequesterSyncPacket;
 import ae2.core.network.clientbound.RestorePreviousGuiPacket;
 import ae2.core.network.clientbound.SetLinkStatusPacket;
 import ae2.core.network.serverbound.CableBusPartLeftClickPacket;
@@ -39,6 +40,8 @@ import ae2.core.network.serverbound.MEInteractionPacket;
 import ae2.core.network.serverbound.MouseWheelPacket;
 import ae2.core.network.serverbound.QuickMovePatternPacket;
 import ae2.core.network.serverbound.RequestClosestMeteoritePacket;
+import ae2.core.network.serverbound.RequesterSlotUpdatePacket;
+import ae2.core.network.serverbound.RequesterUpdatePacket;
 import ae2.core.network.serverbound.SelectKeyTypePacket;
 import ae2.core.network.serverbound.SelectWirelessTerminalPacket;
 import ae2.core.network.serverbound.SwapSlotsPacket;
@@ -94,6 +97,7 @@ public final class InitNetwork {
         registerClientbound(AppEngPayloadHandler.Client.class, RestorePreviousGuiPacket.class);
         registerClientbound(AppEngPayloadHandler.Client.class, SetLinkStatusPacket.class);
         registerClientbound(AppEngPayloadHandler.Client.class, CraftingTreeDataPacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, RequesterSyncPacket.class);
         CHANNEL.registerMessage(ConfigValuePacket.ClientHandler.class, ConfigValuePacket.class, nextPacketId++, Side.CLIENT);
         registerServerbound(AppEngPayloadHandler.Server.class, ColorApplicatorSelectColorPacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, CableBusPartLeftClickPacket.class);
@@ -118,6 +122,8 @@ public final class InitNetwork {
         registerServerbound(AppEngPayloadHandler.Server.class, WirelessTerminalPickBlockPacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, WirelessTerminalSettingsPacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, SwitchCraftingTreePacket.class);
+        registerServerbound(AppEngPayloadHandler.Server.class, RequesterSlotUpdatePacket.class);
+        registerServerbound(AppEngPayloadHandler.Server.class, RequesterUpdatePacket.class);
         CHANNEL.registerMessage(ConfigValuePacket.ServerHandler.class, ConfigValuePacket.class, nextPacketId++, Side.SERVER);
     }
 

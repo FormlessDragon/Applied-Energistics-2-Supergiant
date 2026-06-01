@@ -29,6 +29,7 @@ import ae2.tile.crafting.TileCraftingMonitor;
 import ae2.tile.crafting.TileCraftingUnit;
 import ae2.tile.crafting.TileMolecularAssembler;
 import ae2.tile.crafting.TilePatternProvider;
+import ae2.tile.crafting.TileRequester;
 import ae2.tile.misc.TileCaner;
 import ae2.tile.misc.TileCellWorkbench;
 import ae2.tile.misc.TileCharger;
@@ -125,6 +126,7 @@ public final class AEBlockEntities {
         GameRegistry.registerTileEntity(TileIngredientBuffer.class, Tags.MOD_ID + ":ingredient_buffer");
         GameRegistry.registerTileEntity(TileCaner.class, Tags.MOD_ID + ":caner");
         GameRegistry.registerTileEntity(TilePatternProvider.class, Tags.MOD_ID + ":pattern_provider");
+        GameRegistry.registerTileEntity(TileRequester.class, Tags.MOD_ID + ":requester");
         GameRegistry.registerTileEntity(TileCraftingUnit.class, Tags.MOD_ID + ":crafting_unit");
         GameRegistry.registerTileEntity(TileCraftingMonitor.class, Tags.MOD_ID + ":crafting_monitor");
         GameRegistry.registerTileEntity(TileMolecularAssembler.class, Tags.MOD_ID + ":molecular_assembler");

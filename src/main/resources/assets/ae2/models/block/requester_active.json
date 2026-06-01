@@ -1,0 +1,6 @@
+{
+  "parent": "ae2:block/requester",
+  "textures": {
+    "face": "ae2:block/requester_active"
+  }
+}

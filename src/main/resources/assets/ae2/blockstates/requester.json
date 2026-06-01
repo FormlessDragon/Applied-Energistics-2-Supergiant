@@ -1,0 +1,189 @@
+{
+  "forge_marker": 1,
+  "variants": {
+    "active=false,facing=north,spin=0": {
+      "model": "ae2:requester"
+    },
+    "active=false,facing=north,spin=1": {
+      "model": "ae2:requester"
+    },
+    "active=false,facing=north,spin=2": {
+      "model": "ae2:requester"
+    },
+    "active=false,facing=north,spin=3": {
+      "model": "ae2:requester"
+    },
+    "active=true,facing=north,spin=0": {
+      "model": "ae2:requester_active"
+    },
+    "active=true,facing=north,spin=1": {
+      "model": "ae2:requester_active"
+    },
+    "active=true,facing=north,spin=2": {
+      "model": "ae2:requester_active"
+    },
+    "active=true,facing=north,spin=3": {
+      "model": "ae2:requester_active"
+    },
+    "active=false,facing=south,spin=0": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "y": 180 } ] }
+    },
+    "active=false,facing=south,spin=1": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "y": 180 } ] }
+    },
+    "active=false,facing=south,spin=2": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "y": 180 } ] }
+    },
+    "active=false,facing=south,spin=3": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "y": 180 } ] }
+    },
+    "active=true,facing=south,spin=0": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "y": 180 } ] }
+    },
+    "active=true,facing=south,spin=1": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "y": 180 } ] }
+    },
+    "active=true,facing=south,spin=2": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "y": 180 } ] }
+    },
+    "active=true,facing=south,spin=3": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "y": 180 } ] }
+    },
+    "active=false,facing=west,spin=0": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "y": 90 } ] }
+    },
+    "active=false,facing=west,spin=1": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "y": 90 } ] }
+    },
+    "active=false,facing=west,spin=2": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "y": 90 } ] }
+    },
+    "active=false,facing=west,spin=3": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "y": 90 } ] }
+    },
+    "active=true,facing=west,spin=0": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "y": 90 } ] }
+    },
+    "active=true,facing=west,spin=1": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "y": 90 } ] }
+    },
+    "active=true,facing=west,spin=2": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "y": 90 } ] }
+    },
+    "active=true,facing=west,spin=3": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "y": 90 } ] }
+    },
+    "active=false,facing=east,spin=0": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "y": 270 } ] }
+    },
+    "active=false,facing=east,spin=1": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "y": 270 } ] }
+    },
+    "active=false,facing=east,spin=2": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "y": 270 } ] }
+    },
+    "active=false,facing=east,spin=3": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "y": 270 } ] }
+    },
+    "active=true,facing=east,spin=0": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "y": 270 } ] }
+    },
+    "active=true,facing=east,spin=1": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "y": 270 } ] }
+    },
+    "active=true,facing=east,spin=2": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "y": 270 } ] }
+    },
+    "active=true,facing=east,spin=3": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "y": 270 } ] }
+    },
+    "active=false,facing=up,spin=0": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "x": 90 }, { "z": 180 } ] }
+    },
+    "active=false,facing=up,spin=1": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "x": 90 }, { "z": 270 } ] }
+    },
+    "active=false,facing=up,spin=2": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "x": 90 } ] }
+    },
+    "active=false,facing=up,spin=3": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "x": 90 }, { "z": 90 } ] }
+    },
+    "active=true,facing=up,spin=0": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "x": 90 }, { "z": 180 } ] }
+    },
+    "active=true,facing=up,spin=1": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "x": 90 }, { "z": 270 } ] }
+    },
+    "active=true,facing=up,spin=2": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "x": 90 } ] }
+    },
+    "active=true,facing=up,spin=3": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "x": 90 }, { "z": 90 } ] }
+    },
+    "active=false,facing=down,spin=0": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "x": 270 } ] }
+    },
+    "active=false,facing=down,spin=1": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "x": 270 }, { "z": 270 } ] }
+    },
+    "active=false,facing=down,spin=2": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "x": 270 }, { "z": 180 } ] }
+    },
+    "active=false,facing=down,spin=3": {
+      "model": "ae2:requester",
+      "transform": { "rotation": [ { "x": 270 }, { "z": 90 } ] }
+    },
+    "active=true,facing=down,spin=0": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "x": 270 } ] }
+    },
+    "active=true,facing=down,spin=1": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "x": 270 }, { "z": 270 } ] }
+    },
+    "active=true,facing=down,spin=2": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "x": 270 }, { "z": 180 } ] }
+    },
+    "active=true,facing=down,spin=3": {
+      "model": "ae2:requester_active",
+      "transform": { "rotation": [ { "x": 270 }, { "z": 90 } ] }
+    }
+  }
+}

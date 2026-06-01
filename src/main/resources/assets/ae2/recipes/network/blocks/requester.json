@@ -1,0 +1,43 @@
+{
+  "type": "forge:ore_shaped",
+  "pattern": [
+    "aba",
+    "cdc",
+    "aea"
+  ],
+  "key": {
+    "a": {
+      "type": "forge:ore_dict",
+      "ore": "ingotIron"
+    },
+    "b": [
+      {
+        "item": "ae2:interface"
+      },
+      {
+        "item": "ae2:cable_interface"
+      }
+    ],
+    "c": {
+      "item": "ae2:crafting_accelerator"
+    },
+    "d": [
+      {
+        "item": "ae2:monitor"
+      },
+      {
+        "item": "ae2:semi_dark_monitor"
+      },
+      {
+        "item": "ae2:dark_monitor"
+      }
+    ],
+    "e": {
+      "item": "ae2:engineering_processor"
+    }
+  },
+  "result": {
+    "item": "ae2:requester",
+    "count": 1
+  }
+}

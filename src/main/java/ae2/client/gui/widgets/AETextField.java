@@ -290,6 +290,10 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
         }
     }
 
+    public boolean isEnabled() {
+        return this.enabled;
+    }
+
     private Rectangle getVisualBounds() {
         int left = this.x - PADDING;
         int top = this.y - PADDING;

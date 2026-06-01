@@ -33,6 +33,7 @@ public final class SlotSemantics {
     public static final SlotSemantic CRAFTING_GRID = register("CRAFTING_GRID", true);
     public static final SlotSemantic CRAFTING_RESULT = register("CRAFTING_RESULT", false);
     public static final SlotSemantic MISSING_INGREDIENT = register("MISSING_INGREDIENT", true);
+    public static final SlotSemantic REQUEST = register("REQUEST", true);
 
     private SlotSemantics() {
     }
