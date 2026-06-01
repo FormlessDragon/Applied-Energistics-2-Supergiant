@@ -72,6 +72,11 @@ public class NumberEntryWidget implements ICompositeWidget {
     private final ConfirmableTextField textField;
     private final DecimalFormat decimalFormat;
     private NumberEntryType type;
+    private BigDecimal amountPerUnit;
+    private BigDecimal minInternalValue;
+    private BigDecimal maxInternalValue;
+    private BigDecimal minButtonValue;
+    private BigDecimal maxButtonValue;
     private List<GuiButton> buttons = ObjectLists.emptyList();
     private long minValue;
     private long maxValue = Long.MAX_VALUE;
@@ -94,6 +99,7 @@ public class NumberEntryWidget implements ICompositeWidget {
         this.normalTextColor = style.getColor(PaletteColor.TEXTFIELD_TEXT).toARGB();
 
         this.type = Objects.requireNonNull(type, "type");
+        refreshUnitCache();
         this.decimalFormat = new DecimalFormat("#.######", new DecimalFormatSymbols());
         this.decimalFormat.setParseBigDecimal(true);
         this.decimalFormat.setNegativePrefix("-");
@@ -190,11 +196,13 @@ public class NumberEntryWidget implements ICompositeWidget {
 
     public void setMinValue(long minValue) {
         this.minValue = minValue;
+        refreshBoundsCache();
         validate();
     }
 
     public void setMaxValue(long maxValue) {
         this.maxValue = maxValue;
+        refreshBoundsCache();
         validate();
     }
 
@@ -304,22 +312,16 @@ public class NumberEntryWidget implements ICompositeWidget {
      * value.
      */
     public OptionalLong getLongValue() {
-        var internalValue = getValueInternal();
-        if (internalValue.isEmpty()) {
+        var value = validateValue().externalValue();
+        if (value.isEmpty()) {
             return OptionalLong.empty();
         }
 
-        if (type.amountPerUnit() == 1 && internalValue.get().scale() > 0) {
+        var externalValue = value.getAsLong();
+        if (externalValue < minValue || externalValue > maxValue) {
             return OptionalLong.empty();
         }
-
-        var externalValue = convertToExternalValue(internalValue.get());
-        if (externalValue < minValue) {
-            return OptionalLong.empty();
-        } else if (externalValue > maxValue) {
-            return OptionalLong.empty();
-        }
-        return OptionalLong.of(externalValue);
+        return value;
     }
 
     public void setLongValue(long value) {
@@ -333,12 +335,10 @@ public class NumberEntryWidget implements ICompositeWidget {
     private void addQty(long delta) {
         var currentValue = getValueInternal().orElse(BigDecimal.ZERO);
         var newValue = currentValue.add(BigDecimal.valueOf(delta));
-        var minimum = convertToInternalValue(this.minValue).setScale(0, RoundingMode.CEILING);
-        var maximum = convertToInternalValue(this.maxValue).setScale(0, RoundingMode.FLOOR);
-        if (newValue.compareTo(minimum) < 0) {
-            newValue = minimum;
-        } else if (newValue.compareTo(maximum) > 0) {
-            newValue = maximum;
+        if (newValue.compareTo(minButtonValue) < 0) {
+            newValue = minButtonValue;
+        } else if (newValue.compareTo(maxButtonValue) > 0) {
+            newValue = maxButtonValue;
         } else if (currentValue.compareTo(BigDecimal.ONE) == 0 && delta > 1) {
             newValue = newValue.subtract(BigDecimal.ONE);
         }
@@ -377,20 +377,23 @@ public class NumberEntryWidget implements ICompositeWidget {
         List<ITextComponent> validationErrors = new ObjectArrayList<>();
         List<ITextComponent> infoMessages = new ObjectArrayList<>();
 
-        var possibleValue = getValueInternal();
-        if (possibleValue.isPresent()) {
-            if (type.amountPerUnit() == 1 && possibleValue.get().scale() > 0) {
+        var possibleValue = validateValue();
+        if (possibleValue.internalValue().isPresent()) {
+            var internalValue = possibleValue.internalValue().get();
+            if (possibleValue.notAnInteger()) {
                 validationErrors.add(GuiText.NumberNonInteger.text());
+            } else if (possibleValue.externalValue().isEmpty()) {
+                validationErrors.add(GuiText.InvalidNumber.text());
             } else {
-                var value = convertToExternalValue(possibleValue.get());
+                var value = possibleValue.externalValue().getAsLong();
                 if (value < minValue) {
-                    var formatted = decimalFormat.format(convertToInternalValue(minValue));
+                    var formatted = decimalFormat.format(minInternalValue);
                     validationErrors.add(GuiText.NumberLessThanMinValue.text(formatted));
                 } else if (value > maxValue) {
-                    var formatted = decimalFormat.format(convertToInternalValue(maxValue));
+                    var formatted = decimalFormat.format(maxInternalValue);
                     validationErrors.add(GuiText.NumberGreaterThanMaxValue.text(formatted));
                 } else if (!isNumber()) {
-                    infoMessages.add(new TextComponentString("= " + decimalFormat.format(possibleValue.get())));
+                    infoMessages.add(new TextComponentString("= " + decimalFormat.format(internalValue)));
                 }
             }
         } else {
@@ -422,10 +425,11 @@ public class NumberEntryWidget implements ICompositeWidget {
     }
 
     public void setType(NumberEntryType type) {
-        if (this.type == type) {
+        if (this.type.equals(type)) {
             return;
         }
         this.type = type;
+        refreshUnitCache();
         setTextFieldBounds(this.textFieldBounds);
         if (onChange != null) {
             onChange.run();
@@ -434,16 +438,53 @@ public class NumberEntryWidget implements ICompositeWidget {
         validate();
     }
 
-    private long convertToExternalValue(BigDecimal internalValue) {
-        var multiplicand = BigDecimal.valueOf(type.amountPerUnit());
-        var value = internalValue.multiply(multiplicand, MathContext.DECIMAL128);
-        value = value.setScale(0, RoundingMode.UP);
-        return value.longValue();
+    static OptionalLong toExternalValue(BigDecimal internalValue, int amountPerUnit) {
+        if (amountPerUnit == 1 && internalValue.scale() > 0) {
+            return OptionalLong.empty();
+        }
+
+        return toExternalValue(internalValue, BigDecimal.valueOf(amountPerUnit));
+    }
+
+    private static OptionalLong toExternalValue(BigDecimal internalValue, BigDecimal amountPerUnit) {
+        try {
+            var value = internalValue.multiply(amountPerUnit);
+            return OptionalLong.of(value.setScale(0, RoundingMode.UNNECESSARY).longValueExact());
+        } catch (ArithmeticException ignored) {
+            return OptionalLong.empty();
+        }
+    }
+
+    private OptionalLong convertToExternalValue(BigDecimal internalValue) {
+        return toExternalValue(internalValue, amountPerUnit);
     }
 
     private BigDecimal convertToInternalValue(long externalValue) {
-        var divisor = BigDecimal.valueOf(type.amountPerUnit());
-        return BigDecimal.valueOf(externalValue).divide(divisor, MathContext.DECIMAL128);
+        return BigDecimal.valueOf(externalValue).divide(amountPerUnit, MathContext.DECIMAL128);
+    }
+
+    private void refreshUnitCache() {
+        this.amountPerUnit = BigDecimal.valueOf(type.amountPerUnit());
+        refreshBoundsCache();
+    }
+
+    private void refreshBoundsCache() {
+        this.minInternalValue = convertToInternalValue(this.minValue);
+        this.maxInternalValue = convertToInternalValue(this.maxValue);
+        this.minButtonValue = minInternalValue.setScale(0, RoundingMode.CEILING);
+        this.maxButtonValue = maxInternalValue.setScale(0, RoundingMode.FLOOR);
+    }
+
+    private ValidatedValue validateValue() {
+        var internalValue = getValueInternal();
+        if (internalValue.isEmpty()) {
+            return new ValidatedValue(Optional.empty(), OptionalLong.empty(), false);
+        }
+
+        var internal = internalValue.get();
+        var notAnInteger = type.amountPerUnit() == 1 && internal.scale() > 0;
+        return new ValidatedValue(internalValue, notAnInteger ? OptionalLong.empty() : convertToExternalValue(internal),
+            notAnInteger);
     }
 
     @Override
@@ -491,5 +532,9 @@ public class NumberEntryWidget implements ICompositeWidget {
             }
         }
         return false;
+    }
+
+    private record ValidatedValue(Optional<BigDecimal> internalValue, OptionalLong externalValue,
+                                  boolean notAnInteger) {
     }
 }
