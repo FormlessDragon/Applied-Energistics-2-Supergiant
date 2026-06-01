@@ -4,6 +4,7 @@ import ae2.api.implementations.guiobjects.IGuiItem;
 import ae2.api.implementations.guiobjects.IPortableTerminal;
 import ae2.api.implementations.guiobjects.ItemGuiHost;
 import ae2.api.storage.ITerminalHost;
+import ae2.client.gui.implementations.GuiAdvancedIOBus;
 import ae2.client.gui.implementations.GuiAnnihilationPlane;
 import ae2.client.gui.implementations.GuiCaner;
 import ae2.client.gui.implementations.GuiCellWorkbench;
@@ -15,6 +16,7 @@ import ae2.client.gui.implementations.GuiEnergyLevelEmitter;
 import ae2.client.gui.implementations.GuiFormationPlane;
 import ae2.client.gui.implementations.GuiIOBus;
 import ae2.client.gui.implementations.GuiIOPort;
+import ae2.client.gui.implementations.GuiImportExportBus;
 import ae2.client.gui.implementations.GuiIngredientBuffer;
 import ae2.client.gui.implementations.GuiInscriber;
 import ae2.client.gui.implementations.GuiInterface;
@@ -33,6 +35,7 @@ import ae2.client.gui.implementations.GuiSkyChest;
 import ae2.client.gui.implementations.GuiSpatialAnchor;
 import ae2.client.gui.implementations.GuiSpatialIOPort;
 import ae2.client.gui.implementations.GuiSpecialPreciseExportBus;
+import ae2.client.gui.implementations.GuiStockExportBus;
 import ae2.client.gui.implementations.GuiStorageBus;
 import ae2.client.gui.implementations.GuiStorageLevelEmitter;
 import ae2.client.gui.implementations.GuiThresholdExportBus;
@@ -52,6 +55,7 @@ import ae2.client.gui.networking.GuiControllerStatus;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.container.AEBaseContainer;
 import ae2.container.GuiIds;
+import ae2.container.implementations.ContainerAdvancedIOBus;
 import ae2.container.implementations.ContainerAnnihilationPlane;
 import ae2.container.implementations.ContainerCaner;
 import ae2.container.implementations.ContainerCellWorkbench;
@@ -85,6 +89,7 @@ import ae2.container.implementations.ContainerQuartzKnife;
 import ae2.container.implementations.ContainerSkyChest;
 import ae2.container.implementations.ContainerSpatialAnchor;
 import ae2.container.implementations.ContainerSpatialIOPort;
+import ae2.container.implementations.ContainerStockExportBus;
 import ae2.container.implementations.ContainerStorageBus;
 import ae2.container.implementations.ContainerStorageLevelEmitter;
 import ae2.container.implementations.ContainerThresholdExportBus;
@@ -112,11 +117,14 @@ import ae2.items.contents.VoidCellGuiHost;
 import ae2.items.tools.powered.WirelessTerminalRegistry;
 import ae2.items.tools.powered.WirelessUniversalTerminalItem;
 import ae2.parts.AEBasePart;
+import ae2.parts.automation.AdvancedIOBusPart;
 import ae2.parts.automation.AnnihilationPlanePart;
 import ae2.parts.automation.EnergyLevelEmitterPart;
 import ae2.parts.automation.FormationPlanePart;
 import ae2.parts.automation.IOBusPart;
 import ae2.parts.automation.ImportBusPart;
+import ae2.parts.automation.ImportExportBusPart;
+import ae2.parts.automation.StockExportBusPart;
 import ae2.parts.automation.StorageLevelEmitterPart;
 import ae2.parts.automation.ThresholdLevelEmitterPart;
 import ae2.parts.automation.special.ModExportBusPart;
@@ -191,6 +199,9 @@ public class AEGuiHandler implements IGuiHandler {
             || bridge == GuiIds.GuiKey.MOD_EXPORT_BUS
             || bridge == GuiIds.GuiKey.PRECISE_EXPORT_BUS
             || bridge == GuiIds.GuiKey.THRESHOLD_EXPORT_BUS
+            || bridge == GuiIds.GuiKey.STOCK_EXPORT_BUS
+            || bridge == GuiIds.GuiKey.IMPORT_EXPORT_BUS
+            || bridge == GuiIds.GuiKey.ADVANCED_IO_BUS
             || bridge == GuiIds.GuiKey.OD_STORAGE_BUS
             || bridge == GuiIds.GuiKey.MOD_STORAGE_BUS
             || bridge == GuiIds.GuiKey.PRECISE_STORAGE_BUS
@@ -429,6 +440,18 @@ public class AEGuiHandler implements IGuiHandler {
             case THRESHOLD_EXPORT_BUS -> {
                 return createPartContainer(player, partLocator(x, y, z), ID, ThresholdExportBusPart.class,
                     host -> new ContainerThresholdExportBus(player.inventory, host));
+            }
+            case STOCK_EXPORT_BUS -> {
+                return createPartContainer(player, partLocator(x, y, z), ID, StockExportBusPart.class,
+                    host -> new ContainerStockExportBus(player.inventory, host));
+            }
+            case IMPORT_EXPORT_BUS -> {
+                return createPartContainer(player, partLocator(x, y, z), ID, ImportExportBusPart.class,
+                    host -> new ContainerIOBus(player.inventory, host));
+            }
+            case ADVANCED_IO_BUS -> {
+                return createPartContainer(player, partLocator(x, y, z), ID, AdvancedIOBusPart.class,
+                    host -> new ContainerAdvancedIOBus(player.inventory, host));
             }
             case OD_STORAGE_BUS -> {
                 return createPartContainer(player, partLocator(x, y, z), ID, ODStorageBusPart.class,
@@ -804,6 +827,24 @@ public class AEGuiHandler implements IGuiHandler {
                     ThresholdExportBusPart.class, host -> new ContainerThresholdExportBus(player.inventory, host));
                 return thresholdContainer == null ? null : new GuiThresholdExportBus(thresholdContainer,
                     player.inventory, null, GuiStyleManager.loadStyleDoc("/screens/threshold_export_bus.json"));
+            }
+            case STOCK_EXPORT_BUS -> {
+                ContainerStockExportBus stockContainer = createPartContainer(player, partLocator(x, y, z), ID,
+                    StockExportBusPart.class, host -> new ContainerStockExportBus(player.inventory, host));
+                return stockContainer == null ? null : new GuiStockExportBus<>(stockContainer, player.inventory, null,
+                    GuiStyleManager.loadStyleDoc("/screens/stock_export_bus.json"));
+            }
+            case IMPORT_EXPORT_BUS -> {
+                ContainerIOBus importExportContainer = createPartContainer(player, partLocator(x, y, z), ID,
+                    ImportExportBusPart.class, host -> new ContainerIOBus(player.inventory, host));
+                return importExportContainer == null ? null : new GuiImportExportBus(importExportContainer, player.inventory,
+                    null, GuiStyleManager.loadStyleDoc("/screens/import_export_bus.json"));
+            }
+            case ADVANCED_IO_BUS -> {
+                ContainerAdvancedIOBus advancedContainer = createPartContainer(player, partLocator(x, y, z), ID,
+                    AdvancedIOBusPart.class, host -> new ContainerAdvancedIOBus(player.inventory, host));
+                return advancedContainer == null ? null : new GuiAdvancedIOBus(advancedContainer, player.inventory,
+                    null, GuiStyleManager.loadStyleDoc("/screens/advanced_io_bus.json"));
             }
             case OD_STORAGE_BUS -> {
                 ContainerODStorageBus odContainer = createPartContainer(player, partLocator(x, y, z), ID,

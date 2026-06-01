@@ -23,6 +23,7 @@ The upstream repository remains the original AE2 project and the primary referen
 * [Mari023/AE2WirelessTerminalLibrary](https://github.com/Mari023/AE2WirelessTerminalLibrary): integrated AE2WTL wireless terminal behavior with partial code reuse under the MIT License; textures follow upstream notices.
 * [NovaEngineering-Source/AE2CT-Legacy](https://github.com/NovaEngineering-Source/AE2CT-Legacy): integrated AE2CT-Legacy under the LGPL-3.0 Licenses.
 * [GlodBlock/ExtendedAE](https://github.com/GlodBlock/ExtendedAE): ported selected EAE machines, tools, recipes, GUIs, and resources into the `ae2` namespace under the LGPL-3.0 License.
+* [pedroksl/AdvancedAE](https://github.com/pedroksl/AdvancedAE): ported selected AdvancedAE parts, recipes, GUIs, and behavior into the `ae2` namespace under the LGPL-3.0 License;
 
 ## License
 

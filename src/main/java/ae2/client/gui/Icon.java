@@ -144,6 +144,8 @@ public final class Icon {
     public static final Icon ACCESS_WRITE = registerBuiltin("access_write", 16, 16);
     public static final Icon ACCESS_READ = registerBuiltin("access_read", 16, 16);
     public static final Icon ACCESS_READ_WRITE = registerBuiltin("access_read_write", 16, 16);
+    public static final Icon REGULATE_STOCK_ON = registerBuiltin("regulate_stock_on", 16, 16);
+    public static final Icon REGULATE_STOCK_OFF = registerBuiltin("regulate_stock_off", 16, 16);
     public static final Icon CRAFT_HAMMER = registerBuiltin("craft_hammer", 16, 16);
     public static final Icon BACKGROUND_CHARGABLE = registerBuiltin("background_chargable", 16, 16);
 

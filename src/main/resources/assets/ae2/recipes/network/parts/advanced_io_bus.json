@@ -1,0 +1,26 @@
+{
+  "type": "forge:ore_shaped",
+  "pattern": [
+    "aba",
+    "cbd",
+    "aba"
+  ],
+  "key": {
+    "a": {
+      "item": "ae2:speed_card"
+    },
+    "b": {
+      "item": "ae2:concurrent_processor"
+    },
+    "c": {
+      "item": "ae2:import_export_bus"
+    },
+    "d": {
+      "item": "ae2:stock_export_bus"
+    }
+  },
+  "result": {
+    "item": "ae2:advanced_io_bus",
+    "count": 1
+  }
+}

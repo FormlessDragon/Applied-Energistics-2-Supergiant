@@ -241,6 +241,9 @@ public final class AEPartIds {
     public static final ResourceLocation PRECISE_STORAGE_BUS = id("precise_storage_bus");
     public static final ResourceLocation PRECISE_EXPORT_BUS = id("precise_export_bus");
     public static final ResourceLocation THRESHOLD_EXPORT_BUS = id("threshold_export_bus");
+    public static final ResourceLocation STOCK_EXPORT_BUS = id("stock_export_bus");
+    public static final ResourceLocation IMPORT_EXPORT_BUS = id("import_export_bus");
+    public static final ResourceLocation ADVANCED_IO_BUS = id("advanced_io_bus");
     public static final ResourceLocation LEVEL_EMITTER = id("level_emitter");
     public static final ResourceLocation ENERGY_LEVEL_EMITTER = id("energy_level_emitter");
     public static final ResourceLocation THRESHOLD_LEVEL_EMITTER = id("threshold_level_emitter");
@@ -255,6 +258,7 @@ public final class AEPartIds {
     public static final ResourceLocation MONITOR = id("monitor");
     public static final ResourceLocation SEMI_DARK_MONITOR = id("semi_dark_monitor");
     public static final ResourceLocation DARK_MONITOR = id("dark_monitor");
+    public static final ResourceLocation THROUGHPUT_MONITOR = id("throughput_monitor");
     public static final ResourceLocation TERMINAL = id("terminal");
     public static final ResourceLocation CRAFTING_TERMINAL = id("crafting_terminal");
     public static final ResourceLocation PATTERN_ENCODING_TERMINAL = id("pattern_encoding_terminal");

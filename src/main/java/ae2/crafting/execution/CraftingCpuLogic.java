@@ -322,10 +322,6 @@ public class CraftingCpuLogic {
         if (!canAttemptMultiplier(CraftingCpuHelper.calculatePatternPower(details, 1), energyService, multiplier)) {
             return 0;
         }
-        if (mergePush && provider.getMaxPatternPushMultiplier(details, multiplier) < multiplier) {
-            return 0;
-        }
-
         var expectedOutputs = new KeyCounter();
         var expectedContainerItems = new KeyCounter();
         ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)

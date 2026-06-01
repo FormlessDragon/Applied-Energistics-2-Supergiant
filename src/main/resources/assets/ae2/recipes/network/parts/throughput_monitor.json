@@ -1,0 +1,15 @@
+{
+  "type": "forge:ore_shapeless",
+  "ingredients": [
+    {
+      "item": "ae2:calculation_processor"
+    },
+    {
+      "item": "ae2:storage_monitor"
+    }
+  ],
+  "result": {
+    "item": "ae2:throughput_monitor",
+    "count": 1
+  }
+}

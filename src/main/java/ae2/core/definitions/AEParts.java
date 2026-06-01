@@ -23,15 +23,20 @@ import ae2.api.parts.IPart;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.PartModels;
 import ae2.api.util.AEColor;
+import ae2.core.localization.InGameTooltip;
 import ae2.items.parts.ColoredPartItem;
 import ae2.items.parts.PartItem;
 import ae2.items.parts.PartModelsHelper;
+import ae2.items.parts.TooltipPartItem;
+import ae2.parts.automation.AdvancedIOBusPart;
 import ae2.parts.automation.AnnihilationPlanePart;
 import ae2.parts.automation.AnnihilationPlanePartItem;
 import ae2.parts.automation.EnergyLevelEmitterPart;
 import ae2.parts.automation.ExportBusPart;
 import ae2.parts.automation.FormationPlanePart;
 import ae2.parts.automation.ImportBusPart;
+import ae2.parts.automation.ImportExportBusPart;
+import ae2.parts.automation.StockExportBusPart;
 import ae2.parts.automation.StorageLevelEmitterPart;
 import ae2.parts.automation.ThresholdLevelEmitterPart;
 import ae2.parts.automation.special.ModExportBusPart;
@@ -68,6 +73,7 @@ import ae2.parts.reporting.PanelPart;
 import ae2.parts.reporting.PatternAccessTerminalPart;
 import ae2.parts.reporting.SemiDarkPanelPart;
 import ae2.parts.reporting.StorageMonitorPart;
+import ae2.parts.reporting.ThroughputMonitorPart;
 import ae2.parts.storagebus.StorageBusPart;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.item.Item;
@@ -120,6 +126,21 @@ public final class AEParts {
         AEPartIds.PRECISE_EXPORT_BUS, PreciseExportBusPart.class, PreciseExportBusPart::new);
     public static final ItemDefinition<PartItem<ThresholdExportBusPart>> THRESHOLD_EXPORT_BUS = createPart(
         AEPartIds.THRESHOLD_EXPORT_BUS, ThresholdExportBusPart.class, ThresholdExportBusPart::new);
+    public static final ItemDefinition<PartItem<StockExportBusPart>> STOCK_EXPORT_BUS = createTooltipPart(
+        AEPartIds.STOCK_EXPORT_BUS, StockExportBusPart.class, StockExportBusPart::new,
+        InGameTooltip.StockExportBusLine1,
+        InGameTooltip.StockExportBusLine2,
+        InGameTooltip.StockExportBusLine3);
+    public static final ItemDefinition<PartItem<ImportExportBusPart>> IMPORT_EXPORT_BUS = createTooltipPart(
+        AEPartIds.IMPORT_EXPORT_BUS, ImportExportBusPart.class, ImportExportBusPart::new,
+        InGameTooltip.ImportExportBusLine1,
+        InGameTooltip.ImportExportBusLine2,
+        InGameTooltip.ImportExportBusLine3);
+    public static final ItemDefinition<PartItem<AdvancedIOBusPart>> ADVANCED_IO_BUS = createTooltipPart(
+        AEPartIds.ADVANCED_IO_BUS, AdvancedIOBusPart.class, AdvancedIOBusPart::new,
+        InGameTooltip.AdvancedIOBusLine1,
+        InGameTooltip.AdvancedIOBusLine2,
+        InGameTooltip.AdvancedIOBusLine3);
     public static final ItemDefinition<PartItem<StorageLevelEmitterPart>> LEVEL_EMITTER = createPart(
         AEPartIds.LEVEL_EMITTER, StorageLevelEmitterPart.class, StorageLevelEmitterPart::new);
     public static final ItemDefinition<PartItem<EnergyLevelEmitterPart>> ENERGY_LEVEL_EMITTER = createPart(
@@ -154,6 +175,8 @@ public final class AEParts {
         AEPartIds.DARK_MONITOR, DarkPanelPart.class, DarkPanelPart::new);
     public static final ItemDefinition<PartItem<StorageMonitorPart>> STORAGE_MONITOR = createPart(
         AEPartIds.STORAGE_MONITOR, StorageMonitorPart.class, StorageMonitorPart::new);
+    public static final ItemDefinition<PartItem<ThroughputMonitorPart>> THROUGHPUT_MONITOR = createPart(
+        AEPartIds.THROUGHPUT_MONITOR, ThroughputMonitorPart.class, ThroughputMonitorPart::new);
     public static final ItemDefinition<PartItem<ConversionMonitorPart>> CONVERSION_MONITOR = createPart(
         AEPartIds.CONVERSION_MONITOR, ConversionMonitorPart.class, ConversionMonitorPart::new);
     public static final ItemDefinition<PartItem<EnergyAcceptorPart>> ENERGY_ACCEPTOR = createPart(
@@ -186,6 +209,9 @@ public final class AEParts {
         PRECISE_STORAGE_BUS,
         PRECISE_EXPORT_BUS,
         THRESHOLD_EXPORT_BUS,
+        STOCK_EXPORT_BUS,
+        IMPORT_EXPORT_BUS,
+        ADVANCED_IO_BUS,
         LEVEL_EMITTER,
         ENERGY_LEVEL_EMITTER,
         THRESHOLD_LEVEL_EMITTER,
@@ -203,6 +229,7 @@ public final class AEParts {
         SEMI_DARK_MONITOR,
         DARK_MONITOR,
         STORAGE_MONITOR,
+        THROUGHPUT_MONITOR,
         CONVERSION_MONITOR,
         ENERGY_ACCEPTOR,
         PATTERN_ENCODING_TERMINAL,
@@ -241,6 +268,14 @@ public final class AEParts {
                                                                             Function<IPartItem<T>, T> factory) {
         PartModels.registerModels(PartModelsHelper.createModels(partClass));
         return new ItemDefinition<>(id, new PartItem<>(partClass, factory));
+    }
+
+    private static <T extends IPart> ItemDefinition<PartItem<T>> createTooltipPart(ResourceLocation id,
+                                                                                   Class<T> partClass,
+                                                                                   Function<IPartItem<T>, T> factory,
+                                                                                   InGameTooltip... tooltipLines) {
+        PartModels.registerModels(PartModelsHelper.createModels(partClass));
+        return new ItemDefinition<>(id, new TooltipPartItem<>(partClass, factory, tooltipLines));
     }
 
     private static <T extends IPart> ItemDefinition<PartItem<T>> createCustomPartItem(Supplier<PartItem<T>> factory) {

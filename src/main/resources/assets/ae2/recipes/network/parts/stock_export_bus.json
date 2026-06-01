@@ -1,0 +1,23 @@
+{
+  "type": "forge:ore_shaped",
+  "pattern": [
+    "   ",
+    "abc",
+    "   "
+  ],
+  "key": {
+    "a": {
+      "item": "ae2:calculation_processor"
+    },
+    "b": {
+      "item": "ae2:export_bus"
+    },
+    "c": {
+      "item": "ae2:logic_processor"
+    }
+  },
+  "result": {
+    "item": "ae2:stock_export_bus",
+    "count": 1
+  }
+}

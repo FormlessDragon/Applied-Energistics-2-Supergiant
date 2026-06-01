@@ -191,7 +191,7 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
 
     @Override
     public boolean onMouseWheel(Point mousePos, double delta) {
-        if (!this.scrollbar.isVisible() || !mousePos.isIn(getBounds())) {
+        if (!this.scrollbar.isVisible() || !isMouseOverScrollableArea(mousePos)) {
             return false;
         }
 
@@ -246,6 +246,39 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
 
     private boolean scrolling() {
         return getUpgradeSlotCount() > this.maxRows;
+    }
+
+    private boolean isMouseOverScrollableArea(Point mousePos) {
+        if (mousePos.isIn(getBounds())) {
+            return true;
+        }
+
+        Rectangle scrollbarBounds = this.scrollbar.getBounds();
+        if (mousePos.isIn(scrollbarBounds)) {
+            return true;
+        }
+
+        int firstSlot = this.scrollbar.getCurrentScroll();
+        int index = 0;
+        for (Slot slot : getPanelSlots()) {
+            boolean slotVisible = index >= firstSlot && index < firstSlot + getVisibleSlotCount();
+            index++;
+
+            if (!slotVisible) {
+                continue;
+            }
+
+            if (slot instanceof AppEngSlot appEngSlot && !appEngSlot.isSlotEnabled()) {
+                continue;
+            }
+
+            if (mousePos.x() >= slot.xPos && mousePos.x() < slot.xPos + SLOT_SIZE
+                && mousePos.y() >= slot.yPos && mousePos.y() < slot.yPos + SLOT_SIZE) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void updateScrollbar() {

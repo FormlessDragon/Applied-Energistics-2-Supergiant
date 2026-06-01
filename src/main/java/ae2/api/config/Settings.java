@@ -82,6 +82,7 @@ public final class Settings {
     public static final Setting<YesNo> INSCRIBER_SEPARATE_SIDES = register("inscriber_separate_sides", YesNo.NO,
         YesNo.YES);
     public static final Setting<YesNo> AUTO_EXPORT = register("auto_export", YesNo.NO, YesNo.YES);
+    public static final Setting<YesNo> REGULATE_STOCK = register("regulate_stock", YesNo.YES, YesNo.NO);
     @Deprecated(forRemoval = true)
     public static final Setting<YesNo> INSCRIBER_BUFFER_SIZE = register("inscriber_buffer_size", YesNo.NO, YesNo.YES);
     public static final Setting<InscriberInputCapacity> INSCRIBER_INPUT_CAPACITY = register("inscriber_input_capacity",

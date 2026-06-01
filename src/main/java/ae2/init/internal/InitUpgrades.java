@@ -87,7 +87,10 @@ public final class InitUpgrades {
             AEParts.OD_EXPORT_BUS,
             AEParts.MOD_EXPORT_BUS,
             AEParts.PRECISE_EXPORT_BUS,
-            AEParts.THRESHOLD_EXPORT_BUS)) {
+            AEParts.THRESHOLD_EXPORT_BUS,
+            AEParts.STOCK_EXPORT_BUS,
+            AEParts.IMPORT_EXPORT_BUS,
+            AEParts.ADVANCED_IO_BUS)) {
             Upgrades.add(AEItems.FUZZY_CARD.item(), exportBus.item(), 1, itemIoBusGroup);
             Upgrades.add(AEItems.REDSTONE_CARD.item(), exportBus.item(), 1, itemIoBusGroup);
             Upgrades.add(AEItems.CAPACITY_CARD.item(), exportBus.item(), 5, itemIoBusGroup);

@@ -436,29 +436,24 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     @Override
     public boolean canMergePatternPush(IPatternDetails patternDetails) {
         var basePatternDetails = PseudoPatternDetails.unwrap(patternDetails);
-        if (!this.mainNode.isActive() || !this.patterns.contains(basePatternDetails)
-            || !this.pendingSendList.isEmpty() || getCraftingLockedReason() != LockCraftingMode.NONE) {
+        if (!canMergePatternPushBasic(basePatternDetails)) {
             return false;
         }
-        if (!shouldBypassBlockingFor(basePatternDetails)
-            && this.configManager.getSetting(Settings.BLOCKING_MODE) != BlockingMode.NO) {
+        if (getInsertionMode() == PatternProviderInsertionMode.PREFER_EMPTY
+            && shouldUseSinglePushForPreferEmpty(basePatternDetails)) {
             return false;
         }
-        if (getInsertionMode() == PatternProviderInsertionMode.EMPTY_ONLY) {
-            return false;
-        }
-        return getInsertionMode() != PatternProviderInsertionMode.PREFER_EMPTY
-            || !shouldUseSinglePushForPreferEmpty(basePatternDetails);
+        return !shouldUseSinglePushForPartialExternalTarget(basePatternDetails);
     }
 
     @Override
     public int getMaxPatternPushMultiplier(IPatternDetails patternDetails, int maxMultiplier) {
         this.pendingMergePush = null;
-        if (maxMultiplier <= 0 || !canMergePatternPush(patternDetails)) {
+        var basePatternDetails = PseudoPatternDetails.unwrap(patternDetails);
+        if (maxMultiplier <= 0 || !canMergePatternPushBasic(basePatternDetails)) {
             return 0;
         }
 
-        var basePatternDetails = PseudoPatternDetails.unwrap(patternDetails);
         PushTargetSet targetSet = collectPushTargets(basePatternDetails);
         if (targetSet == null) {
             return 0;
@@ -492,6 +487,18 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         }
         this.pendingMergePush = mergePush;
         return mergePush.multiplier();
+    }
+
+    private boolean canMergePatternPushBasic(IPatternDetails patternDetails) {
+        if (!this.mainNode.isActive() || !this.patterns.contains(patternDetails)
+            || !this.pendingSendList.isEmpty() || getCraftingLockedReason() != LockCraftingMode.NONE) {
+            return false;
+        }
+        if (!shouldBypassBlockingFor(patternDetails)
+            && this.configManager.getSetting(Settings.BLOCKING_MODE) != BlockingMode.NO) {
+            return false;
+        }
+        return getInsertionMode() != PatternProviderInsertionMode.EMPTY_ONLY;
     }
 
     @Nullable
@@ -752,6 +759,38 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         KeyCounter[] inputHolder = buildPatternInputHolder(patternDetails, 1);
         ExternalTarget target = findFirstExternalTarget(patternDetails, inputHolder, targetSet.externalTargets);
         return target != null && target.target().hasEmptySlots();
+    }
+
+    private boolean shouldUseSinglePushForPartialExternalTarget(IPatternDetails patternDetails) {
+        PushTargetSet targetSet = collectPushTargets(patternDetails);
+        if (targetSet == null || !patternDetails.supportsPushInputsToExternalInventory()
+            || !targetSet.machineTargets.isEmpty()) {
+            return false;
+        }
+
+        if (this.configManager.getSetting(Settings.PATTERN_PROVIDER_OUTPUT_SIDE_MODE)
+            == PatternProviderOutputSideMode.SPLIT_BY_INGREDIENTS_TYPE) {
+            Reference2ObjectMap<AEKeyType, KeyCounter[]> inputsByType = splitInputsByType(
+                buildPatternInputHolder(patternDetails, 1));
+            for (KeyCounter[] inputs : inputsByType.values()) {
+                TargetMatch match = PatternProviderMergeHelper.findSinglePushTarget(targetSet.externalTargets, inputs,
+                    getInsertionMode(), target -> this.isTargetBlocked(target.target(), patternDetails));
+                if (match == null) {
+                    return false;
+                }
+                if (!PatternProviderMergeHelper.acceptsAllFully(match.target().target(), inputs, 1,
+                    getInsertionMode())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        KeyCounter[] inputHolder = buildPatternInputHolder(patternDetails, 1);
+        TargetMatch match = PatternProviderMergeHelper.findSinglePushTarget(targetSet.externalTargets, inputHolder,
+            getInsertionMode(), target -> this.isTargetBlocked(target.target(), patternDetails));
+        return match != null && !PatternProviderMergeHelper.acceptsAllFully(match.target().target(), inputHolder, 1,
+            getInsertionMode());
     }
 
     @Nullable
