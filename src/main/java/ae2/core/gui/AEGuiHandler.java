@@ -31,6 +31,7 @@ import ae2.client.gui.implementations.GuiPatternProvider;
 import ae2.client.gui.implementations.GuiPreciseStorageBus;
 import ae2.client.gui.implementations.GuiQNB;
 import ae2.client.gui.implementations.GuiQuartzKnife;
+import ae2.client.gui.implementations.GuiRequester;
 import ae2.client.gui.implementations.GuiSkyChest;
 import ae2.client.gui.implementations.GuiSpatialAnchor;
 import ae2.client.gui.implementations.GuiSpatialIOPort;
@@ -51,6 +52,7 @@ import ae2.client.gui.me.items.GuiPatternEncodingTerm;
 import ae2.client.gui.me.networktool.GuiNetworkStatus;
 import ae2.client.gui.me.networktool.GuiNetworkTool;
 import ae2.client.gui.me.patternaccess.GuiPatternAccessTerm;
+import ae2.client.gui.me.requester.GuiRequesterTerm;
 import ae2.client.gui.networking.GuiControllerStatus;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.container.AEBaseContainer;
@@ -86,6 +88,8 @@ import ae2.container.implementations.ContainerPatternModifier;
 import ae2.container.implementations.ContainerPatternProvider;
 import ae2.container.implementations.ContainerQNB;
 import ae2.container.implementations.ContainerQuartzKnife;
+import ae2.container.implementations.ContainerRequester;
+import ae2.container.implementations.ContainerRequesterTerm;
 import ae2.container.implementations.ContainerSkyChest;
 import ae2.container.implementations.ContainerSpatialAnchor;
 import ae2.container.implementations.ContainerSpatialIOPort;
@@ -110,6 +114,7 @@ import ae2.core.gui.locator.PartLocator;
 import ae2.helpers.WirelessCraftingTerminalGuiHost;
 import ae2.helpers.WirelessPatternAccessTerminalGuiHost;
 import ae2.helpers.WirelessPatternEncodingTerminalGuiHost;
+import ae2.helpers.WirelessRequesterTerminalGuiHost;
 import ae2.items.contents.ConfigModifierGuiHost;
 import ae2.items.contents.NetworkToolGuiHost;
 import ae2.items.contents.PatternModifierGuiHost;
@@ -140,11 +145,13 @@ import ae2.parts.misc.InterfacePart;
 import ae2.parts.reporting.CraftingTerminalPart;
 import ae2.parts.reporting.ItemTerminalPart;
 import ae2.parts.reporting.PatternAccessTerminalPart;
+import ae2.parts.reporting.RequesterTerminalPart;
 import ae2.parts.storagebus.StorageBusPart;
 import ae2.tile.AEBaseTile;
 import ae2.tile.crafting.TileCraftingUnit;
 import ae2.tile.crafting.TileMolecularAssembler;
 import ae2.tile.crafting.TilePatternProvider;
+import ae2.tile.crafting.TileRequester;
 import ae2.tile.misc.TileCaner;
 import ae2.tile.misc.TileCellWorkbench;
 import ae2.tile.misc.TileCondenser;
@@ -188,7 +195,8 @@ public class AEGuiHandler implements IGuiHandler {
             || bridge == GuiIds.GuiKey.WIRELESS_TERMINAL
             || bridge == GuiIds.GuiKey.WIRELESS_CRAFTING_TERMINAL
             || bridge == GuiIds.GuiKey.WIRELESS_PATTERN_ENCODING_TERMINAL
-            || bridge == GuiIds.GuiKey.WIRELESS_PATTERN_ACCESS_TERMINAL;
+            || bridge == GuiIds.GuiKey.WIRELESS_PATTERN_ACCESS_TERMINAL
+            || bridge == GuiIds.GuiKey.WIRELESS_REQUESTER_TERMINAL;
     }
 
     private static boolean isPartGui(GuiIds.GuiKey bridge) {
@@ -213,7 +221,8 @@ public class AEGuiHandler implements IGuiHandler {
             || bridge == GuiIds.GuiKey.ME_STORAGE_TERMINAL
             || bridge == GuiIds.GuiKey.CRAFTING_TERMINAL
             || bridge == GuiIds.GuiKey.PATTERN_ENCODING_TERMINAL
-            || bridge == GuiIds.GuiKey.PATTERN_ACCESS_TERMINAL;
+            || bridge == GuiIds.GuiKey.PATTERN_ACCESS_TERMINAL
+            || bridge == GuiIds.GuiKey.REQUESTER_TERMINAL;
     }
 
     private static @Nullable PartLocator partLocator(int x, int y, int z) {
@@ -399,6 +408,11 @@ public class AEGuiHandler implements IGuiHandler {
                 return createPartContainer(player, partLocator(x, y, z), ID, PatternProviderPart.class,
                     host -> new ContainerPatternProvider(player.inventory, host));
             }
+            case REQUESTER -> {
+                if (te instanceof TileRequester requester) {
+                    return initTileContainer(new ContainerRequester(player.inventory, requester), te, ID);
+                }
+            }
             case CRAFTING_CPU -> {
                 if (te instanceof TileCraftingUnit) {
                     return initTileContainer(new ContainerCraftingCPU(player.inventory, (TileCraftingUnit) te),
@@ -501,6 +515,10 @@ public class AEGuiHandler implements IGuiHandler {
                 return createPartContainer(player, partLocator(x, y, z), ID, PatternAccessTerminalPart.class,
                     host -> new ContainerPatternAccessTerm(player.inventory, host));
             }
+            case REQUESTER_TERMINAL -> {
+                return createPartContainer(player, partLocator(x, y, z), ID, RequesterTerminalPart.class,
+                    host -> new ContainerRequesterTerm(player.inventory, host));
+            }
             case QUARTZ_KNIFE -> {
                 return createQuartzKnifeContainer(player, x, ID);
             }
@@ -536,6 +554,9 @@ public class AEGuiHandler implements IGuiHandler {
             }
             case WIRELESS_PATTERN_ACCESS_TERMINAL -> {
                 return createWirelessPatternAccessTerminalContainer(player, x, ID);
+            }
+            case WIRELESS_REQUESTER_TERMINAL -> {
+                return createWirelessRequesterTerminalContainer(player, x, ID);
             }
         }
         return null;
@@ -758,6 +779,14 @@ public class AEGuiHandler implements IGuiHandler {
                 }
                 return null;
             }
+            case REQUESTER -> {
+                if (te instanceof TileRequester requester) {
+                    ContainerRequester container = initTileContainer(new ContainerRequester(player.inventory,
+                        requester), te, ID);
+                    return new GuiRequester(container, player.inventory, requester.getRequesterName(),
+                        GuiStyleManager.loadStyleDoc("/screens/requester.json"));
+                }
+            }
             case CRAFTING_CPU -> {
                 if (te instanceof TileCraftingUnit craftingUnit) {
                     ContainerCraftingCPU container = initTileContainer(new ContainerCraftingCPU(player.inventory,
@@ -954,6 +983,17 @@ public class AEGuiHandler implements IGuiHandler {
                 }
                 return null;
             }
+            case REQUESTER_TERMINAL -> {
+                ContainerRequesterTerm requesterTerminalContainer = createPartContainer(player,
+                    partLocator(x, y, z), ID,
+                    RequesterTerminalPart.class,
+                    host -> new ContainerRequesterTerm(player.inventory, host));
+                if (requesterTerminalContainer != null) {
+                    return new GuiRequesterTerm(requesterTerminalContainer, player.inventory, null,
+                        GuiStyleManager.loadStyleDoc("/screens/terminals/requester_terminal.json"));
+                }
+                return null;
+            }
             case QUARTZ_KNIFE -> {
                 ContainerQuartzKnife container = createQuartzKnifeContainer(player, x, ID);
                 if (container != null) {
@@ -1045,6 +1085,15 @@ public class AEGuiHandler implements IGuiHandler {
                 if (wirelessPatternAccessTerminalContainer != null) {
                     return new GuiPatternAccessTerm<>(wirelessPatternAccessTerminalContainer, player.inventory, null,
                         GuiStyleManager.loadStyleDoc("/screens/terminals/pattern_access_terminal.json"));
+                }
+                return null;
+            }
+            case WIRELESS_REQUESTER_TERMINAL -> {
+                ContainerRequesterTerm wirelessRequesterTerminalContainer =
+                    createWirelessRequesterTerminalContainer(player, x, ID);
+                if(wirelessRequesterTerminalContainer != null) {
+                    return new GuiRequesterTerm(wirelessRequesterTerminalContainer, player.inventory, null,
+                        GuiStyleManager.loadStyleDoc("/screens/terminals/requester_terminal.json"));
                 }
                 return null;
             }
@@ -1165,6 +1214,17 @@ public class AEGuiHandler implements IGuiHandler {
         }
 
         return initContainer(new ContainerPatternAccessTerm(player.inventory, wirelessHost), locator, guiId);
+    }
+
+    private @Nullable ContainerRequesterTerm createWirelessRequesterTerminalContainer(EntityPlayer player,
+                                                                                      int slot, int guiId) {
+        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+        ItemGuiHost<?> host = createItemGuiHost(player, locator, GuiIds.GuiKey.WIRELESS_REQUESTER_TERMINAL);
+        if (!(host instanceof WirelessRequesterTerminalGuiHost wirelessHost)) {
+            return null;
+        }
+
+        return initContainer(new ContainerRequesterTerm(player.inventory, wirelessHost), locator, guiId);
     }
 
     private @Nullable IPortableTerminal createPortableTerminalHost(EntityPlayer player, ItemGuiHostLocator locator) {

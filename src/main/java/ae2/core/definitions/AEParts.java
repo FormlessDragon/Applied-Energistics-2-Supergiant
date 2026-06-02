@@ -71,6 +71,7 @@ import ae2.parts.reporting.DarkPanelPart;
 import ae2.parts.reporting.ItemTerminalPart;
 import ae2.parts.reporting.PanelPart;
 import ae2.parts.reporting.PatternAccessTerminalPart;
+import ae2.parts.reporting.RequesterTerminalPart;
 import ae2.parts.reporting.SemiDarkPanelPart;
 import ae2.parts.reporting.StorageMonitorPart;
 import ae2.parts.reporting.ThroughputMonitorPart;
@@ -185,6 +186,8 @@ public final class AEParts {
         AEPartIds.PATTERN_ENCODING_TERMINAL, PatternEncodingTerminalPart.class, PatternEncodingTerminalPart::new);
     public static final ItemDefinition<PartItem<PatternAccessTerminalPart>> PATTERN_ACCESS_TERMINAL = createPart(
         AEPartIds.PATTERN_ACCESS_TERMINAL, PatternAccessTerminalPart.class, PatternAccessTerminalPart::new);
+    public static final ItemDefinition<PartItem<RequesterTerminalPart>> REQUESTER_TERMINAL = createPart(
+        AEPartIds.REQUESTER_TERMINAL, RequesterTerminalPart.class, RequesterTerminalPart::new);
     public static final ItemDefinition<PartItem<MEP2PTunnelPart>> ME_P2P_TUNNEL = createPart(
         AEPartIds.ME_P2P_TUNNEL, MEP2PTunnelPart.class, MEP2PTunnelPart::new);
     public static final ItemDefinition<PartItem<RedstoneP2PTunnelPart>> REDSTONE_P2P_TUNNEL = createPart(
@@ -234,6 +237,7 @@ public final class AEParts {
         ENERGY_ACCEPTOR,
         PATTERN_ENCODING_TERMINAL,
         PATTERN_ACCESS_TERMINAL,
+        REQUESTER_TERMINAL,
         ME_P2P_TUNNEL,
         REDSTONE_P2P_TUNNEL,
         ITEM_P2P_TUNNEL,

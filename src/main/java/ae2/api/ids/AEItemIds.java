@@ -58,6 +58,7 @@ public final class AEItemIds {
     public static final ResourceLocation WIRELESS_CRAFTING_TERMINAL = id("wireless_crafting_terminal");
     public static final ResourceLocation WIRELESS_PATTERN_ENCODING_TERMINAL = id("wireless_pattern_encoding_terminal");
     public static final ResourceLocation WIRELESS_PATTERN_ACCESS_TERMINAL = id("wireless_pattern_access_terminal");
+    public static final ResourceLocation WIRELESS_REQUESTER_TERMINAL = id("wireless_requester_terminal");
     public static final ResourceLocation WIRELESS_UNIVERSAL_TERMINAL = id("wireless_universal_terminal");
     public static final ResourceLocation QUANTUM_BRIDGE_CARD = id("quantum_bridge_card");
     public static final ResourceLocation MAGNET_CARD = id("magnet_card");

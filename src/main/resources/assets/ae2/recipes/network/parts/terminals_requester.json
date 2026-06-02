@@ -1,0 +1,26 @@
+{
+	"type": "forge:ore_shapeless",
+	"ingredients": [
+		[
+			{
+				"item": "ae2:monitor"
+			},
+			{
+				"item": "ae2:semi_dark_monitor"
+			},
+			{
+				"item": "ae2:dark_monitor"
+			}
+		],
+		{
+			"item": "ae2:logic_processor"
+		},
+		{
+			"item": "ae2:requester"
+		}
+	],
+	"result": {
+		"item": "ae2:requester_terminal",
+		"count": 1
+	}
+}

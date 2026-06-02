@@ -1,0 +1,396 @@
+package ae2.tile.crafting;
+
+import ae2.api.config.Actionable;
+import ae2.api.networking.GridFlags;
+import ae2.api.networking.IGridNode;
+import ae2.api.networking.crafting.CalculationStrategy;
+import ae2.api.networking.crafting.CraftingSubmitErrorCode;
+import ae2.api.networking.crafting.ICraftingForceStartRequester;
+import ae2.api.networking.crafting.ICraftingLink;
+import ae2.api.networking.crafting.ICraftingPlan;
+import ae2.api.networking.crafting.ICraftingRequester;
+import ae2.api.networking.crafting.ICraftingSubmitResult;
+import ae2.api.networking.security.IActionHost;
+import ae2.api.networking.security.IActionSource;
+import ae2.api.networking.storage.IStorageWatcherNode;
+import ae2.api.networking.ticking.IGridTickable;
+import ae2.api.networking.ticking.TickRateModulation;
+import ae2.api.networking.ticking.TickingRequest;
+import ae2.api.orientation.BlockOrientation;
+import ae2.api.orientation.RelativeSide;
+import ae2.api.stacks.AEKey;
+import ae2.api.storage.StorageHelper;
+import ae2.core.AEConfig;
+import ae2.core.definitions.AEBlocks;
+import ae2.requester.RequestHost;
+import ae2.requester.RequestManager;
+import ae2.requester.StorageManager;
+import ae2.requester.status.LinkState;
+import ae2.requester.status.RequestStatus;
+import ae2.requester.status.StatusState;
+import ae2.text.TextComponentItemStack;
+import ae2.tile.grid.AENetworkedTile;
+import ae2.util.SettingsFrom;
+import com.google.common.collect.ImmutableSet;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.text.ITextComponent;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
+import java.util.Set;
+
+public class TileRequester extends AENetworkedTile implements RequestHost, IGridTickable, ICraftingForceStartRequester {
+
+    private static final String REQUESTS_TAG = "requests";
+    private static final String STORAGE_MANAGER_TAG = "storage_manager";
+    private static final String REQUEST_STATUS_TAG = "request_status";
+    private static final String MEMORY_CARD_REQUESTS_TAG = "requester_requests";
+
+    private final RequestManager requestManager;
+    private final StorageManager storageManager;
+    private final StatusState[] requestStatus;
+    private final IActionSource actionSource = IActionSource.ofMachine(this);
+    private final RequesterServices services = new GridRequesterServices();
+    private boolean submittingForceStart;
+
+    public TileRequester() {
+        int requestCount = AEConfig.instance().getRequests();
+        this.requestManager = new RequestManager(this, requestCount);
+        this.storageManager = new StorageManager(requestCount);
+        this.requestStatus = new StatusState[requestCount];
+
+        Arrays.fill(this.requestStatus, StatusState.IDLE);
+        this.getMainNode()
+            .addService(IGridTickable.class, this)
+            .addService(ICraftingRequester.class, this)
+            .addService(IStorageWatcherNode.class, this.storageManager)
+            .setIdlePowerUsage(AEConfig.instance().getIdleEnergy());
+        if (AEConfig.instance().getRequireChannel()) {
+            this.getMainNode().setFlags(GridFlags.REQUIRE_CHANNEL);
+        }
+    }
+
+    @Override
+    public ItemStack getItemFromTile() {
+        return AEBlocks.REQUESTER.stack();
+    }
+
+    @Override
+    public void saveAdditional(NBTTagCompound data) {
+        super.saveAdditional(data);
+        data.setTag(REQUESTS_TAG, this.requestManager.writeToNBT());
+        data.setTag(STORAGE_MANAGER_TAG, this.storageManager.writeToNBT());
+        data.setTag(REQUEST_STATUS_TAG, this.writeStatusToNBT());
+    }
+
+    @Override
+    public void loadTag(NBTTagCompound data) {
+        super.loadTag(data);
+        if (data.hasKey(REQUESTS_TAG, 10)) {
+            this.requestManager.readFromNBT(data.getCompoundTag(REQUESTS_TAG));
+        }
+        if (data.hasKey(STORAGE_MANAGER_TAG, 10)) {
+            this.storageManager.readFromNBT(data.getCompoundTag(STORAGE_MANAGER_TAG));
+        }
+        if (data.hasKey(REQUEST_STATUS_TAG, 10)) {
+            this.readStatusFromNBT(data.getCompoundTag(REQUEST_STATUS_TAG));
+        }
+    }
+
+    @Override
+    public void exportSettings(SettingsFrom mode, NBTTagCompound output) {
+        super.exportSettings(mode, output);
+        if (mode == SettingsFrom.MEMORY_CARD) {
+            output.setTag(MEMORY_CARD_REQUESTS_TAG, this.requestManager.writeToNBT());
+        }
+    }
+
+    @Override
+    public void importSettings(SettingsFrom mode, NBTTagCompound input, @Nullable EntityPlayer player) {
+        super.importSettings(mode, input, player);
+        if (mode == SettingsFrom.MEMORY_CARD && input.hasKey(MEMORY_CARD_REQUESTS_TAG, 10)) {
+            this.requestManager.replaceFromNBT(input.getCompoundTag(MEMORY_CARD_REQUESTS_TAG));
+            this.resetRuntimeState();
+            this.saveChanges();
+        }
+    }
+
+    @Override
+    public Set<EnumFacing> getGridConnectableSides(BlockOrientation orientation) {
+        EnumSet<EnumFacing> exposedSides = EnumSet.allOf(EnumFacing.class);
+        exposedSides.remove(orientation.getSide(RelativeSide.FRONT));
+        return exposedSides;
+    }
+
+    @Override
+    public RequestManager getRequestManager() {
+        return this.requestManager;
+    }
+
+    public StorageManager getStorageManager() {
+        return this.storageManager;
+    }
+
+    @Override
+    public IActionSource getActionSource() {
+        return this.actionSource;
+    }
+
+    @Override
+    public ITextComponent getRequesterName() {
+        return this.hasCustomName()
+            ? this.getCustomName()
+            : TextComponentItemStack.of(AEBlocks.REQUESTER.stack());
+    }
+
+    @Override
+    public long getRequesterSortValue() {
+        return ((long) this.pos.getZ() << 24) ^ ((long) this.pos.getX() << 8) ^ this.pos.getY();
+    }
+
+    @Override
+    public void onRequestChanged(int index) {
+        this.storageManager.clear(index);
+        this.setRequestState(index, StatusState.IDLE);
+        this.saveChanges();
+    }
+
+    @Override
+    public void onRequestUpdated(int index) {
+        this.saveChanges();
+    }
+
+    @Override
+    public IGridNode getActionableNode() {
+        return this.getMainNode().getNode();
+    }
+
+    @Override
+    public TickingRequest getTickingRequest(IGridNode node) {
+        return new TickingRequest(1, 20, false);
+    }
+
+    @Override
+    public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
+        if (this.world == null || this.world.isRemote || !this.getMainNode().isActive()) {
+            return TickRateModulation.IDLE;
+        }
+
+        return this.handleRequests();
+    }
+
+    @Override
+    public ImmutableSet<ICraftingLink> getRequestedJobs() {
+        ImmutableSet.Builder<ICraftingLink> links = ImmutableSet.builder();
+        for (StatusState state : this.requestStatus) {
+            if (state instanceof LinkState linkState) {
+                links.add(linkState.link());
+            }
+        }
+        return links.build();
+    }
+
+    @Override
+    public long insertCraftedItems(ICraftingLink link, AEKey what, long amount, Actionable mode) {
+        if (amount <= 0) {
+            return 0;
+        }
+
+        int slot = this.findLinkSlot(link);
+        if (slot < 0) {
+            throw new IllegalStateException("No requester crafting link found");
+        }
+
+        if (mode == Actionable.MODULATE) {
+            this.storageManager.addPending(slot, what, amount);
+            this.saveChanges();
+        }
+        return amount;
+    }
+
+    @Override
+    public void jobStateChange(ICraftingLink link) {
+        // Tracked by requestStatus, matching upstream. The next requester tick observes link state.
+    }
+
+    TickRateModulation handleRequests() {
+        boolean changed = false;
+        TickRateModulation tickRateModulation = TickRateModulation.IDLE;
+        for (int i = 0; i < this.requestStatus.length; i++) {
+            StatusState current = this.requestStatus[i];
+            StatusState result = this.handleRequest(i);
+            if (!current.equals(result)) {
+                changed = true;
+            }
+
+            TickRateModulation resultTickRateModulation = result.getTickRateModulation();
+            if (resultTickRateModulation.ordinal() > tickRateModulation.ordinal()) {
+                tickRateModulation = resultTickRateModulation;
+            }
+
+            this.setRequestState(i, result);
+        }
+        if (changed) {
+            this.saveChanges();
+        }
+        return tickRateModulation;
+    }
+
+    public boolean isActive() {
+        for (StatusState state : this.requestStatus) {
+            if (state.visibleStatus() != RequestStatus.IDLE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private StatusState handleRequest(int slot) {
+        StatusState state = this.requestStatus[slot];
+        StatusState result = state.handle(this, slot);
+        this.setRequestState(slot, result);
+        if (this.requestStatus[slot].type() != RequestStatus.IDLE && !this.requestStatus[slot].equals(state)) {
+            return this.handleRequest(slot);
+        }
+        return this.requestStatus[slot];
+    }
+
+    private void setRequestState(int slot, StatusState state) {
+        this.requestStatus[slot] = state;
+        this.requestManager.get(slot).setClientStatus(state.visibleStatus());
+        this.markForUpdate();
+    }
+
+    private int findLinkSlot(ICraftingLink link) {
+        for (int i = 0; i < this.requestStatus.length; i++) {
+            StatusState state = this.requestStatus[i];
+            if (state instanceof LinkState linkState && linkState.link().equals(link)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private NBTTagCompound writeStatusToNBT() {
+        var tag = new NBTTagCompound();
+        for (int i = 0; i < this.requestStatus.length; i++) {
+            StatusState state = this.requestStatus[i];
+            if (state instanceof LinkState linkState) {
+                var linkTag = new NBTTagCompound();
+                linkState.link().writeToNBT(linkTag);
+                tag.setTag(Integer.toString(i), linkTag);
+            }
+        }
+        return tag;
+    }
+
+    private void readStatusFromNBT(NBTTagCompound tag) {
+        Arrays.fill(this.requestStatus, StatusState.IDLE);
+        for (int i = 0; i < this.requestStatus.length; i++) {
+            String key = Integer.toString(i);
+            if (tag.hasKey(key, 10)) {
+                ICraftingLink link = StorageHelper.loadCraftingLink(tag.getCompoundTag(key), this);
+                if (link != null) {
+                    this.setRequestState(i, new LinkState(link));
+                }
+            }
+        }
+    }
+
+    @Override
+    public boolean canForceStartCrafting(ICraftingPlan plan) {
+        return this.submittingForceStart;
+    }
+
+    public long getStoredAmount(AEKey key) {
+        return this.services.getStoredAmount(key);
+    }
+
+    public Future<ICraftingPlan> beginPlan(AEKey key, long amount) {
+        return this.services.beginPlan(key, amount);
+    }
+
+    public ICraftingSubmitResult submitPlan(ICraftingPlan plan, int slot) {
+        this.submittingForceStart = this.requestManager.get(slot).isForceStart();
+        try {
+            return this.services.submitPlan(plan, this, this, this.submittingForceStart);
+        } finally {
+            this.submittingForceStart = false;
+        }
+    }
+
+    public long insert(AEKey key, long amount) {
+        return this.services.insert(key, amount);
+    }
+
+    private void resetRuntimeState() {
+        for (int i = 0; i < this.requestStatus.length; i++) {
+            this.storageManager.clear(i);
+            this.setRequestState(i, StatusState.IDLE);
+        }
+    }
+
+    interface RequesterServices {
+        long getStoredAmount(AEKey key);
+
+        Future<ICraftingPlan> beginPlan(AEKey key, long amount);
+
+        ICraftingSubmitResult submitPlan(ICraftingPlan plan, ICraftingRequester requester, IActionHost actionHost,
+                                         boolean forceStart);
+
+        long insert(AEKey key, long amount);
+    }
+
+    private final class GridRequesterServices implements RequesterServices {
+        @Override
+        public long getStoredAmount(AEKey key) {
+            var grid = getMainNode().getGrid();
+            return grid == null ? 0 : grid.getStorageService().getCachedInventory().get(key);
+        }
+
+        @Override
+        public Future<ICraftingPlan> beginPlan(AEKey key, long amount) {
+            var grid = getMainNode().getGrid();
+            if (grid == null || world == null) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return grid.getCraftingService().beginCraftingCalculation(world, TileRequester.this::getActionSource,
+                key, amount, CalculationStrategy.REPORT_MISSING_ITEMS);
+        }
+
+        @Override
+        public ICraftingSubmitResult submitPlan(ICraftingPlan plan, ICraftingRequester requester,
+                                                IActionHost actionHost, boolean forceStart) {
+            var grid = getMainNode().getGrid();
+            if (grid == null) {
+                return new SubmitResult(CraftingSubmitErrorCode.NO_CPU_FOUND, null);
+            }
+            return grid.getCraftingService().submitJob(plan, requester, null, false, actionSource, forceStart);
+        }
+
+        @Override
+        public long insert(AEKey key, long amount) {
+            var grid = getMainNode().getGrid();
+            if (grid == null) {
+                return 0;
+            }
+            return StorageHelper.poweredInsert(grid.getEnergyService(), grid.getStorageService().getInventory(),
+                key, amount, actionSource, Actionable.MODULATE);
+        }
+    }
+
+    private record SubmitResult(CraftingSubmitErrorCode errorCode, ICraftingLink link)
+        implements ICraftingSubmitResult {
+        @Override
+        public Object errorDetail() {
+            return null;
+        }
+    }
+
+}

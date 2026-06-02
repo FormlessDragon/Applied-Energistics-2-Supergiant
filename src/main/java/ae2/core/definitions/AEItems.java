@@ -69,6 +69,7 @@ import ae2.items.tools.powered.PortableCellItem;
 import ae2.items.tools.powered.WirelessCraftingTerminalItem;
 import ae2.items.tools.powered.WirelessPatternAccessTerminalItem;
 import ae2.items.tools.powered.WirelessPatternEncodingTerminalItem;
+import ae2.items.tools.powered.WirelessRequesterTerminalItem;
 import ae2.items.tools.powered.WirelessTerminalItem;
 import ae2.items.tools.powered.WirelessUniversalTerminalItem;
 import ae2.items.tools.quartz.QuartzAxeItem;
@@ -359,6 +360,9 @@ public final class AEItems {
     public static final ItemDefinition<WirelessPatternAccessTerminalItem> WIRELESS_PATTERN_ACCESS_TERMINAL =
         new ItemDefinition<>(AEItemIds.WIRELESS_PATTERN_ACCESS_TERMINAL,
             new WirelessPatternAccessTerminalItem(getWirelessTerminalBattery()));
+    public static final ItemDefinition<WirelessRequesterTerminalItem> WIRELESS_REQUESTER_TERMINAL =
+        new ItemDefinition<>(AEItemIds.WIRELESS_REQUESTER_TERMINAL,
+            new WirelessRequesterTerminalItem(getWirelessTerminalBattery()));
     public static final ItemDefinition<WirelessUniversalTerminalItem> WIRELESS_UNIVERSAL_TERMINAL =
         new ItemDefinition<>(AEItemIds.WIRELESS_UNIVERSAL_TERMINAL,
             new WirelessUniversalTerminalItem(getWirelessTerminalBattery()));
@@ -516,6 +520,7 @@ public final class AEItems {
         WIRELESS_CRAFTING_TERMINAL,
         WIRELESS_PATTERN_ENCODING_TERMINAL,
         WIRELESS_PATTERN_ACCESS_TERMINAL,
+        WIRELESS_REQUESTER_TERMINAL,
         WIRELESS_UNIVERSAL_TERMINAL,
         CHARGED_STAFF,
         MATTER_CANNON,

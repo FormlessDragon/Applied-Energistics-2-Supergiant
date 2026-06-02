@@ -23,9 +23,10 @@ The upstream repository remains the original AE2 project and the primary referen
 
 * [Lapis256/AE2ToggleableViewCell](https://github.com/Lapis256/AE2ToggleableViewCell/tree/1.21.1): integrated the toggleable view cell feature with partial code reuse under the MIT License.
 * [Mari023/AE2WirelessTerminalLibrary](https://github.com/Mari023/AE2WirelessTerminalLibrary): integrated AE2WTL wireless terminal behavior with partial code reuse under the MIT License; textures follow upstream notices.
-* [NovaEngineering-Source/AE2CT-Legacy](https://github.com/NovaEngineering-Source/AE2CT-Legacy): integrated AE2CT-Legacy under the LGPL-3.0 Licenses.
+* [NovaEngineering-Source/AE2CT-Legacy](https://github.com/NovaEngineering-Source/AE2CT-Legacy): integrated AE2CT-Legacy under the LGPL-3.0 License.
 * [GlodBlock/ExtendedAE](https://github.com/GlodBlock/ExtendedAE): ported selected EAE machines, tools, recipes, GUIs, and resources into the `ae2` namespace under the LGPL-3.0 License.
 * [pedroksl/AdvancedAE](https://github.com/pedroksl/AdvancedAE): ported selected AdvancedAE parts, recipes, GUIs, and behavior into the `ae2` namespace under the LGPL-3.0 License;
+* [AlmostReliable/merequester](https://github.com/AlmostReliable/merequester): integrated ME Requester under LGPL-3.0 license.
 
 ## License
 

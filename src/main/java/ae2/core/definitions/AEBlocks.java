@@ -25,6 +25,7 @@ import ae2.block.crafting.CraftingUnitBlock;
 import ae2.block.crafting.CraftingUnitType;
 import ae2.block.crafting.MolecularAssemblerBlock;
 import ae2.block.crafting.PatternProviderBlock;
+import ae2.block.crafting.RequesterBlock;
 import ae2.block.misc.AEDecorativeBlock;
 import ae2.block.misc.BuddingCertusQuartzBlock;
 import ae2.block.misc.CanerBlock;
@@ -361,6 +362,9 @@ public final class AEBlocks {
     public static final BlockDefinition<PatternProviderBlock> PATTERN_PROVIDER = new BlockDefinition<>(
         AppEng.makeId("pattern_provider"),
         new PatternProviderBlock());
+    public static final BlockDefinition<RequesterBlock> REQUESTER = new BlockDefinition<>(
+        AEBlockIds.REQUESTER,
+        new RequesterBlock());
     public static final BlockDefinition<CraftingUnitBlock> CRAFTING_UNIT = new BlockDefinition<>(
         AppEng.makeId("crafting_unit"),
         new CraftingUnitBlock(CraftingUnitType.UNIT),
@@ -583,6 +587,7 @@ public final class AEBlocks {
         INGREDIENT_BUFFER,
         CANER,
         PATTERN_PROVIDER,
+        REQUESTER,
         CRAFTING_UNIT,
         CRAFTING_ACCELERATOR,
         CRAFTING_STORAGE_1K,

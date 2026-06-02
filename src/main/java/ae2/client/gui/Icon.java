@@ -207,6 +207,9 @@ public final class Icon {
     public static final Icon CRAFTING_TREE_NODE_MISSING = registerBuiltin("crafting_tree_node_missing", 20, 20);
     public static final Icon CRAFTING_TREE_MISSING_OVERLAY = registerBuiltin("crafting_tree_missing_overlay", 20, 20);
 
+    public static final Icon ENABLED = registerBuiltin("enabled", 16, 16);
+    public static final Icon DISABLED = registerBuiltin("disabled", 16, 16);
+
     public final int width;
     public final int height;
     private final ResourceLocation id;
