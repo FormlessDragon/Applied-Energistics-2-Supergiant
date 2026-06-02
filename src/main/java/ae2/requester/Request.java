@@ -203,6 +203,15 @@ public final class Request {
         clientStatus = readStatus(tag);
     }
 
+    void reset() {
+        enabled = true;
+        forceStart = false;
+        configuredStack = null;
+        amount = 0;
+        batchSize = 1;
+        clientStatus = RequestStatus.IDLE;
+    }
+
     private static RequestStatus readStatus(NBTTagCompound tag) {
         if (!tag.hasKey(STATUS, 8)) {
             return RequestStatus.IDLE;

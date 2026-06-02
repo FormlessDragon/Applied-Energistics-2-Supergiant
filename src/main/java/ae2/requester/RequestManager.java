@@ -56,4 +56,14 @@ public final class RequestManager {
             }
         }
     }
+
+    public void replaceFromNBT(NBTTagCompound tag) {
+        for (int i = 0; i < size(); i++) {
+            get(i).reset();
+            String key = Integer.toString(i);
+            if (tag.hasKey(key, 10)) {
+                get(i).readFromNBT(tag.getCompoundTag(key));
+            }
+        }
+    }
 }

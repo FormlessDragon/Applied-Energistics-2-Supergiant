@@ -86,6 +86,9 @@ public final class AEConfig {
     @Config.Name("tick_rates")
     public static final TickRateConfig TICK_RATES = new TickRateConfig();
 
+    @Config.Name("requester")
+    public static final Requester REQUESTER = new Requester();
+
     private static AEConfig INSTANCE;
 
     private AEConfig() {
@@ -451,6 +454,18 @@ public final class AEConfig {
 
     public int getSpatialDimensionId() {
         return WORLD_GEN.spatialDimensionId;
+    }
+
+    public int getRequests() {
+        return REQUESTER.requests;
+    }
+
+    public double getIdleEnergy() {
+        return REQUESTER.idleEnergy;
+    }
+
+    public boolean getRequireChannel() {
+        return REQUESTER.requireChannel;
     }
 
     public void save() {
@@ -845,5 +860,19 @@ public final class AEConfig {
             this.min = tickRate.getDefaultMin();
             this.max = tickRate.getDefaultMax();
         }
+    }
+
+    public static final class Requester {
+        @Config.Name("requests")
+        @Config.Comment("The amount of requests a single ME Requester can hold.")
+        @Config.RangeInt(min = 1, max = 64)
+        public int requests = 5;
+        @Config.Name("idleEnergy")
+        @Config.Comment("The amount of energy (in AE) the ME Requester drains from the ME network when idle.")
+        @Config.RangeDouble(min = 0.0)
+        public double idleEnergy = 5.0;
+        @Config.Name("requireChannel")
+        @Config.Comment("Whether the ME Requester requires an ME network channel to function.")
+        public boolean requireChannel = true;
     }
 }

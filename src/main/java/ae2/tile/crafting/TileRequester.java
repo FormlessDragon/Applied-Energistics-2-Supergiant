@@ -20,6 +20,7 @@ import ae2.api.orientation.BlockOrientation;
 import ae2.api.orientation.RelativeSide;
 import ae2.api.stacks.AEKey;
 import ae2.api.storage.StorageHelper;
+import ae2.core.AEConfig;
 import ae2.core.definitions.AEBlocks;
 import ae2.requester.RequestHost;
 import ae2.requester.RequestManager;
@@ -29,11 +30,14 @@ import ae2.requester.status.RequestStatus;
 import ae2.requester.status.StatusState;
 import ae2.text.TextComponentItemStack;
 import ae2.tile.grid.AENetworkedTile;
+import ae2.util.SettingsFrom;
 import com.google.common.collect.ImmutableSet;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.text.ITextComponent;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -42,28 +46,34 @@ import java.util.concurrent.Future;
 import java.util.Set;
 
 public class TileRequester extends AENetworkedTile implements RequestHost, IGridTickable, ICraftingForceStartRequester {
-    public static final int REQUEST_COUNT = 5;
-    public static final double IDLE_POWER_USAGE = 5.0;
 
     private static final String REQUESTS_TAG = "requests";
     private static final String STORAGE_MANAGER_TAG = "storage_manager";
     private static final String REQUEST_STATUS_TAG = "request_status";
+    private static final String MEMORY_CARD_REQUESTS_TAG = "requester_requests";
 
-    private final RequestManager requestManager = new RequestManager(this, REQUEST_COUNT);
-    private final StorageManager storageManager = new StorageManager(REQUEST_COUNT);
-    private final StatusState[] requestStatus = new StatusState[REQUEST_COUNT];
+    private final RequestManager requestManager;
+    private final StorageManager storageManager;
+    private final StatusState[] requestStatus;
     private final IActionSource actionSource = IActionSource.ofMachine(this);
-    private RequesterServices services = new GridRequesterServices();
+    private final RequesterServices services = new GridRequesterServices();
     private boolean submittingForceStart;
 
     public TileRequester() {
+        int requestCount = AEConfig.instance().getRequests();
+        this.requestManager = new RequestManager(this, requestCount);
+        this.storageManager = new StorageManager(requestCount);
+        this.requestStatus = new StatusState[requestCount];
+
         Arrays.fill(this.requestStatus, StatusState.IDLE);
         this.getMainNode()
             .addService(IGridTickable.class, this)
             .addService(ICraftingRequester.class, this)
             .addService(IStorageWatcherNode.class, this.storageManager)
-            .setFlags(GridFlags.REQUIRE_CHANNEL)
-            .setIdlePowerUsage(IDLE_POWER_USAGE);
+            .setIdlePowerUsage(AEConfig.instance().getIdleEnergy());
+        if (AEConfig.instance().getRequireChannel()) {
+            this.getMainNode().setFlags(GridFlags.REQUIRE_CHANNEL);
+        }
     }
 
     @Override
@@ -90,6 +100,24 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
         }
         if (data.hasKey(REQUEST_STATUS_TAG, 10)) {
             this.readStatusFromNBT(data.getCompoundTag(REQUEST_STATUS_TAG));
+        }
+    }
+
+    @Override
+    public void exportSettings(SettingsFrom mode, NBTTagCompound output) {
+        super.exportSettings(mode, output);
+        if (mode == SettingsFrom.MEMORY_CARD) {
+            output.setTag(MEMORY_CARD_REQUESTS_TAG, this.requestManager.writeToNBT());
+        }
+    }
+
+    @Override
+    public void importSettings(SettingsFrom mode, NBTTagCompound input, @Nullable EntityPlayer player) {
+        super.importSettings(mode, input, player);
+        if (mode == SettingsFrom.MEMORY_CARD && input.hasKey(MEMORY_CARD_REQUESTS_TAG, 10)) {
+            this.requestManager.replaceFromNBT(input.getCompoundTag(MEMORY_CARD_REQUESTS_TAG));
+            this.resetRuntimeState();
+            this.saveChanges();
         }
     }
 
@@ -299,6 +327,13 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
 
     public long insert(AEKey key, long amount) {
         return this.services.insert(key, amount);
+    }
+
+    private void resetRuntimeState() {
+        for (int i = 0; i < this.requestStatus.length; i++) {
+            this.storageManager.clear(i);
+            this.setRequestState(i, StatusState.IDLE);
+        }
     }
 
     interface RequesterServices {
