@@ -157,7 +157,7 @@ public interface MutableQuadView extends QuadView {
      * may not honor it.
      *
      * <p>
-     * For emissive rendering, it is better to use {@link MaterialFinder#emissive(boolean)}.
+     * For emissive rendering, it is better to use the material finder emissive setting.
      */
     void lightmap(int vertexIndex, int lightmap);
 
@@ -165,7 +165,7 @@ public interface MutableQuadView extends QuadView {
      * Convenience: set lightmap for all vertices at once.
      *
      * <p>
-     * For emissive rendering, it is better to use {@link MaterialFinder#emissive(boolean)}. See
+     * For emissive rendering, it is better to use the material finder emissive setting. See
      * {@link #lightmap(int, int)}.
      */
     default MutableQuadView lightmap(int b0, int b1, int b2, int b3) {

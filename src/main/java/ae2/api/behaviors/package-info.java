@@ -24,7 +24,8 @@
  * <li>Emptying and filling container items in AE2 menus: {@link ae2.api.behaviors.ContainerItemStrategy}</li>
  * </ul>
  *
- * @apiNote These classes are experimental: we might release breaking changes to them in any release.
+ * <p>
+ * API note: These classes are experimental: we might release breaking changes to them in any release.
  */
 @ApiStatus.Experimental
 package ae2.api.behaviors;

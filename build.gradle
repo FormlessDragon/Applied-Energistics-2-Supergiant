@@ -352,6 +352,15 @@ def syncDevClassesToResources = tasks.register('syncDevClassesToResources', Copy
     into(layout.buildDirectory.dir('resources/main'))
 }
 
+tasks.withType(Javadoc).configureEach {
+    dependsOn(syncDevResourcesToClasses)
+    dependsOn(syncDevClassesToResources)
+    options.encoding = 'UTF-8'
+    options.charSet = 'UTF-8'
+    options.docEncoding = 'UTF-8'
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
 tasks.named('classes').configure {
     finalizedBy(syncDevResourcesToClasses)
     finalizedBy(syncDevClassesToResources)

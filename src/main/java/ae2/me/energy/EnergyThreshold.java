@@ -29,8 +29,8 @@ public class EnergyThreshold implements Comparable<EnergyThreshold> {
     /**
      * Special constructor to allow querying a for a subset of thresholds.
      *
-     * @param lim
-     * @param bound
+     * @param lim the energy threshold
+     * @param watcher the watcher associated with the threshold
      */
     public EnergyThreshold(double lim, IEnergyWatcher watcher) {
         this.threshold = lim;

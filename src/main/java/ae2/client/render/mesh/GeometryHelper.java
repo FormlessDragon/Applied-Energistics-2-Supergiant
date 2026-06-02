@@ -95,7 +95,7 @@ public abstract class GeometryHelper {
      * vanilla resource packs, also true if quad is outside the face.
      *
      * <p>
-     * Test will be unreliable if not already parallel, use {@link #isQuadParallelToFace(Direction, QuadView)} for that
+     * Test will be unreliable if not already parallel, use {@link GeometryHelper#isQuadParallelToFace(EnumFacing, QuadView)} for that
      * purpose. Expects convex quads with all points co-planar.
      */
     public static boolean isParallelQuadOnFace(EnumFacing lightFace, QuadView quad) {
@@ -148,7 +148,7 @@ public abstract class GeometryHelper {
     }
 
     /**
-     * Used by {@link #isQuadCubic(Direction, QuadView)}. True if quad touches all four corners of unit square.
+     * Used by {@link GeometryHelper#isQuadCubic(EnumFacing, QuadView)}. True if quad touches all four corners of unit square.
      *
      * <p>
      * For compatibility with resource packs that contain models with quads exceeding block boundaries, considers
@@ -187,7 +187,7 @@ public abstract class GeometryHelper {
 
     /**
      * Identifies the face to which the quad is most closely aligned. This mimics the value that
-     * {@link BakedQuad#getDirection()} returns, and is used in the vanilla renderer for all diffuse lighting.
+     * {@link BakedQuad#getFace()} returns, and is used in the vanilla renderer for all diffuse lighting.
      *
      * <p>
      * Derived from the quad face normal and expects convex quads with all points co-planar.

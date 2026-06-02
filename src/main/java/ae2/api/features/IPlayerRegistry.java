@@ -63,7 +63,7 @@ public interface IPlayerRegistry {
     }
 
     /**
-     * Convenience method to get a connected {@link ServerPlayer} for a given ME player id. This can return null for two
+     * Convenience method to get a connected {@link EntityPlayerMP} for a given ME player id. This can return null for two
      * reasons: the ME player id is unknown, or the player associated with the given ID is not logged onto the server.
      */
     @Nullable
