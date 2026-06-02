@@ -35,8 +35,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
-public final class BlockDefinition<T extends Block> implements java.util.function.Supplier<T> {
+public final class BlockDefinition<T extends Block> implements Supplier<T> {
 
     private final String englishName;
     private final ResourceLocation id;

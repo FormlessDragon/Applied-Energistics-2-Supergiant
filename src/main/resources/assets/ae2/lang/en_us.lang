@@ -1348,6 +1348,7 @@ tile.ae2.chiseled_quartz_stairs.name=Chiseled Certus Quartz Stairs
 tile.ae2.chiseled_quartz_wall.name=Chiseled Certus Quartz Wall
 tile.ae2.condenser.name=Matter Condenser
 tile.ae2.controller.name=ME Controller
+tile.ae2.4x_crafting_accelerator.name=4x Crafting Co-Processing Unit
 tile.ae2.crafting_accelerator.name=Crafting Co-Processing Unit
 tile.ae2.crafting_monitor.name=Crafting Monitor
 tile.ae2.crafting_unit.name=Crafting Unit

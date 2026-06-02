@@ -62,6 +62,7 @@ public final class InitBuiltInModels {
             "block/builtin/cable_bus", "models/block/builtin/cable_bus");
         addBuiltInModel("block/crafting/unit_formed", () -> new CraftingCubeModel(CraftingUnitType.UNIT));
         addBuiltInModel("block/crafting/accelerator_formed", () -> new CraftingCubeModel(CraftingUnitType.ACCELERATOR));
+        addBuiltInModel("block/crafting/accelerator_4x_formed", () -> new CraftingCubeModel(CraftingUnitType.ACCELERATOR_4X));
         addBuiltInModel("block/crafting/storage_1k_formed", () -> new CraftingCubeModel(CraftingUnitType.STORAGE_1K));
         addBuiltInModel("block/crafting/storage_4k_formed", () -> new CraftingCubeModel(CraftingUnitType.STORAGE_4K));
         addBuiltInModel("block/crafting/storage_16k_formed", () -> new CraftingCubeModel(CraftingUnitType.STORAGE_16K));

@@ -1348,6 +1348,7 @@ tile.ae2.chiseled_quartz_stairs.name=雕纹赛特斯石英楼梯
 tile.ae2.chiseled_quartz_wall.name=雕纹赛特斯石英墙
 tile.ae2.condenser.name=物质聚合器
 tile.ae2.controller.name=ME控制器
+tile.ae2.4x_crafting_accelerator.name=4x并行处理单元
 tile.ae2.crafting_accelerator.name=并行处理单元
 tile.ae2.crafting_monitor.name=合成监控器
 tile.ae2.crafting_unit.name=合成单元

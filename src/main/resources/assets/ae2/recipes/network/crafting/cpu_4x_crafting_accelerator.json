@@ -1,0 +1,15 @@
+{
+  "type": "forge:ore_shapeless",
+  "ingredients": [
+    {
+      "item": "ae2:crafting_unit"
+    },
+    {
+      "item": "ae2:concurrent_processor"
+    }
+  ],
+  "result": {
+    "item": "ae2:4x_crafting_accelerator",
+    "count": 1
+  }
+}

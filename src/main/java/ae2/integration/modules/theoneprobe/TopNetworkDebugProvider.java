@@ -12,8 +12,7 @@ import ae2.me.service.TickManagerService;
 import ae2.parts.networking.CablePart;
 import ae2.parts.p2p.P2PTunnelPart;
 import ae2.parts.storagebus.StorageBusPart;
-import ae2.tile.crafting.TileCraftingMonitor;
-import ae2.tile.crafting.TileCraftingUnit;
+import ae2.tile.crafting.ICraftingCPUTileEntity;
 import ae2.tile.crafting.TileMolecularAssembler;
 import ae2.tile.crafting.TilePatternProvider;
 import ae2.tile.networking.TileCableBus;
@@ -158,8 +157,7 @@ public final class TopNetworkDebugProvider {
 
         if (owner instanceof TileMolecularAssembler
             || owner instanceof TilePatternProvider
-            || owner instanceof TileCraftingUnit
-            || owner instanceof TileCraftingMonitor) {
+            || owner instanceof ICraftingCPUTileEntity) {
             return Category.CRAFTING;
         }
 

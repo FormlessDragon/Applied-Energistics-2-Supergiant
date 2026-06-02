@@ -18,8 +18,6 @@
 
 package ae2.tile.crafting;
 
-import ae2.api.ids.AEBlockIds;
-import ae2.api.implementations.IPowerChannelState;
 import ae2.api.networking.GridFlags;
 import ae2.api.networking.IGridMultiblock;
 import ae2.api.networking.IGridNode;
@@ -28,7 +26,8 @@ import ae2.api.orientation.BlockOrientation;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigurableObject;
 import ae2.block.crafting.AbstractCraftingUnitBlock;
-import ae2.me.cluster.IAEMultiBlock;
+import ae2.block.crafting.ICraftingUnitType;
+import ae2.core.definitions.AEBlocks;
 import ae2.me.cluster.implementations.CraftingCPUCalculator;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
 import ae2.tile.grid.AENetworkedTile;
@@ -36,7 +35,6 @@ import ae2.util.NullConfigManager;
 import ae2.util.Platform;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.minecraft.block.Block;
 import net.minecraft.block.properties.IProperty;
 import net.minecraft.block.properties.PropertyBool;
 import net.minecraft.block.state.IBlockState;
@@ -44,7 +42,6 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
-import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
@@ -55,15 +52,13 @@ import java.util.List;
 import java.util.Set;
 
 public class TileCraftingUnit extends AENetworkedTile
-    implements IAEMultiBlock<CraftingCPUCluster>, IPowerChannelState, IConfigurableObject {
-
-    private static final long KILOBYTE = 1024L;
+    implements ICraftingCPUTileEntity, IConfigurableObject {
 
     private final CraftingCPUCalculator calc = new CraftingCPUCalculator(this);
     private NBTTagCompound previousState;
     private boolean coreBlock;
     private CraftingCPUCluster cluster;
-    private ClientState clientState = ClientState.DEFAULT;
+    private ICraftingCPUTileEntity.ClientState clientState = ICraftingCPUTileEntity.ClientState.DEFAULT;
 
     public TileCraftingUnit() {
         this.getMainNode().setFlags(GridFlags.MULTIBLOCK, GridFlags.REQUIRE_CHANNEL)
@@ -94,9 +89,8 @@ public class TileCraftingUnit extends AENetworkedTile
             return ItemStack.EMPTY;
         }
 
-        Block block = this.world.getBlockState(this.pos).getBlock();
-        Item item = Item.getItemFromBlock(block);
-        return item == null ? ItemStack.EMPTY : new ItemStack(block);
+        Item item = this.getUnitBlock().type.getItemFromType();
+        return item == null ? ItemStack.EMPTY : new ItemStack(item);
     }
 
     public void setName(String name) {
@@ -106,32 +100,21 @@ public class TileCraftingUnit extends AENetworkedTile
         }
     }
 
-    @Nullable
-    private ResourceLocation getCraftingBlockId() {
-        if (this.world == null) {
-            return null;
+    public AbstractCraftingUnitBlock<?> getUnitBlock() {
+        if (this.world == null || this.isInvalid()) {
+            return AEBlocks.CRAFTING_UNIT.block();
         }
-        return this.world.getBlockState(this.pos).getBlock().getRegistryName();
+
+        if (this.world.getBlockState(this.pos).getBlock() instanceof AbstractCraftingUnitBlock<?> craftingBlock) {
+            return craftingBlock;
+        }
+
+        return AEBlocks.CRAFTING_UNIT.block();
     }
 
-    public long getStorageBytes() {
-        ResourceLocation id = getCraftingBlockId();
-        if (AEBlockIds.CRAFTING_STORAGE_1K.equals(id)) {
-            return KILOBYTE;
-        } else if (AEBlockIds.CRAFTING_STORAGE_4K.equals(id)) {
-            return 4 * KILOBYTE;
-        } else if (AEBlockIds.CRAFTING_STORAGE_16K.equals(id)) {
-            return 16 * KILOBYTE;
-        } else if (AEBlockIds.CRAFTING_STORAGE_64K.equals(id)) {
-            return 64 * KILOBYTE;
-        } else if (AEBlockIds.CRAFTING_STORAGE_256K.equals(id)) {
-            return 256 * KILOBYTE;
-        }
-        return 0;
-    }
-
-    public int getAcceleratorThreads() {
-        return AEBlockIds.CRAFTING_ACCELERATOR.equals(getCraftingBlockId()) ? 1 : 0;
+    @Override
+    public ICraftingUnitType getCraftingUnitType() {
+        return this.getUnitBlock().type;
     }
 
     @Override
@@ -148,7 +131,7 @@ public class TileCraftingUnit extends AENetworkedTile
     protected void writeToStream(ByteBuf data) {
         super.writeToStream(data);
 
-        ClientState state = this.getRenderState();
+        ICraftingCPUTileEntity.ClientState state = this.getRenderState();
         data.writeBoolean(state.formed());
         data.writeBoolean(state.powered());
         data.writeByte(encodeConnections(state.connections()));
@@ -158,7 +141,7 @@ public class TileCraftingUnit extends AENetworkedTile
     protected boolean readFromStream(ByteBuf data) {
         boolean changed = super.readFromStream(data);
 
-        ClientState nextState = new ClientState(data.readBoolean(), data.readBoolean(),
+        ICraftingCPUTileEntity.ClientState nextState = new ICraftingCPUTileEntity.ClientState(data.readBoolean(), data.readBoolean(),
             decodeConnections(data.readUnsignedByte()));
         changed |= !nextState.equals(this.clientState);
         this.clientState = nextState;
@@ -184,7 +167,7 @@ public class TileCraftingUnit extends AENetworkedTile
     protected void saveVisualState(NBTTagCompound data) {
         super.saveVisualState(data);
 
-        ClientState state = this.getRenderState();
+        ICraftingCPUTileEntity.ClientState state = this.getRenderState();
         data.setBoolean("formed", state.formed());
         data.setBoolean("powered", state.powered());
         data.setByte("connections", (byte) encodeConnections(state.connections()));
@@ -211,7 +194,7 @@ public class TileCraftingUnit extends AENetworkedTile
     protected void loadVisualState(NBTTagCompound data) {
         super.loadVisualState(data);
 
-        this.clientState = new ClientState(data.getBoolean("formed"), data.getBoolean("powered"),
+        this.clientState = new ICraftingCPUTileEntity.ClientState(data.getBoolean("formed"), data.getBoolean("powered"),
             decodeConnections(data.getByte("connections") & 0xFF));
     }
 
@@ -264,7 +247,13 @@ public class TileCraftingUnit extends AENetworkedTile
         }
     }
 
+    @Override
     public void breakCluster() {
+        this.cancelJobAndDropContents();
+    }
+
+    @Override
+    public void cancelJobAndDropContents() {
         if (this.cluster == null) {
             return;
         }
@@ -279,14 +268,14 @@ public class TileCraftingUnit extends AENetworkedTile
         }
 
         var places = new ObjectArrayList<BlockPos>();
-        Iterator<TileCraftingUnit> it = this.cluster.getBlockEntities();
+        Iterator<ICraftingCPUTileEntity> it = this.cluster.getCraftingBlockEntities();
         while (it.hasNext()) {
-            TileCraftingUnit blockEntity = it.next();
+            ICraftingCPUTileEntity blockEntity = it.next();
             if (this == blockEntity) {
                 places.add(this.pos);
             } else {
                 for (EnumFacing facing : EnumFacing.values()) {
-                    BlockPos place = blockEntity.pos.offset(facing);
+                    BlockPos place = blockEntity.getPos().offset(facing);
                     if (this.world.isAirBlock(place)) {
                         places.add(place);
                     }
@@ -372,7 +361,7 @@ public class TileCraftingUnit extends AENetworkedTile
         return this.getMainNode().isActive();
     }
 
-    public ClientState getRenderState() {
+    public ICraftingCPUTileEntity.ClientState getRenderState() {
         if (this.world != null && !this.world.isRemote) {
             return this.createRenderState();
         }
@@ -384,15 +373,15 @@ public class TileCraftingUnit extends AENetworkedTile
             return;
         }
 
-        ClientState nextState = this.createRenderState();
+        ICraftingCPUTileEntity.ClientState nextState = this.createRenderState();
         if (!nextState.equals(this.clientState)) {
             this.clientState = nextState;
             this.markForUpdate();
         }
     }
 
-    private ClientState createRenderState() {
-        return new ClientState(this.isFormed(), this.isPowered(), this.getConnections());
+    private ICraftingCPUTileEntity.ClientState createRenderState() {
+        return new ICraftingCPUTileEntity.ClientState(this.isFormed(), this.isPowered(), this.getConnections());
     }
 
     private EnumSet<EnumFacing> getConnections() {
@@ -415,7 +404,7 @@ public class TileCraftingUnit extends AENetworkedTile
         }
 
         List<IGridNode> nodes = new ObjectArrayList<>();
-        Iterator<TileCraftingUnit> it = this.getCluster().getBlockEntities();
+        Iterator<ICraftingCPUTileEntity> it = this.getCluster().getCraftingBlockEntities();
         while (it.hasNext()) {
             var node = it.next().getGridNode();
             if (node != null) {
@@ -433,13 +422,5 @@ public class TileCraftingUnit extends AENetworkedTile
             return cluster.getConfigManager();
         }
         return NullConfigManager.INSTANCE;
-    }
-
-    public record ClientState(boolean formed, boolean powered, EnumSet<EnumFacing> connections) {
-        public static final ClientState DEFAULT = new ClientState(false, false, EnumSet.noneOf(EnumFacing.class));
-
-        public ClientState {
-            connections = connections.clone();
-        }
     }
 }

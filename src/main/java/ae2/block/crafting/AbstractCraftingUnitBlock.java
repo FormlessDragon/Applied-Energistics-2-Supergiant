@@ -25,7 +25,8 @@ import ae2.core.definitions.AEBlocks;
 import ae2.core.gui.GuiOpener;
 import ae2.core.localization.PlayerMessages;
 import ae2.recipes.game.CraftingUnitTransformRecipe;
-import ae2.tile.crafting.TileCraftingUnit;
+import ae2.tile.AEBaseTile;
+import ae2.tile.crafting.ICraftingCPUTileEntity;
 import ae2.util.InteractionUtil;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
@@ -51,7 +52,8 @@ import net.minecraftforge.common.property.IUnlistedProperty;
 import java.util.EnumSet;
 import java.util.Objects;
 
-public abstract class AbstractCraftingUnitBlock<T extends TileCraftingUnit> extends AEBaseTileBlock<T> {
+public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICraftingCPUTileEntity>
+    extends AEBaseTileBlock<T> {
     public static final PropertyBool FORMED = PropertyBool.create("formed");
     public static final PropertyBool POWERED = PropertyBool.create("powered");
     public static final IUnlistedProperty<CraftingCubeState> STATE = new IUnlistedProperty<>() {
@@ -110,7 +112,7 @@ public abstract class AbstractCraftingUnitBlock<T extends TileCraftingUnit> exte
             return state;
         }
 
-        TileCraftingUnit.ClientState renderState = tile.getRenderState();
+        ICraftingCPUTileEntity.ClientState renderState = tile.getRenderState();
         return state.withProperty(FORMED, renderState.formed())
                     .withProperty(POWERED, renderState.powered());
     }

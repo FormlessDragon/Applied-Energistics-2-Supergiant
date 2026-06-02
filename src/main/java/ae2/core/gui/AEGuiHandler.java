@@ -148,7 +148,7 @@ import ae2.parts.reporting.PatternAccessTerminalPart;
 import ae2.parts.reporting.RequesterTerminalPart;
 import ae2.parts.storagebus.StorageBusPart;
 import ae2.tile.AEBaseTile;
-import ae2.tile.crafting.TileCraftingUnit;
+import ae2.tile.crafting.ICraftingCPUTileEntity;
 import ae2.tile.crafting.TileMolecularAssembler;
 import ae2.tile.crafting.TilePatternProvider;
 import ae2.tile.crafting.TileRequester;
@@ -414,8 +414,8 @@ public class AEGuiHandler implements IGuiHandler {
                 }
             }
             case CRAFTING_CPU -> {
-                if (te instanceof TileCraftingUnit) {
-                    return initTileContainer(new ContainerCraftingCPU(player.inventory, (TileCraftingUnit) te),
+                if (te instanceof ICraftingCPUTileEntity craftingCpu) {
+                    return initTileContainer(new ContainerCraftingCPU(player.inventory, craftingCpu),
                         te, ID);
                 }
             }
@@ -788,7 +788,7 @@ public class AEGuiHandler implements IGuiHandler {
                 }
             }
             case CRAFTING_CPU -> {
-                if (te instanceof TileCraftingUnit craftingUnit) {
+                if (te instanceof ICraftingCPUTileEntity craftingUnit) {
                     ContainerCraftingCPU container = initTileContainer(new ContainerCraftingCPU(player.inventory,
                         craftingUnit), te, ID);
                     return new GuiCraftingCPU<>(container, player.inventory, null,

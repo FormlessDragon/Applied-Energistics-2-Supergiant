@@ -110,6 +110,7 @@ public final class AEBlockIds {
     public static final ResourceLocation CREATIVE_ENERGY_CELL = id("creative_energy_cell");
     public static final ResourceLocation CRAFTING_UNIT = id("crafting_unit");
     public static final ResourceLocation CRAFTING_ACCELERATOR = id("crafting_accelerator");
+    public static final ResourceLocation CRAFTING_ACCELERATOR_4X = id("4x_crafting_accelerator");
     public static final ResourceLocation CRAFTING_STORAGE_1K = id("1k_crafting_storage");
     public static final ResourceLocation CRAFTING_STORAGE_4K = id("4k_crafting_storage");
     public static final ResourceLocation CRAFTING_STORAGE_16K = id("16k_crafting_storage");

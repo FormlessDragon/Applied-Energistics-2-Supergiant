@@ -53,7 +53,7 @@ import ae2.me.helpers.InterestManager;
 import ae2.me.helpers.StackWatcher;
 import ae2.me.service.helpers.CraftingServiceStorage;
 import ae2.me.service.helpers.NetworkCraftingProviders;
-import ae2.tile.crafting.TileCraftingUnit;
+import ae2.tile.crafting.ICraftingCPUTileEntity;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
@@ -227,7 +227,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
         this.craftingProviders.removeProvider(gridNode);
 
-        if (gridNode.getOwner() instanceof TileCraftingUnit) {
+        if (gridNode.getOwner() instanceof ICraftingCPUTileEntity) {
             this.updateList = true;
         }
     }
@@ -253,7 +253,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
             }
         }
 
-        if (gridNode.getOwner() instanceof TileCraftingUnit) {
+        if (gridNode.getOwner() instanceof ICraftingCPUTileEntity) {
             this.updateList = true;
         }
     }
@@ -266,7 +266,11 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
     private void updateCPUClusters() {
         this.craftingCPUClusters.clear();
 
-        for (var tile : this.grid.getMachines(TileCraftingUnit.class)) {
+        for (var node : this.grid.getNodes()) {
+            if (!(node.getOwner() instanceof ICraftingCPUTileEntity tile)) {
+                continue;
+            }
+
             final CraftingCPUCluster cluster = tile.getCluster();
             if (cluster != null) {
                 this.craftingCPUClusters.add(cluster);

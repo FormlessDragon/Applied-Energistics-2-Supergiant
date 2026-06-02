@@ -37,11 +37,12 @@ import ae2.crafting.execution.CraftingCpuLogic;
 import ae2.me.cluster.IAECluster;
 import ae2.me.cluster.MBCalculator;
 import ae2.me.helpers.MachineSource;
+import ae2.tile.crafting.ICraftingCPUTileEntity;
 import ae2.tile.crafting.TileCraftingMonitor;
-import ae2.tile.crafting.TileCraftingUnit;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
@@ -55,7 +56,7 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
     public final CraftingCpuLogic craftingLogic = new CraftingCpuLogic(this);
     protected final BlockPos boundsMin;
     protected final BlockPos boundsMax;
-    protected final ObjectList<TileCraftingUnit> blockEntities = new ObjectArrayList<>();
+    protected final ObjectList<ICraftingCPUTileEntity> blockEntities = new ObjectArrayList<>();
     protected final ObjectList<TileCraftingMonitor> status = new ObjectArrayList<>();
     protected final IConfigManager configManager;
     protected ITextComponent myName;
@@ -89,7 +90,7 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
 
     @Override
     public void updateStatus(boolean updateGrid) {
-        for (TileCraftingUnit tile : this.blockEntities) {
+        for (ICraftingCPUTileEntity tile : this.blockEntities) {
             tile.updateSubType(true);
         }
     }
@@ -109,7 +110,7 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
         try {
             boolean posted = false;
 
-            for (TileCraftingUnit tile : this.blockEntities) {
+            for (ICraftingCPUTileEntity tile : this.blockEntities) {
                 final IGridNode node = tile.getActionableNode();
                 if (node != null && !posted) {
                     node.grid().postEvent(new GridCraftingCpuChange(node));
@@ -126,11 +127,19 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
     }
 
     @Override
-    public Iterator<TileCraftingUnit> getBlockEntities() {
+    public Iterator<? extends TileEntity> getBlockEntities() {
+        ObjectList<TileEntity> tiles = new ObjectArrayList<>(this.blockEntities.size());
+        for (ICraftingCPUTileEntity blockEntity : this.blockEntities) {
+            tiles.add(blockEntity.getTileEntity());
+        }
+        return tiles.iterator();
+    }
+
+    public Iterator<ICraftingCPUTileEntity> getCraftingBlockEntities() {
         return this.blockEntities.iterator();
     }
 
-    public void addTileEntity(TileCraftingUnit tile) {
+    public void addTileEntity(ICraftingCPUTileEntity tile) {
         if (this.machineSrc == null || tile.isCoreBlock()) {
             this.machineSrc = new MachineSource(tile);
         }
@@ -162,7 +171,7 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
     }
 
     public void markDirty() {
-        TileCraftingUnit core = this.getCore();
+        ICraftingCPUTileEntity core = this.getCore();
         if (core != null) {
             core.saveChanges();
         }
@@ -185,14 +194,14 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
     }
 
     @Nullable
-    protected TileCraftingUnit getCore() {
+    protected ICraftingCPUTileEntity getCore() {
         if (this.machineSrc == null) {
             return null;
         }
 
         return this.machineSrc.machine()
-                              .filter(TileCraftingUnit.class::isInstance)
-                              .map(TileCraftingUnit.class::cast)
+                              .filter(ICraftingCPUTileEntity.class::isInstance)
+                              .map(ICraftingCPUTileEntity.class::cast)
                               .orElse(null);
     }
 
@@ -253,7 +262,7 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
 
     @Nullable
     public IGridNode getNode() {
-        TileCraftingUnit core = getCore();
+        ICraftingCPUTileEntity core = getCore();
         return core != null ? core.getActionableNode() : null;
     }
 
@@ -268,7 +277,7 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
     }
 
     public void done() {
-        final TileCraftingUnit core = this.getCore();
+        final ICraftingCPUTileEntity core = this.getCore();
         if (core == null) {
             return;
         }
@@ -290,7 +299,7 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
 
     public void updateName() {
         this.myName = null;
-        for (TileCraftingUnit tile : this.blockEntities) {
+        for (ICraftingCPUTileEntity tile : this.blockEntities) {
             if (tile.hasCustomName()) {
                 var customName = tile.getCustomName();
                 if (this.myName == null) {
@@ -306,12 +315,12 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
 
     @Nullable
     public World getLevel() {
-        TileCraftingUnit core = this.getCore();
+        ICraftingCPUTileEntity core = this.getCore();
         return core == null ? null : core.getWorld();
     }
 
     public void breakCluster() {
-        final TileCraftingUnit tile = this.getCore();
+        final ICraftingCPUTileEntity tile = this.getCore();
         if (tile != null) {
             tile.breakCluster();
         }

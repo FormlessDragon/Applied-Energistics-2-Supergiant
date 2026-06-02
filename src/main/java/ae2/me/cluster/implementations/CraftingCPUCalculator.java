@@ -21,16 +21,16 @@ package ae2.me.cluster.implementations;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.events.GridCraftingCpuChange;
 import ae2.me.cluster.MBCalculator;
-import ae2.tile.crafting.TileCraftingUnit;
+import ae2.tile.crafting.ICraftingCPUTileEntity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
 import java.util.Iterator;
 
-public class CraftingCPUCalculator extends MBCalculator<TileCraftingUnit, CraftingCPUCluster> {
+public class CraftingCPUCalculator extends MBCalculator<ICraftingCPUTileEntity, CraftingCPUCluster> {
 
-    public CraftingCPUCalculator(TileCraftingUnit t) {
+    public CraftingCPUCalculator(ICraftingCPUTileEntity t) {
         super(t);
     }
 
@@ -57,7 +57,7 @@ public class CraftingCPUCalculator extends MBCalculator<TileCraftingUnit, Crafti
         boolean storage = false;
 
         for (BlockPos blockPos : BlockPos.getAllInBox(min, max)) {
-            if (!(world.getTileEntity(blockPos) instanceof TileCraftingUnit craftingTile)) {
+            if (!(world.getTileEntity(blockPos) instanceof ICraftingCPUTileEntity craftingTile)) {
                 return false;
             }
 
@@ -70,14 +70,16 @@ public class CraftingCPUCalculator extends MBCalculator<TileCraftingUnit, Crafti
     @Override
     public void updateBlockEntities(CraftingCPUCluster c, World world, BlockPos min, BlockPos max) {
         for (BlockPos blockPos : BlockPos.getAllInBox(min, max)) {
-            final TileCraftingUnit tile = (TileCraftingUnit) world.getTileEntity(blockPos);
-            tile.updateStatus(c);
-            c.addTileEntity(tile);
+            var t = world.getTileEntity(blockPos);
+            if (t instanceof ICraftingCPUTileEntity tile) {
+                tile.updateStatus(c);
+                c.addTileEntity(tile);
+            }
         }
 
         c.done();
 
-        final Iterator<TileCraftingUnit> i = c.getBlockEntities();
+        final Iterator<ICraftingCPUTileEntity> i = c.getCraftingBlockEntities();
         while (i.hasNext()) {
             var tile = i.next();
             var node = tile.getGridNode();
@@ -91,6 +93,6 @@ public class CraftingCPUCalculator extends MBCalculator<TileCraftingUnit, Crafti
 
     @Override
     public boolean isValidBlockEntity(TileEntity te) {
-        return te instanceof TileCraftingUnit;
+        return te instanceof ICraftingCPUTileEntity;
     }
 }

@@ -3,10 +3,10 @@
   "textures": {
     "particle": "ae2:block/crafting/accelerator",
     "north": "ae2:block/crafting/accelerator",
-    "east": "ae2:block/crafting/unit",
-    "south": "ae2:block/crafting/unit",
-    "west": "ae2:block/crafting/unit",
-    "up": "ae2:block/crafting/unit",
-    "down": "ae2:block/crafting/unit"
+    "east": "ae2:block/crafting/accelerator",
+    "south": "ae2:block/crafting/accelerator",
+    "west": "ae2:block/crafting/accelerator",
+    "up": "ae2:block/crafting/accelerator",
+    "down": "ae2:block/crafting/accelerator"
   }
 }

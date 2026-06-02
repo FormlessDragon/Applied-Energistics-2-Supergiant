@@ -35,11 +35,10 @@ import ae2.core.network.clientbound.CraftingStatusPacket;
 import ae2.core.network.clientbound.CraftingSupplierLocationsPacket;
 import ae2.crafting.execution.CraftingSupplierLocation;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
-import ae2.tile.crafting.TileCraftingUnit;
+import ae2.tile.crafting.ICraftingCPUTileEntity;
 import ae2.util.NullConfigManager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
 
@@ -63,18 +62,10 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
     public boolean cantStoreItems = false;
     @Nullable
     private CraftingCPUCluster cpu;
-    @Nullable
-    private ITextComponent initialTitle;
     private boolean cachedSuspend;
 
-    public ContainerCraftingCPU(InventoryPlayer ip, TileCraftingUnit host) {
+    public ContainerCraftingCPU(InventoryPlayer ip, ICraftingCPUTileEntity host) {
         this(ip, (Object) host);
-    }
-
-    public ContainerCraftingCPU(InventoryPlayer ip, TileCraftingUnit host,
-                                @Nullable ITextComponent initialTitle) {
-        this(ip, host);
-        setInitialTitle(initialTitle);
     }
 
     protected ContainerCraftingCPU(InventoryPlayer ip, Object host) {
@@ -83,7 +74,7 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
         this.configHost = host instanceof IConfigurableObject ? (IConfigurableObject) host : null;
         this.grid = extractGrid(host);
 
-        if (host instanceof TileCraftingUnit craftingUnit) {
+        if (host instanceof ICraftingCPUTileEntity craftingUnit) {
             this.setCPU(craftingUnit.getCluster());
         }
 
@@ -97,7 +88,7 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
 
     @Nullable
     private static IGrid extractGrid(Object host) {
-        if (host instanceof TileCraftingUnit craftingUnit) {
+        if (host instanceof ICraftingCPUTileEntity craftingUnit) {
             ae2.api.networking.IManagedGridNode node = craftingUnit.getMainNode();
             return node != null ? node.getGrid() : null;
         }
@@ -108,17 +99,6 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
         }
 
         return null;
-    }
-
-    @Nullable
-    public ITextComponent getInitialTitle() {
-        return this.initialTitle;
-    }
-
-    public void setInitialTitle(@Nullable ITextComponent title) {
-        if (isClientSide()) {
-            this.initialTitle = title != null ? title : new TextComponentString("");
-        }
     }
 
     protected void setCPU(@Nullable ICraftingCPU cpu) {

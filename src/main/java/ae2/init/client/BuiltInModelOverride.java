@@ -86,6 +86,7 @@ public final class BuiltInModelOverride {
 
         putCraftingModel(bakedModels, "unit", CraftingUnitType.UNIT, textureGetter);
         putCraftingModel(bakedModels, "accelerator", CraftingUnitType.ACCELERATOR, textureGetter);
+        putCraftingModel(bakedModels, "accelerator_4x", CraftingUnitType.ACCELERATOR_4X, textureGetter);
         putCraftingModel(bakedModels, "storage_1k", CraftingUnitType.STORAGE_1K, textureGetter);
         putCraftingModel(bakedModels, "storage_4k", CraftingUnitType.STORAGE_4K, textureGetter);
         putCraftingModel(bakedModels, "storage_16k", CraftingUnitType.STORAGE_16K, textureGetter);

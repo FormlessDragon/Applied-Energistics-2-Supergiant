@@ -23,7 +23,8 @@ import net.minecraft.item.Item;
 
 public enum CraftingUnitType implements ICraftingUnitType {
     UNIT(0),
-    ACCELERATOR(0),
+    ACCELERATOR(0, 1),
+    ACCELERATOR_4X(0, 4),
     STORAGE_1K(1),
     STORAGE_4K(4),
     STORAGE_16K(16),
@@ -32,9 +33,15 @@ public enum CraftingUnitType implements ICraftingUnitType {
     MONITOR(0);
 
     private final int storageKb;
+    private final int accelerator;
 
     CraftingUnitType(int storageKb) {
+        this(storageKb, 0);
+    }
+
+    CraftingUnitType(int storageKb, int accelerator) {
         this.storageKb = storageKb;
+        this.accelerator = accelerator;
     }
 
     @Override
@@ -44,7 +51,7 @@ public enum CraftingUnitType implements ICraftingUnitType {
 
     @Override
     public int getAcceleratorThreads() {
-        return this == ACCELERATOR ? 1 : 0;
+        return accelerator;
     }
 
     @Override
@@ -52,6 +59,7 @@ public enum CraftingUnitType implements ICraftingUnitType {
         return switch (this) {
             case UNIT -> AEBlocks.CRAFTING_UNIT.item();
             case ACCELERATOR -> AEBlocks.CRAFTING_ACCELERATOR.item();
+            case ACCELERATOR_4X -> AEBlocks.CRAFTING_ACCELERATOR_4X.item();
             case STORAGE_1K -> AEBlocks.CRAFTING_STORAGE_1K.item();
             case STORAGE_4K -> AEBlocks.CRAFTING_STORAGE_4K.item();
             case STORAGE_16K -> AEBlocks.CRAFTING_STORAGE_16K.item();
@@ -61,4 +69,3 @@ public enum CraftingUnitType implements ICraftingUnitType {
         };
     }
 }
-

@@ -373,6 +373,10 @@ public final class AEBlocks {
         AppEng.makeId("crafting_accelerator"),
         new CraftingUnitBlock(CraftingUnitType.ACCELERATOR),
         CraftingBlockItem::new);
+    public static final BlockDefinition<CraftingUnitBlock> CRAFTING_ACCELERATOR_4X = new BlockDefinition<>(
+        AEBlockIds.CRAFTING_ACCELERATOR_4X,
+        new CraftingUnitBlock(CraftingUnitType.ACCELERATOR_4X),
+        CraftingBlockItem::new);
     public static final BlockDefinition<CraftingUnitBlock> CRAFTING_STORAGE_1K = new BlockDefinition<>(
         AppEng.makeId("1k_crafting_storage"),
         new CraftingUnitBlock(CraftingUnitType.STORAGE_1K),
@@ -590,6 +594,7 @@ public final class AEBlocks {
         REQUESTER,
         CRAFTING_UNIT,
         CRAFTING_ACCELERATOR,
+        CRAFTING_ACCELERATOR_4X,
         CRAFTING_STORAGE_1K,
         CRAFTING_STORAGE_4K,
         CRAFTING_STORAGE_16K,

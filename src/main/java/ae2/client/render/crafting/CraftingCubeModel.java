@@ -41,6 +41,7 @@ public class CraftingCubeModel implements IModel {
     private static final ResourceLocation UNIT_BASE = texture("unit_base");
     private static final ResourceLocation LIGHT_BASE = texture("light_base");
     private static final ResourceLocation ACCELERATOR_LIGHT = texture("accelerator_light");
+    private static final ResourceLocation ACCELERATOR_4X_LIGHT = texture("accelerator_4x_light");
     private static final ResourceLocation STORAGE_1K_LIGHT = texture("1k_storage_light");
     private static final ResourceLocation STORAGE_4K_LIGHT = texture("4k_storage_light");
     private static final ResourceLocation STORAGE_16K_LIGHT = texture("16k_storage_light");
@@ -61,6 +62,7 @@ public class CraftingCubeModel implements IModel {
                                                       CraftingUnitType type) {
         return switch (type) {
             case ACCELERATOR -> textureGetter.apply(ACCELERATOR_LIGHT);
+            case ACCELERATOR_4X -> textureGetter.apply(ACCELERATOR_4X_LIGHT);
             case STORAGE_1K -> textureGetter.apply(STORAGE_1K_LIGHT);
             case STORAGE_4K -> textureGetter.apply(STORAGE_4K_LIGHT);
             case STORAGE_16K -> textureGetter.apply(STORAGE_16K_LIGHT);
@@ -81,8 +83,9 @@ public class CraftingCubeModel implements IModel {
     @Override
     public Collection<ResourceLocation> getTextures() {
         return ImmutableList.of(RING_CORNER, RING_SIDE_HOR, RING_SIDE_VER, UNIT_BASE, LIGHT_BASE,
-            ACCELERATOR_LIGHT, STORAGE_1K_LIGHT, STORAGE_4K_LIGHT, STORAGE_16K_LIGHT, STORAGE_64K_LIGHT,
-            STORAGE_256K_LIGHT, MONITOR_BASE, MONITOR_LIGHT_DARK, MONITOR_LIGHT_MEDIUM, MONITOR_LIGHT_BRIGHT);
+            ACCELERATOR_LIGHT, ACCELERATOR_4X_LIGHT, STORAGE_1K_LIGHT, STORAGE_4K_LIGHT, STORAGE_16K_LIGHT,
+            STORAGE_64K_LIGHT, STORAGE_256K_LIGHT, MONITOR_BASE, MONITOR_LIGHT_DARK, MONITOR_LIGHT_MEDIUM,
+            MONITOR_LIGHT_BRIGHT);
     }
 
     @Override
@@ -95,7 +98,7 @@ public class CraftingCubeModel implements IModel {
         return switch (this.type) {
             case UNIT -> new UnitBakedModel(format, ringCorner, ringSideHor, ringSideVer,
                 bakedTextureGetter.apply(UNIT_BASE));
-            case ACCELERATOR, STORAGE_1K, STORAGE_4K, STORAGE_16K, STORAGE_64K, STORAGE_256K ->
+            case ACCELERATOR, ACCELERATOR_4X, STORAGE_1K, STORAGE_4K, STORAGE_16K, STORAGE_64K, STORAGE_256K ->
                 new LightBakedModel(format, ringCorner, ringSideHor, ringSideVer,
                     bakedTextureGetter.apply(LIGHT_BASE), getLightTexture(bakedTextureGetter, this.type));
             case MONITOR -> new MonitorBakedModel(format, ringCorner, ringSideHor, ringSideVer,
