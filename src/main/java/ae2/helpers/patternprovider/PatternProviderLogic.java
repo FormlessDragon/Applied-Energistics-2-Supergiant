@@ -408,7 +408,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         }
 
         this.pendingMergePush = null;
-        PushTargetSet targetSet = collectPushTargets(basePatternDetails);
+        PushTargetSet targetSet = collectPushTargets();
         if (targetSet == null) {
             return false;
         }
@@ -454,7 +454,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             return 0;
         }
 
-        PushTargetSet targetSet = collectPushTargets(basePatternDetails);
+        PushTargetSet targetSet = collectPushTargets();
         if (targetSet == null) {
             return 0;
         }
@@ -494,6 +494,9 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             || !this.pendingSendList.isEmpty() || getCraftingLockedReason() != LockCraftingMode.NONE) {
             return false;
         }
+        if (this.configManager.getSetting(Settings.LOCK_CRAFTING_MODE) == LockCraftingMode.LOCK_UNTIL_RESULT) {
+            return false;
+        }
         if (!shouldBypassBlockingFor(patternDetails)
             && this.configManager.getSetting(Settings.BLOCKING_MODE) != BlockingMode.NO) {
             return false;
@@ -502,7 +505,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     }
 
     @Nullable
-    private PushTargetSet collectPushTargets(IPatternDetails patternDetails) {
+    private PushTargetSet collectPushTargets() {
         ObjectList<MachinePushTarget> machineTargets = new ObjectArrayList<>();
         ObjectList<ExternalTarget> externalTargets = new ObjectArrayList<>();
         TileEntity blockEntity = this.host.getTileEntity();
@@ -738,7 +741,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     }
 
     private boolean shouldUseSinglePushForPreferEmpty(IPatternDetails patternDetails) {
-        PushTargetSet targetSet = collectPushTargets(patternDetails);
+        PushTargetSet targetSet = collectPushTargets();
         if (targetSet == null || !patternDetails.supportsPushInputsToExternalInventory()) {
             return false;
         }
@@ -762,7 +765,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     }
 
     private boolean shouldUseSinglePushForPartialExternalTarget(IPatternDetails patternDetails) {
-        PushTargetSet targetSet = collectPushTargets(patternDetails);
+        PushTargetSet targetSet = collectPushTargets();
         if (targetSet == null || !patternDetails.supportsPushInputsToExternalInventory()
             || !targetSet.machineTargets.isEmpty()) {
             return false;
@@ -988,11 +991,6 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         this.upgrades.clear();
         this.pendingSendList.clear();
         this.returnInv.clear();
-    }
-
-    void testSetPatterns(List<IPatternDetails> patterns) {
-        this.patterns.clear();
-        this.patterns.addAll(patterns);
     }
 
     public PatternProviderReturnInventory getReturnInv() {

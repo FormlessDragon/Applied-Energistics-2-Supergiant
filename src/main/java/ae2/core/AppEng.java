@@ -43,7 +43,11 @@ public interface AppEng {
     }
 
     static ResourceLocation makeId(String path) {
-        return new ResourceLocation(MOD_ID, path);
+        return makeId(MOD_ID, path);
+    }
+
+    static ResourceLocation makeId(String name, String path) {
+        return new ResourceLocation(name, path);
     }
 
     /**
