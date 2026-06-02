@@ -20,7 +20,6 @@ package ae2.core.definitions;
 
 import ae2.api.ids.AEBlockIds;
 import ae2.core.AppEng;
-import ae2.core.Tags;
 import ae2.debug.TileCubeGenerator;
 import ae2.debug.TileEnergyGenerator;
 import ae2.debug.TileItemGen;
@@ -61,9 +60,7 @@ import ae2.tile.storage.TileIOPort;
 import ae2.tile.storage.TileMEChest;
 import ae2.tile.storage.TileSkyChest;
 import ae2.tile.storage.TileSkyStoneTank;
-import net.minecraftforge.fml.common.registry.GameRegistry;
 
-@SuppressWarnings("deprecation")
 public final class AEBlockEntities {
 
     public static final TileDefinition<TileCableBus> CABLE_BUS = new TileDefinition<>(AppEng.makeId("cable_bus"),
@@ -89,6 +86,62 @@ public final class AEBlockEntities {
         AEBlockIds.DEBUG_CUBE_GEN, TileCubeGenerator.class);
     public static final TileDefinition<TilePhantomNode> DEBUG_PHANTOM_NODE = new TileDefinition<>(
         AEBlockIds.DEBUG_PHANTOM_NODE, TilePhantomNode.class);
+    public static final TileDefinition<TileController> CONTROLLER = new TileDefinition<>(
+        AppEng.makeId("controller"), TileController.class);
+    public static final TileDefinition<TileCreativeEnergyCell> CREATIVE_ENERGY_CELL = new TileDefinition<>(
+        AppEng.makeId("creative_energy_cell"), TileCreativeEnergyCell.class);
+    public static final TileDefinition<TileCrystalResonanceGenerator> CRYSTAL_RESONANCE_GENERATOR =
+        new TileDefinition<>(AppEng.makeId("crystal_resonance_generator"), TileCrystalResonanceGenerator.class);
+    public static final TileDefinition<TileEnergyAcceptor> ENERGY_ACCEPTOR = new TileDefinition<>(
+        AppEng.makeId("energy_acceptor"), TileEnergyAcceptor.class);
+    public static final TileDefinition<TileEnergyCell> ENERGY_CELL = new TileDefinition<>(
+        AppEng.makeId("energy_cell"), TileEnergyCell.class);
+    public static final TileDefinition<TileWirelessAccessPoint> WIRELESS_ACCESS_POINT = new TileDefinition<>(
+        AppEng.makeId("wireless_access_point"), TileWirelessAccessPoint.class);
+    public static final TileDefinition<TileMEChest> ME_CHEST = new TileDefinition<>(AppEng.makeId("chest"),
+        TileMEChest.class);
+    public static final TileDefinition<TileDrive> DRIVE = new TileDefinition<>(AppEng.makeId("drive"),
+        TileDrive.class);
+    public static final TileDefinition<TileCellWorkbench> CELL_WORKBENCH = new TileDefinition<>(
+        AppEng.makeId("cell_workbench"), TileCellWorkbench.class);
+    public static final TileDefinition<TileCondenser> CONDENSER = new TileDefinition<>(AppEng.makeId("condenser"),
+        TileCondenser.class);
+    public static final TileDefinition<TileCharger> CHARGER = new TileDefinition<>(AppEng.makeId("charger"),
+        TileCharger.class);
+    public static final TileDefinition<TileGrowthAccelerator> GROWTH_ACCELERATOR = new TileDefinition<>(
+        AppEng.makeId("growth_accelerator"), TileGrowthAccelerator.class);
+    public static final TileDefinition<TileInscriber> INSCRIBER = new TileDefinition<>(AppEng.makeId("inscriber"),
+        TileInscriber.class);
+    public static final TileDefinition<TileCrystalAssembler> CRYSTAL_ASSEMBLER = new TileDefinition<>(
+        AppEng.makeId("crystal_assembler"), TileCrystalAssembler.class);
+    public static final TileDefinition<TileCrystalFixer> CRYSTAL_FIXER = new TileDefinition<>(
+        AppEng.makeId("crystal_fixer"), TileCrystalFixer.class);
+    public static final TileDefinition<TileIngredientBuffer> INGREDIENT_BUFFER = new TileDefinition<>(
+        AppEng.makeId("ingredient_buffer"), TileIngredientBuffer.class);
+    public static final TileDefinition<TileCaner> CANER = new TileDefinition<>(AppEng.makeId("caner"),
+        TileCaner.class);
+    public static final TileDefinition<TilePatternProvider> PATTERN_PROVIDER = new TileDefinition<>(
+        AppEng.makeId("pattern_provider"), TilePatternProvider.class);
+    public static final TileDefinition<TileRequester> REQUESTER = new TileDefinition<>(AppEng.makeId("requester"),
+        TileRequester.class);
+    public static final TileDefinition<TileCraftingUnit> CRAFTING_UNIT = new TileDefinition<>(
+        AppEng.makeId("crafting_unit"), TileCraftingUnit.class);
+    public static final TileDefinition<TileCraftingMonitor> CRAFTING_MONITOR = new TileDefinition<>(
+        AppEng.makeId("crafting_monitor"), TileCraftingMonitor.class);
+    public static final TileDefinition<TileMolecularAssembler> MOLECULAR_ASSEMBLER = new TileDefinition<>(
+        AppEng.makeId("molecular_assembler"), TileMolecularAssembler.class);
+    public static final TileDefinition<TileInterface> INTERFACE = new TileDefinition<>(AppEng.makeId("interface"),
+        TileInterface.class);
+    public static final TileDefinition<TileIOPort> IO_PORT = new TileDefinition<>(AppEng.makeId("io_port"),
+        TileIOPort.class);
+    public static final TileDefinition<TileSpatialPylon> SPATIAL_PYLON = new TileDefinition<>(
+        AppEng.makeId("spatial_pylon"), TileSpatialPylon.class);
+    public static final TileDefinition<TileSpatialIOPort> SPATIAL_IO_PORT = new TileDefinition<>(
+        AppEng.makeId("spatial_io_port"), TileSpatialIOPort.class);
+    public static final TileDefinition<TileSpatialAnchor> SPATIAL_ANCHOR = new TileDefinition<>(
+        AppEng.makeId("spatial_anchor"), TileSpatialAnchor.class);
+    public static final TileDefinition<TilePaint> PAINT = new TileDefinition<>(AppEng.makeId("paint"),
+        TilePaint.class);
 
     private AEBlockEntities() {
     }
@@ -106,35 +159,33 @@ public final class AEBlockEntities {
         DEBUG_ITEM_GEN.register();
         DEBUG_CUBE_GEN.register();
         DEBUG_PHANTOM_NODE.register();
-        GameRegistry.registerTileEntity(TileController.class, Tags.MOD_ID + ":controller");
-        GameRegistry.registerTileEntity(TileCreativeEnergyCell.class, Tags.MOD_ID + ":creative_energy_cell");
-        GameRegistry.registerTileEntity(TileCrystalResonanceGenerator.class,
-            Tags.MOD_ID + ":crystal_resonance_generator");
-        GameRegistry.registerTileEntity(TileEnergyAcceptor.class, Tags.MOD_ID + ":energy_acceptor");
-        GameRegistry.registerTileEntity(TileEnergyCell.class, Tags.MOD_ID + ":energy_cell");
-        GameRegistry.registerTileEntity(TileWirelessAccessPoint.class, Tags.MOD_ID + ":wireless_access_point");
-        GameRegistry.registerTileEntity(TileMEChest.class, Tags.MOD_ID + ":chest");
-        GameRegistry.registerTileEntity(TileDrive.class, Tags.MOD_ID + ":drive");
-        GameRegistry.registerTileEntity(TileCellWorkbench.class, Tags.MOD_ID + ":cell_workbench");
-        GameRegistry.registerTileEntity(TileCondenser.class, Tags.MOD_ID + ":condenser");
-
-        GameRegistry.registerTileEntity(TileCharger.class, Tags.MOD_ID + ":charger");
-        GameRegistry.registerTileEntity(TileGrowthAccelerator.class, Tags.MOD_ID + ":growth_accelerator");
-        GameRegistry.registerTileEntity(TileInscriber.class, Tags.MOD_ID + ":inscriber");
-        GameRegistry.registerTileEntity(TileCrystalAssembler.class, Tags.MOD_ID + ":crystal_assembler");
-        GameRegistry.registerTileEntity(TileCrystalFixer.class, Tags.MOD_ID + ":crystal_fixer");
-        GameRegistry.registerTileEntity(TileIngredientBuffer.class, Tags.MOD_ID + ":ingredient_buffer");
-        GameRegistry.registerTileEntity(TileCaner.class, Tags.MOD_ID + ":caner");
-        GameRegistry.registerTileEntity(TilePatternProvider.class, Tags.MOD_ID + ":pattern_provider");
-        GameRegistry.registerTileEntity(TileRequester.class, Tags.MOD_ID + ":requester");
-        GameRegistry.registerTileEntity(TileCraftingUnit.class, Tags.MOD_ID + ":crafting_unit");
-        GameRegistry.registerTileEntity(TileCraftingMonitor.class, Tags.MOD_ID + ":crafting_monitor");
-        GameRegistry.registerTileEntity(TileMolecularAssembler.class, Tags.MOD_ID + ":molecular_assembler");
-        GameRegistry.registerTileEntity(TileInterface.class, Tags.MOD_ID + ":interface");
-        GameRegistry.registerTileEntity(TileIOPort.class, Tags.MOD_ID + ":io_port");
-        GameRegistry.registerTileEntity(TileSpatialPylon.class, Tags.MOD_ID + ":spatial_pylon");
-        GameRegistry.registerTileEntity(TileSpatialIOPort.class, Tags.MOD_ID + ":spatial_io_port");
-        GameRegistry.registerTileEntity(TileSpatialAnchor.class, Tags.MOD_ID + ":spatial_anchor");
-        GameRegistry.registerTileEntity(TilePaint.class, Tags.MOD_ID + ":paint");
+        CONTROLLER.register();
+        CREATIVE_ENERGY_CELL.register();
+        CRYSTAL_RESONANCE_GENERATOR.register();
+        ENERGY_ACCEPTOR.register();
+        ENERGY_CELL.register();
+        WIRELESS_ACCESS_POINT.register();
+        ME_CHEST.register();
+        DRIVE.register();
+        CELL_WORKBENCH.register();
+        CONDENSER.register();
+        CHARGER.register();
+        GROWTH_ACCELERATOR.register();
+        INSCRIBER.register();
+        CRYSTAL_ASSEMBLER.register();
+        CRYSTAL_FIXER.register();
+        INGREDIENT_BUFFER.register();
+        CANER.register();
+        PATTERN_PROVIDER.register();
+        REQUESTER.register();
+        CRAFTING_UNIT.register();
+        CRAFTING_MONITOR.register();
+        MOLECULAR_ASSEMBLER.register();
+        INTERFACE.register();
+        IO_PORT.register();
+        SPATIAL_PYLON.register();
+        SPATIAL_IO_PORT.register();
+        SPATIAL_ANCHOR.register();
+        PAINT.register();
     }
 }

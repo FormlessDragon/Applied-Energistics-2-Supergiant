@@ -1,9 +1,9 @@
 package ae2.client.gui.implementations;
 
 import ae2.client.gui.me.requester.AbstractGuiRequester;
+import ae2.client.gui.me.requester.ClientRequester;
 import ae2.client.gui.style.GuiStyle;
 import ae2.container.implementations.ContainerRequester;
-import ae2.requester.abstraction.RequesterReference;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
@@ -17,7 +17,7 @@ public class GuiRequester extends AbstractGuiRequester<ContainerRequester> {
     private static final int MAX_ROW_COUNT = 5;
 
     private long requesterId;
-    private @Nullable RequesterReference requesterReference;
+    private @Nullable ClientRequester requesterReference;
 
     public GuiRequester(ContainerRequester container, InventoryPlayer playerInventory, ITextComponent title,
                         GuiStyle style) {
@@ -39,10 +39,10 @@ public class GuiRequester extends AbstractGuiRequester<ContainerRequester> {
     protected void refreshList() {
         this.lines.clear();
 
-        RequesterReference requester = findById(this.requesterId);
+        ClientRequester requester = findById(this.requesterId);
         if (requester != null) {
-            for (int i = 0; i < requester.getRequestManager().size(); i++) {
-                this.lines.add(requester.getRequestManager().get(i));
+            for (int i = 0; i < requester.getRequests().size(); i++) {
+                this.lines.add(requester.getRequests().get(i));
             }
         }
 
@@ -52,15 +52,15 @@ public class GuiRequester extends AbstractGuiRequester<ContainerRequester> {
 
     @Override
     protected Collection<?> getByName(String name) {
-        RequesterReference requester = findById(this.requesterId);
+        ClientRequester requester = findById(this.requesterId);
         return requester == null ? Collections.emptyList() : Collections.singleton(requester);
     }
 
     @Override
-    protected RequesterReference getById(long requesterId, @Nullable ITextComponent name, long sortValue,
+    protected ClientRequester getById(long requesterId, @Nullable ITextComponent name, long sortValue,
                                          int requestCount) {
-        if (this.requesterReference == null || this.requesterReference.getRequestManager().size() != requestCount) {
-            this.requesterReference = new RequesterReference(requesterId, name, sortValue, requestCount);
+        if (this.requesterReference == null || this.requesterReference.getRequests().size() != requestCount) {
+            this.requesterReference = new ClientRequester(requesterId, name, sortValue, requestCount);
         } else {
             this.requesterReference.update(name, sortValue);
         }
@@ -69,7 +69,7 @@ public class GuiRequester extends AbstractGuiRequester<ContainerRequester> {
 
     @Nullable
     @Override
-    protected RequesterReference findById(long requesterId) {
+    protected ClientRequester findById(long requesterId) {
         return this.requesterReference != null && this.requesterReference.getRequesterId() == requesterId
             ? this.requesterReference
             : null;

@@ -144,8 +144,7 @@ public class RestrictedInputSlot extends AppEngSlot {
 
     @Override
     public ItemStack getDisplayStack() {
-        if (isRemote() && (this.type == PlacableItemType.ENCODED_PATTERN
-            || this.type == PlacableItemType.PROVIDER_PATTERN)) {
+        if (isRemote() && isEncodedPatternDisplaySlot()) {
             ItemStack stack = super.getDisplayStack();
             if (!stack.isEmpty() && stack.getItem() instanceof EncodedPatternItem<?> encodedPatternItem
                 && getContainer() != null) {
@@ -156,6 +155,12 @@ public class RestrictedInputSlot extends AppEngSlot {
             }
         }
         return super.getDisplayStack();
+    }
+
+    private boolean isEncodedPatternDisplaySlot() {
+        return this.type == PlacableItemType.ENCODED_PATTERN
+            || this.type == PlacableItemType.PROVIDER_PATTERN
+            || this.type == PlacableItemType.MOLECULAR_ASSEMBLER_PATTERN;
     }
 
     @SuppressWarnings("unused")

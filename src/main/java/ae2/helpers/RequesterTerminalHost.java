@@ -1,9 +1,10 @@
-package ae2.api.storage;
+package ae2.helpers;
 
 import ae2.api.networking.IGridNode;
+import ae2.api.storage.ILinkStatus;
 import org.jetbrains.annotations.Nullable;
 
-public interface IRequesterTermContainerHost {
+public interface RequesterTerminalHost {
     @Nullable
     IGridNode getGridNode();
 

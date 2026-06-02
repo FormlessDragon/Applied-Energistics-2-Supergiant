@@ -49,9 +49,11 @@ public class TileCellWorkbench extends AEBaseTile
     private IUpgradeInventory cacheUpgrades;
     @Nullable
     private ConfigInventory cacheConfig;
-    private boolean locked;    private final ConfigInventory config = ConfigInventory.configTypes(63)
+    private boolean locked;
+    private final ConfigInventory config = ConfigInventory.configTypes(63)
                                                           .changeListener(this::configChanged)
                                                           .build();
+
     public TileCellWorkbench() {
         this.manager.registerSetting(Settings.COPY_MODE, CopyMode.CLEAR_ON_REMOVE);
         this.cell.setEnableClientEvents(true);

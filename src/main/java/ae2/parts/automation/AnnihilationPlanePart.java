@@ -86,24 +86,18 @@ public class AnnihilationPlanePart extends UpgradeablePart implements IGridTicka
     private final PlaneConnectionHelper connectionHelper = new PlaneConnectionHelper(this);
     @Nullable
     protected List<PickupStrategy> pickupStrategies;
-    private IPartitionList filter;    private final ConfigInventory config = ConfigInventory.configTypes(63)
+    private IPartitionList filter;
+    private Object2IntMap<Enchantment> enchantments = new Object2IntLinkedOpenHashMap<>();
+    private final ConfigInventory config = ConfigInventory.configTypes(63)
                                                           .supportedTypes(AEKeyType.items(), AEKeyType.fluids())
                                                           .changeListener(this::updateFilter)
                                                           .build();
-    private Object2IntMap<Enchantment> enchantments = new Object2IntLinkedOpenHashMap<>();
     private ContinuousGeneration continuousGeneration;
     private int continuousGenerationTicks;
     private IncludeExclude listMode = IncludeExclude.WHITELIST;
     public AnnihilationPlanePart(IPartItem<?> partItem) {
         super(partItem);
         getMainNode().addService(IGridTickable.class, this);
-    }
-
-    static boolean shouldInsertWithFilter(boolean hasFilterEntries, boolean matchesFilter, boolean inverted) {
-        if (!hasFilterEntries) {
-            return true;
-        }
-        return inverted != matchesFilter;
     }
 
     @PartModels
@@ -461,6 +455,4 @@ public class AnnihilationPlanePart extends UpgradeablePart implements IGridTicka
 
     private record ContinuousGeneration(AEKey what, long amount, int ticks) {
     }
-
-
 }

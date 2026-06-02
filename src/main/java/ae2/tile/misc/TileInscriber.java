@@ -82,11 +82,12 @@ public class TileInscriber extends AENetworkedPoweredTile
     private final AppEngInternalInventory topItemHandler = new AppEngInternalInventory(this, 1, 64, new BaseFilter());
     private final AppEngInternalInventory bottomItemHandler = new AppEngInternalInventory(this, 1, 64,
         new BaseFilter());
-    private final AppEngInternalInventory sideItemHandler = new AppEngInternalInventory(this, 2, 64, new BaseFilter());    private final ConfigManager configManager = new ConfigManager(this::onConfigChanged);
+    private final AppEngInternalInventory sideItemHandler = new AppEngInternalInventory(this, 2, 64, new BaseFilter());
     private final InternalInventory inv = new CombinedInternalInventory(this.topItemHandler, this.bottomItemHandler,
         this.sideItemHandler);
     private final InternalInventory topItemHandlerExtern = new FilteredInternalInventory(this.topItemHandler,
         new AutomationFilter());
+    private final ConfigManager configManager = new ConfigManager(this::onConfigChanged);
     private final InternalInventory bottomItemHandlerExtern = new FilteredInternalInventory(this.bottomItemHandler,
         new AutomationFilter());
     private final InternalInventory sideItemHandlerExtern = new FilteredInternalInventory(this.sideItemHandler,

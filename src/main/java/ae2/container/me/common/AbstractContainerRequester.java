@@ -9,16 +9,15 @@ import ae2.container.slot.RequestSlot;
 import ae2.core.AELog;
 import ae2.core.network.clientbound.RequesterSyncPacket;
 import ae2.helpers.InventoryAction;
-import ae2.requester.Request;
-import ae2.requester.RequestManager;
-import ae2.requester.abstraction.RequestTracker;
 import ae2.tile.crafting.TileRequester;
+import ae2.tile.crafting.requester.Request;
+import ae2.tile.crafting.requester.RequestList;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -30,9 +29,8 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
     public static final int REQUEST_SLOT_X = 27;
     public static final int REQUEST_SLOT_FIRST_Y = 21;
     public static final int REQUEST_SLOT_SPACING = 19;
-
-    private long idSerial = Long.MIN_VALUE;
     private final List<RequestSlot> requestSlots = new ArrayList<>(REQUEST_SLOT_COUNT);
+    private long idSerial = Long.MIN_VALUE;
 
     protected AbstractContainerRequester(InventoryPlayer playerInventory, Object host) {
         super(playerInventory, host);
@@ -56,8 +54,7 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
         return Collections.unmodifiableList(this.requestSlots);
     }
 
-    public final void updateRequestSlot(int row, boolean visible, long requesterId, int requestIndex, boolean locked,
-                                        ItemStack stack) {
+    public final void updateRequestSlot(int row, boolean visible, long requesterId, int requestIndex) {
         if (row < 0 || row >= this.requestSlots.size()) {
             return;
         }
@@ -70,7 +67,7 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
             return;
         }
 
-        RequestTracker tracker = getRequestTracker(requesterId);
+        RequesterServerView tracker = getRequestTracker(requesterId);
         if (tracker == null || requestIndex < 0 || requestIndex >= tracker.getServer().size()) {
             slot.clearRequest();
             slot.setSlotEnabled(false);
@@ -79,16 +76,17 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
         }
 
         slot.setRequester(requesterId, requestIndex);
-        slot.setLocked(locked);
-        slot.setStack(GenericStack.fromItemStack(stack));
+        Request request = tracker.getServer().get(requestIndex);
+        slot.setLocked(request.getClientStatus().locksRequest());
+        slot.setStack(request.getConfiguredStack());
         slot.setSlotEnabled(true);
         slot.setActive(true);
     }
 
     @Override
     public void doAction(EntityPlayerMP player, InventoryAction action, int slot, long id) {
-        RequestTracker inv = getRequestTracker(id);
-        if(inv == null) {
+        RequesterServerView inv = getRequestTracker(id);
+        if (inv == null) {
             return;
         }
 
@@ -99,6 +97,9 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
 
         Request request = inv.getServer().get(slot);
         var carried = getCarried();
+        if (request.getClientStatus().locksRequest()) {
+            return;
+        }
 
         switch (action) {
             case PICKUP_OR_SET_DOWN -> request.updateConfiguredStack(GenericStack.fromItemStack(carried));
@@ -136,7 +137,7 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
     }
 
     private void updateRequestFromSlot(RequestSlot slot) {
-        RequestTracker inv = getRequestTracker(slot.getRequesterId());
+        RequesterServerView inv = getRequestTracker(slot.getRequesterId());
         if (inv == null) {
             return;
         }
@@ -147,14 +148,26 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
             return;
         }
 
-        inv.getServer().get(requestIndex).updateConfiguredStack(slot.getConfiguredStack());
+        Request request = inv.getServer().get(requestIndex);
+        if (request.getClientStatus().locksRequest()) {
+            return;
+        }
+
+        request.updateConfiguredStack(slot.getConfiguredStack());
     }
 
     public void updateRequesterState(long requesterId, int requestIndex, boolean enabled, boolean forceStart) {
         var requestTracker = getRequestTracker(requesterId);
-        if (requestTracker == null) return;
-        if (requestIndex < 0 || requestIndex >= requestTracker.getServer().size()) return;
+        if (requestTracker == null) {
+            return;
+        }
+        if (requestIndex < 0 || requestIndex >= requestTracker.getServer().size()) {
+            return;
+        }
         var request = requestTracker.getServer().get(requestIndex);
+        if (request.getClientStatus().locksRequest() && (enabled || forceStart != request.isForceStart())) {
+            return;
+        }
         request.updateState(enabled, forceStart);
     }
 
@@ -167,21 +180,24 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
             return;
         }
         var request = requestTracker.getServer().get(requestIndex);
+        if (request.getClientStatus().locksRequest()) {
+            return;
+        }
         request.updateAmount(amount);
         request.updateBatchSize(batchSize);
     }
 
-    protected final RequestTracker createTracker(TileRequester requester) {
-        return new RequestTracker(requester, this.idSerial++);
+    protected final RequesterServerView createTracker(TileRequester requester) {
+        return new RequesterServerView(requester, this.idSerial++);
     }
 
     protected abstract void sendFullUpdate(@Nullable IGrid grid);
 
     protected abstract void sendPartialUpdate();
 
-    protected final void syncRequestTrackerFull(RequestTracker tracker) {
-        RequestManager server = tracker.getServer();
-        RequestManager client = tracker.getClient();
+    protected final void syncRequestTrackerFull(RequesterServerView tracker) {
+        RequestList server = tracker.getServer();
+        RequestList client = tracker.getClient();
         var rows = new Int2ObjectOpenHashMap<NBTTagCompound>(server.size());
         for (int i = 0; i < server.size(); i++) {
             NBTTagCompound serverData = server.get(i).writeToNBT();
@@ -193,9 +209,9 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
             server.size(), rows));
     }
 
-    protected final void syncRequestTrackerPartial(RequestTracker tracker) {
-        RequestManager server = tracker.getServer();
-        RequestManager client = tracker.getClient();
+    protected final void syncRequestTrackerPartial(RequesterServerView tracker) {
+        RequestList server = tracker.getServer();
+        RequestList client = tracker.getClient();
         var rows = new Int2ObjectOpenHashMap<NBTTagCompound>();
         for (int i = 0; i < server.size(); i++) {
             Request serverRequest = server.get(i);
@@ -213,5 +229,5 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
     }
 
     @Nullable
-    protected abstract RequestTracker getRequestTracker(long requesterId);
+    protected abstract RequesterServerView getRequestTracker(long requesterId);
 }

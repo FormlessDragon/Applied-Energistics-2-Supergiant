@@ -2,8 +2,8 @@ package ae2.container.implementations;
 
 import ae2.api.networking.IGrid;
 import ae2.container.me.common.AbstractContainerRequester;
+import ae2.container.me.common.RequesterServerView;
 import ae2.core.network.clientbound.RequesterSyncPacket;
-import ae2.requester.abstraction.RequestTracker;
 import ae2.tile.crafting.TileRequester;
 import net.minecraft.entity.player.InventoryPlayer;
 import org.jetbrains.annotations.Nullable;
@@ -12,13 +12,13 @@ public class ContainerRequester extends AbstractContainerRequester {
     private static final long REQUESTER_ID = 0;
 
     private final TileRequester requester;
-    private final RequestTracker requestTracker;
+    private final RequesterServerView requestTracker;
     private boolean sentFullUpdate;
 
     public ContainerRequester(InventoryPlayer playerInventory, TileRequester requester) {
         super(playerInventory, requester);
         this.requester = requester;
-        this.requestTracker = new RequestTracker(requester, REQUESTER_ID);
+        this.requestTracker = new RequesterServerView(requester, REQUESTER_ID);
 
         this.addRequestSlots();
         this.addPlayerInventorySlots(8, 131);
@@ -46,7 +46,7 @@ public class ContainerRequester extends AbstractContainerRequester {
 
     @Nullable
     @Override
-    protected RequestTracker getRequestTracker(long requesterId) {
+    protected RequesterServerView getRequestTracker(long requesterId) {
         return requesterId == this.requestTracker.getId() ? this.requestTracker : null;
     }
 

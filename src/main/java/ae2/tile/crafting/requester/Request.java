@@ -1,9 +1,7 @@
-package ae2.requester;
+package ae2.tile.crafting.requester;
 
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
-import ae2.requester.abstraction.RequesterReference;
-import ae2.requester.status.RequestStatus;
 import net.minecraft.nbt.NBTTagCompound;
 import org.jetbrains.annotations.Nullable;
 
@@ -18,9 +16,9 @@ public final class Request {
     @Nullable
     private final RequestHost host;
     private final int index;
-    @Nullable
-    private RequesterReference requesterReference;
+    private long requesterId;
     private int clientIndex;
+    private boolean hasRequesterLocation;
 
     private boolean enabled = true;
     private boolean forceStart = false;
@@ -40,16 +38,28 @@ public final class Request {
         this.clientIndex = index;
     }
 
+    private static RequestStatus readStatus(NBTTagCompound tag) {
+        if (!tag.hasKey(STATUS, 8)) {
+            return RequestStatus.IDLE;
+        }
+
+        try {
+            return RequestStatus.valueOf(tag.getString(STATUS));
+        } catch (IllegalArgumentException ignored) {
+            return RequestStatus.IDLE;
+        }
+    }
+
     public boolean isEnabled() {
         return this.enabled;
     }
 
-    public boolean isForceStart() {
-        return this.forceStart;
-    }
-
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public boolean isForceStart() {
+        return this.forceStart;
     }
 
     public void setForceStart(boolean forceStart) {
@@ -71,10 +81,6 @@ public final class Request {
 
     public @Nullable GenericStack getConfiguredStack() {
         return configuredStack;
-    }
-
-    public void setConfiguredStack(@Nullable GenericStack configuredStack) {
-        this.configuredStack = configuredStack;
     }
 
     public void updateConfiguredStack(@Nullable GenericStack stack) {
@@ -151,13 +157,18 @@ public final class Request {
         return this.clientIndex;
     }
 
-    public @Nullable RequesterReference getRequesterReference() {
-        return this.requesterReference;
+    public long getRequesterId() {
+        return this.requesterId;
     }
 
-    public void setRequesterReference(@Nullable RequesterReference requesterReference, int index) {
-        this.requesterReference = requesterReference;
+    public boolean hasRequesterLocation() {
+        return this.hasRequesterLocation;
+    }
+
+    public void setRequesterLocation(long requesterId, int index) {
+        this.requesterId = requesterId;
         this.clientIndex = index;
+        this.hasRequesterLocation = true;
     }
 
     private void resetConfiguredStack() {
@@ -210,17 +221,8 @@ public final class Request {
         amount = 0;
         batchSize = 1;
         clientStatus = RequestStatus.IDLE;
-    }
-
-    private static RequestStatus readStatus(NBTTagCompound tag) {
-        if (!tag.hasKey(STATUS, 8)) {
-            return RequestStatus.IDLE;
-        }
-
-        try {
-            return RequestStatus.valueOf(tag.getString(STATUS));
-        } catch (IllegalArgumentException ignored) {
-            return RequestStatus.IDLE;
-        }
+        requesterId = 0;
+        clientIndex = index;
+        hasRequesterLocation = false;
     }
 }

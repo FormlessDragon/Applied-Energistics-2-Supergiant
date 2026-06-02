@@ -105,10 +105,11 @@ public class StorageBusPart extends UpgradeablePart
     @Nullable
     private ITextComponent handlerDescription;
     @Nullable
-    private Map<AEKeyType, ExternalStorageStrategy> externalStorageStrategies;    private final ConfigInventory config = ConfigInventory.configTypes(63)
+    private Map<AEKeyType, ExternalStorageStrategy> externalStorageStrategies;
+    private boolean wasOnline;
+    private final ConfigInventory config = ConfigInventory.configTypes(63)
                                                           .changeListener(this::onConfigurationChanged)
                                                           .build();
-    private boolean wasOnline;
     private int priority;
     private PendingUpdateStatus updateStatus = PendingUpdateStatus.FAST_UPDATE;
     @Nullable

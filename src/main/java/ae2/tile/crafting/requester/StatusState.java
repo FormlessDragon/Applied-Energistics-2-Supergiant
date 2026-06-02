@@ -1,4 +1,4 @@
-package ae2.requester.status;
+package ae2.tile.crafting.requester;
 
 import ae2.api.networking.ticking.TickRateModulation;
 import ae2.tile.crafting.TileRequester;

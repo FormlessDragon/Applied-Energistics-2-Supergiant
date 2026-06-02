@@ -1091,7 +1091,7 @@ public class AEGuiHandler implements IGuiHandler {
             case WIRELESS_REQUESTER_TERMINAL -> {
                 ContainerRequesterTerm wirelessRequesterTerminalContainer =
                     createWirelessRequesterTerminalContainer(player, x, ID);
-                if(wirelessRequesterTerminalContainer != null) {
+                if (wirelessRequesterTerminalContainer != null) {
                     return new GuiRequesterTerm(wirelessRequesterTerminalContainer, player.inventory, null,
                         GuiStyleManager.loadStyleDoc("/screens/terminals/requester_terminal.json"));
                 }

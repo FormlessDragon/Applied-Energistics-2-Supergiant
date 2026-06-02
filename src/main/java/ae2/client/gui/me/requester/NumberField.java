@@ -1,10 +1,11 @@
-package ae2.client.gui.widgets;
+package ae2.client.gui.me.requester;
 
 import ae2.api.stacks.AEFluidKey;
 import ae2.api.stacks.AEKey;
 import ae2.client.gui.MathExpressionParser;
 import ae2.client.gui.NumberEntryType;
 import ae2.client.gui.style.GuiStyle;
+import ae2.client.gui.widgets.ConfirmableTextField;
 import ae2.core.localization.GuiText;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
@@ -57,7 +58,7 @@ public class NumberField extends ConfirmableTextField {
         this.setLongValue(0);
         this.setResponder(_ -> validate());
         this.setOnConfirm(() -> {
-            if(getLongValue().isPresent()) {
+            if (getLongValue().isPresent()) {
                 onConfirm.accept(getLongValue().getAsLong());
                 setFocused(false);
             }
@@ -67,7 +68,7 @@ public class NumberField extends ConfirmableTextField {
 
     public void renderWidget(FontRenderer font) {
         super.drawTextBox();
-        if(!isFluid) {
+        if (!isFluid) {
             return;
         }
         font.drawString("B", getX() + WIDTH - PADDING, getY(), 0x54_5454);
@@ -147,22 +148,22 @@ public class NumberField extends ConfirmableTextField {
     public void setTooltipMessage(List<ITextComponent> tooltipMessage) {
         tooltipMessage.addFirst(new TextComponentTranslation("gui.ae2.requester." + name));
         super.setTooltipMessage(tooltipMessage);
-        if(!isFocused() || (tooltipMessage.size() > 1 && !tooltipMessage.getFirst().getFormattedText().startsWith("="))) {
+        if (!isFocused() || (tooltipMessage.size() > 1 && !tooltipMessage.getFirst().getFormattedText().startsWith("="))) {
             return;
         }
         tooltipMessage.add(
-                new TextComponentString("» ")
-                        .setStyle(new Style().setColor(TextFormatting.AQUA))
-                        .appendSibling(
-                                new TextComponentTranslation("gui.ae2.requester.submit")
-                                        .setStyle(new Style().setColor(TextFormatting.GRAY))
-                        )
+            new TextComponentString("» ")
+                .setStyle(new Style().setColor(TextFormatting.AQUA))
+                .appendSibling(
+                    new TextComponentTranslation("gui.ae2.requester.submit")
+                        .setStyle(new Style().setColor(TextFormatting.GRAY))
+                )
         );
     }
 
     @Override
     public void setFocused(boolean isFocusedIn) {
-        if(isFocusedIn && !this.isEnabled()) {
+        if (isFocusedIn && !this.isEnabled()) {
             return;
         }
         super.setFocused(isFocusedIn);
@@ -171,7 +172,7 @@ public class NumberField extends ConfirmableTextField {
     void adjustToType(@Nullable AEKey key) {
         this.isFluid = key instanceof AEFluidKey;
         this.type = NumberEntryType.of(key);
-        if(isFluid) {
+        if (isFluid) {
             this.setMaxStringLength(5);
             resize(WIDTH - PADDING, HEIGHT);
         } else {

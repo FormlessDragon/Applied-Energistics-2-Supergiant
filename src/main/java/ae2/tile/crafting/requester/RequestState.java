@@ -1,9 +1,8 @@
-package ae2.requester.status;
+package ae2.tile.crafting.requester;
 
 import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.networking.ticking.TickRateModulation;
 import ae2.api.stacks.AEKey;
-import ae2.requester.Request;
 import ae2.tile.crafting.TileRequester;
 
 import java.util.concurrent.Future;
@@ -11,13 +10,13 @@ import java.util.concurrent.Future;
 public final class RequestState implements StatusState {
     @Override
     public StatusState handle(TileRequester host, int slot) {
-        Request request = host.getRequestManager().get(slot);
+        Request request = host.getRequests().get(slot);
         AEKey key = request.getKey();
         if (!request.isEnabled() || request.isEmpty() || key == null) {
             return IDLE;
         }
 
-        long amountToCraft = host.getStorageManager().computeAmountToCraft(slot, request);
+        long amountToCraft = host.getStorageTracker().computeAmountToCraft(slot, request);
         if (amountToCraft <= 0) {
             return IDLE;
         }

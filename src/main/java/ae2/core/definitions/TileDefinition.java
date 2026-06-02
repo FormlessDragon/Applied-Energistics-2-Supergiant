@@ -37,5 +37,5 @@ public record TileDefinition<T extends TileEntity>(ResourceLocation id, Class<T>
         var tile = level.getTileEntity(pos);
         return this.tileClass.isInstance(tile) ? this.tileClass.cast(tile) : null;
     }
-}
 
+}

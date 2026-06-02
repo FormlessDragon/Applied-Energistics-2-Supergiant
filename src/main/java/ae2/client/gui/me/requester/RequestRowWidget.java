@@ -1,12 +1,13 @@
-package ae2.client.gui.widgets;
+package ae2.client.gui.me.requester;
 
 import ae2.client.Point;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
+import ae2.client.gui.widgets.ToggleButton;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.RequesterUpdatePacket;
-import ae2.requester.Request;
+import ae2.tile.crafting.requester.Request;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiButton;
@@ -61,13 +62,13 @@ public final class RequestRowWidget {
         this.forceStartBtn = new ToggleButton(Icon.ENABLED, Icon.DISABLED, this::forceStartBtnChanged);
         this.forceStartBtn.setDisableBackground(true);
         this.forceStartBtn.setTooltipOn(List.of(
-                new TextComponentTranslation("gui.ae2.ForceStart"),
-                new TextComponentTranslation("gui.ae2.requester.ForceStartDetailOn")
-                        .setStyle(new Style().setColor(TextFormatting.GRAY))));
+            new TextComponentTranslation("gui.ae2.ForceStart"),
+            new TextComponentTranslation("gui.ae2.requester.ForceStartDetailOn")
+                .setStyle(new Style().setColor(TextFormatting.GRAY))));
         this.forceStartBtn.setTooltipOff(List.of(
-                new TextComponentTranslation("gui.ae2.ForceStart"),
-                new TextComponentTranslation("gui.ae2.requester.ForceStartDetailOff")
-                        .setStyle(new Style().setColor(TextFormatting.GRAY))));
+            new TextComponentTranslation("gui.ae2.ForceStart"),
+            new TextComponentTranslation("gui.ae2.requester.ForceStartDetailOff")
+                .setStyle(new Style().setColor(TextFormatting.GRAY))));
 
         this.buttons.add(this.enableBtn);
         this.buttons.add(this.forceStartBtn);
@@ -84,12 +85,16 @@ public final class RequestRowWidget {
 
         this.amountField.adjustToType(request.getKey());
         this.batchField.adjustToType(request.getKey());
-        if(status.locksRequest()) {
+        if (status.locksRequest()) {
             this.amountField.setEnabled(false);
             this.batchField.setEnabled(false);
-        }else {
+            this.enableBtn.enabled = request.isEnabled();
+            this.forceStartBtn.enabled = false;
+        } else {
             this.amountField.setEnabled(true);
             this.batchField.setEnabled(true);
+            this.enableBtn.enabled = true;
+            this.forceStartBtn.enabled = true;
         }
         if (!this.amountField.isFocused() && !this.batchField.isFocused()) {
             this.amountField.setLongValue(request.getAmount());
@@ -100,7 +105,7 @@ public final class RequestRowWidget {
     }
 
     public void setRequester(Request request) {
-        this.requesterId = request.getRequesterReference() == null ? 0 : request.getRequesterReference().getRequesterId();
+        this.requesterId = request.getRequesterId();
         this.requestIndex = request.getIndex();
         updateFromRequest(request);
     }
@@ -109,7 +114,9 @@ public final class RequestRowWidget {
         this.visible = visible;
         for (GuiButton button : this.buttons) {
             button.visible = visible;
-            button.enabled = visible;
+            if (!visible) {
+                button.enabled = false;
+            }
         }
         this.amountField.setVisible(visible);
         this.batchField.setVisible(visible);
@@ -187,24 +194,24 @@ public final class RequestRowWidget {
             return false;
         }
 
-        for(ToggleButton btn : this.buttons) {
-            if(btn.isMouseOver()) {
+        for (ToggleButton btn : this.buttons) {
+            if (btn.isMouseOver()) {
                 gui.drawTooltipWithHeader(mouseX, mouseY, btn.getTooltipMessage());
                 return true;
             }
         }
 
-        if(this.amountField.isMouseOver(mouseX, mouseY)) {
+        if (this.amountField.isMouseOver(mouseX, mouseY)) {
             gui.drawTooltipWithHeader(mouseX, mouseY, this.amountField.getTooltipMessage());
             return true;
         }
 
-        if(this.batchField.isMouseOver(mouseX, mouseY)) {
+        if (this.batchField.isMouseOver(mouseX, mouseY)) {
             gui.drawTooltipWithHeader(mouseX, mouseY, this.batchField.getTooltipMessage());
             return true;
         }
 
-        if(this.statusDisplay.isMouseOver(mouseX, mouseY)) {
+        if (this.statusDisplay.isMouseOver(mouseX, mouseY)) {
             gui.drawTooltipWithHeader(mouseX, mouseY, this.statusDisplay.getTooltipMessage());
             return true;
         }
@@ -241,7 +248,7 @@ public final class RequestRowWidget {
     }
 
     private void submit() {
-        if(this.request == null) {
+        if (this.request == null) {
             return;
         }
         long amount = amountField.getLongValue().orElse(0);
@@ -261,7 +268,7 @@ public final class RequestRowWidget {
     }
 
     private void forceStartBtnChanged(boolean changed) {
-        if(this.request == null) {
+        if (this.request == null) {
             return;
         }
 

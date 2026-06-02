@@ -36,5 +36,9 @@ public enum CraftingSubmitErrorCode {
      * Could not obtain one of the ingredients needed for the job. {@link ICraftingSubmitResult#errorDetail()} is a
      * {@link GenericStack} explaining what is missing.
      */
-    MISSING_INGREDIENT
+    MISSING_INGREDIENT,
+    /**
+     * The requested output has no pattern or emitter that can produce it.
+     */
+    NO_CRAFTING_PATTERN
 }

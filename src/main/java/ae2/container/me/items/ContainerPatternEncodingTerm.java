@@ -160,6 +160,30 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         tryAutoFillBlankPatterns();
     }
 
+    private static String actionForProcessingAmountOperation(ProcessingPatternAmountHelper.Operation operation) {
+        return switch (operation) {
+            case MULTIPLY_2 -> ACTION_PROCESSING_MULTIPLY_2;
+            case MULTIPLY_3 -> ACTION_PROCESSING_MULTIPLY_3;
+            case MULTIPLY_5 -> ACTION_PROCESSING_MULTIPLY_5;
+            case DIVIDE_2 -> ACTION_PROCESSING_DIVIDE_2;
+            case DIVIDE_3 -> ACTION_PROCESSING_DIVIDE_3;
+            case DIVIDE_5 -> ACTION_PROCESSING_DIVIDE_5;
+        };
+    }
+
+    private static void collectProcessingStacks(ConfigInventory inventory, List<GenericStack> stacks) {
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            stacks.add(inventory.getStack(slot));
+        }
+    }
+
+    private static void applyProcessingAmountOperation(ConfigInventory inventory,
+                                                       ProcessingPatternAmountHelper.Operation operation) {
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            inventory.setStack(slot, ProcessingPatternAmountHelper.apply(inventory.getStack(slot), operation));
+        }
+    }
+
     @Override
     public void broadcastChanges() {
         super.broadcastChanges();
@@ -667,30 +691,6 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
 
         for (int i = 0; i < newOutputs.length; i++) {
             this.processingOutputSlots[i].putStack(newOutputs[i]);
-        }
-    }
-
-    private static String actionForProcessingAmountOperation(ProcessingPatternAmountHelper.Operation operation) {
-        return switch (operation) {
-            case MULTIPLY_2 -> ACTION_PROCESSING_MULTIPLY_2;
-            case MULTIPLY_3 -> ACTION_PROCESSING_MULTIPLY_3;
-            case MULTIPLY_5 -> ACTION_PROCESSING_MULTIPLY_5;
-            case DIVIDE_2 -> ACTION_PROCESSING_DIVIDE_2;
-            case DIVIDE_3 -> ACTION_PROCESSING_DIVIDE_3;
-            case DIVIDE_5 -> ACTION_PROCESSING_DIVIDE_5;
-        };
-    }
-
-    private static void collectProcessingStacks(ConfigInventory inventory, List<GenericStack> stacks) {
-        for (int slot = 0; slot < inventory.size(); slot++) {
-            stacks.add(inventory.getStack(slot));
-        }
-    }
-
-    private static void applyProcessingAmountOperation(ConfigInventory inventory,
-                                                       ProcessingPatternAmountHelper.Operation operation) {
-        for (int slot = 0; slot < inventory.size(); slot++) {
-            inventory.setStack(slot, ProcessingPatternAmountHelper.apply(inventory.getStack(slot), operation));
         }
     }
 

@@ -6,11 +6,11 @@ import ae2.api.storage.ILinkStatus;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.ILinkStatusAwareContainer;
 import ae2.container.me.common.AbstractContainerRequester;
+import ae2.container.me.common.RequesterServerView;
 import ae2.container.slot.RestrictedInputSlot;
 import ae2.core.network.clientbound.RequesterSyncPacket;
+import ae2.helpers.RequesterTerminalHost;
 import ae2.helpers.WirelessTerminalGuiHost;
-import ae2.api.storage.IRequesterTermContainerHost;
-import ae2.requester.abstraction.RequestTracker;
 import ae2.tile.crafting.TileRequester;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -21,19 +21,19 @@ import java.util.Map;
 
 public class ContainerRequesterTerm extends AbstractContainerRequester implements ILinkStatusAwareContainer {
 
-    private final IRequesterTermContainerHost host;
+    private final RequesterTerminalHost host;
 
-    private final Long2ObjectOpenHashMap<RequestTracker> byId = new Long2ObjectOpenHashMap<>();
-    private final Map<TileRequester, RequestTracker> byRequesters = new IdentityHashMap<>();
+    private final Long2ObjectOpenHashMap<RequesterServerView> byId = new Long2ObjectOpenHashMap<>();
+    private final Map<TileRequester, RequesterServerView> byRequesters = new IdentityHashMap<>();
     private ILinkStatus linkStatus = ILinkStatus.ofDisconnected();
 
-    public ContainerRequesterTerm(InventoryPlayer playerInventory, IRequesterTermContainerHost host) {
+    public ContainerRequesterTerm(InventoryPlayer playerInventory, RequesterTerminalHost host) {
         super(playerInventory, host);
         this.host = host;
         if (host instanceof WirelessTerminalGuiHost<?> wirelessHost) {
             setupUpgrades(wirelessHost.getUpgrades());
             RestrictedInputSlot slot = new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.QE_SINGULARITY,
-                    wirelessHost.getSingularityStorage(), 0, 0, 0);
+                wirelessHost.getSingularityStorage(), 0, 0, 0);
             slot.setStackLimit(1);
             this.addSlot(slot, SlotSemantics.WIRELESS_SINGULARITY);
         }
@@ -50,6 +50,9 @@ public class ContainerRequesterTerm extends AbstractContainerRequester implement
 
         IGrid grid = getGrid();
         if (grid == null) {
+            if (!this.byId.isEmpty() || !this.byRequesters.isEmpty()) {
+                sendFullUpdate(null);
+            }
             return;
         }
 
@@ -81,15 +84,30 @@ public class ContainerRequesterTerm extends AbstractContainerRequester implement
 
     @Nullable
     @Override
-    protected RequestTracker getRequestTracker(long requesterId) {
-        return this.byId.get(requesterId);
+    protected RequesterServerView getRequestTracker(long requesterId) {
+        RequesterServerView tracker = this.byId.get(requesterId);
+        if (tracker == null) {
+            return null;
+        }
+
+        IGrid grid = getGrid();
+        if (grid != null && grid.getActiveMachines(TileRequester.class).contains(tracker.getRequester())) {
+            return tracker;
+        }
+
+        this.byId.remove(requesterId);
+        this.byRequesters.remove(tracker.getRequester());
+        return null;
     }
 
     private VisitorState visitRequesters(IGrid grid) {
         VisitorState state = new VisitorState();
-        for(var requester : grid.getActiveMachines(TileRequester.class)) {
-            RequestTracker requestTracker = byRequesters.get(requester);
-            if(requestTracker == null || !requestTracker.getName().equals(requester.getRequesterName())) {
+        for (var requester : grid.getActiveMachines(TileRequester.class)) {
+            RequesterServerView requestTracker = byRequesters.get(requester);
+            if (requestTracker == null
+                || !requestTracker.getName().equals(requester.getRequesterName())
+                || requestTracker.getSortBy() != requester.getRequesterSortValue()
+                || requestTracker.getServer().size() != requester.getRequests().size()) {
                 state.forceFullUpdate = true;
                 return state;
             }
@@ -100,17 +118,20 @@ public class ContainerRequesterTerm extends AbstractContainerRequester implement
 
     @Override
     protected void sendFullUpdate(@Nullable IGrid grid) {
-        assert grid != null;
         this.byId.clear();
         this.byRequesters.clear();
 
         sendPacketToClient(RequesterSyncPacket.clearAll());
 
-        for(var requester : grid.getActiveMachines(TileRequester.class)) {
+        if (grid == null) {
+            return;
+        }
+
+        for (var requester : grid.getActiveMachines(TileRequester.class)) {
             this.byRequesters.put(requester, createTracker(requester));
         }
 
-        for(var requestTracker : this.byRequesters.values()) {
+        for (var requestTracker : this.byRequesters.values()) {
             this.byId.put(requestTracker.getId(), requestTracker);
             syncRequestTrackerFull(requestTracker);
         }
@@ -118,7 +139,7 @@ public class ContainerRequesterTerm extends AbstractContainerRequester implement
 
     @Override
     protected void sendPartialUpdate() {
-        for (RequestTracker tracker : this.byRequesters.values()) {
+        for (RequesterServerView tracker : this.byRequesters.values()) {
             syncRequestTrackerPartial(tracker);
         }
     }

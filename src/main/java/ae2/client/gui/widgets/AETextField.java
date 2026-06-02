@@ -53,7 +53,6 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
     private final FontRenderer fontRenderer;
     private final int fontPad;
     private final GuiStyle style;
-    private int selectionColor;
     private boolean enabled = true;
     private List<ITextComponent> tooltipMessage = ObjectLists.emptyList();
     @Nullable
@@ -86,7 +85,6 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
         this.style = style;
         this.fontPad = fontRenderer.getStringWidth("_");
         this.setEnableBackgroundDrawing(false);
-        this.setSelectionColor(style.getColor(PaletteColor.TEXTFIELD_SELECTION).toARGB());
         this.setTextColor(style.getColor(PaletteColor.TEXTFIELD_TEXT).toARGB());
         this.setDisabledTextColour(style.getColor(PaletteColor.TEXTFIELD_TEXT).toARGB());
     }
@@ -194,14 +192,6 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
         this.setSelectionPos(this.getMaxStringLength());
     }
 
-    public int getSelectionColor() {
-        return this.selectionColor;
-    }
-
-    public void setSelectionColor(int color) {
-        this.selectionColor = color;
-    }
-
     @Override
     public void drawTextBox() {
         if (!this.getVisible()) {
@@ -281,6 +271,10 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
         this.tooltipMessage = Objects.requireNonNull(tooltipMessage);
     }
 
+    public boolean isEnabled() {
+        return this.enabled;
+    }
+
     @Override
     public void setEnabled(boolean enabled) {
         super.setEnabled(enabled);
@@ -288,10 +282,6 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
         if (!enabled) {
             this.clearKeyRepeat();
         }
-    }
-
-    public boolean isEnabled() {
-        return this.enabled;
     }
 
     private Rectangle getVisualBounds() {
@@ -302,11 +292,6 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
             top,
             this.width + 2 * PADDING + this.fontPad,
             this.height + 2 * PADDING);
-    }
-
-    @Nullable
-    public ITextComponent getPlaceholder() {
-        return this.placeholder;
     }
 
     public void setPlaceholder(@Nullable ITextComponent placeholder) {

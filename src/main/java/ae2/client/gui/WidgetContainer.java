@@ -552,7 +552,6 @@ public class WidgetContainer {
         searchField.setEnableBackgroundDrawing(false);
         searchField.setMaxStringLength(25);
         searchField.setTextColor(0xFFFFFF);
-        searchField.setSelectionColor(0xFF000080);
         searchField.setVisible(true);
         add(id, searchField);
         return searchField;

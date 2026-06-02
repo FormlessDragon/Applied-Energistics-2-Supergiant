@@ -8,21 +8,20 @@ import ae2.api.upgrades.IUpgradeableObject;
 import ae2.client.gui.me.common.GuiTerminalSettings;
 import ae2.client.gui.me.items.WirelessUniversalTerminalSelectorWindow;
 import ae2.client.gui.style.GuiStyle;
+import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.ItemStackButton;
+import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.UpgradesPanel;
 import ae2.container.SlotSemantics;
-import ae2.container.me.common.AbstractContainerRequester;
-import ae2.client.gui.widgets.AETextField;
-import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.container.implementations.ContainerRequesterTerm;
+import ae2.container.me.common.AbstractContainerRequester;
 import ae2.core.AEConfig;
 import ae2.core.localization.GuiText;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.items.tools.powered.WirelessUniversalTerminalItem;
-import ae2.requester.Request;
-import ae2.requester.abstraction.RequesterReference;
+import ae2.tile.crafting.requester.Request;
 import com.google.common.collect.HashMultimap;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -48,8 +47,8 @@ import java.util.WeakHashMap;
 public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTerm> implements ITextFieldGui {
     private static final Rectangle FOOTER_BBOX = new Rectangle(0, 133, GUI_WIDTH, GUI_FOOTER_HEIGHT + 2);
 
-    private final HashMap<Long, RequesterReference> byId = new HashMap<>();
-    private final HashMultimap<String, RequesterReference> byName = HashMultimap.create();
+    private final HashMap<Long, ClientRequester> byId = new HashMap<>();
+    private final HashMultimap<String, ClientRequester> byName = HashMultimap.create();
     private final List<String> requesterNames = new ArrayList<>();
     private final Map<String, Set<Object>> searchCache = new WeakHashMap<>();
     private final AETextField searchField;
@@ -78,6 +77,18 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
         this.searchField.setResponder(ignored -> refreshList());
         this.searchField.setPlaceholder(GuiText.SearchPlaceholder.text());
         this.searchField.setTooltipMessage(Collections.singletonList(GuiText.SearchTooltip.text()));
+    }
+
+    private static String requesterDisplayName(ClientRequester requester) {
+        return requester.getDisplayName().getFormattedText();
+    }
+
+    private static String requesterSearchName(ClientRequester requester) {
+        return requester.getSearchName();
+    }
+
+    private static boolean keyMatchesSearchQuery(@Nullable AEKey key, String searchTerm) {
+        return key != null && key.getDisplayName().getFormattedText().toLowerCase(Locale.ROOT).contains(searchTerm);
     }
 
     @Override
@@ -140,15 +151,15 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
         Set<Object> cachedSearch = searchByQuery(searchQuery);
         boolean rebuild = cachedSearch.isEmpty();
 
-        for (RequesterReference requester : this.byId.values()) {
+        for (ClientRequester requester : this.byId.values()) {
             if (!rebuild && !cachedSearch.contains(requester)) {
                 continue;
             }
 
             boolean found = searchQuery.isEmpty() || requesterSearchName(requester).contains(searchQuery);
             if (!found) {
-                for (int i = 0; i < requester.getRequestManager().size(); i++) {
-                    found = keyMatchesSearchQuery(requester.getRequestManager().get(i).getKey(), searchQuery);
+                for (int i = 0; i < requester.getRequests().size(); i++) {
+                    found = keyMatchesSearchQuery(requester.getRequests().get(i).getKey(), searchQuery);
                     if (found) {
                         break;
                     }
@@ -173,12 +184,12 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
         for (String name : this.requesterNames) {
             this.lines.add(name);
 
-            List<RequesterReference> requesters = new ArrayList<>(this.byName.get(name));
+            List<ClientRequester> requesters = new ArrayList<>(this.byName.get(name));
             requesters.sort(Comparator.naturalOrder());
 
-            for (RequesterReference requester : requesters) {
-                for (int i = 0; i < requester.getRequestManager().size(); i++) {
-                    Request request = requester.getRequestManager().get(i);
+            for (ClientRequester requester : requesters) {
+                for (int i = 0; i < requester.getRequests().size(); i++) {
+                    Request request = requester.getRequests().get(i);
                     this.lines.add(request);
                 }
             }
@@ -193,11 +204,11 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
     }
 
     @Override
-    protected RequesterReference getById(long requesterId, @Nullable ITextComponent name, long sortValue,
+    protected ClientRequester getById(long requesterId, @Nullable ITextComponent name, long sortValue,
                                          int requestCount) {
-        RequesterReference requester = this.byId.get(requesterId);
-        if (requester == null || requester.getRequestManager().size() != requestCount) {
-            requester = new RequesterReference(requesterId, name, sortValue, requestCount);
+        ClientRequester requester = this.byId.get(requesterId);
+        if (requester == null || requester.getRequests().size() != requestCount) {
+            requester = new ClientRequester(requesterId, name, sortValue, requestCount);
             this.byId.put(requesterId, requester);
         } else {
             requester.update(name, sortValue);
@@ -207,7 +218,7 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
 
     @Nullable
     @Override
-    protected RequesterReference findById(long requesterId) {
+    protected ClientRequester findById(long requesterId) {
         return this.byId.get(requesterId);
     }
 
@@ -221,18 +232,6 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
         button.set(next);
         AEConfig.instance().setTerminalStyle(next);
         this.setWorldAndResolution(this.mc, this.width, this.height);
-    }
-
-    private static String requesterDisplayName(RequesterReference requester) {
-        return requester.getDisplayName().getFormattedText();
-    }
-
-    private static String requesterSearchName(RequesterReference requester) {
-        return requester.getSearchName();
-    }
-
-    private static boolean keyMatchesSearchQuery(@Nullable AEKey key, String searchTerm) {
-        return key != null && key.getDisplayName().getFormattedText().toLowerCase(Locale.ROOT).contains(searchTerm);
     }
 
     private Set<Object> searchByQuery(String searchQuery) {

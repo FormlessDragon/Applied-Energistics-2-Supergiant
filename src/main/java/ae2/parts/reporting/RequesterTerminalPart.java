@@ -7,16 +7,16 @@ import ae2.api.storage.ILinkStatus;
 import ae2.container.GuiIds;
 import ae2.core.AppEng;
 import ae2.core.gui.GuiOpener;
+import ae2.helpers.RequesterTerminalHost;
 import ae2.items.parts.PartModels;
 import ae2.parts.PartModel;
-import ae2.api.storage.IRequesterTermContainerHost;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.Vec3d;
 
-public class RequesterTerminalPart extends AbstractDisplayPart implements IRequesterTermContainerHost {
+public class RequesterTerminalPart extends AbstractDisplayPart implements RequesterTerminalHost {
 
     @PartModels
     public static final ResourceLocation MODEL_OFF = AppEng.makeId("part/requester_terminal_off");

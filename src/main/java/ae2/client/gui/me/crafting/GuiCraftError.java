@@ -59,6 +59,7 @@ public class GuiCraftError extends AEBaseGui<ContainerCraftConfirm> {
             case CPU_BUSY -> errorText = GuiText.CraftErrorCpuBusy.text();
             case CPU_OFFLINE -> errorText = GuiText.CraftErrorCpuOffline.text();
             case CPU_TOO_SMALL -> errorText = GuiText.CraftErrorCpuTooSmall.text();
+            case NO_CRAFTING_PATTERN -> errorText = GuiText.CraftErrorNoCraftingPattern.text();
             case MISSING_INGREDIENT -> {
                 if (details instanceof GenericStack) {
                     setMissingIngredientSlot((GenericStack) details);

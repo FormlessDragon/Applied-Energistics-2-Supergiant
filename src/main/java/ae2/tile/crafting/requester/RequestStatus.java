@@ -1,13 +1,13 @@
-package ae2.requester.status;
+package ae2.tile.crafting.requester;
 
 public enum RequestStatus {
     IDLE,
     MISSING,
+    NO_PATTERN,
     REQUESTING,
     PLANNING,
     CRAFTING,
     EXPORTING,
-    BLOCKING,
     CPU;
 
     public RequestStatus translateToClient() {

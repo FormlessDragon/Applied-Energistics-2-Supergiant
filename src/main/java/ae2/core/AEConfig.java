@@ -33,7 +33,7 @@ import java.util.Arrays;
 import java.util.List;
 
 @Config(modid = Tags.MOD_ID, name = Tags.MOD_ID, category = "")
-public final class AEConfig {
+public class AEConfig {
 
     @Config.Name("general")
     public static final General GENERAL = new General();
@@ -476,7 +476,7 @@ public final class AEConfig {
     public static final class General {
         @Config.Name("tinyTntBlockDamage")
         @Config.Comment("Enables the ability of Tiny TNT to break blocks.")
-        public final boolean tinyTntBlockDamage = true;
+        public boolean tinyTntBlockDamage = true;
         @Config.Name("debugLogging")
         @Config.Comment("Enables extra AE2 bootstrap logging.")
         public boolean debugLogging;
@@ -509,201 +509,201 @@ public final class AEConfig {
         @Config.Name("colorApplicator")
         @Config.Comment("Maximum AE stored by the Color Applicator.")
         @Config.RangeInt(min = 1)
-        public final int colorApplicator = 20000;
+        public int colorApplicator = 20000;
 
         @Config.Name("chargedStaff")
         @Config.Comment("Maximum AE stored by the Charged Staff.")
         @Config.RangeInt(min = 1)
-        public final int chargedStaff = 8000;
+        public int chargedStaff = 8000;
 
         @Config.Name("matterCannon")
         @Config.Comment("Maximum AE stored by the Matter Cannon.")
         @Config.RangeInt(min = 1)
-        public final int matterCannon = 200000;
+        public int matterCannon = 200000;
 
         @Config.Name("entropyManipulator")
         @Config.Comment("Maximum AE stored by the Entropy Manipulator.")
         @Config.RangeInt(min = 1)
-        public final int entropyManipulator = 100000;
+        public int entropyManipulator = 100000;
 
         @Config.Name("wirelessTerminal")
         @Config.Comment("Maximum AE stored by wireless terminals.")
         @Config.RangeInt(min = 1)
-        public final int wirelessTerminal = 1600000;
+        public int wirelessTerminal = 1600000;
 
         @Config.Name("portableCell")
         @Config.Comment("Maximum AE stored by portable cells.")
         @Config.RangeInt(min = 1)
-        public final int portableCell = 20000;
+        public int portableCell = 20000;
     }
 
     public static final class Condenser {
         @Config.Name("matterBalls")
         @Config.RangeInt(min = 1)
-        public final int matterBallsPower = 256;
+        public int matterBallsPower = 256;
 
         @Config.Name("singularity")
         @Config.RangeInt(min = 1)
-        public final int singularityPower = 256000;
+        public int singularityPower = 256000;
     }
 
     public static final class Automation {
         @Config.Name("formationPlaneEntityLimit")
         @Config.RangeInt(min = 1)
-        public final int formationPlaneEntityLimit = 128;
+        public int formationPlaneEntityLimit = 128;
 
         @Config.Name("interfaceItemSlotCapacityStacks")
         @Config.Comment("Maximum number of items a single ME Interface stocking slot can hold.")
         @Config.RangeInt(min = 1)
-        public final int interfaceItemSlotCapacityStacks = 1024;
+        public int interfaceItemSlotCapacityStacks = 1024;
 
         @Config.Name("interfaceFluidSlotCapacityBuckets")
         @Config.Comment("Maximum number of fluid buckets a single ME Interface stocking slot can hold.")
         @Config.RangeInt(min = 1)
-        public final int interfaceFluidSlotCapacityBuckets = 256;
+        public int interfaceFluidSlotCapacityBuckets = 256;
 
         @Config.Name("MEInterfacePageLimit")
         @Config.Comment("Maximum number of 18-slot ME Interface pages.")
         @Config.RangeInt(min = 1)
         @Config.RequiresWorldRestart
         @Config.RequiresMcRestart
-        public final int meInterfacePageLimit = 1;
+        public int meInterfacePageLimit = 1;
 
         @Config.Name("PatternProviderExpansionCardLimit")
         @Config.Comment("Maximum number of Pattern Expansion Cards that can be installed in one Pattern Provider.")
         @Config.RangeInt(min = 0)
         @Config.RequiresWorldRestart
         @Config.RequiresMcRestart
-        public final int patternProviderExpansionCardLimit = 3;
+        public int patternProviderExpansionCardLimit = 3;
 
         @Config.Name("MolecularAssemblerPatternExpansionCardLimit")
         @Config.Comment("Maximum number of Pattern Expansion Cards that can be installed in one Molecular Assembler.")
         @Config.RangeInt(min = 0)
         @Config.RequiresWorldRestart
         @Config.RequiresMcRestart
-        public final int molecularAssemblerPatternExpansionCardLimit = 3;
+        public int molecularAssemblerPatternExpansionCardLimit = 3;
 
         @Config.Name("annihilationPlaneSkyDustGeneration")
         @Config.Comment("If enabled, an annihilation placed face up at the maximum world height will generate sky stone passively.")
-        public final boolean annihilationPlaneSkyDustGeneration = true;
+        public boolean annihilationPlaneSkyDustGeneration = true;
 
         @Config.Name("matterCannonBlockDamage")
         @Config.Comment("Allow the Matter Cannon to break blocks.")
-        public final boolean matterCannonBlockDamage = true;
+        public boolean matterCannonBlockDamage = true;
     }
 
     public static final class Crafting {
         @Config.Name("growthAccelerator")
         @Config.Comment("Number of ticks between two crystal growth accelerator ticks.")
         @Config.RangeInt(min = 1, max = 100)
-        public final int growthAccelerator = 10;
+        public int growthAccelerator = 10;
     }
 
     public static final class CraftingCPU {
         @Config.Name("craftingCalculationTimePerTick")
         @Config.RangeInt(min = 1)
-        public final int craftingCalculationTimePerTick = 5;
+        public int craftingCalculationTimePerTick = 5;
     }
 
     public static final class Tooltip {
         @Config.Name("showCellUpgrades")
         @Config.Comment("Show storage cell upgrades in extended tooltips.")
-        public final boolean showCellUpgrades = true;
+        public boolean showCellUpgrades = true;
 
         @Config.Name("showCellContent")
         @Config.Comment("Show storage cell contents in extended tooltips.")
-        public final boolean showCellContent = true;
+        public boolean showCellContent = true;
 
         @Config.Name("maxCellContentShown")
         @Config.Comment("Maximum number of storage cell entries shown in tooltips.")
         @Config.RangeInt(min = 1, max = 32)
-        public final int maxCellContentShown = 5;
+        public int maxCellContentShown = 5;
     }
 
     public static final class Wireless {
         @Config.Name("wirelessBaseCost")
         @Config.Comment("Base AE drain for wireless access points.")
         @Config.RangeDouble(min = 0.0D)
-        public final double wirelessBaseCost = 8.0D;
+        public double wirelessBaseCost = 8.0D;
 
         @Config.Name("wirelessCostMultiplier")
         @Config.Comment("Additional drain multiplier for wireless access points.")
         @Config.RangeDouble(min = 0.0D)
-        public final double wirelessCostMultiplier = 1.0D;
+        public double wirelessCostMultiplier = 1.0D;
 
         @Config.Name("wirelessBaseRange")
         @Config.Comment("Base wireless access point range in blocks.")
         @Config.RangeDouble(min = 0.0D)
-        public final double wirelessBaseRange = 16.0D;
+        public double wirelessBaseRange = 16.0D;
 
         @Config.Name("wirelessBoosterRangeMultiplier")
         @Config.Comment("Range multiplier contributed by each wireless booster.")
         @Config.RangeDouble(min = 0.0D)
-        public final double wirelessBoosterRangeMultiplier = 1.0D;
+        public double wirelessBoosterRangeMultiplier = 1.0D;
 
         @Config.Name("wirelessBoosterExp")
         @Config.Comment("Exponent applied to the installed wireless boosters when calculating range.")
         @Config.RangeDouble(min = 0.0D)
-        public final double wirelessBoosterExp = 1.5D;
+        public double wirelessBoosterExp = 1.5D;
 
         @Config.Name("wirelessHighWirelessCount")
         @Config.Comment("Booster scaling factor used when calculating wireless access point drain.")
         @Config.RangeDouble(min = 1.0D)
-        public final double wirelessHighWirelessCount = 64.0D;
+        public double wirelessHighWirelessCount = 64.0D;
 
         @Config.Name("wirelessTerminalDrainMultiplier")
         @Config.Comment("Energy drain per block for wireless terminals.")
         @Config.RangeDouble(min = 0.0D)
-        public final double wirelessTerminalDrainMultiplier = 1.0D;
+        public double wirelessTerminalDrainMultiplier = 1.0D;
     }
 
     public static final class PowerRatios {
         @Config.Name("p2pTunnelEnergyTax")
         @Config.Comment("The cost to transport energy through an energy P2P tunnel expressed as a factor of the transported energy.")
         @Config.RangeDouble(min = 0.0D, max = 1.0D)
-        public final double p2pTunnelEnergyTax = 0.025D;
+        public double p2pTunnelEnergyTax = 0.025D;
 
         @Config.Name("p2pTunnelTransportTax")
         @Config.Comment("The cost to transport items/fluids/etc. through P2P tunnels, expressed in AE energy per equivalent I/O bus operation.")
         @Config.RangeDouble(min = 0.0D, max = 1.0D)
-        public final double p2pTunnelTransportTax = 0.025D;
+        public double p2pTunnelTransportTax = 0.025D;
     }
 
     public static final class Spatial {
         @Config.Name("spatialPowerExponent")
         @Config.RangeDouble(min = 0.0D)
-        public final double spatialPowerExponent = 1.35D;
+        public double spatialPowerExponent = 1.35D;
 
         @Config.Name("spatialPowerMultiplier")
         @Config.RangeDouble(min = 0.0D)
-        public final double spatialPowerMultiplier = 1250.0D;
+        public double spatialPowerMultiplier = 1250.0D;
     }
 
     public static final class VibrationChamber {
         @Config.Name("baseEnergyPerFuelTick")
         @Config.Comment("AE energy produced per fuel burn tick.")
         @Config.RangeDouble(min = 0.1D, max = 1000.0D)
-        public final double baseEnergyPerFuelTick = 5.0D;
+        public double baseEnergyPerFuelTick = 5.0D;
 
         @Config.Name("minEnergyPerGameTick")
         @Config.Comment("Minimum amount of AE/t the vibration chamber can slow down to when energy is being wasted.")
         @Config.RangeInt(min = 0, max = 1000)
-        public final int minEnergyPerGameTick = 4;
+        public int minEnergyPerGameTick = 4;
 
         @Config.Name("baseMaxEnergyPerGameTick")
         @Config.Comment("Maximum amount of AE/t the vibration chamber can speed up to when generated energy is being fully consumed.")
         @Config.RangeInt(min = 1, max = 1000)
-        public final int baseMaxEnergyPerGameTick = 40;
+        public int baseMaxEnergyPerGameTick = 40;
     }
 
     public static final class Client {
         @Config.Name("enableEffects")
         @Config.Comment("Enable AE2 particle and lightning effects.")
-        public final boolean enableEffects = true;
+        public boolean enableEffects = true;
 
         @Config.Name("placementPreviewEnabled")
         @Config.Comment("Show part and facade placement previews.")
-        public final boolean placementPreviewEnabled = true;
+        public boolean placementPreviewEnabled = true;
 
         @Config.Name("showDebugGuiOverlays")
         @Config.Comment("Show debugging GUI overlays.")
@@ -738,7 +738,7 @@ public final class AEConfig {
         @Config.Name("terminalMargin")
         @Config.Comment("The vertical margin to apply when sizing terminals.")
         @Config.RangeInt(min = 0)
-        public final int terminalMargin = 25;
+        public int terminalMargin = 25;
         @Config.Name("terminalStyle")
         @Config.Comment("Size of ME terminal GUIs.")
         public TerminalStyle terminalStyle = TerminalStyle.SMALL;
@@ -773,14 +773,14 @@ public final class AEConfig {
     public static final class WorldGen {
         @Config.Name("spawnPressesInMeteoritesEnabled")
         @Config.Comment("Spawn mysterious cubes inside meteorites.")
-        public final boolean spawnPressesInMeteoritesEnabled = true;
+        public boolean spawnPressesInMeteoritesEnabled = true;
         @Config.Name("meteoriteDimensionWhitelist")
         @Config.Comment("Dimensions that may generate meteorites.")
-        public final int[] meteoriteDimensionWhitelist = new int[]{0};
+        public int[] meteoriteDimensionWhitelist = new int[]{0};
         @Config.Name("spatialDimensionId")
         @Config.Comment("Dimension id for the spatial storage dimension.")
         @Config.RangeInt()
-        public final int spatialDimensionId = -256;
+        public int spatialDimensionId = -256;
         @Config.Name("spawnFlawlessOnly")
         @Config.Comment("Spawn only flawless budding quartz in meteorites.")
         public boolean spawnFlawlessOnly;
@@ -788,43 +788,43 @@ public final class AEConfig {
 
     public static final class TickRateConfig {
         @Config.Name("Interface")
-        public final TickRateRange interfaceRate = new TickRateRange(TickRates.Interface);
+        public TickRateRange interfaceRate = new TickRateRange(TickRates.Interface);
 
         @Config.Name("ImportBus")
-        public final TickRateRange importBus = new TickRateRange(TickRates.ImportBus);
+        public TickRateRange importBus = new TickRateRange(TickRates.ImportBus);
 
         @Config.Name("ExportBus")
-        public final TickRateRange exportBus = new TickRateRange(TickRates.ExportBus);
+        public TickRateRange exportBus = new TickRateRange(TickRates.ExportBus);
 
         @Config.Name("FormationPlane")
-        public final TickRateRange formationPlane = new TickRateRange(TickRates.FormationPlane);
+        public TickRateRange formationPlane = new TickRateRange(TickRates.FormationPlane);
 
         @Config.Name("AnnihilationPlane")
-        public final TickRateRange annihilationPlane = new TickRateRange(TickRates.AnnihilationPlane);
+        public TickRateRange annihilationPlane = new TickRateRange(TickRates.AnnihilationPlane);
 
         @Config.Name("METunnel")
-        public final TickRateRange meTunnel = new TickRateRange(TickRates.METunnel);
+        public TickRateRange meTunnel = new TickRateRange(TickRates.METunnel);
 
         @Config.Name("Inscriber")
-        public final TickRateRange inscriber = new TickRateRange(TickRates.Inscriber);
+        public TickRateRange inscriber = new TickRateRange(TickRates.Inscriber);
 
         @Config.Name("Charger")
-        public final TickRateRange charger = new TickRateRange(TickRates.Charger);
+        public TickRateRange charger = new TickRateRange(TickRates.Charger);
 
         @Config.Name("IOPort")
-        public final TickRateRange ioPort = new TickRateRange(TickRates.IOPort);
+        public TickRateRange ioPort = new TickRateRange(TickRates.IOPort);
 
         @Config.Name("VibrationChamber")
-        public final TickRateRange vibrationChamber = new TickRateRange(TickRates.VibrationChamber);
+        public TickRateRange vibrationChamber = new TickRateRange(TickRates.VibrationChamber);
 
         @Config.Name("StorageBus")
-        public final TickRateRange storageBus = new TickRateRange(TickRates.StorageBus);
+        public TickRateRange storageBus = new TickRateRange(TickRates.StorageBus);
 
         @Config.Name("ItemTunnel")
-        public final TickRateRange itemTunnel = new TickRateRange(TickRates.ItemTunnel);
+        public TickRateRange itemTunnel = new TickRateRange(TickRates.ItemTunnel);
 
         @Config.Name("LightTunnel")
-        public final TickRateRange lightTunnel = new TickRateRange(TickRates.LightTunnel);
+        public TickRateRange lightTunnel = new TickRateRange(TickRates.LightTunnel);
 
         private TickRateRange get(TickRates tickRate) {
             return switch (tickRate) {
@@ -849,12 +849,12 @@ public final class AEConfig {
         @Config.Name("min")
         @Config.Comment("Minimum ticks between work cycles.")
         @Config.RangeInt(min = 1)
-        public final int min;
+        public int min;
 
         @Config.Name("max")
         @Config.Comment("Maximum ticks between work cycles.")
         @Config.RangeInt(min = 1)
-        public final int max;
+        public int max;
 
         private TickRateRange(TickRates tickRate) {
             this.min = tickRate.getDefaultMin();
@@ -867,10 +867,12 @@ public final class AEConfig {
         @Config.Comment("The amount of requests a single ME Requester can hold.")
         @Config.RangeInt(min = 1, max = 64)
         public int requests = 5;
+
         @Config.Name("idleEnergy")
         @Config.Comment("The amount of energy (in AE) the ME Requester drains from the ME network when idle.")
-        @Config.RangeDouble(min = 0.0)
+        @Config.RangeDouble(min = 0)
         public double idleEnergy = 5.0;
+
         @Config.Name("requireChannel")
         @Config.Comment("Whether the ME Requester requires an ME network channel to function.")
         public boolean requireChannel = true;

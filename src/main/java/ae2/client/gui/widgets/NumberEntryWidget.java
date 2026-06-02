@@ -150,6 +150,23 @@ public class NumberEntryWidget implements ICompositeWidget {
         return GuiScreen.isShiftKeyDown() || GuiScreen.isCtrlKeyDown();
     }
 
+    static OptionalLong toExternalValue(BigDecimal internalValue, int amountPerUnit) {
+        if (amountPerUnit == 1 && internalValue.scale() > 0) {
+            return OptionalLong.empty();
+        }
+
+        return toExternalValue(internalValue, BigDecimal.valueOf(amountPerUnit));
+    }
+
+    private static OptionalLong toExternalValue(BigDecimal internalValue, BigDecimal amountPerUnit) {
+        try {
+            var value = internalValue.multiply(amountPerUnit);
+            return OptionalLong.of(value.setScale(0, RoundingMode.UNNECESSARY).longValueExact());
+        } catch (ArithmeticException ignored) {
+            return OptionalLong.empty();
+        }
+    }
+
     public void setOnConfirm(Runnable callback) {
         this.onConfirm = callback;
     }
@@ -436,23 +453,6 @@ public class NumberEntryWidget implements ICompositeWidget {
         }
 
         validate();
-    }
-
-    static OptionalLong toExternalValue(BigDecimal internalValue, int amountPerUnit) {
-        if (amountPerUnit == 1 && internalValue.scale() > 0) {
-            return OptionalLong.empty();
-        }
-
-        return toExternalValue(internalValue, BigDecimal.valueOf(amountPerUnit));
-    }
-
-    private static OptionalLong toExternalValue(BigDecimal internalValue, BigDecimal amountPerUnit) {
-        try {
-            var value = internalValue.multiply(amountPerUnit);
-            return OptionalLong.of(value.setScale(0, RoundingMode.UNNECESSARY).longValueExact());
-        } catch (ArithmeticException ignored) {
-            return OptionalLong.empty();
-        }
     }
 
     private OptionalLong convertToExternalValue(BigDecimal internalValue) {

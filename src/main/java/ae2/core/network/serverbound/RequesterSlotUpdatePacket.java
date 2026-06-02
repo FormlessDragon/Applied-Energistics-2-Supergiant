@@ -4,10 +4,7 @@ import ae2.container.me.common.AbstractContainerRequester;
 import ae2.core.network.ServerboundPacket;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketBuffer;
-
-import java.io.IOException;
 
 public class RequesterSlotUpdatePacket extends ServerboundPacket {
     private int windowId;
@@ -15,52 +12,43 @@ public class RequesterSlotUpdatePacket extends ServerboundPacket {
     private boolean visible;
     private long requesterId;
     private int requestIndex;
-    private boolean locked;
-    private ItemStack stack = ItemStack.EMPTY;
+    private boolean invalid;
 
     public RequesterSlotUpdatePacket() {
     }
 
-    private RequesterSlotUpdatePacket(int windowId, int row, boolean visible, long requesterId, int requestIndex,
-                                      boolean locked, ItemStack stack) {
+    private RequesterSlotUpdatePacket(int windowId, int row, boolean visible, long requesterId, int requestIndex) {
         this.windowId = windowId;
         this.row = row;
         this.visible = visible;
         this.requesterId = requesterId;
         this.requestIndex = requestIndex;
-        this.locked = locked;
-        this.stack = stack.copy();
     }
 
-    public static RequesterSlotUpdatePacket visible(int windowId, int row, long requesterId, int requestIndex,
-                                                    boolean locked, ItemStack stack) {
-        return new RequesterSlotUpdatePacket(windowId, row, true, requesterId, requestIndex, locked, stack);
+    public static RequesterSlotUpdatePacket visible(int windowId, int row, long requesterId, int requestIndex) {
+        return new RequesterSlotUpdatePacket(windowId, row, true, requesterId, requestIndex);
     }
 
     public static RequesterSlotUpdatePacket hidden(int windowId, int row) {
-        return new RequesterSlotUpdatePacket(windowId, row, false, 0, -1, false, ItemStack.EMPTY);
+        return new RequesterSlotUpdatePacket(windowId, row, false, 0, -1);
     }
 
     @Override
     protected void read(ByteBuf buf) {
         var packetBuffer = new PacketBuffer(buf);
-        this.windowId = packetBuffer.readVarInt();
-        this.row = packetBuffer.readVarInt();
-        this.visible = packetBuffer.readBoolean();
-        if (this.visible) {
-            this.requesterId = packetBuffer.readVarLong();
-            this.requestIndex = packetBuffer.readVarInt();
-            this.locked = packetBuffer.readBoolean();
-            try {
-                this.stack = packetBuffer.readItemStack();
-            } catch (IOException e) {
-                throw new IllegalArgumentException("Could not read requester slot stack", e);
+        try {
+            this.windowId = packetBuffer.readVarInt();
+            this.row = packetBuffer.readVarInt();
+            this.visible = packetBuffer.readBoolean();
+            if (this.visible) {
+                this.requesterId = packetBuffer.readVarLong();
+                this.requestIndex = packetBuffer.readVarInt();
+            } else {
+                this.requesterId = 0;
+                this.requestIndex = -1;
             }
-        } else {
-            this.requesterId = 0;
-            this.requestIndex = -1;
-            this.locked = false;
-            this.stack = ItemStack.EMPTY;
+        } catch (RuntimeException e) {
+            this.invalid = true;
         }
     }
 
@@ -73,20 +61,21 @@ public class RequesterSlotUpdatePacket extends ServerboundPacket {
         if (this.visible) {
             packetBuffer.writeVarLong(this.requesterId);
             packetBuffer.writeVarInt(this.requestIndex);
-            packetBuffer.writeBoolean(this.locked);
-            packetBuffer.writeItemStack(this.stack);
         }
     }
 
     @Override
     public void handleServer(EntityPlayerMP player) {
+        if (this.invalid) {
+            return;
+        }
+
         if (player.openContainer.windowId != this.windowId) {
             return;
         }
 
         if (player.openContainer instanceof AbstractContainerRequester container) {
-            container.updateRequestSlot(this.row, this.visible, this.requesterId, this.requestIndex, this.locked,
-                this.stack);
+            container.updateRequestSlot(this.row, this.visible, this.requesterId, this.requestIndex);
         }
     }
 
@@ -110,11 +99,4 @@ public class RequesterSlotUpdatePacket extends ServerboundPacket {
         return this.requestIndex;
     }
 
-    boolean isLocked() {
-        return this.locked;
-    }
-
-    ItemStack getStack() {
-        return this.stack;
-    }
 }

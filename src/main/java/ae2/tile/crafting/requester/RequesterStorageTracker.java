@@ -1,4 +1,4 @@
-package ae2.requester;
+package ae2.tile.crafting.requester;
 
 import ae2.api.networking.IStackWatcher;
 import ae2.api.networking.storage.IStorageWatcherNode;
@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
-public final class StorageManager implements IStorageWatcherNode {
+public final class RequesterStorageTracker implements IStorageWatcherNode {
     private static final String BUFFERED = "buffered";
     private static final String TOTAL = "total";
     private static final String PENDING_INSERTION = "pendingInsertion";
@@ -24,7 +24,7 @@ public final class StorageManager implements IStorageWatcherNode {
     private final @Nullable AEKey[] watchedKeys;
     private @Nullable IStackWatcher stackWatcher;
 
-    public StorageManager(int size) {
+    public RequesterStorageTracker(int size) {
         this.total = new KeyCounter[size];
         this.buffered = new KeyCounter[size];
         this.pendingInsertion = new KeyCounter[size];
@@ -35,6 +35,26 @@ public final class StorageManager implements IStorageWatcherNode {
             this.buffered[i] = new KeyCounter();
             this.pendingInsertion[i] = new KeyCounter();
             this.known[i] = new KeyCounter();
+        }
+    }
+
+    private static NBTTagList writeCounter(KeyCounter counter) {
+        var list = new NBTTagList();
+        for (var entry : counter) {
+            long amount = entry.getLongValue();
+            if (amount > 0) {
+                list.appendTag(GenericStack.writeTag(new GenericStack(entry.getKey(), amount)));
+            }
+        }
+        return list;
+    }
+
+    private static void readCounter(NBTTagList list, KeyCounter counter) {
+        for (int entryIndex = 0; entryIndex < list.tagCount(); entryIndex++) {
+            var stack = GenericStack.readTag(list.getCompoundTagAt(entryIndex));
+            if (stack != null) {
+                counter.add(stack.what(), stack.amount());
+            }
         }
     }
 
@@ -75,6 +95,9 @@ public final class StorageManager implements IStorageWatcherNode {
     }
 
     public void watch(int slot, @Nullable AEKey key) {
+        if (Objects.equals(watchedKeys[slot], key)) {
+            return;
+        }
         watchedKeys[slot] = key;
         resetWatcher();
     }
@@ -117,10 +140,10 @@ public final class StorageManager implements IStorageWatcherNode {
         return outstanding < request.getAmount() ? request.getBatchSize() : 0;
     }
 
-    public long markExported(int slot, AEKey key, long amount) {
+    public void markExported(int slot, AEKey key, long amount) {
         long exported = Math.clamp(amount, 0, getBufferedAmount(slot, key));
         if (exported <= 0) {
-            return 0;
+            return;
         }
 
         buffered[slot].remove(key, exported);
@@ -128,7 +151,6 @@ public final class StorageManager implements IStorageWatcherNode {
         pendingInsertion[slot].add(key, exported);
         total[slot].remove(key, exported);
         total[slot].removeZeros();
-        return exported;
     }
 
     public void clear(int slot) {
@@ -177,26 +199,6 @@ public final class StorageManager implements IStorageWatcherNode {
             }
             if (slotTag.hasKey(KNOWN, 9)) {
                 readCounter(slotTag.getTagList(KNOWN, 10), known[i]);
-            }
-        }
-    }
-
-    private static NBTTagList writeCounter(KeyCounter counter) {
-        var list = new NBTTagList();
-        for (var entry : counter) {
-            long amount = entry.getLongValue();
-            if (amount > 0) {
-                list.appendTag(GenericStack.writeTag(new GenericStack(entry.getKey(), amount)));
-            }
-        }
-        return list;
-    }
-
-    private static void readCounter(NBTTagList list, KeyCounter counter) {
-        for (int entryIndex = 0; entryIndex < list.tagCount(); entryIndex++) {
-            var stack = GenericStack.readTag(list.getCompoundTagAt(entryIndex));
-            if (stack != null) {
-                counter.add(stack.what(), stack.amount());
             }
         }
     }

@@ -1,4 +1,4 @@
-package ae2.requester.status;
+package ae2.tile.crafting.requester;
 
 import ae2.api.networking.crafting.CraftingSubmitErrorCode;
 import ae2.api.networking.crafting.ICraftingLink;
@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-public final class PlanState implements StatusState {
+public record PlanState(Future<ICraftingPlan> future) implements StatusState {
     private static final Set<CraftingSubmitErrorCode> CPU_ERROR_CODES = Set.of(
         CraftingSubmitErrorCode.NO_CPU_FOUND,
         CraftingSubmitErrorCode.NO_SUITABLE_CPU_FOUND,
@@ -19,16 +19,6 @@ public final class PlanState implements StatusState {
         CraftingSubmitErrorCode.CPU_OFFLINE,
         CraftingSubmitErrorCode.CPU_TOO_SMALL
     );
-
-    private final Future<ICraftingPlan> future;
-
-    public PlanState(Future<ICraftingPlan> future) {
-        this.future = future;
-    }
-
-    public Future<ICraftingPlan> future() {
-        return future;
-    }
 
     @Override
     public StatusState handle(TileRequester host, int slot) {
@@ -45,22 +35,26 @@ public final class PlanState implements StatusState {
                 return IDLE;
             }
 
-            if (!host.getRequestManager().get(slot).isForceStart() && !plan.missingItems().isEmpty()) {
-                return new MissingState();
+            if (!host.getRequests().get(slot).isForceStart() && !plan.missingItems().isEmpty()) {
+                return BlockedState.missing();
             }
 
             ICraftingSubmitResult result = host.submitPlan(plan, slot);
             ICraftingLink link = result.link();
             if (result.successful() && link != null) {
-                host.getStorageManager().setTotalAmount(slot, plan.finalOutput().what(), plan.finalOutput().amount());
+                host.getStorageTracker().setTotalAmount(slot, plan.finalOutput().what(), plan.finalOutput().amount());
                 return new LinkState(link);
             }
 
             if (result.errorCode() != null && CPU_ERROR_CODES.contains(result.errorCode())) {
-                return new CpuState();
+                return BlockedState.cpu();
             }
-            if (result.errorCode() == CraftingSubmitErrorCode.MISSING_INGREDIENT) {
-                return new MissingState();
+            if (result.errorCode() == CraftingSubmitErrorCode.NO_CRAFTING_PATTERN) {
+                return BlockedState.noPattern();
+            }
+            if (result.errorCode() == CraftingSubmitErrorCode.MISSING_INGREDIENT
+                || result.errorCode() == CraftingSubmitErrorCode.INCOMPLETE_PLAN) {
+                return BlockedState.missing();
             }
             return IDLE;
         } catch (InterruptedException e) {

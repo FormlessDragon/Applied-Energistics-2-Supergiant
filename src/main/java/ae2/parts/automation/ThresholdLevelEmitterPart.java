@@ -56,12 +56,14 @@ public class ThresholdLevelEmitterPart extends AbstractLevelEmitterPart
     public static final PartModel MODEL_ON_HAS_CHANNEL = new PartModel(MODEL_BASE_ON,
         StorageLevelEmitterPart.MODEL_STATUS_HAS_CHANNEL);
     private IStackWatcher storageWatcher;
-    private IStackWatcher craftingWatcher;    private final ConfigInventory config = ConfigInventory.configTypes(1)
+    private IStackWatcher craftingWatcher;
+    private long lastUpdateTick = -1;
+    private final ConfigInventory config = ConfigInventory.configTypes(1)
                                                           .changeListener(this::configureWatchers)
                                                           .build();
-    private long lastUpdateTick = -1;
     private long upperValue;
     private long lowerValue;
+
     public ThresholdLevelEmitterPart(IPartItem<?> partItem) {
         super(partItem);
         getMainNode().addService(IStorageWatcherNode.class, new IStorageWatcherNode() {

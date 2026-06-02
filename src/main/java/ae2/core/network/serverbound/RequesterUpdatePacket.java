@@ -7,11 +7,6 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.PacketBuffer;
 
 public class RequesterUpdatePacket extends ServerboundPacket {
-    private enum UpdateType {
-        STATE,
-        NUMBERS
-    }
-
     private UpdateType updateType = UpdateType.STATE;
     private int windowId;
     private long requesterId;
@@ -42,20 +37,10 @@ public class RequesterUpdatePacket extends ServerboundPacket {
         this.batchSize = batchSize;
     }
 
-    @Override
-    protected void read(ByteBuf buf) {
-        var packetBuffer = new PacketBuffer(buf);
-        this.windowId = packetBuffer.readVarInt();
-        this.requesterId = packetBuffer.readVarLong();
-        this.requestIndex = packetBuffer.readVarInt();
-        this.updateType = UpdateType.values()[packetBuffer.readVarInt()];
-        if (this.updateType == UpdateType.STATE) {
-            this.enabled = packetBuffer.readBoolean();
-            this.forceStart = packetBuffer.readBoolean();
-        } else {
-            this.amount = packetBuffer.readVarLong();
-            this.batchSize = packetBuffer.readVarLong();
-        }
+    private static UpdateType readUpdateType(PacketBuffer packetBuffer) {
+        int ordinal = packetBuffer.readVarInt();
+        UpdateType[] values = UpdateType.values();
+        return ordinal >= 0 && ordinal < values.length - 1 ? values[ordinal] : UpdateType.INVALID;
     }
 
     @Override
@@ -75,7 +60,42 @@ public class RequesterUpdatePacket extends ServerboundPacket {
     }
 
     @Override
+    protected void read(ByteBuf buf) {
+        var packetBuffer = new PacketBuffer(buf);
+        try {
+            this.windowId = packetBuffer.readVarInt();
+            this.requesterId = packetBuffer.readVarLong();
+            this.requestIndex = packetBuffer.readVarInt();
+            this.updateType = readUpdateType(packetBuffer);
+            if (this.updateType == UpdateType.INVALID) {
+                return;
+            }
+            if (this.updateType == UpdateType.STATE) {
+                this.enabled = packetBuffer.readBoolean();
+                this.forceStart = packetBuffer.readBoolean();
+            } else {
+                this.amount = packetBuffer.readVarLong();
+                this.batchSize = packetBuffer.readVarLong();
+            }
+        } catch (RuntimeException e) {
+            this.updateType = UpdateType.INVALID;
+        }
+    }
+
+    boolean isStateUpdate() {
+        return this.updateType == UpdateType.STATE;
+    }
+
+    boolean isNumbersUpdate() {
+        return this.updateType == UpdateType.NUMBERS;
+    }
+
+    @Override
     public void handleServer(EntityPlayerMP player) {
+        if (this.updateType == UpdateType.INVALID) {
+            return;
+        }
+
         if (player.openContainer.windowId != this.windowId) {
             return;
         }
@@ -88,14 +108,6 @@ public class RequesterUpdatePacket extends ServerboundPacket {
             }
             container.syncInventoryActionState(player);
         }
-    }
-
-    boolean isStateUpdate() {
-        return this.updateType == UpdateType.STATE;
-    }
-
-    boolean isNumbersUpdate() {
-        return this.updateType == UpdateType.NUMBERS;
     }
 
     int getWindowId() {
@@ -120,5 +132,11 @@ public class RequesterUpdatePacket extends ServerboundPacket {
 
     long getBatchSize() {
         return this.batchSize;
+    }
+
+    private enum UpdateType {
+        STATE,
+        NUMBERS,
+        INVALID
     }
 }

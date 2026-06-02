@@ -1,23 +1,23 @@
-package ae2.requester.abstraction;
+package ae2.client.gui.me.requester;
 
-import ae2.requester.RequestManager;
+import ae2.tile.crafting.requester.RequestList;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
 
-public final class RequesterReference implements Comparable<RequesterReference> {
+public final class ClientRequester implements Comparable<ClientRequester> {
     private final long requesterId;
+    private final RequestList requestManager;
     private @Nullable ITextComponent displayName;
     private long sortValue;
-    private final RequestManager requestManager;
 
-    public RequesterReference(long requesterId, @Nullable ITextComponent displayName, long sortValue, int requestCount) {
+    public ClientRequester(long requesterId, @Nullable ITextComponent displayName, long sortValue, int requestCount) {
         this.requesterId = requesterId;
         this.displayName = displayName;
         this.sortValue = sortValue;
-        this.requestManager = new RequestManager(null, requestCount);
+        this.requestManager = new RequestList(null, requestCount);
         for (int i = 0; i < this.requestManager.size(); i++) {
-            this.requestManager.get(i).setRequesterReference(this, i);
+            this.requestManager.get(i).setRequesterLocation(this.requesterId, i);
         }
     }
 
@@ -38,12 +38,12 @@ public final class RequesterReference implements Comparable<RequesterReference> 
         return getDisplayName().getFormattedText().toLowerCase();
     }
 
-    public RequestManager getRequestManager() {
+    public RequestList getRequests() {
         return this.requestManager;
     }
 
     @Override
-    public int compareTo(RequesterReference other) {
+    public int compareTo(ClientRequester other) {
         int sortCompare = Long.compare(this.sortValue, other.sortValue);
         return sortCompare != 0 ? sortCompare : Long.compare(this.requesterId, other.requesterId);
     }

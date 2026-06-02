@@ -365,6 +365,9 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         if (!forceStart && !job.missingItems().isEmpty()) {
             return CraftingSubmitResult.INCOMPLETE_PLAN;
         }
+        if (!job.missingItems().isEmpty() && job.patternTimes().isEmpty() && job.emittedItems().isEmpty()) {
+            return CraftingSubmitResult.NO_CRAFTING_PATTERN;
+        }
 
         CraftingCPUCluster cpuCluster;
 

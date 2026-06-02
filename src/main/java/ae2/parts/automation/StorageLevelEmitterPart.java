@@ -105,7 +105,10 @@ public class StorageLevelEmitterPart extends AbstractLevelEmitterPart
                     long currentTick = TickHandler.instance().getCurrentTick();
                     if (currentTick != lastUpdateTick) {
                         lastUpdateTick = currentTick;
-                        updateReportingValue(getGridNode().grid());
+                        var gridNode = getGridNode();
+                        if (gridNode != null) {
+                            updateReportingValue(gridNode.grid());
+                        }
                     }
                 }
             }
@@ -131,6 +134,8 @@ public class StorageLevelEmitterPart extends AbstractLevelEmitterPart
         getMainNode().addService(ICraftingProvider.class, this);
     }    private final ConfigInventory config = ConfigInventory.configTypes(1).changeListener(this::configureWatchers)
                                                           .build();
+
+
 
     @Override
     protected void registerSettings(IConfigManagerBuilder builder) {

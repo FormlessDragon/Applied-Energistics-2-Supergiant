@@ -53,6 +53,14 @@ public class RequesterSyncPacket extends ClientboundPacket {
         return new RequesterSyncPacket(false, requesterId, null, 0, 0, rows);
     }
 
+    private static Int2ObjectMap<NBTTagCompound> copyRows(Int2ObjectMap<NBTTagCompound> rows) {
+        var copy = new Int2ObjectOpenHashMap<NBTTagCompound>(rows.size());
+        for (var entry : rows.int2ObjectEntrySet()) {
+            copy.put(entry.getIntKey(), entry.getValue().copy());
+        }
+        return copy;
+    }
+
     public boolean isFullUpdate() {
         return this.fullUpdate;
     }
@@ -156,13 +164,5 @@ public class RequesterSyncPacket extends ClientboundPacket {
                 display.postIncrementalUpdate(this.requesterId, this.rows);
             }
         }
-    }
-
-    private static Int2ObjectMap<NBTTagCompound> copyRows(Int2ObjectMap<NBTTagCompound> rows) {
-        var copy = new Int2ObjectOpenHashMap<NBTTagCompound>(rows.size());
-        for (var entry : rows.int2ObjectEntrySet()) {
-            copy.put(entry.getIntKey(), entry.getValue().copy());
-        }
-        return copy;
     }
 }

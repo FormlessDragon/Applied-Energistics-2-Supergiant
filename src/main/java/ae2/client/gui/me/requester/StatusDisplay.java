@@ -1,7 +1,8 @@
-package ae2.client.gui.widgets;
+package ae2.client.gui.me.requester;
 
 import ae2.api.util.AEColor;
-import ae2.requester.status.RequestStatus;
+import ae2.client.gui.widgets.ITooltip;
+import ae2.tile.crafting.requester.RequestStatus;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.util.text.ITextComponent;
@@ -30,6 +31,31 @@ public final class StatusDisplay implements ITooltip {
     StatusDisplay(int x, int y, BooleanSupplier isInactive) {
         this.statusBox = new Rectangle(x, y, WIDTH, HEIGHT);
         this.isInactive = isInactive;
+    }
+
+    private static int opaque(int rgb) {
+        return OPAQUE | rgb;
+    }
+
+    private static void addStatusTooltipLine(List<ITextComponent> tooltip, RequestStatus status) {
+        tooltip.add(statusText(status));
+        tooltip.add(new TextComponentTranslation("gui.ae2.requester.status." + status.name().toLowerCase() + ".desc"));
+        tooltip.add(new TextComponentString(" "));
+    }
+
+    private static ITextComponent statusText(RequestStatus status) {
+        return new TextComponentTranslation("gui.ae2.requester.status." + status.name().toLowerCase())
+            .setStyle(new Style().setColor(statusFormatting(status)));
+    }
+
+    private static TextFormatting statusFormatting(RequestStatus status) {
+        return switch (status) {
+            case IDLE, REQUESTING, PLANNING -> TextFormatting.DARK_GREEN;
+            case MISSING, NO_PATTERN -> TextFormatting.RED;
+            case CPU -> TextFormatting.GOLD;
+            case CRAFTING -> TextFormatting.YELLOW;
+            case EXPORTING -> TextFormatting.DARK_PURPLE;
+        };
     }
 
     public void renderWidget() {
@@ -72,16 +98,11 @@ public final class StatusDisplay implements ITooltip {
     private int getStatusColor(RequestStatus requestStatus) {
         return switch (requestStatus) {
             case IDLE, REQUESTING, PLANNING -> AEColor.GREEN.mediumVariant;
-            case MISSING -> AEColor.RED.mediumVariant;
+            case MISSING, NO_PATTERN -> AEColor.RED.mediumVariant;
             case CPU -> AEColor.YELLOW.blackVariant;
             case CRAFTING -> AEColor.YELLOW.mediumVariant;
             case EXPORTING -> AEColor.PURPLE.blackVariant;
-            case BLOCKING -> AEColor.BLUE.mediumVariant;
         };
-    }
-
-    private static int opaque(int rgb) {
-        return OPAQUE | rgb;
     }
 
     void setStatus(RequestStatus status) {
@@ -96,43 +117,21 @@ public final class StatusDisplay implements ITooltip {
             tooltip.add(new TextComponentString(" "));
             addStatusTooltipLine(tooltip, RequestStatus.IDLE);
             addStatusTooltipLine(tooltip, RequestStatus.MISSING);
+            addStatusTooltipLine(tooltip, RequestStatus.NO_PATTERN);
             addStatusTooltipLine(tooltip, RequestStatus.CPU);
             addStatusTooltipLine(tooltip, RequestStatus.CRAFTING);
             addStatusTooltipLine(tooltip, RequestStatus.EXPORTING);
-            addStatusTooltipLine(tooltip, RequestStatus.BLOCKING);
         } else {
             tooltip.add(statusText(getVisibleStatus()));
             tooltip.add(new TextComponentString(" "));
             tooltip.add(new TextComponentTranslation("gui.ae2.requester.status.shift").setStyle(
-                    new Style().setColor(TextFormatting.GRAY)));
+                new Style().setColor(TextFormatting.GRAY)));
         }
         return tooltip;
     }
 
     private RequestStatus getVisibleStatus() {
         return this.isInactive.getAsBoolean() ? RequestStatus.IDLE : this.status;
-    }
-
-    private static void addStatusTooltipLine(List<ITextComponent> tooltip, RequestStatus status) {
-        tooltip.add(statusText(status));
-        tooltip.add(new TextComponentTranslation("gui.ae2.requester.status." + status.name().toLowerCase() + ".desc"));
-        tooltip.add(new TextComponentString(" "));
-    }
-
-    private static ITextComponent statusText(RequestStatus status) {
-        return new TextComponentTranslation("gui.ae2.requester.status." + status.name().toLowerCase())
-                .setStyle(new Style().setColor(statusFormatting(status)));
-    }
-
-    private static TextFormatting statusFormatting(RequestStatus status) {
-        return switch (status) {
-            case IDLE, REQUESTING, PLANNING -> TextFormatting.DARK_GREEN;
-            case MISSING -> TextFormatting.RED;
-            case CPU -> TextFormatting.GOLD;
-            case CRAFTING -> TextFormatting.YELLOW;
-            case EXPORTING -> TextFormatting.DARK_PURPLE;
-            case BLOCKING -> TextFormatting.BLUE;
-        };
     }
 
     @Override

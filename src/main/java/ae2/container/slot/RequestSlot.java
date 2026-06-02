@@ -1,7 +1,7 @@
 package ae2.container.slot;
 
 import ae2.api.stacks.GenericStack;
-import ae2.requester.Request;
+import ae2.tile.crafting.requester.Request;
 import ae2.util.ConfigInventory;
 import net.minecraft.item.ItemStack;
 
@@ -27,9 +27,7 @@ public final class RequestSlot extends FakeSlot {
         boolean oldLocked = this.locked;
         ItemStack oldStack = getConfiguredItemStack().copy();
 
-        if (request.getRequesterReference() != null) {
-            setRequester(request.getRequesterReference().getRequesterId(), request.getIndex());
-        }
+        setRequester(request.getRequesterId(), request.getIndex());
         setStack(request.getConfiguredStack());
         setLocked(request.getClientStatus().locksRequest());
         return oldRequesterId != this.requesterId

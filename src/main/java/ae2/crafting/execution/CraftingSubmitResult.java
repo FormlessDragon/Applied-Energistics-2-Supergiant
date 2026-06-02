@@ -16,6 +16,8 @@ public record CraftingSubmitResult(@Nullable ICraftingLink link,
     public static final ICraftingSubmitResult CPU_BUSY = simpleError(CraftingSubmitErrorCode.CPU_BUSY);
     public static final ICraftingSubmitResult CPU_OFFLINE = simpleError(CraftingSubmitErrorCode.CPU_OFFLINE);
     public static final ICraftingSubmitResult CPU_TOO_SMALL = simpleError(CraftingSubmitErrorCode.CPU_TOO_SMALL);
+    public static final ICraftingSubmitResult NO_CRAFTING_PATTERN =
+        simpleError(CraftingSubmitErrorCode.NO_CRAFTING_PATTERN);
 
     public static ICraftingSubmitResult successful(@Nullable ICraftingLink link) {
         return new CraftingSubmitResult(link, null, null);

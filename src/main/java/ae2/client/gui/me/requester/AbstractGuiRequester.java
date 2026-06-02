@@ -1,11 +1,10 @@
 package ae2.client.gui.me.requester;
 
-import ae2.client.gui.AEBaseGui;
 import ae2.api.behaviors.ContainerItemStrategies;
 import ae2.api.behaviors.EmptyingAction;
+import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.style.Blitter;
 import ae2.client.gui.style.GuiStyle;
-import ae2.client.gui.widgets.RequestRowWidget;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.container.me.common.AbstractContainerRequester;
 import ae2.container.slot.RequestSlot;
@@ -14,9 +13,8 @@ import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.core.network.serverbound.RequesterSlotUpdatePacket;
 import ae2.helpers.InventoryAction;
-import ae2.requester.Request;
-import ae2.requester.RequestManager;
-import ae2.requester.abstraction.RequesterReference;
+import ae2.tile.crafting.requester.Request;
+import ae2.tile.crafting.requester.RequestList;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.GlStateManager;
@@ -42,30 +40,25 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
     implements RequesterDisplay {
 
     protected static final int GUI_WIDTH = 195;
-    private static final int GUI_PADDING_X = 8;
-    private static final int GUI_PADDING_Y = 6;
     protected static final int GUI_HEADER_HEIGHT = 20;
     protected static final int GUI_FOOTER_HEIGHT = 99;
-
-    private static final int TEXT_MARGIN_X = 2;
-    private static final int TEXT_MAX_WIDTH = 156;
-
     protected static final int ROW_HEIGHT = 19;
     protected static final int MIN_ROW_COUNT = 3;
+    private static final int GUI_PADDING_X = 8;
+    private static final int GUI_PADDING_Y = 6;
+    private static final int TEXT_MARGIN_X = 2;
+    private static final int TEXT_MAX_WIDTH = 156;
     private static final int SLOT_X = GUI_PADDING_X + ROW_HEIGHT;
     private static final int SLOT_Y_OFFSET = 2;
 
     private static final Rectangle HEADER_BBOX = new Rectangle(0, 0, GUI_WIDTH, GUI_HEADER_HEIGHT);
     private static final Rectangle TEXT_BBOX = new Rectangle(0, 60, GUI_WIDTH, ROW_HEIGHT);
     private static final Rectangle REQUEST_BBOX = new Rectangle(0, 38, GUI_WIDTH, ROW_HEIGHT);
-
-    private final ResourceLocation texture;
-
     protected final InventoryPlayer playerInventory;
     protected final GuiStyle style;
     protected final Scrollbar scrollbar;
     protected final ArrayList<Object> lines = new ArrayList<>();
-
+    private final ResourceLocation texture;
     private final List<RequestRowWidget> requestWidgets = new ObjectArrayList<>();
 
     protected boolean refreshList;
@@ -84,6 +77,18 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
         }
     }
 
+    private static void readRequest(ClientRequester requester, int index, @Nullable NBTTagCompound tag) {
+        Request request = requester.getRequests().get(index);
+        if (tag != null) {
+            request.readFromNBT(tag);
+        }
+        request.setRequesterLocation(requester.getRequesterId(), index);
+    }
+
+    protected static ResourceLocation requesterTexture(String name) {
+        return AppEng.makeId("textures/guis/" + name + ".png");
+    }
+
     @Override
     public final void postClearAll() {
         clearData();
@@ -93,8 +98,8 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
     @Override
     public final void postFullUpdate(long requesterId, @Nullable ITextComponent requesterName, long sortValue,
                                      int requestCount, Int2ObjectMap<NBTTagCompound> rows) {
-        RequesterReference requester = getById(requesterId, requesterName, sortValue, requestCount);
-        RequestManager requests = requester.getRequestManager();
+        ClientRequester requester = getById(requesterId, requesterName, sortValue, requestCount);
+        RequestList requests = requester.getRequests();
         for (int i = 0; i < requests.size(); i++) {
             readRequest(requester, i, rows.get(i));
         }
@@ -104,9 +109,9 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
 
     @Override
     public final void postIncrementalUpdate(long requesterId, Int2ObjectMap<NBTTagCompound> rows) {
-        RequesterReference requester = findById(requesterId);
+        ClientRequester requester = findById(requesterId);
         if (requester != null) {
-            RequestManager requests = requester.getRequestManager();
+            RequestList requests = requester.getRequests();
             for (var entry : rows.int2ObjectEntrySet()) {
                 int index = entry.getIntKey();
                 if (index >= 0 && index < requests.size()) {
@@ -248,7 +253,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
 
     @Override
     protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, ClickType clickType) {
-        if(!(slot instanceof RequestSlot requestSlot)) {
+        if (!(slot instanceof RequestSlot requestSlot)) {
             super.handleMouseClick(slot, slotId, mouseButton, clickType);
             return;
         }
@@ -259,27 +264,16 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
 
         if (mouseButton == 1 && getEmptyingAction(slot, this.playerInventory.getItemStack()) != null) {
             var packet = new InventoryActionPacket(
-                    this.container.windowId,
-                    InventoryAction.EMPTY_ITEM,
-                    requestSlot.getRequestIndex(),
-                    requestSlot.getRequesterId()
+                this.container.windowId,
+                InventoryAction.EMPTY_ITEM,
+                requestSlot.getRequestIndex(),
+                requestSlot.getRequesterId()
             );
             InitNetwork.sendToServer(packet);
             return;
         }
 
-        InventoryAction action = null;
-        switch (clickType) {
-            case PICKUP -> action = mouseButton == 1 ? InventoryAction.SPLIT_OR_PLACE_SINGLE : InventoryAction.PICKUP_OR_SET_DOWN;
-            case QUICK_MOVE -> action = mouseButton == 1 ? InventoryAction.PICKUP_SINGLE : InventoryAction.SHIFT_CLICK;
-            case CLONE -> {
-                if (this.mc.player.capabilities.isCreativeMode) {
-                    action = InventoryAction.CREATIVE_DUPLICATE;
-                }
-            }
-            default -> {
-            }
-        }
+        InventoryAction action = getInventoryAction(mouseButton, clickType);
 
         if (action != null) {
             InitNetwork.sendToServer(new InventoryActionPacket(this.container.windowId, action,
@@ -328,7 +322,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
                                    int requestCount) {
     }
 
-    protected void afterIncrementalUpdate(long requesterId) {
+    protected void afterIncrementalUpdate(@SuppressWarnings("unused") long requesterId) {
     }
 
     protected void clearData() {
@@ -338,20 +332,12 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
 
     protected abstract Collection<?> getByName(String name);
 
-    protected abstract RequesterReference getById(long requesterId, @Nullable ITextComponent name, long sortValue,
+    protected abstract ClientRequester getById(long requesterId, @Nullable ITextComponent name, long sortValue,
                                                   int requestCount);
 
-    protected abstract @Nullable RequesterReference findById(long requesterId);
+    protected abstract @Nullable ClientRequester findById(long requesterId);
 
     protected abstract Rectangle getFooterBounds();
-
-    private static void readRequest(RequesterReference requester, int index, @Nullable NBTTagCompound tag) {
-        Request request = requester.getRequestManager().get(index);
-        if (tag != null) {
-            request.readFromNBT(tag);
-        }
-        request.setRequesterReference(requester, index);
-    }
 
     private void updateVisibleRows() {
         int scrollLevel = this.scrollbar.getCurrentScroll();
@@ -379,7 +365,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
 
     private void updateRequestSlot(int row, @Nullable Request request, boolean visible) {
         RequestSlot slot = this.container.getRequestSlots().get(row);
-        if (!visible || request == null || request.getRequesterReference() == null) {
+        if (!visible || request == null || !request.hasRequesterLocation()) {
             boolean changed = slot.clearRequest();
             slot.setSlotEnabled(false);
             slot.setActive(false);
@@ -396,18 +382,25 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
         slot.setActive(true);
         if (changed) {
             InitNetwork.sendToServer(RequesterSlotUpdatePacket.visible(this.container.windowId, row,
-                slot.getRequesterId(), slot.getRequestIndex(), slot.isLocked(), slot.getRawStack()));
+                slot.getRequesterId(), slot.getRequestIndex()));
         }
+    }
+
+    @Nullable
+    private InventoryAction getInventoryAction(int mouseButton, ClickType clickType) {
+        return switch (clickType) {
+            case PICKUP ->
+                mouseButton == 1 ? InventoryAction.SPLIT_OR_PLACE_SINGLE : InventoryAction.PICKUP_OR_SET_DOWN;
+            case QUICK_MOVE -> mouseButton == 1 ? InventoryAction.PICKUP_SINGLE : InventoryAction.SHIFT_CLICK;
+            case CLONE -> this.mc.player.capabilities.isCreativeMode ? InventoryAction.CREATIVE_DUPLICATE : null;
+            default -> null;
+        };
     }
 
     private void blit(Rectangle srcRect, int x, int y) {
         Blitter.texture(this.texture).copy()
-                .src(srcRect)
-                .dest(x, y)
-                .blit();
-    }
-
-    protected static ResourceLocation requesterTexture(String name) {
-        return AppEng.makeId("textures/guis/" + name + ".png");
+               .src(srcRect)
+               .dest(x, y)
+               .blit();
     }
 }

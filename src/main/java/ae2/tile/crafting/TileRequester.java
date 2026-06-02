@@ -22,13 +22,14 @@ import ae2.api.stacks.AEKey;
 import ae2.api.storage.StorageHelper;
 import ae2.core.AEConfig;
 import ae2.core.definitions.AEBlocks;
-import ae2.requester.RequestHost;
-import ae2.requester.RequestManager;
-import ae2.requester.StorageManager;
-import ae2.requester.status.LinkState;
-import ae2.requester.status.RequestStatus;
-import ae2.requester.status.StatusState;
 import ae2.text.TextComponentItemStack;
+import ae2.tile.crafting.requester.LinkState;
+import ae2.tile.crafting.requester.PlanState;
+import ae2.tile.crafting.requester.RequestHost;
+import ae2.tile.crafting.requester.RequestList;
+import ae2.tile.crafting.requester.RequestStatus;
+import ae2.tile.crafting.requester.RequesterStorageTracker;
+import ae2.tile.crafting.requester.StatusState;
 import ae2.tile.grid.AENetworkedTile;
 import ae2.util.SettingsFrom;
 import com.google.common.collect.ImmutableSet;
@@ -41,9 +42,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
-import java.util.Set;
 
 public class TileRequester extends AENetworkedTile implements RequestHost, IGridTickable, ICraftingForceStartRequester {
 
@@ -52,8 +53,8 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
     private static final String REQUEST_STATUS_TAG = "request_status";
     private static final String MEMORY_CARD_REQUESTS_TAG = "requester_requests";
 
-    private final RequestManager requestManager;
-    private final StorageManager storageManager;
+    private final RequestList requestManager;
+    private final RequesterStorageTracker storageManager;
     private final StatusState[] requestStatus;
     private final IActionSource actionSource = IActionSource.ofMachine(this);
     private final RequesterServices services = new GridRequesterServices();
@@ -61,8 +62,8 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
 
     public TileRequester() {
         int requestCount = AEConfig.instance().getRequests();
-        this.requestManager = new RequestManager(this, requestCount);
-        this.storageManager = new StorageManager(requestCount);
+        this.requestManager = new RequestList(this, requestCount);
+        this.storageManager = new RequesterStorageTracker(requestCount);
         this.requestStatus = new StatusState[requestCount];
 
         Arrays.fill(this.requestStatus, StatusState.IDLE);
@@ -129,11 +130,11 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
     }
 
     @Override
-    public RequestManager getRequestManager() {
+    public RequestList getRequests() {
         return this.requestManager;
     }
 
-    public StorageManager getStorageManager() {
+    public RequesterStorageTracker getStorageTracker() {
         return this.storageManager;
     }
 
@@ -156,6 +157,7 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
 
     @Override
     public void onRequestChanged(int index) {
+        this.cancelRequest(index);
         this.storageManager.clear(index);
         this.setRequestState(index, StatusState.IDLE);
         this.saveChanges();
@@ -189,8 +191,8 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
     public ImmutableSet<ICraftingLink> getRequestedJobs() {
         ImmutableSet.Builder<ICraftingLink> links = ImmutableSet.builder();
         for (StatusState state : this.requestStatus) {
-            if (state instanceof LinkState linkState) {
-                links.add(linkState.link());
+            if (state instanceof LinkState(var link)) {
+                links.add(link);
             }
         }
         return links.build();
@@ -204,7 +206,7 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
 
         int slot = this.findLinkSlot(link);
         if (slot < 0) {
-            throw new IllegalStateException("No requester crafting link found");
+            return 0;
         }
 
         if (mode == Actionable.MODULATE) {
@@ -216,7 +218,11 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
 
     @Override
     public void jobStateChange(ICraftingLink link) {
-        // Tracked by requestStatus, matching upstream. The next requester tick observes link state.
+        int slot = this.findLinkSlot(link);
+        if (slot >= 0) {
+            this.setRequestState(slot, link.isCanceled() ? StatusState.IDLE : StatusState.EXPORT);
+            this.saveChanges();
+        }
     }
 
     TickRateModulation handleRequests() {
@@ -262,15 +268,19 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
     }
 
     private void setRequestState(int slot, StatusState state) {
+        StatusState previous = this.requestStatus[slot];
+        RequestStatus previousVisibleStatus = this.requestManager.get(slot).getClientStatus();
         this.requestStatus[slot] = state;
         this.requestManager.get(slot).setClientStatus(state.visibleStatus());
-        this.markForUpdate();
+        if (!previous.equals(state) || previousVisibleStatus != state.visibleStatus()) {
+            this.markForUpdate();
+        }
     }
 
     private int findLinkSlot(ICraftingLink link) {
         for (int i = 0; i < this.requestStatus.length; i++) {
             StatusState state = this.requestStatus[i];
-            if (state instanceof LinkState linkState && linkState.link().equals(link)) {
+            if (state instanceof LinkState(var stateLink) && stateLink.equals(link)) {
                 return i;
             }
         }
@@ -281,9 +291,9 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
         var tag = new NBTTagCompound();
         for (int i = 0; i < this.requestStatus.length; i++) {
             StatusState state = this.requestStatus[i];
-            if (state instanceof LinkState linkState) {
+            if (state instanceof LinkState(var link)) {
                 var linkTag = new NBTTagCompound();
-                linkState.link().writeToNBT(linkTag);
+                link.writeToNBT(linkTag);
                 tag.setTag(Integer.toString(i), linkTag);
             }
         }
@@ -331,8 +341,36 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
 
     private void resetRuntimeState() {
         for (int i = 0; i < this.requestStatus.length; i++) {
+            this.cancelRequest(i);
             this.storageManager.clear(i);
             this.setRequestState(i, StatusState.IDLE);
+        }
+    }
+
+    @Override
+    public void onChunkUnloaded() {
+        this.cancelAllRequests();
+        super.onChunkUnloaded();
+    }
+
+    @Override
+    public void setRemoved() {
+        this.cancelAllRequests();
+        super.setRemoved();
+    }
+
+    private void cancelAllRequests() {
+        for (int i = 0; i < this.requestStatus.length; i++) {
+            this.cancelRequest(i);
+        }
+    }
+
+    private void cancelRequest(int slot) {
+        StatusState state = this.requestStatus[slot];
+        if (state instanceof LinkState(var link)) {
+            link.cancel();
+        } else if (state instanceof PlanState(var future)) {
+            future.cancel(true);
         }
     }
 
@@ -345,6 +383,14 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
                                          boolean forceStart);
 
         long insert(AEKey key, long amount);
+    }
+
+    private record SubmitResult(CraftingSubmitErrorCode errorCode, ICraftingLink link)
+        implements ICraftingSubmitResult {
+        @Override
+        public Object errorDetail() {
+            return null;
+        }
     }
 
     private final class GridRequesterServices implements RequesterServices {
@@ -382,14 +428,6 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
             }
             return StorageHelper.poweredInsert(grid.getEnergyService(), grid.getStorageService().getInventory(),
                 key, amount, actionSource, Actionable.MODULATE);
-        }
-    }
-
-    private record SubmitResult(CraftingSubmitErrorCode errorCode, ICraftingLink link)
-        implements ICraftingSubmitResult {
-        @Override
-        public Object errorDetail() {
-            return null;
         }
     }
 

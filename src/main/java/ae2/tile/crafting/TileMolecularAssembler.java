@@ -101,7 +101,8 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     private final IUpgradeInventory upgrades = new MolecularAssemblerUpgradeInventory(this);
     private final ObjectList<GenericStack> cachedOutputs = new ObjectArrayList<>();
     private final ObjectList<IAssemblerPattern> patterns = new ObjectArrayList<>();
-    private final ObjectOpenHashSet<AEItemKey> patternKeys = new ObjectOpenHashSet<>();    private final GenericStackInv outputBuffer = new GenericStackInv(this::onBufferChanged, OUTPUT_BUFFER_SLOTS);
+    private final ObjectOpenHashSet<AEItemKey> patternKeys = new ObjectOpenHashSet<>();
+    private final GenericStackInv outputBuffer = new GenericStackInv(this::onBufferChanged, OUTPUT_BUFFER_SLOTS);
     private final IActionSource actionSource = new MachineSource(this::getGridNode);
     private int priority;
     @Nullable
@@ -116,7 +117,6 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     private boolean reboot = true;
     @Nullable
     private AssemblerAnimationStatus animationStatus;
-
     public TileMolecularAssembler() {
         this.getMainNode()
             .setIdlePowerUsage(0.0)
@@ -888,7 +888,4 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
             return super.extractItem(slot, amount, simulate);
         }
     }
-
-
-
 }
