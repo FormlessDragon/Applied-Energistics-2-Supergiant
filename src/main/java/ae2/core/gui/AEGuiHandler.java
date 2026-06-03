@@ -107,6 +107,10 @@ import ae2.container.me.items.ContainerCraftingTerm;
 import ae2.container.me.items.ContainerPatternEncodingTerm;
 import ae2.container.me.items.ContainerWirelessCraftingTerm;
 import ae2.container.networking.ContainerControllerStatus;
+import ae2.client.gui.implementations.GuiNetworkAnalyser;
+import ae2.client.gui.implementations.GuiTickAnalyser;
+import ae2.container.implementations.ContainerNetworkAnalyser;
+import ae2.container.implementations.ContainerTickAnalyser;
 import ae2.core.gui.locator.GuiHostLocator;
 import ae2.core.gui.locator.GuiHostLocators;
 import ae2.core.gui.locator.ItemGuiHostLocator;
@@ -186,6 +190,8 @@ public class AEGuiHandler implements IGuiHandler {
     private static boolean isItemGui(GuiIds.GuiKey bridge) {
         return bridge == GuiIds.GuiKey.QUARTZ_KNIFE
             || bridge == GuiIds.GuiKey.NETWORK_TOOL
+            || bridge == GuiIds.GuiKey.NETWORK_ANALYSER
+            || bridge == GuiIds.GuiKey.TICK_ANALYSER
             || bridge == GuiIds.GuiKey.CONFIG_MODIFIER
             || bridge == GuiIds.GuiKey.PATTERN_MODIFIER
             || bridge == GuiIds.GuiKey.NETWORK_STATUS
@@ -525,6 +531,12 @@ public class AEGuiHandler implements IGuiHandler {
             case NETWORK_TOOL -> {
                 return createNetworkToolContainer(player, x, ID);
             }
+            case NETWORK_ANALYSER -> {
+                return createNetworkAnalyserContainer(player, x, ID);
+            }
+            case TICK_ANALYSER -> {
+                return createTickAnalyserContainer(player, x, ID);
+            }
             case CONFIG_MODIFIER -> {
                 return createConfigModifierContainer(player, x, ID);
             }
@@ -582,12 +594,29 @@ public class AEGuiHandler implements IGuiHandler {
         return initContainer(new ContainerNetworkTool(player.inventory, host), locator, guiId);
     }
 
+    private @Nullable ContainerNetworkAnalyser createNetworkAnalyserContainer(EntityPlayer player, int slot, int guiId) {
+        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+        ItemGuiHost<?> host = createItemGuiHost(player, locator, GuiIds.GuiKey.NETWORK_ANALYSER);
+        if (host == null) {
+            return null;
+        }
+
+        return initContainer(new ContainerNetworkAnalyser(player.inventory, host), locator, guiId);
+    }
+
+    private @Nullable ContainerTickAnalyser createTickAnalyserContainer(EntityPlayer player, int slot, int guiId) {
+        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+        ItemGuiHost<?> host = createItemGuiHost(player, locator, GuiIds.GuiKey.TICK_ANALYSER);
+        if (host == null) {
+            return null;
+        }
+
+        return initContainer(new ContainerTickAnalyser(player.inventory, host), locator, guiId);
+    }
+
     @Override
     public Object getClientGuiElement(int ID, EntityPlayer player, World world, int x, int y, int z) {
         GuiIds.GuiKey bridge = GuiIds.GuiKey.fromId(ID);
-        if (bridge == null) {
-            return null;
-        }
         TileEntity te = isItemGui(bridge) || isPartGui(bridge) ? null : world.getTileEntity(new BlockPos(x, y, z));
 
         switch (bridge) {
@@ -1009,6 +1038,14 @@ public class AEGuiHandler implements IGuiHandler {
                         GuiStyleManager.loadStyleDoc("/screens/network_tool.json"));
                 }
                 return null;
+            }
+            case NETWORK_ANALYSER -> {
+                ContainerNetworkAnalyser container = createNetworkAnalyserContainer(player, x, ID);
+                return container == null ? null : new GuiNetworkAnalyser(container, player.inventory);
+            }
+            case TICK_ANALYSER -> {
+                ContainerTickAnalyser container = createTickAnalyserContainer(player, x, ID);
+                return container == null ? null : new GuiTickAnalyser(container, player.inventory);
             }
             case CONFIG_MODIFIER -> {
                 ContainerConfigModifier container = createConfigModifierContainer(player, x, ID);

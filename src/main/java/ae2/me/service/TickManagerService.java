@@ -25,6 +25,7 @@ import ae2.api.networking.ticking.ITickManager;
 import ae2.api.networking.ticking.TickRateModulation;
 import ae2.me.GridNode;
 import ae2.me.service.helpers.TickTracker;
+import ae2.me.ticker.RequestBox;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterators;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
@@ -345,7 +346,7 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
     private TickRateModulation unsafeTickingRequest(TickTracker tt, int diff) {
         try {
             // Shortcut to immediately return when monitoring is disabled.
-            if (!MONITORING_ENABLED) {
+            if (!MONITORING_ENABLED && !RequestBox.hasJob()) {
                 return tt.getGridTickable().tickingRequest(tt.getNode(), diff);
             }
 
@@ -355,7 +356,10 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
 
             stopWatch.stop();
             long elapsedTime = stopWatch.elapsed(TimeUnit.NANOSECONDS);
-            tt.getStatistics().accept(elapsedTime);
+            if (MONITORING_ENABLED) {
+                tt.getStatistics().accept(elapsedTime);
+            }
+            RequestBox.acceptTick(elapsedTime, diff, tt.getNode());
 
             return mod;
         } catch (Throwable t) {

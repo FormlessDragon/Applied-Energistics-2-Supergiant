@@ -35,6 +35,8 @@ import java.util.Map;
 @SuppressWarnings("unused")
 public final class AEItemIds {
     public static final ResourceLocation NETWORK_TOOL = id("network_tool");
+    public static final ResourceLocation NETWORK_ANALYSER = id("network_analyser");
+    public static final ResourceLocation TICK_ANALYSER = id("tick_analyser");
     public static final ResourceLocation ME_PACKING_TAPE = id("me_packing_tape");
     public static final ResourceLocation PACKAGE = id("package");
     public static final ResourceLocation CONFIG_MODIFIER = id("config_modifier");

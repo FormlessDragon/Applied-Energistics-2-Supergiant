@@ -44,6 +44,8 @@ import ae2.init.internal.InitUpgrades;
 import ae2.init.worldgen.InitBiomes;
 import ae2.init.worldgen.InitDimensionTypes;
 import ae2.integration.Integrations;
+import ae2.me.ticker.RequestBox;
+import ae2.me.tracker.PlayerTracker;
 import ae2.recipes.AERecipeLoader;
 import ae2.server.AECommand;
 import ae2.server.services.ChunkLoadingService;
@@ -129,6 +131,8 @@ public final class AppEngBase implements AppEng {
 
     @Mod.EventHandler
     public void serverStarting(FMLServerStartingEvent event) {
+        RequestBox.clear();
+        PlayerTracker.clear();
         event.registerServerCommand(new AECommand(event.getServer()));
     }
 
@@ -139,6 +143,8 @@ public final class AppEngBase implements AppEng {
 
     @Mod.EventHandler
     public void serverStopped(FMLServerStoppedEvent event) {
+        RequestBox.clear();
+        PlayerTracker.clear();
         TickHandler.instance().shutdown();
     }
 
@@ -166,6 +172,8 @@ public final class AppEngBase implements AppEng {
         MinecraftForge.EVENT_BUS.register(new CableBusLeftClickHook());
         MinecraftForge.EVENT_BUS.register(new WrenchHook());
         MinecraftForge.EVENT_BUS.register(new WirelessTerminalEventHandler());
+        MinecraftForge.EVENT_BUS.register(RequestBox.class);
+        MinecraftForge.EVENT_BUS.register(PlayerTracker.class);
         TickHandler.instance().init();
         AppEngRegistries.init();
         InitGridServices.init();

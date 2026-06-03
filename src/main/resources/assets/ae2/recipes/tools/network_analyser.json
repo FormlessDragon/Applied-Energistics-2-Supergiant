@@ -1,0 +1,28 @@
+{
+  "type": "forge:ore_shaped",
+  "pattern": [
+    "C C",
+    "ILI",
+    "MIM"
+  ],
+  "key": {
+    "C": {
+      "type": "forge:ore_dict",
+      "ore": "ingotCopper"
+    },
+    "I": {
+      "type": "forge:ore_dict",
+      "ore": "ingotIron"
+    },
+    "L": {
+      "item": "ae2:logic_processor"
+    },
+    "M": {
+      "item": "ae2:sky_dust"
+    }
+  },
+  "result": {
+    "item": "ae2:network_analyser",
+    "count": 1
+  }
+}
