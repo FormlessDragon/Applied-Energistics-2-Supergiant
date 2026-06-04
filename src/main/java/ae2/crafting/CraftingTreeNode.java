@@ -63,6 +63,8 @@ public class CraftingTreeNode {
      * The patterns that can make this node. Null if they haven't been computed yet.
      */
     private List<CraftingTreeProcess> nodes = null;
+    private Boolean selfReturningRemainderInput;
+    private boolean recursiveDisplayNodesInitialized;
 
     public CraftingTreeNode(ICraftingService cc, CraftingCalculation job, AEKey what, long amount,
                             CraftingTreeProcess par, int slot) {
@@ -152,7 +154,12 @@ public class CraftingTreeNode {
 
         if (this.job.isRequesting(this.what)) {
             if (this.job.resolveRecursiveRequest(this.what, inv, requestedAmount * this.amount)) {
+                this.job.addRecursiveDisplayRequest(this, requestedAmount * this.amount);
                 if (this.what.equals(this.job.getOutput())) {
+                    var currentRequest = this.job.getCurrentRequestKey();
+                    if (currentRequest != null) {
+                        this.job.addRecursiveFinalOutputInput(currentRequest);
+                    }
                     this.job.addRecursiveIntermediateFinalOutput(requestedAmount * this.amount);
                 }
                 return;
@@ -239,20 +246,25 @@ public class CraftingTreeNode {
             for (CraftingTreeProcess pro : this.nodes) {
                 totalRequestedItems = requestCraftingBranch(inv, pro, totalRequestedItems);
                 if (totalRequestedItems <= 0) {
-                    return;
+                    break;
                 }
+            }
+            if (totalRequestedItems <= 0) {
+                return;
             }
         }
 
         if (totalRequestedItems > 0 && this.job.canUseMissingItems() && !this.nodes.isEmpty()) {
-            requestMissingBranch(inv, this.nodes.getFirst(), totalRequestedItems);
+            requestMissingBranches(inv, totalRequestedItems);
             return;
         }
 
-        if (this.job.canUseMissingItems()) {
-            job.addMissing(this.what, totalRequestedItems);
-        } else {
-            throw new CraftBranchFailure(this.what, totalRequestedItems);
+        if (totalRequestedItems > 0) {
+            if (this.job.canUseMissingItems()) {
+                job.addMissing(this.what, totalRequestedItems);
+            } else {
+                throw new CraftBranchFailure(this.what, totalRequestedItems);
+            }
         }
     }
 
@@ -273,7 +285,17 @@ public class CraftingTreeNode {
             }
 
             long available;
-            if (pro.applyReusablePreview(inv, times)) {
+            long missingSeedAmount = pro.getReusablePreviewRecursiveMissingSeedAmount(this.what);
+            if (missingSeedAmount > 0) {
+                long usedMissingSeed = Math.min(totalRequestedItems, missingSeedAmount);
+                pro.applyReusablePreviewRecursiveMissingSeedsOnly();
+                totalRequestedItems -= usedMissingSeed;
+                if (totalRequestedItems <= 0) {
+                    return 0;
+                }
+                continue;
+            } else if (pro.applyReusablePreview(inv, times)) {
+                pro.addTreeRequestTimes(times);
                 available = extractCraftedBranchOutput(inv, totalRequestedItems);
             } else {
                 final ChildCraftingSimulationState child = new ChildCraftingSimulationState(inv);
@@ -281,6 +303,7 @@ public class CraftingTreeNode {
                 try {
                     this.job.pushMissingSuppression();
                     this.job.runTimedCrafting("request-branch " + this.what, () -> pro.request(child, times));
+                    pro.addTreeRequestTimes(times);
                 } catch (CraftBranchFailure failure) {
                     this.job.restoreIntermediateFinalOutputMarker(intermediateFinalOutputMarker);
                     pro.possible = false;
@@ -314,19 +337,32 @@ public class CraftingTreeNode {
         return totalRequestedItems;
     }
 
-    private void requestMissingBranch(CraftingSimulationState inv, CraftingTreeProcess pro, long totalRequestedItems)
+    private void requestMissingBranches(CraftingSimulationState inv, long totalRequestedItems)
         throws CraftBranchFailure, InterruptedException {
-        if (pro.getInputCount(this.what) >= pro.getOutputCount(this.what)) {
-            job.addMissing(this.what, totalRequestedItems);
-            return;
+        boolean requestedAnyBranch = false;
+        for (CraftingTreeProcess pro : this.nodes) {
+            if (pro.getInputCount(this.what) >= pro.getOutputCount(this.what)) {
+                continue;
+            }
+            requestMissingBranch(inv, pro, totalRequestedItems);
+            requestedAnyBranch = true;
+            break;
         }
 
+        if (!requestedAnyBranch) {
+            job.addMissing(this.what, totalRequestedItems);
+        }
+    }
+
+    private void requestMissingBranch(CraftingSimulationState inv, CraftingTreeProcess pro, long totalRequestedItems)
+        throws CraftBranchFailure, InterruptedException {
         var craftedPerPattern = getEffectiveOutputCount(pro);
         var recursiveBatch = this.job.getRecursivePatternBatch(pro.details, this.what);
 
         while (totalRequestedItems > 0) {
             long times = getRequestedPatternTimes(pro, totalRequestedItems, craftedPerPattern, recursiveBatch);
             this.job.runTimedCrafting("request-missing-branch " + this.what, () -> pro.request(inv, times));
+            pro.addTreeRequestTimes(times);
 
             // by now we have succeeded, as request throws an exception in case of failure
             // check how much was actually produced
@@ -338,7 +374,6 @@ public class CraftingTreeNode {
                     return;
                 }
             } else {
-                job.addMissing(this.what, totalRequestedItems);
                 return;
             }
         }
@@ -389,11 +424,16 @@ public class CraftingTreeNode {
         }
 
         if (this.job.isRequesting(this.what)) {
-            if (this.job.canResolveRecursiveRequest(this.what)) {
+            if (this.job.canResolveRecursiveRequest(this.what, inv, available * this.amount)) {
                 long remainingAmount = maxAmount - available;
                 if (remainingAmount > 0) {
+                    this.job.addRecursiveDisplayRequest(this, maxAmount * this.amount);
                     inv.insert(this.what, remainingAmount * this.amount, Actionable.MODULATE);
                     if (this.what.equals(this.job.getOutput())) {
+                        var currentRequest = this.job.getCurrentRequestKey();
+                        if (currentRequest != null) {
+                            this.job.addRecursiveFinalOutputInput(currentRequest);
+                        }
                         this.job.addRecursiveIntermediateFinalOutput(remainingAmount * this.amount);
                     }
                 }
@@ -420,10 +460,24 @@ public class CraftingTreeNode {
             if (times <= 0) {
                 continue;
             }
-            if (!pro.applyReusablePreview(inv, times)) {
+            long missingSeedAmount = pro.getReusablePreviewRecursiveMissingSeedAmount(this.what);
+            if (missingSeedAmount > 0) {
+                long usedMissingSeed = Math.min(totalRequestedItems, missingSeedAmount);
+                pro.applyReusablePreviewRecursiveMissingSeedsOnly();
+                totalRequestedItems -= usedMissingSeed;
+                available += usedMissingSeed / this.amount;
+                if (totalRequestedItems <= 0) {
+                    break;
+                }
+                continue;
+            }
+            if (pro.applyReusablePreview(inv, times)) {
+                pro.addTreeRequestTimes(times);
+            } else {
                 try {
                     this.job.pushMissingSuppression();
                     this.job.runTimedCrafting("request-input-branch " + this.what, () -> pro.request(inv, times));
+                    pro.addTreeRequestTimes(times);
                 } catch (CraftBranchFailure ignored) {
                     continue;
                 } finally {
@@ -580,6 +634,7 @@ public class CraftingTreeNode {
     }
 
     void resetPossible() {
+        this.recursiveDisplayNodesInitialized = false;
         if (this.nodes != null) {
             for (CraftingTreeProcess pro : this.nodes) {
                 pro.resetPossible();
@@ -589,6 +644,51 @@ public class CraftingTreeNode {
 
     public List<CraftingTreeProcess> getNodes() {
         return this.nodes;
+    }
+
+    public List<CraftingTreeProcess> getDisplayNodes() {
+        long recursiveDisplayAmount = getRecursiveDisplayAmount();
+        if (this.nodes == null && recursiveDisplayAmount > 0) {
+            buildChildPatterns();
+        }
+        if (this.nodes != null && recursiveDisplayAmount > 0 && !this.recursiveDisplayNodesInitialized) {
+            this.recursiveDisplayNodesInitialized = true;
+            for (CraftingTreeProcess process : this.nodes) {
+                long outputCount = process.getOutputCount(this.what);
+                if (outputCount <= 0) {
+                    continue;
+                }
+                process.addTreeRequestTimes((recursiveDisplayAmount + outputCount - 1) / outputCount);
+                break;
+            }
+        }
+        return this.nodes;
+    }
+
+    CraftingTreeNode findDisplayNodeFor(AEKey key) {
+        return findDisplayNodeFor(key, true);
+    }
+
+    private CraftingTreeNode findDisplayNodeFor(AEKey key, boolean skipSelf) {
+        if (!skipSelf && this.what.equals(key)) {
+            return this;
+        }
+        if (this.nodes == null) {
+            return null;
+        }
+        for (CraftingTreeProcess process : this.nodes) {
+            for (CraftingTreeNode node : process.getNodes().keySet()) {
+                var found = node.findDisplayNodeFor(key, false);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
+    public long getRecursiveDisplayAmount() {
+        return this.job.getRecursiveDisplayRequest(this);
     }
 
     public AEKey getWhat() {
@@ -601,6 +701,23 @@ public class CraftingTreeNode {
 
     public long getMissing() {
         return job.getMissingItems().get(what);
+    }
+
+    public boolean hasSelfReturningRemainderInput() {
+        if (this.parentInput == null) {
+            return false;
+        }
+
+        if (selfReturningRemainderInput != null) {
+            return selfReturningRemainderInput;
+        }
+
+        for (var possibleInput : this.parentInput.possibleInputs()) {
+            if (possibleInput.what().equals(this.parentInput.getRemainingKey(possibleInput.what()))) {
+                return selfReturningRemainderInput = true;
+            }
+        }
+        return selfReturningRemainderInput = this.what.equals(this.parentInput.getRemainingKey(this.what));
     }
 
     long getTemplateAmount() {

@@ -59,7 +59,9 @@ public class SwitchCraftingTreePacket extends ServerboundPacket {
         FutureTask<ICraftingPlan> fakeFuture = new FutureTask<>(() -> result);
         craftingTree.setJob(fakeFuture);
         fakeFuture.run();
-        InitNetwork.sendToClient(player, new CraftingTreeDataPacket(tree, job.finalOutput()));
+        InitNetwork.sendToClient(player,
+            new CraftingTreeDataPacket(tree, job.finalOutput(), job.patternTimes(), job.usedItems(),
+                job.missingItems()));
     }
 
     @Override

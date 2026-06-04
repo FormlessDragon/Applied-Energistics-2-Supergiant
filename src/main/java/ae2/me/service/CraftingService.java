@@ -66,10 +66,12 @@ import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -79,6 +81,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class CraftingService implements ICraftingService, IGridServiceProvider {
+    private static final String TAG_RECURSIVE_INGREDIENT_RESERVE_AMOUNT = "recursiveIngredientReserveAmount";
+    private static final long DEFAULT_RECURSIVE_INGREDIENT_RESERVE_AMOUNT = 1;
 
     private static final Comparator<CraftingCPUCluster> FAST_FIRST_COMPARATOR = Comparator
         .comparingInt(CraftingCPUCluster::getCoProcessors)
@@ -118,6 +122,8 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
     private final ObjectSet<AEKey> currentlyCraftable = new ObjectOpenHashSet<>();
     private long lastProcessedCraftingLogicChangeTick;
     private long lastProcessedCraftableChangeTick;
+    private long recursiveIngredientReserveAmount = DEFAULT_RECURSIVE_INGREDIENT_RESERVE_AMOUNT;
+    private boolean recursiveIngredientReserveAmountRestored;
     private boolean updateList = false;
 
     public CraftingService(IGrid grid, IStorageService storageGrid, IEnergyService energyGrid) {
@@ -234,6 +240,10 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
     @Override
     public void addNode(IGridNode gridNode, @Nullable NBTTagCompound savedData) {
+        if (savedData != null) {
+            this.restoreRecursiveIngredientReserveAmount(savedData);
+        }
+
         this.craftingProviders.removeProvider(gridNode);
         this.craftingProviders.addProvider(gridNode);
 
@@ -256,6 +266,21 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         if (gridNode.getOwner() instanceof ICraftingCPUTileEntity) {
             this.updateList = true;
         }
+    }
+
+    private void restoreRecursiveIngredientReserveAmount(NBTTagCompound savedData) {
+        if (this.recursiveIngredientReserveAmountRestored
+            || !savedData.hasKey(TAG_RECURSIVE_INGREDIENT_RESERVE_AMOUNT, Constants.NBT.TAG_LONG)) {
+            return;
+        }
+
+        this.recursiveIngredientReserveAmount = Math.max(0, savedData.getLong(TAG_RECURSIVE_INGREDIENT_RESERVE_AMOUNT));
+        this.recursiveIngredientReserveAmountRestored = true;
+    }
+
+    @Override
+    public void saveNodeData(IGridNode gridNode, NBTTagCompound savedData) {
+        savedData.setLong(TAG_RECURSIVE_INGREDIENT_RESERVE_AMOUNT, this.recursiveIngredientReserveAmount);
     }
 
     @Override
@@ -480,8 +505,26 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         return !this.currentlyCrafting.isEmpty();
     }
 
+    @Override
+    public long getRecursiveIngredientReserveAmount() {
+        return this.recursiveIngredientReserveAmount;
+    }
+
+    @Override
+    public void setRecursiveIngredientReserveAmount(long amount) {
+        this.recursiveIngredientReserveAmount = Math.max(0, amount);
+    }
+
     public Iterable<ICraftingProvider> getProviders(IPatternDetails key) {
         return this.craftingProviders.getMediums(key);
+    }
+
+    public List<ICraftingProvider> getProvidersSnapshot(IPatternDetails key) {
+        return this.craftingProviders.getMediumsSnapshot(key);
+    }
+
+    public IGrid getGrid() {
+        return this.grid;
     }
 
     public boolean hasCpu(ICraftingCPU cpu) {

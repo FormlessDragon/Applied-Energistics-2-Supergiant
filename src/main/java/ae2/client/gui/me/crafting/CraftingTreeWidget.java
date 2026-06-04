@@ -1,5 +1,7 @@
 package ae2.client.gui.me.crafting;
 
+import ae2.api.client.AEKeyRendering;
+import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
 import ae2.client.Point;
@@ -7,9 +9,12 @@ import ae2.client.gui.ICompositeWidget;
 import ae2.client.gui.Icon;
 import ae2.client.gui.Tooltip;
 import ae2.client.gui.me.common.StackSizeRenderer;
+import ae2.client.render.overlay.CraftingSupplierHighlightHandler;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
+import ae2.crafting.execution.CraftingSupplierLocation;
+import ae2.crafting.execution.CraftingSupplierLocator;
 import ae2.integration.data.LiteCraftTreeNode;
 import ae2.integration.data.LiteCraftTreeProc;
 import ae2.integration.modules.hei.CraftingTreeUtils;
@@ -28,7 +33,9 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.fml.client.config.GuiUtils;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.input.Keyboard;
@@ -52,6 +59,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
     private static final int NODE_TOTAL_HEIGHT = NODE_HEIGHT + LINE_TOTAL_HEIGHT;
     private static final int ROOT_MARGIN_TOP = 4;
     private static final int NODE_MARGIN_LEFT = 6;
+    private static final int NODE_TOTAL_WIDTH = NODE_WIDTH + NODE_MARGIN_LEFT;
     private static final int LINE_RENDER_OFFSET = (NODE_WIDTH - (LINE_WIDTH * 2)) / 2;
     private static final int ITEM_RENDER_OFFSET = 2;
 
@@ -86,7 +94,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
     private static boolean findLeftNode(TreeNode node, boolean missingOnly) {
         TreeNode previous = node.previous;
         while (previous != null) {
-            if (!missingOnly || LiteCraftTreeNode.isMissing(previous.node)) {
+            if (previous.isSelectable() && (!missingOnly || previous.isMissing())) {
                 previous.select();
                 return true;
             }
@@ -98,7 +106,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
     private static boolean findRightNode(TreeNode node, boolean missingOnly) {
         TreeNode next = node.next;
         while (next != null) {
-            if (!missingOnly || LiteCraftTreeNode.isMissing(next.node)) {
+            if (next.isSelectable() && (!missingOnly || next.isMissing())) {
                 next.select();
                 return true;
             }
@@ -283,21 +291,13 @@ public class CraftingTreeWidget implements ICompositeWidget {
         }
     }
 
-    @Override
-    public boolean onMouseDown(Point mousePos, int button) {
-        Point relativeMouse = toScaledTreeMouse(mousePos);
-        TreeNode node = findNodeAt(relativeMouse);
-        if (node != null) {
-            node.select();
-            return true;
+    private static boolean isMissing(LiteCraftTreeProc proc) {
+        for (LiteCraftTreeNode input : proc.inputs()) {
+            if (LiteCraftTreeNode.isMissing(input)) {
+                return true;
+            }
         }
-
-        mouseDown = true;
-        prevMouseX = mousePos.x();
-        prevMouseY = mousePos.y();
-        mouseClickX = mousePos.x();
-        mouseClickY = mousePos.y();
-        return true;
+        return false;
     }
 
     @Override
@@ -345,43 +345,12 @@ public class CraftingTreeWidget implements ICompositeWidget {
         return true;
     }
 
-    @Override
-    public boolean onKeyTyped(char typedChar, int keyCode) {
-        if (hovered != null) {
-            int showRecipeKeyCode = KeyBindings.showRecipe.getKeyCode();
-            int showUsesKeyCode = KeyBindings.showUses.getKeyCode();
-            int bookmarkKeyCode = KeyBindings.bookmark.getKeyCode();
-
-            if (showRecipeKeyCode > 0 && showRecipeKeyCode <= 255 && showRecipeKeyCode == keyCode) {
-                return CraftingTreeUtils.showStackFocus(hovered.node.output(), IFocus.Mode.OUTPUT);
-            }
-            if (showUsesKeyCode > 0 && showUsesKeyCode <= 255 && showUsesKeyCode == keyCode) {
-                return CraftingTreeUtils.showStackFocus(hovered.node.output(), IFocus.Mode.INPUT);
-            }
-            if (bookmarkKeyCode > 0 && bookmarkKeyCode <= 255 && bookmarkKeyCode == keyCode) {
-                return CraftingTreeUtils.addIngredientToBookmarkList(hovered.node.output());
-            }
+    private static int getNodeRenderDepth(LiteCraftTreeNode node) {
+        int maxDepth = 0;
+        for (LiteCraftTreeProc proc : node.inputs()) {
+            maxDepth = Math.max(maxDepth, 1 + getProcessRenderDepth(proc));
         }
-
-        if (selected == null) {
-            return false;
-        }
-
-        boolean ctrlPressed = Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL);
-        boolean selectChanged = switch (keyCode) {
-            case Keyboard.KEY_LEFT -> findLeftNode(selected, ctrlPressed);
-            case Keyboard.KEY_RIGHT -> findRightNode(selected, ctrlPressed);
-            case Keyboard.KEY_UP -> findVerticalNode(-1);
-            case Keyboard.KEY_DOWN -> findVerticalNode(1);
-            default -> false;
-        };
-
-        if (!selectChanged) {
-            return false;
-        }
-
-        scrollSelectedIntoView();
-        return true;
+        return maxDepth;
     }
 
     @Nullable
@@ -429,22 +398,13 @@ public class CraftingTreeWidget implements ICompositeWidget {
         return image;
     }
 
-    private void rebuildTree() {
-        GenericStack selectedOutput = selected == null ? null : selected.node.output();
-        selected = null;
-        nodes = 0;
-        rows.clear();
-
-        LiteCraftTreeNode treeRoot = getCurrentRoot();
-        if (treeRoot != null) {
-            addNodeRecursive(treeRoot, 0);
+    private static int getProcessRenderDepth(LiteCraftTreeProc proc) {
+        int inputDepth = getProcessInputDepth(proc);
+        int maxDepth = inputDepth;
+        for (LiteCraftTreeNode input : proc.inputs()) {
+            maxDepth = Math.max(maxDepth, inputDepth + getNodeRenderDepth(input));
         }
-
-        TreeNode restoredSelection = findNodeByOutput(selectedOutput);
-        if (restoredSelection != null) {
-            restoredSelection.select();
-        }
-        clampOffsets();
+        return maxDepth;
     }
 
     private void clearTree() {
@@ -466,6 +426,92 @@ public class CraftingTreeWidget implements ICompositeWidget {
         return missingOnly ? missingOnlyRoot : root;
     }
 
+    private static int getProcessInputDepth(LiteCraftTreeProc proc) {
+        if (proc.machines().isEmpty()) {
+            return 0;
+        }
+        return proc.machines().size() > 1 ? 2 : 1;
+    }
+
+    @Override
+    public boolean onMouseDown(Point mousePos, int button) {
+        Point relativeMouse = toScaledTreeMouse(mousePos);
+        TreeNode node = findNodeAt(relativeMouse);
+        if (node != null) {
+            if (button == 0 && GuiScreen.isShiftKeyDown() && node.highlightMachinesAndClose()) {
+                return true;
+            }
+            node.select();
+            return true;
+        }
+
+        mouseDown = true;
+        prevMouseX = mousePos.x();
+        prevMouseY = mousePos.y();
+        mouseClickX = mousePos.x();
+        mouseClickY = mousePos.y();
+        return true;
+    }
+
+    @Override
+    public boolean onKeyTyped(char typedChar, int keyCode) {
+        GenericStack hoveredOutput = hovered == null ? null : hovered.getOutput();
+        if (hoveredOutput != null) {
+            int showRecipeKeyCode = KeyBindings.showRecipe.getKeyCode();
+            int showUsesKeyCode = KeyBindings.showUses.getKeyCode();
+            int bookmarkKeyCode = KeyBindings.bookmark.getKeyCode();
+
+            if (showRecipeKeyCode > 0 && showRecipeKeyCode <= 255 && showRecipeKeyCode == keyCode) {
+                return CraftingTreeUtils.showStackFocus(hoveredOutput, IFocus.Mode.OUTPUT);
+            }
+            if (showUsesKeyCode > 0 && showUsesKeyCode <= 255 && showUsesKeyCode == keyCode) {
+                return CraftingTreeUtils.showStackFocus(hoveredOutput, IFocus.Mode.INPUT);
+            }
+            if (bookmarkKeyCode > 0 && bookmarkKeyCode <= 255 && bookmarkKeyCode == keyCode) {
+                return CraftingTreeUtils.addIngredientToBookmarkList(hoveredOutput);
+            }
+        }
+
+        if (selected == null) {
+            return false;
+        }
+
+        boolean ctrlPressed = Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL);
+        boolean selectChanged = switch (keyCode) {
+            case Keyboard.KEY_LEFT -> findLeftNode(selected, ctrlPressed);
+            case Keyboard.KEY_RIGHT -> findRightNode(selected, ctrlPressed);
+            case Keyboard.KEY_UP -> findVerticalNode(-1);
+            case Keyboard.KEY_DOWN -> findVerticalNode(1);
+            default -> false;
+        };
+
+        if (!selectChanged) {
+            return false;
+        }
+
+        scrollSelectedIntoView();
+        return true;
+    }
+
+    private void rebuildTree() {
+        GenericStack selectedOutput = selected == null ? null : selected.getOutput();
+        selected = null;
+        nodes = 0;
+        rows.clear();
+
+        LiteCraftTreeNode treeRoot = getCurrentRoot();
+        if (treeRoot != null) {
+            addNodeRecursive(treeRoot, 0);
+        }
+        alignJunctionsToRowBottom();
+
+        TreeNode restoredSelection = findNodeByOutput(selectedOutput);
+        if (restoredSelection != null) {
+            restoredSelection.select();
+        }
+        clampOffsets();
+    }
+
     private TreeNode addNodeRecursive(LiteCraftTreeNode node, int depth) {
         TreeNode nodeWidget = new TreeNode(node);
         if (depth == 0) {
@@ -478,42 +524,120 @@ public class CraftingTreeWidget implements ICompositeWidget {
 
         List<TreeNode> directChildren = new ObjectArrayList<>();
         for (LiteCraftTreeProc proc : node.inputs()) {
-            for (LiteCraftTreeNode input : proc.inputs()) {
-                directChildren.add(addNodeRecursive(input, depth + 1));
-            }
+            int firstProcessDepth = depth + 1;
+            int lastProcessDepth = firstProcessDepth + getProcessRenderDepth(proc);
+            alignRows(firstProcessDepth, lastProcessDepth);
+            directChildren.addAll(addProcessRecursive(proc, depth + 1));
+            alignRows(firstProcessDepth, lastProcessDepth);
         }
 
-        fillEmpty(depth, node.getRenderExpandNodes());
-        nodeWidget.childLinkWidth = getChildLinkWidth(nodeWidget, directChildren);
+        configureChildLink(nodeWidget, directChildren);
+        alignRows(depth, depth + getNodeRenderDepth(node));
         return nodeWidget;
     }
 
-    private int getChildLinkWidth(TreeNode parent, List<TreeNode> directChildren) {
-        if (directChildren.size() <= 1) {
-            return 0;
+    private List<TreeNode> addProcessRecursive(LiteCraftTreeProc proc, int depth) {
+        if (proc.machines().isEmpty()) {
+            return addProcessInputs(proc, depth);
+        }
+
+        if (proc.machines().size() > 1) {
+            alignRows(depth, depth + 2);
+        }
+
+        List<TreeNode> machineNodes = new ObjectArrayList<>();
+        boolean missing = isMissing(proc);
+        for (PatternContainerGroup machine : proc.machines()) {
+            TreeNode machineNode = new TreeNode(machine, proc.machineLocations(machine), missing);
+            addNode(machineNode, depth);
+            machineNodes.add(machineNode);
+        }
+
+        if (machineNodes.size() > 1) {
+            addPlaceholders(depth + 1, (machineNodes.size() - 1) / 2, LINE_TOTAL_HEIGHT);
+            TreeNode junction = new TreeNode(missing);
+            addNode(junction, depth + 1);
+            alignJunctionToRowBottom(junction);
+
+            List<TreeNode> materialNodes = addProcessInputs(proc, depth + 2);
+            configureChildLink(junction, materialNodes);
+            for (TreeNode machineNode : machineNodes) {
+                configureChildLink(machineNode, List.of(junction));
+            }
+        } else if (!machineNodes.isEmpty()) {
+            TreeNode machineNode = machineNodes.getFirst();
+            List<TreeNode> materialNodes = addProcessInputs(proc, depth + 1);
+            configureChildLink(machineNode, materialNodes);
+        }
+
+        return machineNodes;
+    }
+
+    private List<TreeNode> addProcessInputs(LiteCraftTreeProc proc, int depth) {
+        List<TreeNode> materialNodes = new ObjectArrayList<>();
+        for (LiteCraftTreeNode input : proc.inputs()) {
+            materialNodes.add(addNodeRecursive(input, depth));
+        }
+        return materialNodes;
+    }
+
+    private void configureChildLink(TreeNode parent, List<TreeNode> directChildren) {
+        parent.hasChildLink = !directChildren.isEmpty();
+        parent.childLinkStartOffset = LINE_RENDER_OFFSET;
+        parent.childLinkWidth = 0;
+        parent.childLinkVerticalHeight = LINE_HEIGHT;
+        if (directChildren.isEmpty()) {
+            return;
         }
 
         Point parentPos = parent.row.getRelativePosition(parent);
-        TreeNode lastChild = directChildren.getLast();
-        Point lastChildPos = lastChild.row.getRelativePosition(lastChild);
-        if (parentPos == null || lastChildPos == null) {
-            return 0;
+        if (parentPos == null) {
+            return;
         }
 
-        return Math.max(0, lastChildPos.x() - parentPos.x()) + LINE_WIDTH;
+        int minAnchorX = parentPos.x() + LINE_RENDER_OFFSET;
+        int maxAnchorX = minAnchorX;
+        for (TreeNode child : directChildren) {
+            Point childPos = child.row.getRelativePosition(child);
+            if (childPos == null) {
+                continue;
+            }
+            int childAnchorX = childPos.x() + LINE_RENDER_OFFSET;
+            minAnchorX = Math.min(minAnchorX, childAnchorX);
+            maxAnchorX = Math.max(maxAnchorX, childAnchorX);
+            parent.childLinkVerticalHeight = Math.max(parent.childLinkVerticalHeight, childPos.y() + 1);
+        }
+
+        parent.childLinkStartOffset = minAnchorX - parentPos.x();
+        parent.childLinkWidth = maxAnchorX == minAnchorX ? 0 : maxAnchorX - minAnchorX + LINE_WIDTH;
     }
 
-    private void fillEmpty(int depth, int fillNodes) {
-        int nodeWidth = NODE_WIDTH + NODE_MARGIN_LEFT;
-        TreeRow row = rows.get(depth);
-        int totalWidth = row.getWidth() + (fillNodes * nodeWidth);
-        for (int i = depth; i < rows.size(); i++) {
-            TreeRow nextRow = rows.get(i);
-            int nextRowWidth = nextRow.getWidth();
-            while (nextRowWidth < totalWidth) {
-                nextRow.widgets.add(new Placeholder());
-                nextRowWidth += nodeWidth;
+    private void alignRows(int firstDepth, int lastDepth) {
+        int maxWidth = 0;
+        for (int depth = firstDepth; depth <= lastDepth; depth++) {
+            while (rows.size() <= depth) {
+                rows.add(new TreeRow());
             }
+            maxWidth = Math.max(maxWidth, rows.get(depth).getWidth());
+        }
+
+        for (int depth = firstDepth; depth <= lastDepth; depth++) {
+            TreeRow row = rows.get(depth);
+            int width = row.getWidth();
+            while (width < maxWidth) {
+                row.widgets.add(row.createPlaceholder());
+                width += NODE_TOTAL_WIDTH;
+            }
+        }
+    }
+
+    private void addPlaceholders(int depth, int count, int height) {
+        while (rows.size() <= depth) {
+            rows.add(new TreeRow());
+        }
+        TreeRow row = rows.get(depth);
+        for (int i = 0; i < count; i++) {
+            row.widgets.add(new Placeholder(height));
         }
     }
 
@@ -525,7 +649,9 @@ public class CraftingTreeWidget implements ICompositeWidget {
         TreeRow row = rows.get(depth);
         node.row = row;
         row.widgets.add(node);
-        nodes++;
+        if (node.countsAsNode()) {
+            nodes++;
+        }
 
         for (int i = row.widgets.size() - 2; i >= 0; i--) {
             RowElement previous = row.widgets.get(i);
@@ -535,6 +661,20 @@ public class CraftingTreeWidget implements ICompositeWidget {
                 break;
             }
         }
+    }
+
+    private void alignJunctionsToRowBottom() {
+        for (TreeRow row : rows) {
+            for (RowElement element : row.widgets) {
+                if (element instanceof TreeNode node && node.isJunction()) {
+                    alignJunctionToRowBottom(node);
+                }
+            }
+        }
+    }
+
+    private void alignJunctionToRowBottom(TreeNode junction) {
+        junction.marginTop = Math.max(0, junction.row.getHeight() - LINE_TOTAL_HEIGHT);
     }
 
     @Nullable
@@ -564,7 +704,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
 
         for (TreeRow row : rows) {
             for (RowElement element : row.widgets) {
-                if (element instanceof TreeNode node && hasSameOutput(node.node.output(), output)) {
+                if (element instanceof TreeNode node && node.getOutput() != null && hasSameOutput(node.getOutput(), output)) {
                     return node;
                 }
             }
@@ -602,6 +742,9 @@ public class CraftingTreeWidget implements ICompositeWidget {
     }
 
     private void select(@Nullable TreeNode node) {
+        if (node != null && !node.isSelectable()) {
+            return;
+        }
         if (selected != null) {
             selected.selected = false;
         }
@@ -622,7 +765,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
         int columnIndex = selected.row.widgets.indexOf(selected);
         while (columnIndex >= 0 && columnIndex < targetRow.widgets.size()) {
             RowElement element = targetRow.widgets.get(columnIndex);
-            if (element instanceof TreeNode node) {
+            if (element instanceof TreeNode node && node.isSelectable()) {
                 node.select();
                 return true;
             }
@@ -736,12 +879,20 @@ public class CraftingTreeWidget implements ICompositeWidget {
 
     private interface RowElement {
         int getFullWidth();
+
+        int getFullHeight();
     }
 
-    private static final class Placeholder implements RowElement {
+    private record Placeholder(int height) implements RowElement {
+
         @Override
         public int getFullWidth() {
             return NODE_MARGIN_LEFT + NODE_WIDTH;
+        }
+
+        @Override
+        public int getFullHeight() {
+            return height;
         }
     }
 
@@ -876,30 +1027,69 @@ public class CraftingTreeWidget implements ICompositeWidget {
         private int getHeight() {
             int height = 0;
             for (RowElement element : widgets) {
-                if (element instanceof TreeNode node) {
-                    height = Math.max(height, node.marginTop + NODE_TOTAL_HEIGHT);
-                } else {
-                    height = Math.max(height, NODE_TOTAL_HEIGHT);
-                }
+                height = Math.max(height, element.getFullHeight());
             }
             return height;
+        }
+
+        private Placeholder createPlaceholder() {
+            return new Placeholder(isJunctionOnly() ? LINE_TOTAL_HEIGHT : NODE_TOTAL_HEIGHT);
+        }
+
+        private boolean isJunctionOnly() {
+            for (RowElement element : widgets) {
+                if (element instanceof TreeNode node && !node.isJunction()) {
+                    return false;
+                }
+            }
+            return !widgets.isEmpty();
         }
     }
 
     private final class TreeNode implements RowElement {
+        @Nullable
         private final LiteCraftTreeNode node;
+        @Nullable
+        private final PatternContainerGroup machine;
+        private final List<CraftingSupplierLocation> machineLocations;
+        private final boolean junction;
+        private final boolean missing;
         private TreeRow row;
         private boolean root;
         private boolean selected;
         private int marginTop;
         private int marginRight;
+        private int childLinkStartOffset = LINE_RENDER_OFFSET;
         private int childLinkWidth;
+        private int childLinkVerticalHeight = LINE_HEIGHT;
+        private boolean hasChildLink;
         private TreeNode previous;
         private TreeNode next;
         private Point currentPosition = Point.ZERO;
 
-        private TreeNode(LiteCraftTreeNode node) {
+        private TreeNode(@NotNull LiteCraftTreeNode node) {
             this.node = node;
+            this.machine = null;
+            this.machineLocations = List.of();
+            this.junction = false;
+            this.missing = LiteCraftTreeNode.isMissing(node);
+        }
+
+        private TreeNode(@Nullable PatternContainerGroup machine, List<CraftingSupplierLocation> machineLocations,
+                         boolean missing) {
+            this.node = null;
+            this.machine = machine;
+            this.machineLocations = machineLocations;
+            this.junction = false;
+            this.missing = missing;
+        }
+
+        private TreeNode(boolean missing) {
+            this.node = null;
+            this.machine = null;
+            this.machineLocations = List.of();
+            this.junction = true;
+            this.missing = missing;
         }
 
         @Override
@@ -907,19 +1097,29 @@ public class CraftingTreeWidget implements ICompositeWidget {
             return NODE_MARGIN_LEFT + NODE_WIDTH + marginRight;
         }
 
+        @Override
+        public int getFullHeight() {
+            return marginTop + (junction ? LINE_TOTAL_HEIGHT : NODE_TOTAL_HEIGHT);
+        }
+
         private int getChildLinkRenderWidth() {
-            return childLinkWidth == 0 ? NODE_WIDTH : LINE_RENDER_OFFSET + childLinkWidth;
+            if (childLinkWidth == 0) {
+                return NODE_WIDTH;
+            }
+            return Math.max(NODE_WIDTH, Math.max(LINE_RENDER_OFFSET, childLinkStartOffset) + childLinkWidth);
         }
 
         private void render(Point position, Point mouse, boolean updateHover) {
-            if (updateHover && isMouseOver(mouse)) {
+            if (updateHover && isSelectable() && isMouseOver(mouse)) {
                 hovered = this;
             }
-            renderBackground(position);
-            renderItem(position.move(ITEM_RENDER_OFFSET, LINE_HEIGHT + ITEM_RENDER_OFFSET));
-            renderMissingOverlay(position);
+            if (!junction) {
+                renderBackground(position);
+                renderIcon(position.move(ITEM_RENDER_OFFSET, LINE_HEIGHT + ITEM_RENDER_OFFSET));
+                renderMissingOverlay(position);
+            }
             renderLinks(position);
-            if (updateHover) {
+            if (updateHover && countsAsNode()) {
                 renderedNodes++;
             }
         }
@@ -928,14 +1128,12 @@ public class CraftingTreeWidget implements ICompositeWidget {
             GlStateManager.enableBlend();
             GlStateManager.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
             Icon background = selected ? Icon.CRAFTING_TREE_NODE_SELECTED :
-                (LiteCraftTreeNode.isMissing(node)
-                 ? Icon.CRAFTING_TREE_NODE_MISSING
-                 : Icon.CRAFTING_TREE_NODE_NORMAL);
+                (missing ? Icon.CRAFTING_TREE_NODE_MISSING : Icon.CRAFTING_TREE_NODE_NORMAL);
             drawIcon(position.x(), position.y() + LINE_HEIGHT, background);
         }
 
         private void renderMissingOverlay(Point position) {
-            if (LiteCraftTreeNode.isMissing(node) && node.missing() > 0) {
+            if (node != null && missing && node.missing() > 0) {
                 GlStateManager.disableDepth();
                 GlStateManager.enableBlend();
                 GlStateManager.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
@@ -945,7 +1143,37 @@ public class CraftingTreeWidget implements ICompositeWidget {
             }
         }
 
+        private void renderIcon(Point position) {
+            if (machine != null) {
+                renderMachine(machine, position);
+                return;
+            }
+            renderItem(position);
+        }
+
+        private void renderMachine(@NotNull PatternContainerGroup machine, Point position) {
+            if (machine.icon() == null) {
+                return;
+            }
+
+            GlStateManager.pushMatrix();
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            AEKeyRendering.drawInGui(Minecraft.getMinecraft(), position.x(), position.y(), machine.icon());
+            RenderHelper.disableStandardItemLighting();
+            GlStateManager.disableLighting();
+            GlStateManager.disableDepth();
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            drawIcon(position.x() - LINE_HEIGHT, position.y() - LINE_HEIGHT, Icon.CRAFTING_TREE_MACHINE);
+            GlStateManager.enableBlend();
+            GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            GlStateManager.popMatrix();
+        }
+
         private void renderItem(Point position) {
+            if (node == null) {
+                return;
+            }
             GenericStack output = node.output();
             if (output == null) {
                 return;
@@ -973,7 +1201,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
 
         private void renderLinks(Point position) {
             renderParentLink(position);
-            renderChildLink(position.move(0, NODE_HEIGHT + LINE_HEIGHT));
+            renderChildLink(position.move(0, junction ? LINE_HEIGHT : NODE_HEIGHT + LINE_HEIGHT));
         }
 
         private void renderParentLink(Point position) {
@@ -981,27 +1209,27 @@ public class CraftingTreeWidget implements ICompositeWidget {
                 return;
             }
 
-            int lineColor = LiteCraftTreeNode.isMissing(node) ? MISSING_LINE_COLOR : LINE_COLOR;
-            int shadowColor = LiteCraftTreeNode.isMissing(node) ? MISSING_LINE_SHADOW_COLOR : LINE_SHADOW_COLOR;
+            int lineColor = missing ? MISSING_LINE_COLOR : LINE_COLOR;
+            int shadowColor = missing ? MISSING_LINE_SHADOW_COLOR : LINE_SHADOW_COLOR;
             renderLine(position.move(LINE_RENDER_OFFSET, -1), LINE_WIDTH, LINE_HEIGHT + 1, lineColor);
             renderLine(position.move(LINE_RENDER_OFFSET + 1, 0), LINE_WIDTH, LINE_HEIGHT, shadowColor);
         }
 
         private void renderChildLink(Point position) {
-            if (node.inputs().isEmpty()) {
+            if (!hasChildLink) {
                 return;
             }
 
-            int lineColor = LiteCraftTreeNode.isMissing(node) ? MISSING_LINE_COLOR : LINE_COLOR;
-            int shadowColor = LiteCraftTreeNode.isMissing(node) ? MISSING_LINE_SHADOW_COLOR : LINE_SHADOW_COLOR;
+            int lineColor = missing ? MISSING_LINE_COLOR : LINE_COLOR;
+            int shadowColor = missing ? MISSING_LINE_SHADOW_COLOR : LINE_SHADOW_COLOR;
             if (childLinkWidth > 0) {
-                renderLine(position.move(LINE_RENDER_OFFSET, LINE_HEIGHT), childLinkWidth, 1, lineColor);
-                renderLine(position.move(LINE_RENDER_OFFSET + 1, LINE_HEIGHT + 1), childLinkWidth, 1, shadowColor);
-                renderLine(position.move(LINE_RENDER_OFFSET, 0), LINE_WIDTH, LINE_HEIGHT, lineColor);
-                renderLine(position.move(LINE_RENDER_OFFSET + 1, 0), LINE_WIDTH, LINE_HEIGHT, shadowColor);
+                renderLine(position.move(childLinkStartOffset, LINE_HEIGHT), childLinkWidth, 1, lineColor);
+                renderLine(position.move(childLinkStartOffset + 1, LINE_HEIGHT + 1), childLinkWidth, 1, shadowColor);
+                renderLine(position.move(LINE_RENDER_OFFSET, 0), LINE_WIDTH, childLinkVerticalHeight, lineColor);
+                renderLine(position.move(LINE_RENDER_OFFSET + 1, 0), LINE_WIDTH, childLinkVerticalHeight, shadowColor);
             } else {
-                renderLine(position.move(LINE_RENDER_OFFSET, 0), LINE_WIDTH, LINE_HEIGHT + 1, lineColor);
-                renderLine(position.move(LINE_RENDER_OFFSET + 1, 0), LINE_WIDTH, LINE_HEIGHT + 2, shadowColor);
+                renderLine(position.move(LINE_RENDER_OFFSET, 0), LINE_WIDTH, childLinkVerticalHeight + 1, lineColor);
+                renderLine(position.move(LINE_RENDER_OFFSET + 1, 0), LINE_WIDTH, childLinkVerticalHeight + 2, shadowColor);
             }
         }
 
@@ -1009,7 +1237,42 @@ public class CraftingTreeWidget implements ICompositeWidget {
             CraftingTreeWidget.this.select(this);
         }
 
+        private boolean highlightMachinesAndClose() {
+            if (machineLocations.isEmpty()) {
+                return false;
+            }
+
+            Minecraft minecraft = Minecraft.getMinecraft();
+            CraftingSupplierHighlightHandler.INSTANCE.showLocations(minecraft, machineLocations);
+            minecraft.displayGuiScreen(null);
+            return true;
+        }
+
+        private boolean isSelectable() {
+            return !junction;
+        }
+
+        private boolean countsAsNode() {
+            return !junction;
+        }
+
+        private boolean isJunction() {
+            return junction;
+        }
+
+        @Nullable
+        private GenericStack getOutput() {
+            return node == null ? null : node.output();
+        }
+
+        private boolean isMissing() {
+            return missing;
+        }
+
         private boolean isMouseOver(Point mouse) {
+            if (junction) {
+                return false;
+            }
             return mouse.x() >= currentPosition.x()
                 && mouse.x() < currentPosition.x() + NODE_WIDTH
                 && mouse.y() >= currentPosition.y() + LINE_HEIGHT
@@ -1017,6 +1280,26 @@ public class CraftingTreeWidget implements ICompositeWidget {
         }
 
         private Tooltip getTooltip() {
+            if (machine != null) {
+                int extraLines = machineLocations.isEmpty() ? 0 :
+                    (GuiScreen.isShiftKeyDown() ? machineLocations.size() : 1);
+                List<ITextComponent> lines = new ObjectArrayList<>(machine.tooltip().size() + 1 + extraLines);
+                lines.add(machine.name());
+                lines.addAll(machine.tooltip());
+                if (!machineLocations.isEmpty()) {
+                    if (GuiScreen.isShiftKeyDown()) {
+                        for (CraftingSupplierLocation location : machineLocations) {
+                            lines.add(formatMachineLocation(location));
+                        }
+                    } else {
+                        lines.add(new TextComponentTranslation("gui.ae2.CraftingTreeHighlightProvider"));
+                    }
+                }
+                return new Tooltip(lines);
+            }
+            if (node == null) {
+                return new Tooltip(List.of());
+            }
             GenericStack output = node.output();
             if (output == null) {
                 return new Tooltip(List.of());
@@ -1036,7 +1319,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
             }
 
             lines.add(Tooltips.getAmountTooltip(ButtonToolTips.Amount, output));
-            if (LiteCraftTreeNode.isMissing(node)) {
+            if (missing) {
                 lines.add(new TextComponentString(node.missing() > 0
                     ? GuiText.CraftingTreeMissing.getLocal(CraftingTreeNumberFormat.formatDecimal(node.missing()))
                     : GuiText.CraftingTreeSubNodeMissing.getLocal()));
@@ -1046,6 +1329,12 @@ public class CraftingTreeWidget implements ICompositeWidget {
             }
 
             return new Tooltip(lines);
+        }
+
+        private ITextComponent formatMachineLocation(CraftingSupplierLocation location) {
+            String dimensionName = CraftingSupplierLocator.getDimensionName(location.dimensionId());
+            return new TextComponentString(location.x() + " " + location.y() + " " + location.z()
+                + " (" + dimensionName + ")");
         }
     }
 

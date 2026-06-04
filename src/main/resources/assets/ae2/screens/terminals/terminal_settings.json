@@ -18,10 +18,19 @@
     "search_settings_title": {
       "position": {
         "left": 8,
-        "top": 90
+        "top": 104
       },
       "text": {
         "translate": "gui.ae2.SearchSettingsTitle"
+      }
+    },
+    "recursive_reserve_label": {
+      "position": {
+        "left": 10,
+        "top": 88
+      },
+      "text": {
+        "translate": "gui.ae2.TerminalSettingsRecursiveIngredientReserve"
       }
     },
     "wireless_settings_title": {
@@ -89,33 +98,39 @@
     },
     "useInternalSearchRadio": {
       "left": 10,
-      "top": 105,
+      "top": 119,
       "width": 75
     },
     "useExternalSearchRadio": {
       "left": 95,
-      "top": 105,
+      "top": 119,
       "width": 75
     },
     "rememberCheckbox": {
       "left": 10,
-      "top": 125,
+      "top": 139,
       "width": 150
     },
     "autoFocusCheckbox": {
       "left": 10,
-      "top": 145,
+      "top": 159,
       "width": 150
     },
     "syncWithExternalCheckbox": {
       "left": 10,
-      "top": 165,
+      "top": 179,
       "width": 150
     },
     "clearExternalCheckbox": {
       "left": 10,
-      "top": 160,
+      "top": 174,
       "width": 180
+    },
+    "recursiveReserveField": {
+      "left": 142,
+      "top": 85,
+      "width": 48,
+      "height": 12
     }
   }
 }

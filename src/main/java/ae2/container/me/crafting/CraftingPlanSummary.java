@@ -56,9 +56,6 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
             mapping(plan, used.getKey()).stored += used.getLongValue();
         }
         for (var missing : job.missingItems()) {
-            if (hiddenOutputs.contains(missing.getKey())) {
-                continue;
-            }
             mapping(plan, missing.getKey()).missing += missing.getLongValue();
         }
         for (var emitted : job.emittedItems()) {

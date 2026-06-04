@@ -20,12 +20,8 @@ import ae2.client.gui.widgets.UpgradesPanel;
 import ae2.container.SlotSemantics;
 import ae2.container.implementations.ContainerPatternProvider;
 import ae2.container.slot.AppEngSlot;
-import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
-import ae2.core.network.InitNetwork;
-import ae2.core.network.bidirectional.ConfigValuePacket;
 import ae2.helpers.patternprovider.PatternProviderCapacity;
-import ae2.util.EnumCycler;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
@@ -40,7 +36,7 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
     private final SettingToggleButton<LockCraftingMode> lockCraftingModeButton;
     private final SettingToggleButton<PatternProviderInsertionMode> insertionModeButton;
     private final SettingToggleButton<PatternProviderOutputSideMode> outputSideModeButton;
-    private final ToggleButton blockingTypeButton;
+    private final SettingToggleButton<PatternProviderBlockingType> blockingTypeButton;
     private final ToggleButton showInPatternAccessTerminalButton;
     private final PatternProviderLockReason lockReason;
     private final PageButton previousPageButton;
@@ -56,15 +52,8 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
 
         this.blockingModeButton = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.BLOCKING_MODE,
             BlockingMode.NO));
-        this.blockingTypeButton = new ToggleButton(Icon.BLOCKING_MODE_TYPE_SMART, Icon.BLOCKING_MODE_TYPE_NORMAL,
-            ignored -> selectBlockingType());
-        this.blockingTypeButton.setTooltipOff(List.of(
-            ButtonToolTips.PatternProviderBlockingType.text(),
-            ButtonToolTips.NormalBlockingDescription.text()));
-        this.blockingTypeButton.setTooltipOn(List.of(
-            ButtonToolTips.PatternProviderBlockingType.text(),
-            ButtonToolTips.SmartBlockingDescription.text()));
-        addToLeftToolbar(this.blockingTypeButton);
+        this.blockingTypeButton = addToLeftToolbar(new ServerSettingToggleButton<>(
+            Settings.PATTERN_PROVIDER_BLOCKING_TYPE, PatternProviderBlockingType.NORMAL));
         this.insertionModeButton = addToLeftToolbar(new ServerSettingToggleButton<>(
             Settings.PATTERN_PROVIDER_INSERTION_MODE, PatternProviderInsertionMode.DEFAULT));
         this.outputSideModeButton = addToLeftToolbar(new ServerSettingToggleButton<>(
@@ -99,8 +88,7 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
 
         this.lockReason.setVisible(this.container.getLockCraftingMode() != LockCraftingMode.NONE);
         this.blockingModeButton.set(this.container.getBlockingMode());
-        this.blockingTypeButton.setVisibility(this.container.getBlockingMode() != BlockingMode.NO);
-        this.blockingTypeButton.setState(this.container.getBlockingType() == PatternProviderBlockingType.SMART);
+        this.blockingTypeButton.set(this.container.getBlockingType());
         this.insertionModeButton.set(this.container.getInsertionMode());
         this.outputSideModeButton.set(this.container.getOutputSideMode());
         this.lockCraftingModeButton.set(this.container.getLockCraftingMode());
@@ -134,18 +122,10 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
         }
     }
 
-    private void selectBlockingType() {
-        var nextValue = EnumCycler.rotateEnum(
-            this.container.getBlockingType(),
-            isHandlingRightClick(),
-            Settings.PATTERN_PROVIDER_BLOCKING_TYPE.getValues());
-        InitNetwork.CHANNEL.sendToServer(new ConfigValuePacket(Settings.PATTERN_PROVIDER_BLOCKING_TYPE, nextValue));
-    }
-
     private void selectPatternProviderMode(boolean ignored) {
-        InitNetwork.CHANNEL.sendToServer(new ConfigValuePacket(
+        ae2.core.network.InitNetwork.CHANNEL.sendToServer(new ae2.core.network.bidirectional.ConfigValuePacket(
             Settings.PATTERN_ACCESS_TERMINAL,
-            EnumCycler.rotateEnum(
+            ae2.util.EnumCycler.rotateEnum(
                 this.container.getShowInAccessTerminal(),
                 isHandlingRightClick(),
                 Settings.PATTERN_ACCESS_TERMINAL.getValues())));

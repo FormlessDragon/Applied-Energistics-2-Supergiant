@@ -217,6 +217,8 @@ public enum GuiText implements LocalizationEnum {
     TerminalSettingsPinAutoCraftedItems,
     TerminalSettingsNotifyForFinishedJobs,
     TerminalSettingsClearGridOnClose,
+    TerminalSettingsRecursiveIngredientReserve,
+    TerminalSettingsRecursiveIngredientReserveTooltip,
     TerminalViewCellsTooltip,
     ViewCellEnabled,
     ViewCellToggleHint,
