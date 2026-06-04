@@ -25,11 +25,11 @@ public class GuiTickAnalyser extends AEBaseGui<ContainerTickAnalyser> {
     private int duration = 60;
     private final boolean[] enabled = new boolean[4];
     private final ColorArea[] dots = new ColorArea[4];
-    private AETextField durationInput;
+    private final AETextField durationInput;
 
     public GuiTickAnalyser(ContainerTickAnalyser container, InventoryPlayer playerInventory) {
         super(container, playerInventory, GuiStyleManager.loadStyleDoc(STYLE_PATH));
-        this.widgets.addButton("start", new TextComponentTranslation("gui.ae2.tick_analyser.begin"), () -> {
+        this.widgets.addButton("start", new TextComponentTranslation("gui.ae2.tick_analyser.start"), () -> {
             syncDuration();
             InitNetwork.sendToServer(new TickProfilerRequestPacket(this.duration));
         });
@@ -40,7 +40,7 @@ public class GuiTickAnalyser extends AEBaseGui<ContainerTickAnalyser> {
             this.widgets.add("dot_" + i, this.dots[i] = new ColorArea(0, 0, 0, 0, this, () -> cycleEnable(index)));
         }
         this.durationInput = this.widgets.addTextField("duration_input");
-        this.durationInput.setMaxStringLength(4);
+        this.durationInput.setMaxStringLength(String.valueOf(TickAnalyserConfig.MAX_DURATION_SECONDS).length());
         this.durationInput.setKeyFilter(this::isNumberInput);
         this.durationInput.setResponder(ignored -> {
             syncDuration();
@@ -52,10 +52,10 @@ public class GuiTickAnalyser extends AEBaseGui<ContainerTickAnalyser> {
 
     public void loadConfig(TickAnalyserConfig config) {
         this.duration = config.duration();
-        this.enabled[0] = config.op1();
-        this.enabled[1] = config.op2();
-        this.enabled[2] = config.op3();
-        this.enabled[3] = config.op4();
+        this.enabled[0] = config.showBelow5Micros();
+        this.enabled[1] = config.show5To100Micros();
+        this.enabled[2] = config.show100To500Micros();
+        this.enabled[3] = config.showAbove500Micros();
         if (this.durationInput != null) {
             this.durationInput.setText(String.valueOf(this.duration));
         }
@@ -91,7 +91,7 @@ public class GuiTickAnalyser extends AEBaseGui<ContainerTickAnalyser> {
 
     private void syncDuration() {
         try {
-            this.duration = Math.max(1, Integer.parseInt(this.durationInput.getText()));
+            this.duration = TickAnalyserConfig.clampDurationSeconds(Integer.parseInt(this.durationInput.getText()));
         } catch (NumberFormatException ignored) {
             this.duration = 60;
         }

@@ -2,8 +2,9 @@ package ae2.me.ticker;
 
 import ae2.api.networking.IGridNode;
 import ae2.core.network.InitNetwork;
-import ae2.me.InWorldGridNode;
 import ae2.core.network.clientbound.ProfileDataUpdatePacket;
+import ae2.items.tools.TickAnalyserConfig;
+import ae2.me.InWorldGridNode;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
@@ -27,7 +28,7 @@ public final class RequestBox {
 
     public static boolean checkPermission(EntityPlayer player) {
         MinecraftServer server = player.getServer();
-        return server != null && server.isSinglePlayer() || player.canUseCommand(2, "ae2_tick_profile");
+        return (server != null && server.isSinglePlayer()) || player.canUseCommand(2, "ae2_tick_profile");
     }
 
     public static RespondCode requestProfile(EntityPlayer player, int duration) {
@@ -37,8 +38,12 @@ public final class RequestBox {
         if (!checkPermission(player)) {
             return RespondCode.DENY;
         }
-        WAITING.put(player, new ProfilerJob(Math.max(1, duration) * 1_000_000_000L));
+        WAITING.put(player, new ProfilerJob(clampDurationSeconds(duration) * 1_000_000_000L));
         return RespondCode.OK;
+    }
+
+    public static int clampDurationSeconds(int duration) {
+        return TickAnalyserConfig.clampDurationSeconds(duration);
     }
 
     public static boolean cancelProfile(EntityPlayer player) {

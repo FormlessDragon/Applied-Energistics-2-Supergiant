@@ -27,6 +27,7 @@ import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEFluidKey;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.AEKey2LongMap;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.MEStorage;
@@ -40,7 +41,6 @@ import ae2.util.inv.CarriedItemInventory;
 import ae2.util.inv.PlayerInternalInventory;
 import ae2.util.prioritylist.IPartitionList;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
@@ -661,7 +661,7 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
     }
 
     private record CraftPlan(ItemStack crafted, List<ItemStack> eventInputs, List<CraftOperation> operations,
-                             List<Refill> refills, Object2LongOpenHashMap<AEKey> networkRequests,
+                             List<Refill> refills, AEKey2LongMap networkRequests,
                              int[] gridConsumes) {
         int times() {
             return operations.size();
@@ -682,7 +682,7 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
         final int[] gridRemaining = new int[GRID_SIZE];
         final int[] gridConsumes = new int[GRID_SIZE];
         final boolean[] slotsRequiringRefill = new boolean[GRID_SIZE];
-        final Object2LongOpenHashMap<AEKey> networkRequests = new Object2LongOpenHashMap<>();
+        final AEKey2LongMap networkRequests = new AEKey2LongMap.OpenHashMap();
         final List<CraftOperation> operations = new ObjectArrayList<>();
         final List<Refill> refills = new ObjectArrayList<>();
         KeyCounter availableStacks;

@@ -243,6 +243,19 @@ public class QuantumCluster implements IAECluster, IActionHost {
         return this.center;
     }
 
+    @Nullable
+    public TileQuantumBridge getLinkedCenter() {
+        if (this.center == null || this.otherSide == 0) {
+            return null;
+        }
+
+        Object other = Locatables.quantumNetworkBridges().get(this.center.getWorld(), this.otherSide);
+        if (other instanceof QuantumCluster otherCluster && !otherCluster.destroyed) {
+            return otherCluster.center;
+        }
+        return null;
+    }
+
     void setCenter(TileQuantumBridge center) {
         this.registered = true;
         this.center = center;

@@ -1,26 +1,22 @@
 package ae2.me.ticker;
 
-import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
-import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.util.math.BlockPos;
 
 public final class ProfilerJob {
     private final long waitingNanoseconds;
     private final long startedAt = System.nanoTime();
-    private final Object2ReferenceMap<SamplePos, GridTickProfiler> results = new Object2ReferenceOpenHashMap<>();
+    private final Object2LongOpenHashMap<SamplePos> nanoseconds = new Object2LongOpenHashMap<>();
+    private final Object2LongOpenHashMap<SamplePos> ticks = new Object2LongOpenHashMap<>();
 
     public ProfilerJob(long waitingNanoseconds) {
         this.waitingNanoseconds = waitingNanoseconds;
     }
 
     public void tick(SamplePos pos, long nanoseconds, long tick) {
-        GridTickProfiler profiler = this.results.get(pos);
-        if (profiler == null) {
-            profiler = new GridTickProfiler();
-            profiler.start();
-            this.results.put(pos, profiler);
-        }
-        profiler.update(tick, nanoseconds);
+        this.nanoseconds.addTo(pos, nanoseconds);
+        this.ticks.addTo(pos, tick);
     }
 
     public boolean isFinished() {
@@ -28,14 +24,14 @@ public final class ProfilerJob {
     }
 
     public ProfileData generateData() {
-        return new ProfileData(this.results.entrySet()
-            .stream()
-            .map(e -> {
-                double rate = e.getValue().rate() / 1000.0D;
-                SamplePos pos = e.getKey();
-                return new ProfileData.ATick(pos.dimension(), pos.pos(), rate, ProfileData.getColor(rate));
-            })
-            .toArray(ProfileData.ATick[]::new));
+        var ticks = new ObjectArrayList<ProfileData.ATick>(this.nanoseconds.size());
+        for (var entry : this.nanoseconds.object2LongEntrySet()) {
+            SamplePos pos = entry.getKey();
+            long tickCount = this.ticks.getLong(pos);
+            double rate = tickCount == 0L ? 0.0D : (double) entry.getLongValue() / tickCount / 1000.0D;
+            ticks.add(new ProfileData.ATick(pos.dimension(), pos.pos(), rate, ProfileData.getColor(rate)));
+        }
+        return new ProfileData(ticks.toArray(new ProfileData.ATick[0]));
     }
 
     public record SamplePos(int dimension, BlockPos pos) {

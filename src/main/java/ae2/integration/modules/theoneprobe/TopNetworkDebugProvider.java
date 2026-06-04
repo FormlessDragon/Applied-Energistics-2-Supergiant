@@ -16,6 +16,7 @@ import ae2.tile.crafting.ICraftingCPUTileEntity;
 import ae2.tile.crafting.TileMolecularAssembler;
 import ae2.tile.crafting.TilePatternProvider;
 import ae2.tile.networking.TileCableBus;
+import ae2.tile.qnb.TileQuantumBridge;
 import ae2.tile.storage.TileDrive;
 import ae2.tile.storage.TileIOPort;
 import ae2.tile.storage.TileMEChest;
@@ -36,6 +37,10 @@ public final class TopNetworkDebugProvider {
 
     public static void addProbeInfo(EntityPlayer player, TileEntity blockEntity, Vec3d hitLocation,
                                     TopTooltipBuilder tooltipBuilder) {
+        if (blockEntity instanceof TileQuantumBridge quantumBridge) {
+            addQuantumBridgeInfo(quantumBridge, tooltipBuilder);
+        }
+
         if (!player.isSneaking() || !TickManagerService.MONITORING_ENABLED) {
             return;
         }
@@ -71,6 +76,36 @@ public final class TopNetworkDebugProvider {
         addLine(tooltipBuilder, labeledValue(TopNetDebugText.crafting.getLocal(), snapshot.crafting()));
         addLine(tooltipBuilder, labeledValue(TopNetDebugText.tick.getLocal(), snapshot.tick()));
         addLine(tooltipBuilder, labeledValue(TopNetDebugText.misc.getLocal(), snapshot.misc()));
+    }
+
+    private static void addQuantumBridgeInfo(TileQuantumBridge quantumBridge, TopTooltipBuilder tooltipBuilder) {
+        var cluster = quantumBridge.getCluster();
+        if (cluster == null) {
+            addLine(tooltipBuilder, value(TopText.quantum_link_missing.getLocal(), TextFormatting.RED));
+            return;
+        }
+
+        TileQuantumBridge linkedCenter = cluster.getLinkedCenter();
+        if (linkedCenter == null || linkedCenter.getWorld() == null) {
+            addLine(tooltipBuilder, value(TopText.quantum_link_missing.getLocal(), TextFormatting.RED));
+            return;
+        }
+
+        String dimensionName = linkedCenter.getWorld().provider.getDimensionType().getName();
+        int dimensionId = linkedCenter.getWorld().provider.getDimension();
+        addLine(tooltipBuilder, line(TopText.quantum_link_dimension.getLocal(), ": ")
+            .appendSibling(value(dimensionName, TextFormatting.GREEN))
+            .appendText(" (dim : ")
+            .appendSibling(value(Integer.toString(dimensionId), TextFormatting.GREEN))
+            .appendText(")"));
+
+        BlockPos linkedPos = linkedCenter.getPos();
+        addLine(tooltipBuilder, line(TopText.quantum_link_position.getLocal(), ": ")
+            .appendSibling(axis("X", linkedPos.getX(), TextFormatting.RED))
+            .appendText(" ")
+            .appendSibling(axis("Y", linkedPos.getY(), TextFormatting.GREEN))
+            .appendText(" ")
+            .appendSibling(axis("Z", linkedPos.getZ(), TextFormatting.AQUA)));
     }
 
     private static void addLine(TopTooltipBuilder tooltipBuilder, ITextComponent line) {

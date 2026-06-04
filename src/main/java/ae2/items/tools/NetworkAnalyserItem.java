@@ -17,15 +17,15 @@ import ae2.core.gui.GuiOpener;
 import ae2.core.gui.locator.GuiHostLocators;
 import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.core.network.InitNetwork;
+import ae2.core.network.clientbound.NetworkDataUpdatePacket;
 import ae2.items.AEBaseItem;
 import ae2.me.InWorldGridNode;
-import ae2.me.helpers.IGridConnectedTile;
 import ae2.me.NetworkData;
+import ae2.me.helpers.IGridConnectedTile;
 import ae2.me.netdata.LinkFlag;
 import ae2.me.netdata.NodeFlag;
 import ae2.me.netdata.State;
 import ae2.me.tracker.PlayerTracker;
-import ae2.core.network.clientbound.NetworkDataUpdatePacket;
 import ae2.util.Platform;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.entity.Entity;
@@ -43,14 +43,17 @@ import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.Map;
+import java.util.WeakHashMap;
 
 public class NetworkAnalyserItem extends AEBaseItem implements IGuiItem {
+    private static final long CACHE_VALID_TICKS = 200L;
     private static final String CONFIG_TAG = "networkAnalyserConfig";
     private static final String TARGET_DIM_TAG = "targetDim";
     private static final String TARGET_POS_TAG = "targetPos";
+    private static final Map<IGrid, CachedNetworkData> NETWORK_CACHE = new WeakHashMap<>();
 
     public NetworkAnalyserItem() {
         setMaxStackSize(1);
@@ -66,6 +69,10 @@ public class NetworkAnalyserItem extends AEBaseItem implements IGuiItem {
     public static void setConfig(ItemStack stack, NetworkAnalyserConfig config) {
         NBTTagCompound tag = Platform.openNbtData(stack);
         tag.setTag(CONFIG_TAG, config.toTag());
+    }
+
+    public static void clearCache() {
+        NETWORK_CACHE.clear();
     }
 
     @Nullable
@@ -121,7 +128,7 @@ public class NetworkAnalyserItem extends AEBaseItem implements IGuiItem {
             return;
         }
 
-        InitNetwork.sendToClient(player, new NetworkDataUpdatePacket(scanNetwork(node.grid(), world)));
+        InitNetwork.sendToClient(player, new NetworkDataUpdatePacket(getOrScanNetwork(node.grid(), world)));
     }
 
     @Nullable
@@ -140,6 +147,19 @@ public class NetworkAnalyserItem extends AEBaseItem implements IGuiItem {
             return host.getGridNode(null);
         }
         return null;
+    }
+
+    private NetworkData getOrScanNetwork(IGrid grid, World world) {
+        long currentTick = world.getTotalWorldTime();
+        int dimension = world.provider.getDimension();
+        CachedNetworkData cached = NETWORK_CACHE.get(grid);
+        if (cached != null && cached.dimension == dimension && currentTick - cached.generatedTick <= CACHE_VALID_TICKS) {
+            return cached.data;
+        }
+
+        NetworkData data = scanNetwork(grid, world);
+        NETWORK_CACHE.put(grid, new CachedNetworkData(dimension, currentTick, data));
+        return data;
     }
 
     private NetworkData scanNetwork(IGrid grid, World world) {
@@ -178,8 +198,10 @@ public class NetworkAnalyserItem extends AEBaseItem implements IGuiItem {
 
     @Nullable
     private NetworkData.ANode getWrappedNode(Map<BlockPos, NetworkData.ANode> nodes, IGridNode node) {
-        NetworkData.ANode wrapped = wrapGridNode(node);
-        return wrapped == null ? null : nodes.get(wrapped.pos());
+        if (node instanceof InWorldGridNode worldNode) {
+            return nodes.get(worldNode.getLocation());
+        }
+        return null;
     }
 
     @Nullable
@@ -218,9 +240,12 @@ public class NetworkAnalyserItem extends AEBaseItem implements IGuiItem {
     @Override
     public ItemGuiHost<?> getGuiHost(EntityPlayer player, ItemGuiHostLocator locator,
                                      @Nullable RayTraceResult hitResult) {
-        return new AnalyserItemHost<>(this, player, locator);
+        return new ItemGuiHost<>(this, player, locator);
     }
 
     public record TargetPos(int dimensionId, BlockPos pos) {
+    }
+
+    private record CachedNetworkData(int dimension, long generatedTick, NetworkData data) {
     }
 }

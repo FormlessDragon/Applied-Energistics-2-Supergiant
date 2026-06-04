@@ -1,24 +1,31 @@
 {
   "type": "forge:ore_shaped",
   "pattern": [
-    "C C",
-    "ILI",
-    "MIM"
+    "A A",
+    "BCB",
+    "DDD"
   ],
   "key": {
-    "C": {
+    "A": {
+      "item": "ae2:wireless_receiver"
+    },
+    "B": {
+      "item": "ae2:engineering_processor"
+    },
+    "C": [
+      {
+        "item": "ae2:monitor"
+      },
+      {
+        "item": "ae2:semi_dark_monitor"
+      },
+      {
+        "item": "ae2:dark_monitor"
+      }
+    ],
+    "D": {
       "type": "forge:ore_dict",
-      "ore": "ingotCopper"
-    },
-    "I": {
-      "type": "forge:ore_dict",
-      "ore": "ingotIron"
-    },
-    "L": {
-      "item": "ae2:logic_processor"
-    },
-    "M": {
-      "item": "ae2:sky_dust"
+      "ore": "crystalFluix"
     }
   },
   "result": {

@@ -2,10 +2,10 @@
   "type": "forge:ore_shapeless",
   "ingredients": [
     {
-      "item": "minecraft:redstone_torch"
+      "item": "ae2:basic_card"
     },
     {
-      "item": "ae2:basic_card"
+      "item": "minecraft:redstone_torch"
     }
   ],
   "result": {

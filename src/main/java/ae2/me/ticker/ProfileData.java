@@ -15,6 +15,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public final class ProfileData {
+    public static final int MAX_PROFILE_TICKS = 262_144;
     public static final ProfileData EMPTY = new ProfileData(new ATick[0]);
 
     public ATick[] ticks;
@@ -35,6 +36,9 @@ public final class ProfileData {
         ProfileData data = new ProfileData();
         try (var stream = new DataInputStream(new BufferedInputStream(new GZIPInputStream(new ByteBufInputStream(buf))))) {
             int len = stream.readInt();
+            if (len < 0 || len > MAX_PROFILE_TICKS) {
+                throw new IllegalArgumentException("Invalid profile tick count: " + len);
+            }
             data.ticks = new ATick[len];
             for (int i = 0; i < len; i++) {
                 int dimension = stream.readInt();

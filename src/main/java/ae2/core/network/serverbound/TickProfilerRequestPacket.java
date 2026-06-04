@@ -30,13 +30,15 @@ public class TickProfilerRequestPacket extends ServerboundPacket {
     public void handleServer(EntityPlayerMP player) {
         if (duration < 0) {
             if (RequestBox.cancelProfile(player)) {
-                player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.cannel"));
+                player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.cancel"));
             } else {
-                player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.no_cannel"));
+                player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.no_cancel"));
             }
         } else {
-            switch (RequestBox.requestProfile(player, duration)) {
-                case OK -> player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.begin", duration));
+            int clampedDuration = RequestBox.clampDurationSeconds(duration);
+            switch (RequestBox.requestProfile(player, clampedDuration)) {
+                case OK -> player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.begin",
+                    clampedDuration));
                 case WAIT -> player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.waiting"));
                 case DENY -> player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.user_control"));
             }

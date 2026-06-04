@@ -2,10 +2,10 @@
   "type": "forge:ore_shapeless",
   "ingredients": [
     {
-      "item": "ae2:calculation_processor"
+      "item": "ae2:basic_card"
     },
     {
-      "item": "ae2:basic_card"
+      "item": "ae2:calculation_processor"
     }
   ],
   "result": {

@@ -1,6 +1,9 @@
 {
   "type": "forge:ore_shapeless",
   "ingredients": [
+    {
+      "item": "ae2:basic_card"
+    },
     [
       {
         "type": "forge:ore_dict",
@@ -9,10 +12,7 @@
       {
         "item": "ae2:charged_certus_quartz_crystal"
       }
-    ],
-    {
-      "item": "ae2:basic_card"
-    }
+    ]
   ],
   "result": {
     "item": "ae2:capacity_card",

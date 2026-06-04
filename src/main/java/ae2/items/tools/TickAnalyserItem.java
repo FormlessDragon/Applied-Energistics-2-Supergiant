@@ -49,6 +49,6 @@ public class TickAnalyserItem extends AEBaseItem implements IGuiItem {
     @Override
     public ItemGuiHost<?> getGuiHost(EntityPlayer player, ItemGuiHostLocator locator,
                                      @Nullable RayTraceResult hitResult) {
-        return new AnalyserItemHost<>(this, player, locator);
+        return new ItemGuiHost<>(this, player, locator);
     }
 }

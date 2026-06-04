@@ -1,7 +1,7 @@
 package ae2.client.render;
 
-import ae2.me.ticker.ProfileData;
 import ae2.items.tools.TickAnalyserConfig;
+import ae2.me.ticker.ProfileData;
 
 public final class ProfileDataHandler {
     private static ProfileData data = ProfileData.EMPTY;
@@ -23,9 +23,9 @@ public final class ProfileDataHandler {
     }
 
     public static boolean shouldRender(double rate) {
-        return rate < 5.0 && config.op1()
-            || rate >= 5.0 && rate < 100.0 && config.op2()
-            || rate >= 100.0 && rate < 500.0 && config.op3()
-            || rate >= 500.0 && config.op4();
+        return (rate < 5.0 && config.showBelow5Micros())
+            || (rate >= 5.0 && rate < 100.0 && config.show5To100Micros())
+            || (rate >= 100.0 && rate < 500.0 && config.show100To500Micros())
+            || (rate >= 500.0 && config.showAbove500Micros());
     }
 }

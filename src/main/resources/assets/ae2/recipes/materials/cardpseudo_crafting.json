@@ -2,14 +2,14 @@
   "type": "forge:ore_shapeless",
   "ingredients": [
     {
-      "item": "ae2:basic_card"
+      "item": "ae2:advanced_card"
     },
     {
       "item": "minecraft:crafting_table"
     }
   ],
   "result": {
-    "item": "ae2:crafting_card",
+    "item": "ae2:pseudo_crafting_card",
     "count": 1
   }
 }

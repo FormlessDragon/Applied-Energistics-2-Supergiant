@@ -44,6 +44,7 @@ import ae2.init.internal.InitUpgrades;
 import ae2.init.worldgen.InitBiomes;
 import ae2.init.worldgen.InitDimensionTypes;
 import ae2.integration.Integrations;
+import ae2.items.tools.NetworkAnalyserItem;
 import ae2.me.ticker.RequestBox;
 import ae2.me.tracker.PlayerTracker;
 import ae2.recipes.AERecipeLoader;
@@ -133,6 +134,7 @@ public final class AppEngBase implements AppEng {
     public void serverStarting(FMLServerStartingEvent event) {
         RequestBox.clear();
         PlayerTracker.clear();
+        NetworkAnalyserItem.clearCache();
         event.registerServerCommand(new AECommand(event.getServer()));
     }
 
@@ -145,6 +147,7 @@ public final class AppEngBase implements AppEng {
     public void serverStopped(FMLServerStoppedEvent event) {
         RequestBox.clear();
         PlayerTracker.clear();
+        NetworkAnalyserItem.clearCache();
         TickHandler.instance().shutdown();
     }
 

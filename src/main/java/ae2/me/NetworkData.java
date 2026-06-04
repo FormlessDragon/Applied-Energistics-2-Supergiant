@@ -20,6 +20,8 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public final class NetworkData {
+    public static final int MAX_NETWORK_NODES = 262_144;
+    public static final int MAX_NETWORK_LINKS = 524_288;
     public static final NetworkData EMPTY = new NetworkData(new ANode[0], new ALink[0]);
 
     public ANode[] nodes;
@@ -59,16 +61,25 @@ public final class NetworkData {
         NetworkData data = new NetworkData();
         try (var stream = new DataInputStream(new BufferedInputStream(new GZIPInputStream(new ByteBufInputStream(buf))))) {
             int nodeCount = stream.readInt();
+            if (nodeCount < 0 || nodeCount > MAX_NETWORK_NODES) {
+                throw new IOException("Invalid network node count: " + nodeCount);
+            }
             data.nodes = new ANode[nodeCount];
             for (int i = 0; i < nodeCount; i++) {
                 data.nodes[i] = new ANode(BlockPos.fromLong(stream.readLong()),
                     new State<>(NodeFlag.byIndex(stream.readByte())));
             }
             int linkCount = stream.readInt();
+            if (linkCount < 0 || linkCount > MAX_NETWORK_LINKS) {
+                throw new IOException("Invalid network link count: " + linkCount);
+            }
             data.links = new ALink[linkCount];
             for (int i = 0; i < linkCount; i++) {
                 int a = stream.readInt();
                 int b = stream.readInt();
+                if (a < 0 || a >= nodeCount || b < 0 || b >= nodeCount) {
+                    throw new IOException("Invalid network link node index: " + a + " -> " + b);
+                }
                 data.links[i] = new ALink(data.nodes[a], data.nodes[b], stream.readShort(),
                     new State<>(LinkFlag.byIndex(stream.readByte())));
             }

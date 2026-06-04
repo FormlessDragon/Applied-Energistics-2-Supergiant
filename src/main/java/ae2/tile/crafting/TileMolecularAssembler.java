@@ -11,6 +11,7 @@ import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.BaseInternalInventory;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGrid;
+import ae2.api.networking.GridFlags;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridNodeListener;
 import ae2.api.networking.crafting.ICraftingProvider;
@@ -120,6 +121,7 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     public TileMolecularAssembler() {
         this.getMainNode()
             .setIdlePowerUsage(0.0)
+            .setFlags(GridFlags.REQUIRE_CHANNEL)
             .addService(IGridTickable.class, this)
             .addService(ICraftingProvider.class, this);
     }

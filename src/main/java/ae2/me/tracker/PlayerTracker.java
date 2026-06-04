@@ -8,6 +8,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 
 public final class PlayerTracker {
+    public static final long UPDATE_INTERVAL_TICKS = 200L;
     private static final Reference2ObjectMap<EntityPlayer, Tracker> TRACKERS = new Reference2ObjectOpenHashMap<>();
 
     private PlayerTracker() {
@@ -17,7 +18,8 @@ public final class PlayerTracker {
         long time = player.world.getTotalWorldTime();
         Tracker last = TRACKERS.get(player);
         Tracker current = new Tracker(dimension, pos, time);
-        if (last == null || last.dimension != dimension || !last.pos.equals(pos) || time - last.time > 100) {
+        if (last == null || last.dimension != dimension || !last.pos.equals(pos)
+            || time - last.time > UPDATE_INTERVAL_TICKS) {
             TRACKERS.put(player, current);
             return true;
         }

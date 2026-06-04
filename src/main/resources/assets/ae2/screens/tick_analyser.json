@@ -52,7 +52,7 @@
   "text": {
     "duration_label": {
       "text": {
-        "translate": "gui.ae2.tick_analyser.set_duration"
+        "translate": "gui.ae2.tick_analyser.duration"
       },
       "position": {
         "left": 103,
@@ -62,7 +62,7 @@
     },
     "range_1": {
       "text": {
-        "translate": "gui.ae2.tick_analyser.range1"
+        "translate": "gui.ae2.tick_analyser.range.below_5"
       },
       "position": {
         "left": 80,
@@ -72,7 +72,7 @@
     },
     "range_2": {
       "text": {
-        "translate": "gui.ae2.tick_analyser.range2"
+        "translate": "gui.ae2.tick_analyser.range.from_5_to_100"
       },
       "position": {
         "left": 177,
@@ -82,7 +82,7 @@
     },
     "range_3": {
       "text": {
-        "translate": "gui.ae2.tick_analyser.range3"
+        "translate": "gui.ae2.tick_analyser.range.from_100_to_500"
       },
       "position": {
         "left": 80,
@@ -92,7 +92,7 @@
     },
     "range_4": {
       "text": {
-        "translate": "gui.ae2.tick_analyser.range4"
+        "translate": "gui.ae2.tick_analyser.range.above_500"
       },
       "position": {
         "left": 177,

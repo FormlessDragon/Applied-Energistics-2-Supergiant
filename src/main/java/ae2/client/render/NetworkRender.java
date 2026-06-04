@@ -10,9 +10,9 @@ import ae2.util.ClientUtil;
 import ae2.util.ColorData;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
@@ -94,21 +94,35 @@ public final class NetworkRender {
     }
 
     private void renderNodes(NetworkData data) {
+        if (data.nodes.length == 0) {
+            return;
+        }
         float size = NetworkDataHandler.getNodeSize();
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder buffer = tessellator.getBuffer();
+        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
         for (NetworkData.ANode node : data.nodes) {
             ColorData color = NetworkDataHandler.getColorByConfig(node.state().get());
-            drawCube(size, color, node.pos());
+            appendCube(buffer, size, color, node.pos());
         }
+        tessellator.draw();
     }
 
     private void renderLinks(NetworkData data, boolean p2pOnly) {
+        if (data.links.length == 0) {
+            return;
+        }
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder buffer = tessellator.getBuffer();
+        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
         for (NetworkData.ALink link : data.links) {
             if (p2pOnly && link.state().get() != LinkFlag.COMPRESSED) {
                 continue;
             }
             ColorData color = NetworkDataHandler.getColorByConfig(link.state().get());
-            drawLink(link.state().get() == LinkFlag.DENSE, color, link.a().pos(), link.b().pos());
+            appendLink(buffer, link.state().get() == LinkFlag.DENSE, color, link.a().pos(), link.b().pos());
         }
+        tessellator.draw();
     }
 
     private void renderChannelLabels(NetworkData data) {
@@ -121,7 +135,7 @@ public final class NetworkRender {
         }
     }
 
-    public void drawCube(float size, ColorData color, BlockPos pos) {
+    void appendCube(BufferBuilder buffer, float size, ColorData color, BlockPos pos) {
         float half = size / 2.0F;
         Vec3d c = ClientUtil.getCenter(pos);
         double minX = c.x - half;
@@ -131,9 +145,6 @@ public final class NetworkRender {
         double maxY = c.y + half;
         double maxZ = c.z + half;
 
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder buffer = tessellator.getBuffer();
-        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
         drawSide(
             new Vec3d(minX, maxY, maxZ),
             new Vec3d(maxX, maxY, maxZ),
@@ -170,10 +181,9 @@ public final class NetworkRender {
             new Vec3d(minX, minY, minZ),
             new Vec3d(maxX, minY, minZ),
             color, buffer);
-        tessellator.draw();
     }
 
-    public void drawLink(boolean dense, ColorData color, BlockPos from, BlockPos to) {
+    private void appendLink(BufferBuilder buffer, boolean dense, ColorData color, BlockPos from, BlockPos to) {
         Vec3d a = ClientUtil.getCenter(from);
         Vec3d b = ClientUtil.getCenter(to);
         double wide = dense ? 0.1D : 0.025D;
@@ -188,16 +198,12 @@ public final class NetworkRender {
         Vec3d bottomLeft2 = b.subtract(law2);
         Vec3d topLeft2 = b.add(law);
 
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder buffer = tessellator.getBuffer();
-        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
         drawSide(topRight, topLeft, bottomRight, bottomLeft, color, buffer);
         drawSide(topRight2, topRight, bottomRight2, bottomRight, color, buffer);
         drawSide(topLeft2, topRight2, bottomLeft2, bottomRight2, color, buffer);
         drawSide(topLeft, topLeft2, bottomLeft, bottomLeft2, color, buffer);
         drawSide(topLeft2, topRight2, topLeft, topRight, color, buffer);
         drawSide(bottomLeft2, bottomRight2, bottomLeft, bottomRight, color, buffer);
-        tessellator.draw();
     }
 
     private void drawSide(Vec3d tr, Vec3d tl, Vec3d br, Vec3d bl, ColorData color, BufferBuilder buffer) {

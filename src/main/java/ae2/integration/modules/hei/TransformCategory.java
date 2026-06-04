@@ -91,7 +91,7 @@ class TransformCategory implements IRecipeCategory<TransformRecipeWrapper> {
             ? HeiText.Explosion.getLocal()
             : HeiText.SubmergeIn.getLocal();
         int textWidth = minecraft().fontRenderer.getStringWidth(circumstanceText);
-        recipeWrapper.setTitleDrawData((WIDTH - textWidth) / 2, circumstanceText);
+        recipeWrapper.setTitleDrawData((WIDTH - textWidth) / 2 + 4, circumstanceText);
         recipeWrapper.setFluidDrawData(0, 0);
 
         int catalystSlot = 100;
