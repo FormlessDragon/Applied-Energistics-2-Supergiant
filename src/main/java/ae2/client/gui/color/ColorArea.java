@@ -1,4 +1,4 @@
-package ae2.client.gui.elements;
+package ae2.client.gui.color;
 
 import ae2.client.gui.AEBaseGui;
 import ae2.util.ColorData;
@@ -24,5 +24,10 @@ public class ColorArea extends DrawableArea {
         int x = this.x + this.screen.getGuiLeft();
         int y = this.y + this.screen.getGuiTop();
         Gui.drawRect(x, y, x + this.w, y + this.h, this.color.toARGB());
+    }
+
+    @Override
+    public void drawRelative() {
+        Gui.drawRect(this.x, this.y, this.x + this.w, this.y + this.h, this.color.toARGB());
     }
 }

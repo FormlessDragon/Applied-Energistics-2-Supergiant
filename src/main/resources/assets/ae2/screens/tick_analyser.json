@@ -4,5 +4,101 @@
   "background": {
     "texture": "guis/tick_analyser.png",
     "srcRect": [0, 0, 207, 131]
+  },
+  "widgets": {
+    "duration_input": {
+      "left": 87,
+      "top": 21,
+      "width": 36,
+      "height": 13
+    },
+    "start": {
+      "left": 15,
+      "top": 98,
+      "width": 56,
+      "height": 19
+    },
+    "cancel": {
+      "left": 136,
+      "top": 98,
+      "width": 56,
+      "height": 19
+    },
+    "dot_0": {
+      "left": 83,
+      "top": 47,
+      "width": 4,
+      "height": 4
+    },
+    "dot_1": {
+      "left": 180,
+      "top": 47,
+      "width": 4,
+      "height": 4
+    },
+    "dot_2": {
+      "left": 83,
+      "top": 76,
+      "width": 4,
+      "height": 4
+    },
+    "dot_3": {
+      "left": 180,
+      "top": 76,
+      "width": 4,
+      "height": 4
+    }
+  },
+  "text": {
+    "duration_label": {
+      "text": {
+        "translate": "gui.ae2.tick_analyser.set_duration"
+      },
+      "position": {
+        "left": 103,
+        "top": 7
+      },
+      "align": "CENTER"
+    },
+    "range_1": {
+      "text": {
+        "translate": "gui.ae2.tick_analyser.range1"
+      },
+      "position": {
+        "left": 80,
+        "top": 45
+      },
+      "align": "RIGHT"
+    },
+    "range_2": {
+      "text": {
+        "translate": "gui.ae2.tick_analyser.range2"
+      },
+      "position": {
+        "left": 177,
+        "top": 45
+      },
+      "align": "RIGHT"
+    },
+    "range_3": {
+      "text": {
+        "translate": "gui.ae2.tick_analyser.range3"
+      },
+      "position": {
+        "left": 80,
+        "top": 74
+      },
+      "align": "RIGHT"
+    },
+    "range_4": {
+      "text": {
+        "translate": "gui.ae2.tick_analyser.range4"
+      },
+      "position": {
+        "left": 177,
+        "top": 74
+      },
+      "align": "RIGHT"
+    }
   }
 }

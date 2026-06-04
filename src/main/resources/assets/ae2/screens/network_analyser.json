@@ -4,5 +4,222 @@
   "background": {
     "texture": "guis/network_analyser.png",
     "srcRect": [0, 0, 251, 168]
+  },
+  "widgets": {
+    "mode_previous": {
+      "left": 37,
+      "top": 18,
+      "width": 10,
+      "height": 16
+    },
+    "mode_next": {
+      "left": 105,
+      "top": 18,
+      "width": 10,
+      "height": 16
+    },
+    "size_decrease": {
+      "left": 37,
+      "top": 46,
+      "width": 10,
+      "height": 16
+    },
+    "size_increase": {
+      "left": 105,
+      "top": 46,
+      "width": 10,
+      "height": 16
+    },
+    "reset_colors": {
+      "left": 146,
+      "top": 142,
+      "width": 65,
+      "height": 20
+    },
+    "color_0": {
+      "left": 198,
+      "top": 22,
+      "width": 25,
+      "height": 9
+    },
+    "color_1": {
+      "left": 198,
+      "top": 43,
+      "width": 25,
+      "height": 9
+    },
+    "color_2": {
+      "left": 198,
+      "top": 64,
+      "width": 25,
+      "height": 9
+    },
+    "color_3": {
+      "left": 198,
+      "top": 85,
+      "width": 25,
+      "height": 9
+    },
+    "color_4": {
+      "left": 198,
+      "top": 106,
+      "width": 25,
+      "height": 9
+    },
+    "color_5": {
+      "left": 198,
+      "top": 127,
+      "width": 25,
+      "height": 9
+    },
+    "color_window": {
+      "left": 73,
+      "top": 48,
+      "width": 110,
+      "height": 95
+    },
+    "color_red": {
+      "left": 81,
+      "top": 57,
+      "width": 90,
+      "height": 7
+    },
+    "color_green": {
+      "left": 81,
+      "top": 72,
+      "width": 90,
+      "height": 7
+    },
+    "color_blue": {
+      "left": 81,
+      "top": 87,
+      "width": 90,
+      "height": 7
+    },
+    "color_alpha": {
+      "left": 81,
+      "top": 102,
+      "width": 90,
+      "height": 7
+    },
+    "color_preview": {
+      "left": 114,
+      "top": 121,
+      "width": 27,
+      "height": 7
+    },
+    "color_apply": {
+      "left": 88,
+      "top": 117,
+      "width": 16,
+      "height": 16
+    },
+    "color_cancel": {
+      "left": 150,
+      "top": 117,
+      "width": 16,
+      "height": 16
+    }
+  },
+  "text": {
+    "mode_label": {
+      "text": {
+        "translate": "gui.ae2.network_analyser.mode"
+      },
+      "position": {
+        "left": 24,
+        "top": 22
+      },
+      "align": "CENTER"
+    },
+    "mode_value": {
+      "position": {
+        "left": 76,
+        "top": 23
+      },
+      "align": "CENTER",
+      "color": "WHITE"
+    },
+    "node_size_label": {
+      "text": {
+        "translate": "gui.ae2.network_analyser.node_size"
+      },
+      "position": {
+        "left": 24,
+        "top": 50
+      },
+      "align": "CENTER"
+    },
+    "node_size_value": {
+      "position": {
+        "left": 76,
+        "top": 51
+      },
+      "align": "CENTER",
+      "color": "WHITE"
+    },
+    "color_label_0": {
+      "position": {
+        "left": 134,
+        "top": 23
+      }
+    },
+    "color_label_1": {
+      "position": {
+        "left": 134,
+        "top": 44
+      }
+    },
+    "color_label_2": {
+      "position": {
+        "left": 134,
+        "top": 65
+      }
+    },
+    "color_label_3": {
+      "position": {
+        "left": 134,
+        "top": 86
+      }
+    },
+    "color_label_4": {
+      "position": {
+        "left": 134,
+        "top": 107
+      }
+    },
+    "color_label_5": {
+      "position": {
+        "left": 134,
+        "top": 128
+      }
+    },
+    "channel_mode": {
+      "position": {
+        "left": 16,
+        "top": 72
+      }
+    },
+    "normal_nodes": {
+      "position": {
+        "left": 16,
+        "top": 86
+      },
+      "color": "ANALYSER_NORMAL_NODES"
+    },
+    "dense_nodes": {
+      "position": {
+        "left": 16,
+        "top": 100
+      },
+      "color": "ANALYSER_DENSE_NODES"
+    },
+    "missing_nodes": {
+      "position": {
+        "left": 16,
+        "top": 114
+      },
+      "color": "ANALYSER_MISSING_NODES"
+    }
   }
 }

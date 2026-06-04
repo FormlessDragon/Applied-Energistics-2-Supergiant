@@ -36,6 +36,7 @@ import org.lwjgl.opengl.GL11;
 import java.awt.Rectangle;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 
 /**
@@ -57,6 +58,8 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
     private List<ITextComponent> tooltipMessage = ObjectLists.emptyList();
     @Nullable
     private Consumer<String> responder;
+    @Nullable
+    private BiPredicate<Character, Integer> keyFilter;
     private int repeatingKeyCode = Keyboard.KEY_NONE;
     private char repeatingChar;
     private long repeatStartMillis;
@@ -112,6 +115,11 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
 
     @Override
     public boolean textboxKeyTyped(char typedChar, int keyCode) {
+        if (this.keyFilter != null && !this.keyFilter.test(typedChar, keyCode)) {
+            return this.isFocused() && this.canConsumeInput()
+                && keyCode != Keyboard.KEY_TAB && keyCode != Keyboard.KEY_ESCAPE;
+        }
+
         if (super.textboxKeyTyped(typedChar, keyCode)) {
             this.armKeyRepeat(typedChar, keyCode);
             if (this.responder != null) {
@@ -157,6 +165,10 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
 
     public void setResponder(@Nullable Consumer<String> responder) {
         this.responder = responder;
+    }
+
+    public void setKeyFilter(@Nullable BiPredicate<Character, Integer> keyFilter) {
+        this.keyFilter = keyFilter;
     }
 
     public void setTextFromClient(String text) {

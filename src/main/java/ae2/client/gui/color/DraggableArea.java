@@ -1,5 +1,6 @@
-package ae2.client.gui.elements;
+package ae2.client.gui.color;
 
+import ae2.client.Point;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.style.Blitter;
 import ae2.core.AppEng;
@@ -31,6 +32,18 @@ public class DraggableArea extends DrawableArea {
         if (isMouseOver(x, y)) {
             this.active = true;
             this.offset = x;
+            setValue((float) ((x - this.screen.getGuiLeft() - this.x) / this.w));
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean clickRelative(double x, double y) {
+        if (isMouseOverRelative(x, y)) {
+            this.active = true;
+            this.offset = x;
+            setValue((float) ((x - this.x) / this.w));
             return true;
         }
         return false;
@@ -38,6 +51,11 @@ public class DraggableArea extends DrawableArea {
 
     @Override
     public void release(double x, double y) {
+        this.active = false;
+    }
+
+    @Override
+    public void releaseRelative(double x, double y) {
         this.active = false;
     }
 
@@ -49,6 +67,16 @@ public class DraggableArea extends DrawableArea {
         }
     }
 
+    public void dragRelative(double x, double y) {
+        drag(x, y);
+    }
+
+    @Override
+    public boolean onMouseDrag(Point mousePos, int button) {
+        dragRelative(mousePos.x(), mousePos.y());
+        return this.active;
+    }
+
     @Override
     public void draw() {
         int x = this.x + this.screen.getGuiLeft();
@@ -57,10 +85,20 @@ public class DraggableArea extends DrawableArea {
     }
 
     @Override
+    public void drawRelative() {
+        SLIDER.copy().dest((int) (this.x + this.value * this.w), this.y).blit();
+    }
+
+    @Override
+    public boolean isMouseOverRelative(double x, double y) {
+        return x >= this.x && x < this.x + this.w
+            && y >= this.y && y < this.y + this.h;
+    }
+
+    @Override
     public boolean isMouseOver(double x, double y) {
-        int offsetX = (int) (this.value * this.w);
-        return x >= this.x + this.screen.getGuiLeft() + offsetX
-            && x < this.x + this.screen.getGuiLeft() + this.w + offsetX
+        return x >= this.x + this.screen.getGuiLeft()
+            && x < this.x + this.screen.getGuiLeft() + this.w
             && y >= this.y + this.screen.getGuiTop()
             && y < this.y + this.screen.getGuiTop() + this.h;
     }
