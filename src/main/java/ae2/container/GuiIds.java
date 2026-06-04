@@ -45,6 +45,8 @@ public final class GuiIds {
         SPATIAL_ANCHOR,
         QUARTZ_KNIFE,
         NETWORK_TOOL,
+        NETWORK_ANALYSER,
+        TICK_ANALYSER,
         NETWORK_STATUS,
         INTERFACE,
         PATTERN_PROVIDER,

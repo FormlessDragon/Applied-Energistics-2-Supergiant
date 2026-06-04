@@ -61,6 +61,8 @@ import ae2.init.client.InitItemModelsProperties;
 import ae2.init.client.InitParticleTypes;
 import ae2.init.client.InitStackRenderHandlers;
 import ae2.integration.Integrations;
+import ae2.client.render.NetworkRender;
+import ae2.client.render.ProfileRender;
 import ae2.tile.crafting.TileCraftingMonitor;
 import ae2.tile.crafting.TileMolecularAssembler;
 import ae2.tile.misc.TileCharger;
@@ -147,6 +149,8 @@ public final class AppEngClient extends AppEngServer {
         MinecraftForge.EVENT_BUS.register(OverlayManager.getInstance());
         MinecraftForge.EVENT_BUS.register(CraftingSupplierHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(StackTooltipRenderer.INSTANCE);
+        MinecraftForge.EVENT_BUS.register(NetworkRender.INSTANCE);
+        MinecraftForge.EVENT_BUS.register(ProfileRender.INSTANCE);
         Integrations.hei().registerClientFeatures();
     }
 

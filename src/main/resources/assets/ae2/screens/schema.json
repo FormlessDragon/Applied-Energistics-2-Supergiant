@@ -314,6 +314,18 @@
         },
         "ERROR": {
           "$ref": "#/definitions/color"
+        },
+        "WHITE": {
+          "$ref": "#/definitions/color"
+        },
+        "ANALYSER_NORMAL_NODES": {
+          "$ref": "#/definitions/color"
+        },
+        "ANALYSER_DENSE_NODES": {
+          "$ref": "#/definitions/color"
+        },
+        "ANALYSER_MISSING_NODES": {
+          "$ref": "#/definitions/color"
         }
       }
     },
@@ -403,7 +415,11 @@
               "DEFAULT_TEXT_COLOR",
               "MUTED_TEXT_COLOR",
               "SELECTION_COLOR",
-              "ERROR"
+              "ERROR",
+              "WHITE",
+              "ANALYSER_NORMAL_NODES",
+              "ANALYSER_DENSE_NODES",
+              "ANALYSER_MISSING_NODES"
             ],
             "default": "DEFAULT_TEXT_COLOR"
           },

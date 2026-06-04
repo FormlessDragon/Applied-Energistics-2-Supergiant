@@ -80,6 +80,8 @@ import ae2.items.tools.quartz.QuartzSpadeItem;
 import ae2.items.tools.quartz.QuartzSwordItem;
 import ae2.items.tools.quartz.QuartzToolType;
 import ae2.items.tools.quartz.QuartzWrenchItem;
+import ae2.items.tools.NetworkAnalyserItem;
+import ae2.items.tools.TickAnalyserItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.util.ResourceLocation;
@@ -374,6 +376,10 @@ public final class AEItems {
         AEItemIds.ENTROPY_MANIPULATOR, new EntropyManipulatorItem());
     public static final ItemDefinition<NetworkToolItem> NETWORK_TOOL = new ItemDefinition<>(AEItemIds.NETWORK_TOOL,
         new NetworkToolItem());
+    public static final ItemDefinition<NetworkAnalyserItem> NETWORK_ANALYSER = new ItemDefinition<>(
+        "ME Network Analyzer", AEItemIds.NETWORK_ANALYSER, new NetworkAnalyserItem());
+    public static final ItemDefinition<TickAnalyserItem> TICK_ANALYSER = new ItemDefinition<>(
+        "ME Tick Profiler", AEItemIds.TICK_ANALYSER, new TickAnalyserItem());
     public static final ItemDefinition<MEPackingTapeItem> ME_PACKING_TAPE = new ItemDefinition<>(
         AEItemIds.ME_PACKING_TAPE, new MEPackingTapeItem());
     public static final ItemDefinition<MEPackageItem> PACKAGE = new ItemDefinition<>(AEItemIds.PACKAGE,
@@ -526,6 +532,8 @@ public final class AEItems {
         MATTER_CANNON,
         ENTROPY_MANIPULATOR,
         NETWORK_TOOL,
+        NETWORK_ANALYSER,
+        TICK_ANALYSER,
         ME_PACKING_TAPE,
         PACKAGE,
         CONFIG_MODIFIER,

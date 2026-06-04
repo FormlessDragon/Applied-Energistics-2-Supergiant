@@ -53,6 +53,14 @@ import ae2.core.network.serverbound.TraceCraftingSupplierPacket;
 import ae2.core.network.serverbound.UpdateHoldingCtrlPacket;
 import ae2.core.network.serverbound.WirelessTerminalPickBlockPacket;
 import ae2.core.network.serverbound.WirelessTerminalSettingsPacket;
+import ae2.core.network.clientbound.NetworkConfigInitPacket;
+import ae2.core.network.clientbound.NetworkDataUpdatePacket;
+import ae2.core.network.clientbound.ProfileDataUpdatePacket;
+import ae2.core.network.clientbound.TickConfigInitPacket;
+import ae2.core.network.serverbound.AnalyserGenericPacket;
+import ae2.core.network.serverbound.NetworkConfigSavePacket;
+import ae2.core.network.serverbound.TickConfigSavePacket;
+import ae2.core.network.serverbound.TickProfilerRequestPacket;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.world.World;
@@ -100,6 +108,10 @@ public final class InitNetwork {
         registerClientbound(AppEngPayloadHandler.Client.class, SetLinkStatusPacket.class);
         registerClientbound(AppEngPayloadHandler.Client.class, CraftingTreeDataPacket.class);
         registerClientbound(AppEngPayloadHandler.Client.class, RequesterSyncPacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, NetworkConfigInitPacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, TickConfigInitPacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, NetworkDataUpdatePacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, ProfileDataUpdatePacket.class);
         registerClientbound(AppEngPayloadHandler.Client.class, RecursiveIngredientReserveAmountPacket.class);
         CHANNEL.registerMessage(ConfigValuePacket.ClientHandler.class, ConfigValuePacket.class, nextPacketId++, Side.CLIENT);
         registerServerbound(AppEngPayloadHandler.Server.class, ColorApplicatorSelectColorPacket.class);
@@ -128,6 +140,10 @@ public final class InitNetwork {
         registerServerbound(AppEngPayloadHandler.Server.class, SwitchCraftingTreePacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, RequesterSlotUpdatePacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, RequesterUpdatePacket.class);
+        registerServerbound(AppEngPayloadHandler.Server.class, AnalyserGenericPacket.class);
+        registerServerbound(AppEngPayloadHandler.Server.class, NetworkConfigSavePacket.class);
+        registerServerbound(AppEngPayloadHandler.Server.class, TickConfigSavePacket.class);
+        registerServerbound(AppEngPayloadHandler.Server.class, TickProfilerRequestPacket.class);
         CHANNEL.registerMessage(ConfigValuePacket.ServerHandler.class, ConfigValuePacket.class, nextPacketId++, Side.SERVER);
     }
 
