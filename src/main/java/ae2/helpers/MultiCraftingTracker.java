@@ -27,6 +27,7 @@ import ae2.api.networking.crafting.ICraftingService;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEKey;
 import ae2.api.storage.StorageHelper;
+import ae2.hooks.ticking.TickHandler;
 import com.google.common.collect.ImmutableSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
@@ -37,11 +38,18 @@ import java.util.concurrent.Future;
 
 public class MultiCraftingTracker {
 
+    private static final int INITIAL_FAILURE_COOLDOWN_TICKS = 40;
+    private static final int MAX_FAILURE_COOLDOWN_TICKS = 200;
+
     private final int size;
     private final ICraftingRequester owner;
 
     private Future<ICraftingPlan>[] jobs = null;
     private ICraftingLink[] links = null;
+    private long[] retryAfterTick = null;
+    private int[] retryFailures = null;
+    private AEKey[] retryKeys = null;
+    private long[] retryAmounts = null;
 
     public MultiCraftingTracker(ICraftingRequester owner, int size) {
         this.owner = owner;
@@ -75,6 +83,10 @@ public class MultiCraftingTracker {
             return false;
         }
 
+        if (this.isRetryCoolingDown(x, what, amount)) {
+            return false;
+        }
+
         if (craftingJob != null) {
             try {
                 ICraftingPlan job = null;
@@ -89,11 +101,18 @@ public class MultiCraftingTracker {
                     this.setJob(x, null);
 
                     if (result.successful()) {
+                        this.clearRetry(x);
                         this.setLink(x, result.link());
                         return true;
                     }
+                    this.markFailure(x, what, amount);
+                } else if (craftingJob.isDone()) {
+                    this.setJob(x, null);
+                    this.markFailure(x, what, amount);
                 }
-            } catch (InterruptedException | ExecutionException ignored) {
+            } catch (InterruptedException | ExecutionException | RuntimeException ignored) {
+                this.markFailure(x, what, amount);
+                this.setJob(x, null);
             }
         } else if (this.getLink(x) == null) {
             this.setJob(x, cg.beginCraftingCalculation(level, () -> mySrc, what, amount, CalculationStrategy.CRAFT_LESS));
@@ -114,6 +133,7 @@ public class MultiCraftingTracker {
             for (int x = 0; x < this.links.length; x++) {
                 if (this.links[x] == link) {
                     this.setLink(x, null);
+                    this.clearRetry(x);
                     return;
                 }
             }
@@ -152,6 +172,8 @@ public class MultiCraftingTracker {
 
             this.jobs = null;
         }
+
+        this.clearRetries();
     }
 
     boolean isBusy(int slot) {
@@ -185,6 +207,62 @@ public class MultiCraftingTracker {
 
         if (!hasStuff) {
             this.links = null;
+        }
+    }
+
+    private boolean isRetryCoolingDown(int slot, AEKey what, long amount) {
+        if (this.retryAfterTick == null || this.retryAfterTick[slot] <= 0) {
+            return false;
+        }
+
+        if (this.retryKeys[slot] == null || !this.retryKeys[slot].equals(what) || this.retryAmounts[slot] != amount) {
+            this.clearRetry(slot);
+            return false;
+        }
+
+        if (TickHandler.instance().getCurrentTick() < this.retryAfterTick[slot]) {
+            return true;
+        }
+
+        this.retryAfterTick[slot] = 0;
+        return false;
+    }
+
+    private void markFailure(int slot, AEKey what, long amount) {
+        this.ensureRetryArrays();
+
+        int failures = this.retryFailures[slot] + 1;
+        this.retryFailures[slot] = failures;
+        this.retryKeys[slot] = what;
+        this.retryAmounts[slot] = amount;
+        this.retryAfterTick[slot] = TickHandler.instance().getCurrentTick()
+            + Math.min(MAX_FAILURE_COOLDOWN_TICKS, INITIAL_FAILURE_COOLDOWN_TICKS * failures);
+    }
+
+    private void clearRetry(int slot) {
+        if (this.retryAfterTick == null) {
+            return;
+        }
+
+        this.retryAfterTick[slot] = 0;
+        this.retryFailures[slot] = 0;
+        this.retryKeys[slot] = null;
+        this.retryAmounts[slot] = 0;
+    }
+
+    private void clearRetries() {
+        this.retryAfterTick = null;
+        this.retryFailures = null;
+        this.retryKeys = null;
+        this.retryAmounts = null;
+    }
+
+    private void ensureRetryArrays() {
+        if (this.retryAfterTick == null) {
+            this.retryAfterTick = new long[this.size];
+            this.retryFailures = new int[this.size];
+            this.retryKeys = new AEKey[this.size];
+            this.retryAmounts = new long[this.size];
         }
     }
 

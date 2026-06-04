@@ -211,8 +211,8 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
             ? GuiText.CraftingTreeDefault.text()
             : GuiText.CraftingTreeMissingOnly.text());
         this.missingOnly.setIcon(active
-            ? Icon.CRAFTING_TREE_BRANCHES_ALL
-            : Icon.CRAFTING_TREE_BRANCHES_FAILED);
+            ? Icon.CRAFTING_TREE_BRANCHES_FAILED
+            : Icon.CRAFTING_TREE_BRANCHES_ALL);
         this.missingOnly.enabled = tree.hasMissingItems();
         this.screenshot.enabled = tree.hasTree();
     }

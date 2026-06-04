@@ -168,6 +168,11 @@ public class NetworkCraftingProviders {
         return Objects.requireNonNullElse(mediumList, Collections.emptyList());
     }
 
+    public List<ICraftingProvider> getMediumsSnapshot(IPatternDetails key) {
+        var mediumList = this.craftingMethods.get(key);
+        return mediumList == null ? List.of() : mediumList.snapshot();
+    }
+
     private void setLastModifiedOnTick() {
         lastModifiedOnTick = TickHandler.instance().getCurrentTick();
     }
@@ -201,6 +206,10 @@ public class NetworkCraftingProviders {
         @NotNull
         public Iterator<ICraftingProvider> iterator() {
             return Iterators.limit(cycleIterator, providers.size());
+        }
+
+        private List<ICraftingProvider> snapshot() {
+            return List.copyOf(providers);
         }
     }
 

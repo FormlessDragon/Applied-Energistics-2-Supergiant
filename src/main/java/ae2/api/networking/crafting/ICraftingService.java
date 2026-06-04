@@ -190,4 +190,17 @@ public interface ICraftingService extends IGridService {
      * @see #isRequesting(AEKey)
      */
     boolean isRequestingAny();
+
+    /**
+     * Amount of each recursive crafting ingredient the grid should try to keep available after planning.
+     */
+    default long getRecursiveIngredientReserveAmount() {
+        return 1;
+    }
+
+    /**
+     * Updates the grid-wide recursive ingredient reserve amount. Values below zero are clamped by implementations.
+     */
+    default void setRecursiveIngredientReserveAmount(long amount) {
+    }
 }

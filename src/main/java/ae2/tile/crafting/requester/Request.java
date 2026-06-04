@@ -79,6 +79,16 @@ public final class Request {
         }
     }
 
+    public void disableWithStatus(RequestStatus status) {
+        if (!this.enabled && this.clientStatus == status) {
+            return;
+        }
+
+        this.enabled = false;
+        this.clientStatus = status;
+        updated();
+    }
+
     public @Nullable GenericStack getConfiguredStack() {
         return configuredStack;
     }

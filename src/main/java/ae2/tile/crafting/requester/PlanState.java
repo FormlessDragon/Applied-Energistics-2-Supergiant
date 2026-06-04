@@ -4,21 +4,45 @@ import ae2.api.networking.crafting.CraftingSubmitErrorCode;
 import ae2.api.networking.crafting.ICraftingLink;
 import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.networking.crafting.ICraftingSubmitResult;
+import ae2.api.networking.crafting.UnsuitableCpus;
 import ae2.api.networking.ticking.TickRateModulation;
 import ae2.tile.crafting.TileRequester;
 
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 public record PlanState(Future<ICraftingPlan> future) implements StatusState {
-    private static final Set<CraftingSubmitErrorCode> CPU_ERROR_CODES = Set.of(
-        CraftingSubmitErrorCode.NO_CPU_FOUND,
-        CraftingSubmitErrorCode.NO_SUITABLE_CPU_FOUND,
-        CraftingSubmitErrorCode.CPU_BUSY,
-        CraftingSubmitErrorCode.CPU_OFFLINE,
-        CraftingSubmitErrorCode.CPU_TOO_SMALL
-    );
+    private static boolean isNoPatternPlan(ICraftingPlan plan) {
+        return !plan.missingItems().isEmpty() && plan.patternTimes().isEmpty() && plan.emittedItems().isEmpty();
+    }
+
+    @Override
+    public RequestStatus type() {
+        return RequestStatus.PLANNING;
+    }
+
+    @Override
+    public TickRateModulation getTickRateModulation() {
+        return this.future.isDone() && !this.future.isCancelled() ? TickRateModulation.URGENT : TickRateModulation.SLOWER;
+    }
+
+    private static boolean isCpuTooSmall(ICraftingSubmitResult result) {
+        if (result.errorCode() == CraftingSubmitErrorCode.CPU_TOO_SMALL) {
+            return true;
+        }
+        if (result.errorCode() == CraftingSubmitErrorCode.NO_SUITABLE_CPU_FOUND
+            && result.errorDetail() instanceof UnsuitableCpus unsuitableCpus) {
+            return unsuitableCpus.tooSmall() > 0;
+        }
+        return false;
+    }
+
+    private static boolean isCpuError(ICraftingSubmitResult result) {
+        return result.errorCode() == CraftingSubmitErrorCode.NO_CPU_FOUND
+            || result.errorCode() == CraftingSubmitErrorCode.NO_SUITABLE_CPU_FOUND
+            || result.errorCode() == CraftingSubmitErrorCode.CPU_BUSY
+            || result.errorCode() == CraftingSubmitErrorCode.CPU_OFFLINE;
+    }
 
     @Override
     public StatusState handle(TileRequester host, int slot) {
@@ -35,7 +59,12 @@ public record PlanState(Future<ICraftingPlan> future) implements StatusState {
                 return IDLE;
             }
 
+            if (isNoPatternPlan(plan)) {
+                return host.disableRequestForNoPattern(slot);
+            }
+
             if (!host.getRequests().get(slot).isForceStart() && !plan.missingItems().isEmpty()) {
+                host.markMissingRetry(slot);
                 return BlockedState.missing();
             }
 
@@ -46,14 +75,19 @@ public record PlanState(Future<ICraftingPlan> future) implements StatusState {
                 return new LinkState(link);
             }
 
-            if (result.errorCode() != null && CPU_ERROR_CODES.contains(result.errorCode())) {
+            if (isCpuTooSmall(result)) {
+                host.markCpuTooSmallRetry(slot);
+                return BlockedState.cpu();
+            }
+            if (isCpuError(result)) {
                 return BlockedState.cpu();
             }
             if (result.errorCode() == CraftingSubmitErrorCode.NO_CRAFTING_PATTERN) {
-                return BlockedState.noPattern();
+                return host.disableRequestForNoPattern(slot);
             }
             if (result.errorCode() == CraftingSubmitErrorCode.MISSING_INGREDIENT
                 || result.errorCode() == CraftingSubmitErrorCode.INCOMPLETE_PLAN) {
+                host.markMissingRetry(slot);
                 return BlockedState.missing();
             }
             return IDLE;
@@ -63,15 +97,5 @@ public record PlanState(Future<ICraftingPlan> future) implements StatusState {
         } catch (ExecutionException ignored) {
             return IDLE;
         }
-    }
-
-    @Override
-    public RequestStatus type() {
-        return RequestStatus.PLANNING;
-    }
-
-    @Override
-    public TickRateModulation getTickRateModulation() {
-        return this.future.isDone() && !this.future.isCancelled() ? TickRateModulation.URGENT : TickRateModulation.SLOWER;
     }
 }

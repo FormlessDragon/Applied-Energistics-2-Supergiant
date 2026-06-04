@@ -20,15 +20,30 @@ package ae2.crafting;
 
 import ae2.api.config.Actionable;
 import ae2.api.crafting.IPatternDetails;
+import ae2.api.implementations.blockentities.PatternContainerGroup;
+import ae2.api.networking.IGrid;
+import ae2.api.networking.crafting.ICraftingProvider;
 import ae2.api.networking.crafting.ICraftingService;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.KeyCounter;
+import ae2.crafting.execution.CraftingSupplierLocation;
+import ae2.crafting.execution.CraftingSupplierLocator;
 import ae2.crafting.inv.ChildCraftingSimulationState;
 import ae2.crafting.inv.CraftingSimulationState;
 import ae2.crafting.pattern.AEProcessingPattern;
+import ae2.helpers.patternprovider.PatternContainer;
+import ae2.helpers.patternprovider.PatternProviderLogic;
 import ae2.helpers.patternprovider.PseudoPatternDetails;
+import ae2.me.service.CraftingService;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 
 /**
  * A crafting tree process is what represents a pattern in the crafting process. It has a parent node (its output), and
@@ -37,13 +52,20 @@ import it.unimi.dsi.fastutil.objects.Object2LongMap;
 public class CraftingTreeProcess {
 
     final IPatternDetails details;
+    private static final Comparator<PatternContainerGroup> MACHINE_GROUP_COMPARATOR =
+        Comparator.comparing(group -> group.name().getFormattedText().toLowerCase(java.util.Locale.ROOT));
+    private final List<PatternContainerGroup> machineGroups;
     private final CraftingTreeNode parent;
     private final CraftingCalculation job;
     // Use linked hashmap to ensure deterministic ordering of subcrafts
     private final Object2LongLinkedOpenHashMap<CraftingTreeNode> nodes = new Object2LongLinkedOpenHashMap<>();
+    private final Object2LongLinkedOpenHashMap<CraftingTreeNode> treeInputDisplayAmounts =
+        new Object2LongLinkedOpenHashMap<>();
     boolean possible = true;
     private boolean containerItems;
     private Preview reusablePreview;
+    private final Map<PatternContainerGroup, List<CraftingSupplierLocation>> machineLocations;
+    private long treeRequestTimes;
     /**
      * If true, we perform this pattern by 1 at the time. This ensures that container items or outputs get reused when
      * possible.
@@ -56,6 +78,9 @@ public class CraftingTreeProcess {
         this.parent = craftingTreeNode;
         this.details = details;
         this.job = job;
+        MachineInfo machineInfo = collectMachineInfo(cc, details);
+        this.machineGroups = machineInfo.groups();
+        this.machineLocations = machineInfo.locations();
 
         updateLimitQty();
 
@@ -66,6 +91,55 @@ public class CraftingTreeProcess {
             this.nodes.put(new CraftingTreeNode(cc, job, firstInput.what(), firstInput.amount(), this, x),
                 input.getMultiplier());
         }
+    }
+
+    private static MachineInfo collectMachineInfo(ICraftingService craftingService,
+                                                  IPatternDetails details) {
+        if (!(craftingService instanceof CraftingService service)) {
+            return new MachineInfo(List.of(), Map.of());
+        }
+
+        Map<PatternContainerGroup, LinkedHashSet<CraftingSupplierLocation>> locationsByGroup = new LinkedHashMap<>();
+        for (ICraftingProvider provider : service.getProvidersSnapshot(details)) {
+            PatternContainerGroup group = getMachineGroup(provider);
+            if (group != null) {
+                locationsByGroup.computeIfAbsent(group, ignored -> new LinkedHashSet<>());
+                CraftingSupplierLocation location = getMachineLocation(service.getGrid(), provider);
+                if (location != null) {
+                    locationsByGroup.get(group).add(location);
+                }
+            }
+        }
+        List<PatternContainerGroup> groups = locationsByGroup.keySet().stream()
+                                                             .sorted(MACHINE_GROUP_COMPARATOR)
+                                                             .toList();
+        Map<PatternContainerGroup, List<CraftingSupplierLocation>> locations = new LinkedHashMap<>();
+        for (PatternContainerGroup group : groups) {
+            locations.put(group, List.copyOf(locationsByGroup.getOrDefault(group, new LinkedHashSet<>())));
+        }
+        return new MachineInfo(groups, locations);
+    }
+
+    @Nullable
+    private static PatternContainerGroup getMachineGroup(ICraftingProvider provider) {
+        if (provider instanceof TemporaryPseudoCraftingProvider) {
+            return null;
+        }
+        if (provider instanceof PatternProviderLogic logic) {
+            return logic.getTerminalGroup();
+        }
+        if (provider instanceof PatternContainer container) {
+            return container.getTerminalGroup();
+        }
+        return PatternContainerGroup.nothing();
+    }
+
+    @Nullable
+    private static CraftingSupplierLocation getMachineLocation(IGrid grid, ICraftingProvider provider) {
+        if (provider instanceof TemporaryPseudoCraftingProvider) {
+            return null;
+        }
+        return CraftingSupplierLocator.resolveLocation(grid, provider);
     }
 
     /**
@@ -110,6 +184,17 @@ public class CraftingTreeProcess {
         return this.nodes.size() == 1 && !this.limitQty && !this.containerItems;
     }
 
+    private static KeyCounter copyPositiveDelta(KeyCounter after, KeyCounter before) {
+        var delta = new KeyCounter();
+        for (var entry : after) {
+            long valueDelta = entry.getLongValue() - before.get(entry.getKey());
+            if (valueDelta > 0) {
+                delta.add(entry.getKey(), valueDelta);
+            }
+        }
+        return delta;
+    }
+
     long getMaximumCraftableTimes(CraftingSimulationState inv, long maxTimes)
         throws InterruptedException {
         this.job.handlePausing();
@@ -117,6 +202,10 @@ public class CraftingTreeProcess {
         long start = System.nanoTime();
         long intermediateFinalOutputMarker = this.job.getIntermediateFinalOutputMarker();
         var recursiveMissingSeedsMarker = this.job.getRecursiveMissingSeedsMarker();
+        var realSeededRecursiveRequestsMarker = this.job.getRealSeededRecursiveRequestsMarker();
+        var realRecursiveSeedsMarker = this.job.getRealRecursiveSeedsMarker();
+        var realSeededRecursiveKeysMarker = this.job.getRealSeededRecursiveKeysMarker();
+        var recursiveDisplayRequestsMarker = this.job.getRecursiveDisplayRequestsMarker();
         var sharedInputs = new ChildCraftingSimulationState(inv);
         this.job.pushProcess(this);
         try {
@@ -129,11 +218,22 @@ public class CraftingTreeProcess {
                     requiredPerPattern * craftableTimes);
                 craftableTimes = availableInputs / requiredPerPattern;
                 if (craftableTimes > 0) {
-                    var recursiveMissingSeeds = this.job.getRecursiveMissingSeedsMarker();
-                    recursiveMissingSeeds.removeAll(recursiveMissingSeedsMarker);
+                    var recursiveMissingSeeds = copyPositiveDelta(this.job.getRecursiveMissingSeedsMarker(),
+                        recursiveMissingSeedsMarker);
+                    var clearedRecursiveMissingSeeds = copyPositiveDelta(recursiveMissingSeedsMarker,
+                        this.job.getRecursiveMissingSeedsMarker());
+                    var realSeededRecursiveRequests = this.job.getRealSeededRecursiveRequestsMarker();
+                    realSeededRecursiveRequests.removeAll(realSeededRecursiveRequestsMarker);
+                    var realRecursiveSeeds = this.job.getRealRecursiveSeedsMarker();
+                    realRecursiveSeeds.removeAll(realRecursiveSeedsMarker);
+                    var realSeededRecursiveKeys = this.job.getRealSeededRecursiveKeysMarker();
+                    realSeededRecursiveKeys.removeAll(realSeededRecursiveKeysMarker);
                     this.reusablePreview = new Preview(inv, sharedInputs, craftableTimes,
                         this.job.getIntermediateFinalOutputMarker() - intermediateFinalOutputMarker,
-                        recursiveMissingSeeds);
+                        recursiveMissingSeeds, clearedRecursiveMissingSeeds, realSeededRecursiveRequests,
+                        realRecursiveSeeds,
+                        realSeededRecursiveKeys,
+                        this.job.getRecursiveDisplayRequestsDelta(recursiveDisplayRequestsMarker));
                 }
                 return craftableTimes;
             }
@@ -152,6 +252,10 @@ public class CraftingTreeProcess {
             this.job.popProcess();
             this.job.restoreIntermediateFinalOutputMarker(intermediateFinalOutputMarker);
             this.job.restoreRecursiveMissingSeedsMarker(recursiveMissingSeedsMarker);
+            this.job.restoreRealSeededRecursiveRequestsMarker(realSeededRecursiveRequestsMarker);
+            this.job.restoreRealRecursiveSeedsMarker(realRecursiveSeedsMarker);
+            this.job.restoreRealSeededRecursiveKeysMarker(realSeededRecursiveKeysMarker);
+            this.job.restoreRecursiveDisplayRequestsMarker(recursiveDisplayRequestsMarker);
             this.job.recordPerformanceStage("process-max-craftable inputs=" + this.nodes.size(),
                 System.nanoTime() - start);
         }
@@ -177,9 +281,29 @@ public class CraftingTreeProcess {
         if (preview.intermediateFinalOutputAmount() > 0) {
             this.job.addIntermediateFinalOutput(preview.intermediateFinalOutputAmount());
         }
-        this.job.addRecursiveMissingSeeds(preview.recursiveMissingSeeds());
+        this.job.applyRecursiveMissingSeedPreview(preview.clearedRecursiveMissingSeeds(),
+            preview.recursiveMissingSeeds());
+        this.job.addRealSeededRecursiveRequests(preview.realSeededRecursiveRequests());
+        this.job.addRealRecursiveSeeds(preview.realRecursiveSeeds());
+        this.job.addRealSeededRecursiveKeys(preview.realSeededRecursiveKeys());
+        this.job.addRecursiveDisplayRequests(preview.recursiveDisplayRequestsDelta());
         this.reusablePreview = null;
         return true;
+    }
+
+    long getReusablePreviewRecursiveMissingSeedAmount(AEKey what) {
+        return this.reusablePreview == null ? 0 : this.reusablePreview.recursiveMissingSeeds().get(what);
+    }
+
+    void applyReusablePreviewRecursiveMissingSeedsOnly() {
+        var preview = this.reusablePreview;
+        if (preview == null) {
+            return;
+        }
+
+        this.job.applyRecursiveMissingSeedPreview(preview.clearedRecursiveMissingSeeds(),
+            preview.recursiveMissingSeeds());
+        this.reusablePreview = null;
     }
 
     void request(CraftingSimulationState inv, long times)
@@ -189,11 +313,10 @@ public class CraftingTreeProcess {
         this.job.pushProcess(this);
         try {
             var containerItems = this.containerItems ? new KeyCounter() : null;
+            long intermediateFinalOutputMarker = this.job.getIntermediateFinalOutputMarker();
 
             // request and remove inputs...
-            for (Object2LongMap.Entry<CraftingTreeNode> entry : this.nodes.object2LongEntrySet()) {
-                entry.getKey().request(inv, entry.getLongValue() * times, containerItems);
-            }
+            requestInputs(inv, times, containerItems, null);
 
             // by now we must have succeeded, otherwise an exception would have been thrown by request() above
 
@@ -216,9 +339,89 @@ public class CraftingTreeProcess {
 
             inv.addCrafting(details, times);
             inv.addBytes(times);
+            requestIntermediateFinalOutputReplacements(inv,
+                this.job.getIntermediateFinalOutputMarker() - intermediateFinalOutputMarker);
         } finally {
             this.job.popProcess();
         }
+    }
+
+    private void requestInputs(CraftingSimulationState inv, long times, @Nullable KeyCounter containerItems,
+                               @Nullable AEKey skippedInput)
+        throws CraftBranchFailure, InterruptedException {
+        for (Object2LongMap.Entry<CraftingTreeNode> entry : this.nodes.object2LongEntrySet()) {
+            var node = entry.getKey();
+            if (node.getWhat().equals(skippedInput)) {
+                continue;
+            }
+            var requiredExtractMarker = inv.getRequiredExtractMarker();
+            var missingItemsMarker = this.job.getMissingItemsMarker();
+            node.request(inv, entry.getLongValue() * times, containerItems);
+            recordTreeInputDisplayAmount(inv, node, requiredExtractMarker, missingItemsMarker);
+        }
+    }
+
+    private void requestIntermediateFinalOutputReplacements(CraftingSimulationState inv, long intermediateAmount)
+        throws CraftBranchFailure, InterruptedException {
+        long outputCount = getOutputCount(this.job.getOutput());
+        if (intermediateAmount <= 0 || outputCount <= 0 || !this.parent.getWhat().equals(this.job.getOutput())) {
+            return;
+        }
+        var skippedInput = getSkippedRecursiveFinalOutputInput();
+        if (skippedInput == null || this.nodes.size() <= 1) {
+            return;
+        }
+
+        long extraTimes = (intermediateAmount + outputCount - 1) / outputCount;
+        long marker = this.job.getIntermediateFinalOutputMarker();
+        requestInputs(inv, extraTimes, null, skippedInput);
+        this.job.restoreIntermediateFinalOutputMarker(marker);
+        inv.addCrafting(details, extraTimes);
+        inv.addBytes(extraTimes);
+    }
+
+    @Nullable
+    private AEKey getSkippedRecursiveFinalOutputInput() {
+        for (CraftingTreeNode node : this.nodes.keySet()) {
+            if (this.job.isRecursiveFinalOutputInput(node.getWhat())) {
+                return node.getWhat();
+            }
+        }
+        return null;
+    }
+
+    void addTreeRequestTimes(long times) {
+        this.treeRequestTimes += times;
+    }
+
+    private void recordTreeInputDisplayAmount(CraftingSimulationState inv, CraftingTreeNode node,
+                                              KeyCounter requiredExtractMarker, KeyCounter missingItemsMarker) {
+        if (!node.hasSelfReturningRemainderInput()) {
+            return;
+        }
+
+        var key = node.getWhat();
+        long extractedDelta = inv.getRequiredExtractAmount(key) - requiredExtractMarker.get(key);
+        long missingDelta = this.job.getMissingItems().get(key) - missingItemsMarker.get(key);
+        long delta = Math.max(0, extractedDelta) + Math.max(0, missingDelta);
+        long previous = this.treeInputDisplayAmounts.getLong(node);
+        this.treeInputDisplayAmounts.put(node, previous + delta);
+    }
+
+    public boolean hasTreeInputDisplayAmount(CraftingTreeNode node) {
+        return this.treeInputDisplayAmounts.containsKey(node);
+    }
+
+    public long getTreeInputDisplayAmount(CraftingTreeNode node) {
+        return this.treeInputDisplayAmounts.getLong(node);
+    }
+
+    public long getTreeDisplayTimes() {
+        return treeRequestTimes;
+    }
+
+    public long getTreeRequestTimes() {
+        return treeRequestTimes;
     }
 
     private boolean isFinalOutputPseudoPattern() {
@@ -323,6 +526,12 @@ public class CraftingTreeProcess {
         }
     }
 
+    void accumulateInputKeys(java.util.Set<AEKey> inputKeys) {
+        for (CraftingTreeNode node : this.nodes.keySet()) {
+            inputKeys.add(node.getWhat());
+        }
+    }
+
     boolean hasMultiplePaths() {
         for (Object2LongMap.Entry<CraftingTreeNode> entry : nodes.object2LongEntrySet()) {
             if (entry.getKey().hasMultiplePaths()) {
@@ -335,6 +544,8 @@ public class CraftingTreeProcess {
     void resetPossible() {
         this.possible = true;
         this.reusablePreview = null;
+        this.treeRequestTimes = 0;
+        this.treeInputDisplayAmounts.clear();
         for (CraftingTreeNode node : this.nodes.keySet()) {
             node.resetPossible();
         }
@@ -344,11 +555,27 @@ public class CraftingTreeProcess {
         return this.details;
     }
 
+    public List<PatternContainerGroup> getMachineGroups() {
+        return machineGroups;
+    }
+
+    public Map<PatternContainerGroup, List<CraftingSupplierLocation>> getMachineLocations() {
+        return machineLocations;
+    }
+
+    private record MachineInfo(List<PatternContainerGroup> groups,
+                               Map<PatternContainerGroup, List<CraftingSupplierLocation>> locations) {
+    }
+
     public Object2LongLinkedOpenHashMap<CraftingTreeNode> getNodes() {
         return nodes;
     }
-
     private record Preview(CraftingSimulationState parent, ChildCraftingSimulationState state, long times,
-                           long intermediateFinalOutputAmount, KeyCounter recursiveMissingSeeds) {
+                           long intermediateFinalOutputAmount, KeyCounter recursiveMissingSeeds,
+                           KeyCounter clearedRecursiveMissingSeeds,
+                           java.util.Set<AEKey> realSeededRecursiveRequests,
+                           java.util.Set<AEKey> realRecursiveSeeds,
+                           java.util.Set<AEKey> realSeededRecursiveKeys,
+                           java.util.IdentityHashMap<CraftingTreeNode, Long> recursiveDisplayRequestsDelta) {
     }
 }

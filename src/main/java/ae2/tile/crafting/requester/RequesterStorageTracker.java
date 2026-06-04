@@ -10,6 +10,7 @@ import net.minecraft.nbt.NBTTagList;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
+import java.util.function.IntConsumer;
 
 public final class RequesterStorageTracker implements IStorageWatcherNode {
     private static final String BUFFERED = "buffered";
@@ -22,14 +23,16 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
     private final KeyCounter[] pendingInsertion;
     private final KeyCounter[] known;
     private final @Nullable AEKey[] watchedKeys;
+    private final IntConsumer stackChangeListener;
     private @Nullable IStackWatcher stackWatcher;
 
-    public RequesterStorageTracker(int size) {
+    public RequesterStorageTracker(int size, IntConsumer stackChangeListener) {
         this.total = new KeyCounter[size];
         this.buffered = new KeyCounter[size];
         this.pendingInsertion = new KeyCounter[size];
         this.known = new KeyCounter[size];
         this.watchedKeys = new AEKey[size];
+        this.stackChangeListener = stackChangeListener;
         for (int i = 0; i < size; i++) {
             this.total[i] = new KeyCounter();
             this.buffered[i] = new KeyCounter();
@@ -122,6 +125,7 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
                 || pendingInsertion[slot].get(what) > 0
                 || known[slot].get(what) > 0) {
                 setKnownAmount(slot, what, amount);
+                this.stackChangeListener.accept(slot);
             }
         }
     }

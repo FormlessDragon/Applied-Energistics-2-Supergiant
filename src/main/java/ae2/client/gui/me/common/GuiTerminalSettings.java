@@ -24,6 +24,7 @@ import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.AECheckbox;
+import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.TabButton;
@@ -36,6 +37,7 @@ import ae2.core.AEConfig;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
+import ae2.core.network.serverbound.SetRecursiveIngredientReserveAmountPacket;
 import ae2.core.network.serverbound.SwitchGuisPacket;
 import ae2.core.network.serverbound.WirelessTerminalSettingsPacket;
 import ae2.helpers.WirelessTerminalGuiHost;
@@ -48,6 +50,10 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.input.Keyboard;
+
+import java.io.IOException;
+import java.util.List;
 
 public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     private final AEBaseGui<?> parent;
@@ -62,6 +68,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     private final AECheckbox autoFocusCheckbox;
     private final AECheckbox syncWithExternalCheckbox;
     private final AECheckbox clearExternalCheckbox;
+    private final AETextField recursiveReserveField;
     private final IconButton generalPageButton;
     private final IconButton wirelessPageButton;
     @Nullable
@@ -79,6 +86,8 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     @Nullable
     private final AE2Button magnetSettingsButton;
     private Page page = Page.GENERAL;
+    private long displayedRecursiveReserveAmount = -1;
+    private boolean recursiveReserveFieldFocused;
 
     public GuiTerminalSettings(GuiMEStorage<? extends ContainerMEStorage> parent) {
         this(parent, parent.getContainer(),
@@ -130,6 +139,9 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
             GuiText.SearchSettingsSyncWithExternal.text(externalSearchName), this::save);
         this.clearExternalCheckbox = widgets.addCheckbox("clearExternalCheckbox",
             GuiText.SearchSettingsClearExternal.text(externalSearchName), this::save);
+        this.recursiveReserveField = widgets.addTextField("recursiveReserveField");
+        this.recursiveReserveField.setMaxStringLength(18);
+        this.recursiveReserveField.setResponder(ignored -> validateRecursiveReserveField());
         if (this.wirelessHost != null) {
             this.pickBlockCheckbox = widgets.addCheckbox("pickBlockCheckbox",
                 GuiText.WirelessTerminalSettingsPickBlock.text(), this::save);
@@ -155,6 +167,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         setTextContent(TEXT_ID_DIALOG_TITLE,
             wirelessOnly ? GuiText.WirelessTerminalSettingsTitle.text() : GuiText.TerminalSettingsTitle.text());
         setTextContent("search_settings_title", GuiText.SearchSettingsTitle.text());
+        setTextContent("recursive_reserve_label", GuiText.TerminalSettingsRecursiveIngredientReserve.text());
         setTextContent("wireless_settings_title", GuiText.WirelessTerminalSettingsTitle.text());
         if (wirelessOnly) {
             this.page = Page.WIRELESS;
@@ -171,6 +184,18 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     protected void updateBeforeRender() {
         super.updateBeforeRender();
         updateState();
+        submitRecursiveReserveOnFocusLoss();
+    }
+
+    @Override
+    protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        if (this.recursiveReserveField.isFocused()
+            && (keyCode == Keyboard.KEY_RETURN || keyCode == Keyboard.KEY_NUMPADENTER)) {
+            submitRecursiveReserveField();
+            this.recursiveReserveField.setFocused(false);
+            return;
+        }
+        super.keyTyped(typedChar, keyCode);
     }
 
     private void returnToParent() {
@@ -256,6 +281,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
 
     private void updateState() {
         AEConfig config = AEConfig.instance();
+        updateRecursiveReserveFromContainer();
         pinAutoCraftedItemsCheckbox.setSelected(config.isPinAutoCraftedItems());
         notifyForFinishedCraftingJobsCheckbox.setSelected(config.isNotifyForFinishedCraftingJobs());
         clearGridOnCloseCheckbox.setSelected(config.isClearGridOnClose());
@@ -279,6 +305,70 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         this.clearExternalCheckbox.visible = this.useExternalSearchRadio.isSelected();
         updateWirelessState();
         updateVisibility();
+    }
+
+    private void updateRecursiveReserveFromContainer() {
+        if (!(this.container instanceof ContainerMEStorage meStorage)) {
+            return;
+        }
+
+        long amount = meStorage.getRecursiveIngredientReserveAmount();
+        if (amount == this.displayedRecursiveReserveAmount) {
+            return;
+        }
+
+        this.displayedRecursiveReserveAmount = amount;
+        if (!this.recursiveReserveField.isFocused()) {
+            this.recursiveReserveField.setText(Long.toString(amount));
+            validateRecursiveReserveField();
+        }
+    }
+
+    private void validateRecursiveReserveField() {
+        if (parseRecursiveReserveField() >= 0) {
+            this.recursiveReserveField.setTextColor(0xFFFFFF);
+            this.recursiveReserveField.setTooltipMessage(List.of(
+                GuiText.TerminalSettingsRecursiveIngredientReserveTooltip.text()));
+        } else {
+            this.recursiveReserveField.setTextColor(0xFF5555);
+            this.recursiveReserveField.setTooltipMessage(List.of(GuiText.InvalidNumber.text()));
+        }
+    }
+
+    private long parseRecursiveReserveField() {
+        String text = this.recursiveReserveField.getText().trim();
+        if (text.isEmpty()) {
+            return -1;
+        }
+        try {
+            long amount = Long.parseLong(text);
+            return amount >= 0 ? amount : -1;
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
+    }
+
+    private void submitRecursiveReserveOnFocusLoss() {
+        boolean focused = this.recursiveReserveField.isFocused();
+        if (this.recursiveReserveFieldFocused && !focused) {
+            submitRecursiveReserveField();
+        }
+        this.recursiveReserveFieldFocused = focused;
+    }
+
+    private void submitRecursiveReserveField() {
+        long amount = parseRecursiveReserveField();
+        if (amount < 0 || amount == this.displayedRecursiveReserveAmount) {
+            validateRecursiveReserveField();
+            return;
+        }
+
+        this.displayedRecursiveReserveAmount = amount;
+        if (this.container instanceof ContainerMEStorage meStorage) {
+            meStorage.setRecursiveIngredientReserveAmount(amount);
+        }
+        InitNetwork.sendToServer(new SetRecursiveIngredientReserveAmountPacket(amount));
+        validateRecursiveReserveField();
     }
 
     private void updateWirelessState() {
@@ -327,6 +417,8 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         this.autoFocusCheckbox.visible = general && this.useInternalSearchRadio.isSelected();
         this.syncWithExternalCheckbox.visible = general && this.useInternalSearchRadio.isSelected();
         this.clearExternalCheckbox.visible = general && this.useExternalSearchRadio.isSelected();
+        setTextHidden("recursive_reserve_label", !general);
+        this.recursiveReserveField.setVisible(general);
 
         if (this.pickBlockCheckbox != null) {
             this.pickBlockCheckbox.visible = wireless;

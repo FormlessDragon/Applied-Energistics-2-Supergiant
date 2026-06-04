@@ -205,9 +205,55 @@ public abstract class CraftingSimulationState implements ICraftingSimulationStat
         return this.unmodifiedCache.get(what);
     }
 
+    public KeyCounter getRequiredExtractMarker() {
+        var marker = new KeyCounter();
+        marker.addAll(this.requiredExtract);
+        return marker;
+    }
+
+    public long getRequiredExtractAmount(AEKey what) {
+        return this.requiredExtract.get(what);
+    }
+
     public long getAvailableAmount(AEKey what) {
         cacheFuzzy(what);
         return this.modifiableCache.get(what);
+    }
+
+    public long getAvailableNonProducedAmount(AEKey what) {
+        cacheFuzzy(what);
+        return Math.max(0, this.unmodifiedCache.get(what) - this.requiredExtract.get(what));
+    }
+
+    public long returnExtractedForReserve(AEKey what, long amount) {
+        cacheFuzzy(what);
+        long returned = Math.min(amount, this.requiredExtract.get(what));
+        if (returned <= 0) {
+            return 0;
+        }
+
+        this.requiredExtract.remove(what, returned);
+        this.modifiableCache.add(what, returned);
+        return returned;
+    }
+
+    public long getNetProducedAmount(AEKey what) {
+        cacheFuzzy(what);
+        long produced = this.modifiableCache.get(what) - this.unmodifiedCache.get(what)
+            + this.requiredExtract.get(what);
+        return Math.max(0, produced);
+    }
+
+    public long getCraftedAmount(AEKey what) {
+        long amount = 0;
+        for (Object2LongMap.Entry<IPatternDetails> entry : this.crafts.object2LongEntrySet()) {
+            for (var output : entry.getKey().getOutputs()) {
+                if (what.matches(output)) {
+                    amount += output.amount() * entry.getLongValue();
+                }
+            }
+        }
+        return amount;
     }
 
     public void ignore(AEKey stack) {

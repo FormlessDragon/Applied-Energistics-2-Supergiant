@@ -22,8 +22,10 @@ import ae2.api.stacks.AEKey;
 import ae2.api.storage.StorageHelper;
 import ae2.core.AEConfig;
 import ae2.core.definitions.AEBlocks;
+import ae2.hooks.ticking.TickHandler;
 import ae2.text.TextComponentItemStack;
 import ae2.tile.crafting.requester.LinkState;
+import ae2.tile.crafting.requester.NoPatternState;
 import ae2.tile.crafting.requester.PlanState;
 import ae2.tile.crafting.requester.RequestHost;
 import ae2.tile.crafting.requester.RequestList;
@@ -48,6 +50,9 @@ import java.util.concurrent.Future;
 
 public class TileRequester extends AENetworkedTile implements RequestHost, IGridTickable, ICraftingForceStartRequester {
 
+    private static final int MISSING_RETRY_TICKS = 100;
+    private static final int CPU_TOO_SMALL_RETRY_TICKS = 100;
+
     private static final String REQUESTS_TAG = "requests";
     private static final String STORAGE_MANAGER_TAG = "storage_manager";
     private static final String REQUEST_STATUS_TAG = "request_status";
@@ -56,6 +61,8 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
     private final RequestList requestManager;
     private final RequesterStorageTracker storageManager;
     private final StatusState[] requestStatus;
+    private final long[] missingRetryUntil;
+    private final long[] cpuRetryUntil;
     private final IActionSource actionSource = IActionSource.ofMachine(this);
     private final RequesterServices services = new GridRequesterServices();
     private boolean submittingForceStart;
@@ -63,8 +70,10 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
     public TileRequester() {
         int requestCount = AEConfig.instance().getRequests();
         this.requestManager = new RequestList(this, requestCount);
-        this.storageManager = new RequesterStorageTracker(requestCount);
+        this.storageManager = new RequesterStorageTracker(requestCount, this::clearMissingRetry);
         this.requestStatus = new StatusState[requestCount];
+        this.missingRetryUntil = new long[requestCount];
+        this.cpuRetryUntil = new long[requestCount];
 
         Arrays.fill(this.requestStatus, StatusState.IDLE);
         this.getMainNode()
@@ -102,6 +111,7 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
         if (data.hasKey(REQUEST_STATUS_TAG, 10)) {
             this.readStatusFromNBT(data.getCompoundTag(REQUEST_STATUS_TAG));
         }
+        this.restorePersistentStatus();
     }
 
     @Override
@@ -159,12 +169,18 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
     public void onRequestChanged(int index) {
         this.cancelRequest(index);
         this.storageManager.clear(index);
+        this.clearRetry(index);
         this.setRequestState(index, StatusState.IDLE);
         this.saveChanges();
     }
 
     @Override
     public void onRequestUpdated(int index) {
+        this.clearRetry(index);
+        if (this.requestManager.get(index).isEnabled()
+            && this.requestStatus[index] instanceof NoPatternState) {
+            this.setRequestState(index, StatusState.IDLE);
+        }
         this.saveChanges();
     }
 
@@ -313,9 +329,57 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
         }
     }
 
+    private void restorePersistentStatus() {
+        for (int i = 0; i < this.requestStatus.length; i++) {
+            if (!this.requestManager.get(i).isEnabled()
+                && this.requestManager.get(i).getClientStatus() == RequestStatus.NO_PATTERN) {
+                this.setRequestState(i, new NoPatternState());
+            }
+        }
+    }
+
     @Override
     public boolean canForceStartCrafting(ICraftingPlan plan) {
         return this.submittingForceStart;
+    }
+
+    public boolean hasIdleCpu() {
+        return this.services.hasIdleCpu();
+    }
+
+    public boolean shouldDelayRetry(int slot, RequestStatus status) {
+        long now = TickHandler.instance().getCurrentTick();
+        if (status == RequestStatus.MISSING) {
+            return now < this.missingRetryUntil[slot];
+        }
+        if (status == RequestStatus.CPU) {
+            return !this.hasIdleCpu() || now < this.cpuRetryUntil[slot];
+        }
+        return false;
+    }
+
+    public void markMissingRetry(int slot) {
+        this.missingRetryUntil[slot] = TickHandler.instance().getCurrentTick() + MISSING_RETRY_TICKS;
+    }
+
+    public void markCpuTooSmallRetry(int slot) {
+        this.cpuRetryUntil[slot] = TickHandler.instance().getCurrentTick() + CPU_TOO_SMALL_RETRY_TICKS;
+    }
+
+    public void clearMissingRetry(int slot) {
+        this.missingRetryUntil[slot] = 0;
+    }
+
+    public void clearRetry(int slot) {
+        this.missingRetryUntil[slot] = 0;
+        this.cpuRetryUntil[slot] = 0;
+    }
+
+    public StatusState disableRequestForNoPattern(int slot) {
+        this.cancelRequest(slot);
+        this.clearRetry(slot);
+        this.requestManager.get(slot).disableWithStatus(RequestStatus.NO_PATTERN);
+        return new NoPatternState();
     }
 
     public long getStoredAmount(AEKey key) {
@@ -343,6 +407,7 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
         for (int i = 0; i < this.requestStatus.length; i++) {
             this.cancelRequest(i);
             this.storageManager.clear(i);
+            this.clearRetry(i);
             this.setRequestState(i, StatusState.IDLE);
         }
     }
@@ -377,6 +442,8 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
     interface RequesterServices {
         long getStoredAmount(AEKey key);
 
+        boolean hasIdleCpu();
+
         Future<ICraftingPlan> beginPlan(AEKey key, long amount);
 
         ICraftingSubmitResult submitPlan(ICraftingPlan plan, ICraftingRequester requester, IActionHost actionHost,
@@ -398,6 +465,15 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
         public long getStoredAmount(AEKey key) {
             var grid = getMainNode().getGrid();
             return grid == null ? 0 : grid.getStorageService().getCachedInventory().get(key);
+        }
+
+        @Override
+        public boolean hasIdleCpu() {
+            var grid = getMainNode().getGrid();
+            if (grid == null) {
+                return false;
+            }
+            return grid.getCraftingService().getCpus().stream().anyMatch(cpu -> !cpu.isBusy());
         }
 
         @Override

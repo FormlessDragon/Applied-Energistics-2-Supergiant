@@ -60,6 +60,7 @@ import ae2.core.gui.locator.GuiHostLocator;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.bidirectional.ConfigValuePacket;
 import ae2.core.network.clientbound.MEInventoryUpdatePacket;
+import ae2.core.network.clientbound.RecursiveIngredientReserveAmountPacket;
 import ae2.core.network.clientbound.SetLinkStatusPacket;
 import ae2.core.network.serverbound.MEInteractionPacket;
 import ae2.helpers.InventoryAction;
@@ -106,6 +107,8 @@ public class ContainerMEStorage extends AEBaseContainer
     public int activeCraftingJobs = -1;
     @GuiSync(SEARCH_KEY_TYPES_ID)
     public SyncedKeyTypes searchKeyTypes = new SyncedKeyTypes();
+    private long recursiveIngredientReserveAmount = 1;
+    private long lastSentRecursiveIngredientReserveAmount = Long.MIN_VALUE;
     private ILinkStatus linkStatus = ILinkStatus.ofDisconnected(null);
     @Nullable
     private Runnable gui;
@@ -229,6 +232,7 @@ public class ContainerMEStorage extends AEBaseContainer
             this.updateLinkStatus();
 
             this.updateActiveCraftingJobs();
+            this.updateRecursiveIngredientReserveAmount();
 
             for (Setting<?> set : this.serverCM.getSettings()) {
                 Enum<?> sideLocal = this.serverCM.getSetting(set);
@@ -328,6 +332,36 @@ public class ContainerMEStorage extends AEBaseContainer
             }
         }
         this.activeCraftingJobs = activeJobs;
+    }
+
+    private void updateRecursiveIngredientReserveAmount() {
+        IGridNode hostNode = getGridNode();
+        if (hostNode == null || !hostNode.isActive()) {
+            return;
+        }
+
+        long amount = hostNode.grid().getCraftingService().getRecursiveIngredientReserveAmount();
+        if (amount == this.lastSentRecursiveIngredientReserveAmount) {
+            return;
+        }
+
+        this.lastSentRecursiveIngredientReserveAmount = amount;
+        this.recursiveIngredientReserveAmount = amount;
+        if (getPlayer() instanceof EntityPlayerMP player) {
+            InitNetwork.CHANNEL.sendTo(new RecursiveIngredientReserveAmountPacket(amount), player);
+        }
+    }
+
+    public long getRecursiveIngredientReserveAmount() {
+        return this.recursiveIngredientReserveAmount;
+    }
+
+    public void setRecursiveIngredientReserveAmount(long amount) {
+        long clampedAmount = Math.max(0, amount);
+        this.recursiveIngredientReserveAmount = clampedAmount;
+        if (isServerSide()) {
+            this.lastSentRecursiveIngredientReserveAmount = clampedAmount;
+        }
     }
 
     private void onSettingChanged(IConfigManager manager, Setting<?> setting) {

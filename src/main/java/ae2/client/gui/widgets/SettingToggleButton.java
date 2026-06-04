@@ -28,6 +28,7 @@ import ae2.api.config.FuzzyMode;
 import ae2.api.config.InscriberInputCapacity;
 import ae2.api.config.LockCraftingMode;
 import ae2.api.config.OperationMode;
+import ae2.api.config.PatternProviderBlockingType;
 import ae2.api.config.PatternProviderInsertionMode;
 import ae2.api.config.PatternProviderOutputSideMode;
 import ae2.api.config.PowerUnit;
@@ -222,6 +223,15 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
                 ButtonToolTips.InterfaceBlockingMode, ButtonToolTips.NonBlocking);
             registerApp(Icon.BLOCKING_MODE_STRONG, Settings.BLOCKING_MODE, BlockingMode.STRONG,
                 ButtonToolTips.InterfaceBlockingMode, ButtonToolTips.StrongBlocking);
+
+            registerApp(Icon.BLOCKING_MODE_TYPE_NORMAL, Settings.PATTERN_PROVIDER_BLOCKING_TYPE,
+                PatternProviderBlockingType.NORMAL,
+                ButtonToolTips.PatternProviderBlockingType,
+                ButtonToolTips.NormalBlockingDescription.text());
+            registerApp(Icon.BLOCKING_MODE_TYPE_SMART, Settings.PATTERN_PROVIDER_BLOCKING_TYPE,
+                PatternProviderBlockingType.SMART,
+                ButtonToolTips.PatternProviderBlockingType,
+                ButtonToolTips.SmartBlockingDescription.text());
 
             registerApp(Icon.PATTERN_PROVIDER_INSERTION_DEFAULT, Settings.PATTERN_PROVIDER_INSERTION_MODE,
                 PatternProviderInsertionMode.DEFAULT,

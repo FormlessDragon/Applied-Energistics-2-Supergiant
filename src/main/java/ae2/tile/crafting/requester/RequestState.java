@@ -21,6 +21,10 @@ public final class RequestState implements StatusState {
             return IDLE;
         }
 
+        if (!host.hasIdleCpu()) {
+            return BlockedState.cpu();
+        }
+
         Future<ICraftingPlan> future = host.beginPlan(key, amountToCraft);
         return new PlanState(future);
     }

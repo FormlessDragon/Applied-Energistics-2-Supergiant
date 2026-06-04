@@ -15,16 +15,16 @@ public final class BlockedState implements StatusState {
         return new BlockedState(RequestStatus.MISSING);
     }
 
-    public static BlockedState noPattern() {
-        return new BlockedState(RequestStatus.NO_PATTERN);
-    }
-
     public static BlockedState cpu() {
         return new BlockedState(RequestStatus.CPU);
     }
 
     @Override
     public StatusState handle(TileRequester host, int slot) {
+        if (host.shouldDelayRetry(slot, this.status)) {
+            return this;
+        }
+
         if (this.simulatedPlanState != null) {
             StatusState planSim = this.simulatedPlanState.handle(host, slot);
             if (planSim == this.simulatedPlanState) {
