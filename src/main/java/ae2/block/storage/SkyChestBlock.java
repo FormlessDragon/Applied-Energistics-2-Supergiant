@@ -17,9 +17,9 @@
  */
 package ae2.block.storage;
 
+import ae2.api.orientation.BlockOrientation;
 import ae2.api.orientation.IOrientationStrategy;
 import ae2.api.orientation.OrientationStrategies;
-import ae2.api.orientation.RelativeSide;
 import ae2.block.AEBaseTileBlock;
 import ae2.container.GuiIds;
 import ae2.core.gui.GuiOpener;
@@ -35,15 +35,20 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraftforge.common.model.TRSRTransformation;
 
-import java.util.Collections;
+import javax.vecmath.Vector4f;
 import java.util.List;
 
-@SuppressWarnings("deprecation")
 public class SkyChestBlock extends AEBaseTileBlock<TileSkyChest> implements ICustomCollision {
-    private static final double AABB_OFFSET_BOTTOM = 0.00;
-    private static final double AABB_OFFSET_SIDES = 0.06;
-    private static final double AABB_OFFSET_TOP = 0.125;
+    private static final double MODEL_MIN_X = 1.0 / 16.0;
+    private static final double MODEL_MIN_Y = 0.0;
+    private static final double MODEL_MIN_Z = 0.0;
+    private static final double MODEL_MAX_X = 15.0 / 16.0;
+    private static final double MODEL_MAX_Y = 15.0 / 16.0;
+    private static final double MODEL_MAX_Z = 15.0 / 16.0;
+    private static final AxisAlignedBB[] ORIENTED_BOUNDS = createOrientedBounds();
+    private static final List<AxisAlignedBB>[] ORIENTED_BOUND_LISTS = createOrientedBoundLists();
     public final SkyChestType type;
 
     public SkyChestBlock(SkyChestType type) {
@@ -61,6 +66,7 @@ public class SkyChestBlock extends AEBaseTileBlock<TileSkyChest> implements ICus
         return OrientationStrategies.horizontalFacing();
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public EnumBlockRenderType getRenderType(IBlockState state) {
         return EnumBlockRenderType.ENTITYBLOCK_ANIMATED;
@@ -86,38 +92,91 @@ public class SkyChestBlock extends AEBaseTileBlock<TileSkyChest> implements ICus
     @Override
     public Iterable<AxisAlignedBB> getSelectedBoundingBoxesFromPool(World world, BlockPos pos, Entity entity,
                                                                     boolean hitFluids) {
-        return Collections.singletonList(computeAABB(world, pos));
+        return ORIENTED_BOUND_LISTS[getOrientation(world, pos).ordinal()];
     }
 
     @Override
     public void addCollidingBlockToList(World world, BlockPos pos, AxisAlignedBB bb, List<AxisAlignedBB> out,
                                         Entity entity) {
-        out.add(computeAABB(world, pos));
+        AxisAlignedBB blockBounds = ORIENTED_BOUNDS[getOrientation(world, pos).ordinal()];
+        if (bb == null || intersectsWorld(bb, blockBounds, pos)) {
+            out.add(blockBounds);
+        }
     }
 
-    private AxisAlignedBB computeAABB(World world, BlockPos pos) {
+    private BlockOrientation getOrientation(World world, BlockPos pos) {
         TileSkyChest chest = this.getTileEntity(world, pos);
-        EnumFacing up = chest != null ? chest.getOrientation().getSide(RelativeSide.TOP) : EnumFacing.UP;
+        return chest != null ? chest.getOrientation() : BlockOrientation.NORTH_UP;
+    }
 
-        double offsetX = up.getXOffset() == 0 ? AABB_OFFSET_SIDES : 0.0;
-        double offsetY = up.getYOffset() == 0 ? AABB_OFFSET_SIDES : 0.0;
-        double offsetZ = up.getZOffset() == 0 ? AABB_OFFSET_SIDES : 0.0;
+    private static boolean intersectsWorld(AxisAlignedBB worldBox, AxisAlignedBB localBox, BlockPos pos) {
+        double minX = localBox.minX + pos.getX();
+        double minY = localBox.minY + pos.getY();
+        double minZ = localBox.minZ + pos.getZ();
+        double maxX = localBox.maxX + pos.getX();
+        double maxY = localBox.maxY + pos.getY();
+        double maxZ = localBox.maxZ + pos.getZ();
 
-        double minX = Math.max(0.0,
-            offsetX + (up.getXOffset() < 0 ? AABB_OFFSET_BOTTOM : up.getXOffset() * AABB_OFFSET_TOP));
-        double minY = Math.max(0.0,
-            offsetY + (up.getYOffset() < 0 ? AABB_OFFSET_TOP : up.getYOffset() * AABB_OFFSET_BOTTOM));
-        double minZ = Math.max(0.0,
-            offsetZ + (up.getZOffset() < 0 ? AABB_OFFSET_BOTTOM : up.getZOffset() * AABB_OFFSET_TOP));
+        return worldBox.maxX > minX && worldBox.minX < maxX
+            && worldBox.maxY > minY && worldBox.minY < maxY
+            && worldBox.maxZ > minZ && worldBox.minZ < maxZ;
+    }
 
-        double maxX = Math.min(1.0,
-            1.0 - offsetX - (up.getXOffset() < 0 ? AABB_OFFSET_TOP : up.getXOffset() * AABB_OFFSET_BOTTOM));
-        double maxY = Math.min(1.0,
-            1.0 - offsetY - (up.getYOffset() < 0 ? AABB_OFFSET_BOTTOM : up.getYOffset() * AABB_OFFSET_TOP));
-        double maxZ = Math.min(1.0,
-            1.0 - offsetZ - (up.getZOffset() < 0 ? AABB_OFFSET_TOP : up.getZOffset() * AABB_OFFSET_BOTTOM));
+    private static AxisAlignedBB[] createOrientedBounds() {
+        AxisAlignedBB[] result = new AxisAlignedBB[BlockOrientation.values().length];
+        for (BlockOrientation orientation : BlockOrientation.values()) {
+            result[orientation.ordinal()] = createOrientedBound(orientation);
+        }
+        return result;
+    }
 
-        return new AxisAlignedBB(minX, minY, minZ, maxX, maxY, maxZ);
+    @SuppressWarnings("unchecked")
+    private static List<AxisAlignedBB>[] createOrientedBoundLists() {
+        List<AxisAlignedBB>[] result = new List[ORIENTED_BOUNDS.length];
+        for (int i = 0; i < ORIENTED_BOUNDS.length; i++) {
+            result[i] = List.of(ORIENTED_BOUNDS[i]);
+        }
+        return result;
+    }
+
+    private static AxisAlignedBB createOrientedBound(BlockOrientation orientation) {
+        TRSRTransformation transformation = orientation.getTransformation();
+
+        double minX = 1.0;
+        double minY = 1.0;
+        double minZ = 1.0;
+        double maxX = 0.0;
+        double maxY = 0.0;
+        double maxZ = 0.0;
+        Vector4f corner = new Vector4f();
+
+        for (int xIndex = 0; xIndex < 2; xIndex++) {
+            double x = xIndex == 0 ? MODEL_MIN_X : MODEL_MAX_X;
+            for (int yIndex = 0; yIndex < 2; yIndex++) {
+                double y = yIndex == 0 ? MODEL_MIN_Y : MODEL_MAX_Y;
+                for (int zIndex = 0; zIndex < 2; zIndex++) {
+                    double z = zIndex == 0 ? MODEL_MIN_Z : MODEL_MAX_Z;
+                    corner.set((float) (x - 0.5), (float) (y - 0.5), (float) (z - 0.5), 1.0F);
+                    transformation.transformPosition(corner);
+                    double rotatedX = corner.x + 0.5;
+                    double rotatedY = corner.y + 0.5;
+                    double rotatedZ = corner.z + 0.5;
+
+                    minX = Math.min(minX, rotatedX);
+                    minY = Math.min(minY, rotatedY);
+                    minZ = Math.min(minZ, rotatedZ);
+                    maxX = Math.max(maxX, rotatedX);
+                    maxY = Math.max(maxY, rotatedY);
+                    maxZ = Math.max(maxZ, rotatedZ);
+                }
+            }
+        }
+
+        return new AxisAlignedBB(clamp(minX), clamp(minY), clamp(minZ), clamp(maxX), clamp(maxY), clamp(maxZ));
+    }
+
+    private static double clamp(double value) {
+        return Math.clamp(value, 0.0, 1.0);
     }
 
     public enum SkyChestType {
