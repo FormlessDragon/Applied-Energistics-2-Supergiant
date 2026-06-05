@@ -24,10 +24,14 @@ import ae2.api.upgrades.UpgradeInventories;
 import ae2.api.util.AECableType;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigurableObject;
+import ae2.container.GuiIds;
+import ae2.container.ISubGui;
 import ae2.core.AppEng;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.definitions.AEItems;
+import ae2.core.gui.GuiOpener;
 import ae2.core.settings.TickRates;
+import ae2.helpers.IOutputSideConfigHost;
 import ae2.helpers.externalstorage.GenericStackFluidStorage;
 import ae2.helpers.externalstorage.GenericStackInv;
 import ae2.recipes.handlers.CrystalAssemblerRecipe;
@@ -53,7 +57,7 @@ import java.util.List;
 import java.util.Set;
 
 public class TileCrystalAssembler extends AENetworkedPoweredTile
-    implements IGridTickable, IUpgradeableObject, IConfigurableObject, ISegmentedInventory {
+    implements IGridTickable, IUpgradeableObject, IConfigurableObject, ISegmentedInventory, IOutputSideConfigHost {
     public static final int INPUT_SLOTS = 9;
     public static final int TANK_CAPACITY = 16000;
     public static final int MAX_PROCESSING_TIME = 200;
@@ -61,7 +65,7 @@ public class TileCrystalAssembler extends AENetworkedPoweredTile
 
     private final AppEngInternalInventory input = new AppEngInternalInventory(this, INPUT_SLOTS, 64,
         new AutomationFilter());
-    private final AppEngInternalInventory output = new AppEngInternalInventory(this, 1, 64, new OutputFilter());
+    private final AppEngInternalInventory output = new AppEngInternalInventory(this, 1, 64);
     private final InternalInventory internalInventory = new CombinedInternalInventory(this.input, this.output);
     private final InternalInventory exposedInventory = new CombinedInternalInventory(
         new FilteredInternalInventory(this.input, new AutomationFilter()),
@@ -416,6 +420,35 @@ public class TileCrystalAssembler extends AENetworkedPoweredTile
 
     public EnumSet<EnumFacing> getOutputSides() {
         return this.outputSides;
+    }
+
+    @Override
+    public void setOutputSideEnabled(EnumFacing side, boolean enabled) {
+        boolean changed = enabled ? this.outputSides.add(side) : this.outputSides.remove(side);
+        if (changed) {
+            saveChanges();
+            wake();
+        }
+    }
+
+    @Override
+    public BlockOrientation getBlockOrientation() {
+        return getOrientation();
+    }
+
+    @Override
+    public EnumSet<EnumFacing> getAllowedOutputSides() {
+        return EnumSet.allOf(EnumFacing.class);
+    }
+
+    @Override
+    public void returnToMainContainer(net.minecraft.entity.player.EntityPlayer player, ISubGui subGui) {
+        GuiOpener.openGui(player, GuiIds.GuiKey.CRYSTAL_ASSEMBLER, this, true);
+    }
+
+    @Override
+    public ItemStack getMainContainerIcon() {
+        return AEBlocks.CRYSTAL_ASSEMBLER.stack();
     }
 
     @Override

@@ -87,6 +87,7 @@ import net.minecraftforge.fml.common.Optional;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.GL11;
 import yalter.mousetweaks.api.IMTModGuiContainer2;
 
 import java.awt.Rectangle;
@@ -868,6 +869,12 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         } finally {
             GlStateManager.popMatrix();
         }
+
+        if (!this.playerInventory.getItemStack().isEmpty()) {
+            GlStateManager.depthMask(true);
+            GlStateManager.depthFunc(GL11.GL_LEQUAL);
+            GlStateManager.clear(GL11.GL_DEPTH_BUFFER_BIT);
+        }
     }
 
     @Nullable
@@ -1034,11 +1041,9 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         if (slot instanceof FakeSlot && !carried.isEmpty()) {
             this.drag_click.add(slot);
             if (this.drag_click.size() > 1) {
-                InventoryAction action = clickedMouseButton == 0
-                    ? InventoryAction.PICKUP_OR_SET_DOWN
-                    : InventoryAction.PLACE_SINGLE;
                 for (Slot draggedSlot : this.drag_click) {
                     if (this.drag_click_sent.add(draggedSlot)) {
+                        InventoryAction action = getDragFakeSlotAction(draggedSlot, carried, clickedMouseButton);
                         sendInventoryAction(action, draggedSlot.slotNumber);
                     }
                 }
@@ -1179,6 +1184,14 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     @Nullable
     protected EmptyingAction getEmptyingAction(@Nullable Slot slot, ItemStack carried) {
         return FakeSlotFilterSupport.getEmptyingAction(slot, carried);
+    }
+
+    private InventoryAction getDragFakeSlotAction(Slot slot, ItemStack carried, int mouseButton) {
+        if (mouseButton == 1 && getEmptyingAction(slot, carried) != null) {
+            return InventoryAction.EMPTY_ITEM;
+        }
+
+        return mouseButton == 0 ? InventoryAction.PICKUP_OR_SET_DOWN : InventoryAction.PLACE_SINGLE;
     }
 
     private void sendInventoryAction(InventoryAction action, int slot) {

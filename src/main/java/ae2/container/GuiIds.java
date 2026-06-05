@@ -85,6 +85,7 @@ public final class GuiIds {
         CRAFT_AMOUNT,
         CRAFT_CONFIRM,
         CRAFTING_STATUS,
+        OUTPUT_SIDES,
         SET_STOCK_AMOUNT,
         PRIORITY,
         BASIC_CELL_CHEST,

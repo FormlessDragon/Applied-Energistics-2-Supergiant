@@ -20,12 +20,18 @@ package ae2.client.gui.implementations;
 import ae2.api.config.InscriberInputCapacity;
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
+import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
+import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.ProgressBar;
 import ae2.client.gui.widgets.ProgressBar.Direction;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
+import ae2.container.GuiIds;
 import ae2.container.implementations.ContainerInscriber;
+import ae2.core.localization.ButtonToolTips;
+import ae2.core.network.InitNetwork;
+import ae2.core.network.serverbound.SwitchGuisPacket;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
@@ -34,6 +40,7 @@ public class GuiInscriber extends GuiUpgradeable<ContainerInscriber> {
     private final ProgressBar progressBar;
     private final SettingToggleButton<YesNo> separateSidesBtn;
     private final SettingToggleButton<YesNo> autoExportBtn;
+    private final IconButton outputSidesBtn;
     private final SettingToggleButton<InscriberInputCapacity> bufferSizeBtn;
 
     public GuiInscriber(ContainerInscriber container, InventoryPlayer playerInventory, ITextComponent title,
@@ -46,6 +53,23 @@ public class GuiInscriber extends GuiUpgradeable<ContainerInscriber> {
         this.separateSidesBtn = addToLeftToolbar(
             new ServerSettingToggleButton<>(Settings.INSCRIBER_SEPARATE_SIDES, YesNo.NO));
         this.autoExportBtn = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.AUTO_EXPORT, YesNo.NO));
+        this.outputSidesBtn = addToLeftToolbar(new IconButton(this::openOutputSides) {
+            {
+                setMessage(ButtonToolTips.OutputSideConfig.text());
+            }
+
+            @Override
+            protected Icon getIcon() {
+                return Icon.OUTPUT_SIDE_CONFIG;
+            }
+
+            @Override
+            public java.util.List<net.minecraft.util.text.ITextComponent> getTooltipMessage() {
+                return java.util.List.of(
+                    ButtonToolTips.OutputSideConfig.text(),
+                    ButtonToolTips.OutputSideConfigHint.text());
+            }
+        });
         this.bufferSizeBtn = addToLeftToolbar(
             new ServerSettingToggleButton<>(Settings.INSCRIBER_INPUT_CAPACITY, InscriberInputCapacity.SIXTY_FOUR));
     }
@@ -58,6 +82,11 @@ public class GuiInscriber extends GuiUpgradeable<ContainerInscriber> {
         this.progressBar.setFullMsg(new TextComponentString(progress + "%"));
         this.separateSidesBtn.set(this.container.getSeparateSides());
         this.autoExportBtn.set(this.container.getAutoExport());
+        this.outputSidesBtn.setVisibility(this.container.getAutoExport() == YesNo.YES);
         this.bufferSizeBtn.set(this.container.getBufferSize());
+    }
+
+    private void openOutputSides() {
+        InitNetwork.sendToServer(SwitchGuisPacket.openSubGui(GuiIds.GuiKey.OUTPUT_SIDES));
     }
 }

@@ -6,6 +6,10 @@ public enum ShowPatternProviders {
      */
     VISIBLE,
     /**
+     * Show pattern providers that are hidden in pattern access terminal.
+     */
+    HIDDEN,
+    /**
      * Show pattern providers that are not hidden in pattern access terminal, and that were not full when the terminal
      * was opened / the setting was set.
      */

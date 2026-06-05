@@ -174,6 +174,9 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
             registerApp(Icon.PATTERN_TERMINAL_VISIBLE, Settings.TERMINAL_SHOW_PATTERN_PROVIDERS,
                 ShowPatternProviders.VISIBLE,
                 ButtonToolTips.InterfaceTerminalDisplayMode, ButtonToolTips.ShowVisibleProviders);
+            registerApp(Icon.PATTERN_TERMINAL_HIDDEN, Settings.TERMINAL_SHOW_PATTERN_PROVIDERS,
+                ShowPatternProviders.HIDDEN,
+                ButtonToolTips.InterfaceTerminalDisplayMode, ButtonToolTips.ShowHiddenProviders);
             registerApp(Icon.PATTERN_TERMINAL_NOT_FULL, Settings.TERMINAL_SHOW_PATTERN_PROVIDERS,
                 ShowPatternProviders.NOT_FULL,
                 ButtonToolTips.InterfaceTerminalDisplayMode, ButtonToolTips.ShowNonFullProviders);

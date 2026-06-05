@@ -8,6 +8,7 @@ import ae2.container.ISubGui;
 import ae2.container.implementations.ContainerCraftAmount;
 import ae2.container.implementations.ContainerCraftConfirm;
 import ae2.container.implementations.ContainerCraftingStatus;
+import ae2.container.implementations.ContainerOutputSides;
 import ae2.container.implementations.ContainerPriority;
 import ae2.container.implementations.ContainerSetStockAmount;
 import ae2.container.implementations.ContainerWirelessMagnet;
@@ -16,6 +17,7 @@ import ae2.core.network.InitNetwork;
 import ae2.core.network.ServerboundPacket;
 import ae2.core.network.clientbound.OpenGuiPacket;
 import ae2.core.network.clientbound.RestorePreviousGuiPacket;
+import ae2.helpers.IOutputSideConfigHost;
 import ae2.helpers.IPriorityHost;
 import ae2.helpers.InterfaceLogicHost;
 import ae2.helpers.WirelessTerminalGuiHost;
@@ -160,6 +162,9 @@ public class SwitchGuisPacket extends ServerboundPacket {
         if (guiKey == GuiIds.GuiKey.CRAFTING_STATUS) {
             return ITerminalHost.class;
         }
+        if (guiKey == GuiIds.GuiKey.OUTPUT_SIDES) {
+            return IOutputSideConfigHost.class;
+        }
         if (guiKey == GuiIds.GuiKey.SET_STOCK_AMOUNT) {
             return InterfaceLogicHost.class;
         }
@@ -182,6 +187,9 @@ public class SwitchGuisPacket extends ServerboundPacket {
         }
         if (guiKey == GuiIds.GuiKey.CRAFTING_STATUS) {
             return new ContainerCraftingStatus(inventory, (ITerminalHost) host);
+        }
+        if (guiKey == GuiIds.GuiKey.OUTPUT_SIDES) {
+            return new ContainerOutputSides(inventory, (IOutputSideConfigHost) host);
         }
         if (guiKey == GuiIds.GuiKey.SET_STOCK_AMOUNT) {
             return new ContainerSetStockAmount(inventory, (InterfaceLogicHost) host);

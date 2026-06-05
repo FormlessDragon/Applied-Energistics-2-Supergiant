@@ -46,11 +46,15 @@ import ae2.api.upgrades.UpgradeInventories;
 import ae2.api.util.AECableType;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigurableObject;
+import ae2.container.GuiIds;
+import ae2.container.ISubGui;
 import ae2.core.AELog;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.definitions.AEItems;
+import ae2.core.gui.GuiOpener;
 import ae2.core.settings.TickRates;
 import ae2.crafting.pattern.AEProcessingPattern;
+import ae2.helpers.IOutputSideConfigHost;
 import ae2.recipes.handlers.InscriberProcessType;
 import ae2.recipes.handlers.InscriberRecipe;
 import ae2.tile.grid.AENetworkedPoweredTile;
@@ -60,6 +64,7 @@ import ae2.util.inv.CombinedInternalInventory;
 import ae2.util.inv.FilteredInternalInventory;
 import ae2.util.inv.filter.IAEItemFilter;
 import io.netty.buffer.ByteBuf;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.PacketBuffer;
@@ -74,7 +79,7 @@ import java.util.EnumSet;
 import java.util.List;
 
 public class TileInscriber extends AENetworkedPoweredTile
-    implements IGridTickable, IUpgradeableObject, IConfigurableObject, ICraftingMachine {
+    implements IGridTickable, IUpgradeableObject, IConfigurableObject, ICraftingMachine, IOutputSideConfigHost {
     private static final int MAX_PROCESSING_STEPS = 200;
     private static final int POWER_PER_CRANK_TURN = 160;
     private final IUpgradeInventory upgrades = UpgradeInventories.forMachine(AEBlocks.INSCRIBER.item(), 5,
@@ -94,6 +99,7 @@ public class TileInscriber extends AENetworkedPoweredTile
         new AutomationFilter());
     private final InternalInventory combinedItemHandlerExtern = new CombinedInternalInventory(this.topItemHandlerExtern,
         this.bottomItemHandlerExtern, this.sideItemHandlerExtern);
+    private final EnumSet<EnumFacing> outputSides = EnumSet.allOf(EnumFacing.class);
     private final ICrankable crankable = new Crankable();
     private final ItemStack[] clientVisualStacks = new ItemStack[]{
         ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY
@@ -131,6 +137,7 @@ public class TileInscriber extends AENetworkedPoweredTile
         data.setInteger("processingTime", this.processingTime);
         data.setBoolean("smash", this.smash);
         data.setInteger("finalStep", this.finalStep);
+        data.setInteger("outputSides", encodeOutputSides());
     }
 
     @Override
@@ -144,6 +151,7 @@ public class TileInscriber extends AENetworkedPoweredTile
         this.processingTime = data.getInteger("processingTime");
         this.smash = data.getBoolean("smash");
         this.finalStep = data.getInteger("finalStep");
+        decodeOutputSides(data.hasKey("outputSides") ? data.getInteger("outputSides") : 0x3F);
         this.cachedTask = null;
         applyInputCapacity();
     }
@@ -496,14 +504,11 @@ public class TileInscriber extends AENetworkedPoweredTile
             return false;
         }
 
-        var pushSides = EnumSet.allOf(EnumFacing.class);
-        if (isSeparateSides()) {
-            EnumFacing top = this.getOrientation().getSide(RelativeSide.TOP);
-            pushSides.remove(top);
-            pushSides.remove(top.getOpposite());
-        }
-
-        for (var side : pushSides) {
+        EnumSet<EnumFacing> allowedOutputSides = getAllowedOutputSides();
+        for (var side : this.outputSides) {
+            if (!allowedOutputSides.contains(side)) {
+                continue;
+            }
             var external = InternalInventory.wrapExternal(this.world, this.pos.offset(side), side.getOpposite());
             if (external == null) {
                 continue;
@@ -595,9 +600,49 @@ public class TileInscriber extends AENetworkedPoweredTile
         return this.configManager.getSetting(Settings.INSCRIBER_SEPARATE_SIDES) == YesNo.YES;
     }
 
+    @Override
+    public EnumSet<EnumFacing> getOutputSides() {
+        return this.outputSides;
+    }
+
+    @Override
+    public void setOutputSideEnabled(EnumFacing side, boolean enabled) {
+        boolean changed = enabled ? this.outputSides.add(side) : this.outputSides.remove(side);
+        if (changed) {
+            saveChanges();
+            wake();
+        }
+    }
+
+    @Override
+    public BlockOrientation getBlockOrientation() {
+        return getOrientation();
+    }
+
+    @Override
+    public EnumSet<EnumFacing> getAllowedOutputSides() {
+        EnumSet<EnumFacing> allowed = EnumSet.allOf(EnumFacing.class);
+        if (isSeparateSides()) {
+            EnumFacing top = this.getOrientation().getSide(RelativeSide.TOP);
+            allowed.remove(top);
+            allowed.remove(top.getOpposite());
+        }
+        return allowed;
+    }
+
+    @Override
+    public void returnToMainContainer(EntityPlayer player, ISubGui subGui) {
+        GuiOpener.openGui(player, GuiIds.GuiKey.INSCRIBER, this, true);
+    }
+
+    @Override
+    public ItemStack getMainContainerIcon() {
+        return AEBlocks.INSCRIBER.stack();
+    }
+
     private void onConfigChanged(IConfigManager manager, Setting<?> setting) {
         if (setting == Settings.AUTO_EXPORT) {
-            this.getMainNode().ifPresent((grid, node) -> grid.getTickManager().wakeDevice(node));
+            wake();
         }
 
         if (setting == Settings.INSCRIBER_SEPARATE_SIDES && this.world != null) {
@@ -613,6 +658,7 @@ public class TileInscriber extends AENetworkedPoweredTile
         }
 
         saveChanges();
+        wake();
     }
 
     private void applyInputCapacity() {
@@ -620,6 +666,27 @@ public class TileInscriber extends AENetworkedPoweredTile
         this.topItemHandler.setMaxStackSize(0, capacity);
         this.bottomItemHandler.setMaxStackSize(0, capacity);
         this.sideItemHandler.setMaxStackSize(0, capacity);
+    }
+
+    private void wake() {
+        this.getMainNode().ifPresent((grid, node) -> grid.getTickManager().wakeDevice(node));
+    }
+
+    private int encodeOutputSides() {
+        int mask = 0;
+        for (EnumFacing side : this.outputSides) {
+            mask |= 1 << side.ordinal();
+        }
+        return mask;
+    }
+
+    private void decodeOutputSides(int mask) {
+        this.outputSides.clear();
+        for (EnumFacing side : EnumFacing.values()) {
+            if ((mask & (1 << side.ordinal())) != 0) {
+                this.outputSides.add(side);
+            }
+        }
     }
 
     private final class Crankable implements ICrankable {

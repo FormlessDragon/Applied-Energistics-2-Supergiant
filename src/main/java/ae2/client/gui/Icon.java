@@ -99,6 +99,7 @@ public final class Icon {
     public static final Icon PATTERN_AUTO_FILL_OFF = registerBuiltin("pattern_auto_fill_off", 16, 16);
     public static final Icon PATTERN_AUTO_FILL_ON = registerBuiltin("pattern_auto_fill_on", 16, 16);
     public static final Icon PATTERN_TERMINAL_VISIBLE = registerBuiltin("pattern_terminal_visible", 16, 16);
+    public static final Icon PATTERN_TERMINAL_HIDDEN = registerBuiltin("pattern_terminal_hidden", 16, 16);
     public static final Icon PATTERN_TERMINAL_ALL = registerBuiltin("pattern_terminal_all", 16, 16);
     public static final Icon PATTERN_TERMINAL_NOT_FULL = registerBuiltin("pattern_terminal_not_full", 16, 16);
     public static final Icon PATTERN_PROVIDER_INSERTION_DEFAULT = registerBuiltin(
@@ -122,6 +123,7 @@ public final class Icon {
     public static final Icon INSCRIBER_COMBINED_SIDES = registerBuiltin("inscriber_combined_sides", 16, 16);
     public static final Icon AUTO_EXPORT_OFF = registerBuiltin("auto_export_off", 16, 16);
     public static final Icon AUTO_EXPORT_ON = registerBuiltin("auto_export_on", 16, 16);
+    public static final Icon OUTPUT_SIDE_CONFIG = registerBuiltin("output_side_config", 16, 16);
     public static final Icon INSCRIBER_BUFFER_4 = registerBuiltin("inscriber_buffer_4", 16, 16);
     public static final Icon INSCRIBER_BUFFER_64 = registerBuiltin("inscriber_buffer_64", 16, 16);
     public static final Icon INSCRIBER_BUFFER_1 = registerBuiltin("inscriber_buffer_1", 16, 16);
@@ -210,6 +212,8 @@ public final class Icon {
 
     public static final Icon ENABLED = registerBuiltin("enabled", 16, 16);
     public static final Icon DISABLED = registerBuiltin("disabled", 16, 16);
+    public static final Icon PATTERN_PROVIDER_HIGHLIGHT = registerBuiltin("pattern_provider_highlight", 6, 11);
+    public static final Icon PATTERN_PROVIDER_RENAME = registerBuiltin("pattern_provider_rename", 6, 11);
 
     public final int width;
     public final int height;

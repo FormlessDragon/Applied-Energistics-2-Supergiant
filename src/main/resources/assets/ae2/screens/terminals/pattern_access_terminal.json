@@ -23,17 +23,17 @@
       "width": 65,
       "height": 10
     },
-    "providerSearch": {
+    "inputSearch": {
+      "left": 104,
+      "top": 4,
+      "width": 65,
+      "height": 10
+    },
+    "outputSearch": {
       "left": 104,
       "top": 17,
       "width": 65,
       "height": 10
-    },
-    "searchMode": {
-      "left": 73,
-      "top": 17,
-      "width": 12,
-      "height": 12
     },
     "patternModifierPanel": {
       "left": -126,

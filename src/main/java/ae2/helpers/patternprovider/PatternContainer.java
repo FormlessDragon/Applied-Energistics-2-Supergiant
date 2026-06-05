@@ -31,5 +31,12 @@ public interface PatternContainer {
     default void openTerminalPatternContainerGui(EntityPlayer player) {
     }
 
+    default boolean canEditTerminalName() {
+        return false;
+    }
+
+    default void setTerminalCustomName(@Nullable String name) {
+    }
+
     PatternContainerGroup getTerminalGroup();
 }

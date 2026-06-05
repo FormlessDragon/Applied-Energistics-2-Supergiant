@@ -21,6 +21,7 @@ package ae2.core.network.clientbound;
 import ae2.api.storage.ISubGuiHost;
 import ae2.api.storage.ITerminalHost;
 import ae2.client.gui.PreviousExternalGui;
+import ae2.client.gui.implementations.GuiOutputSides;
 import ae2.client.gui.implementations.GuiPriority;
 import ae2.client.gui.implementations.GuiWirelessMagnet;
 import ae2.client.gui.me.crafting.GuiCraftAmount;
@@ -33,6 +34,7 @@ import ae2.container.GuiIds;
 import ae2.container.implementations.ContainerCraftAmount;
 import ae2.container.implementations.ContainerCraftConfirm;
 import ae2.container.implementations.ContainerCraftingStatus;
+import ae2.container.implementations.ContainerOutputSides;
 import ae2.container.implementations.ContainerPriority;
 import ae2.container.implementations.ContainerSetStockAmount;
 import ae2.container.implementations.ContainerWirelessMagnet;
@@ -40,6 +42,7 @@ import ae2.core.AELog;
 import ae2.core.gui.locator.GuiHostLocator;
 import ae2.core.gui.locator.GuiHostLocators;
 import ae2.core.network.ClientboundPacket;
+import ae2.helpers.IOutputSideConfigHost;
 import ae2.helpers.IPriorityHost;
 import ae2.helpers.InterfaceLogicHost;
 import ae2.helpers.WirelessTerminalGuiHost;
@@ -95,6 +98,9 @@ public class OpenGuiPacket extends ClientboundPacket {
         }
         if (guiKey == GuiIds.GuiKey.CRAFTING_STATUS) {
             return ITerminalHost.class;
+        }
+        if (guiKey == GuiIds.GuiKey.OUTPUT_SIDES) {
+            return IOutputSideConfigHost.class;
         }
         if (guiKey == GuiIds.GuiKey.SET_STOCK_AMOUNT) {
             return InterfaceLogicHost.class;
@@ -233,6 +239,9 @@ public class OpenGuiPacket extends ClientboundPacket {
         if (this.guiKey == GuiIds.GuiKey.CRAFTING_STATUS) {
             return new ContainerCraftingStatus(inventory, (ITerminalHost) host);
         }
+        if (this.guiKey == GuiIds.GuiKey.OUTPUT_SIDES) {
+            return new ContainerOutputSides(inventory, (IOutputSideConfigHost) host);
+        }
         if (this.guiKey == GuiIds.GuiKey.SET_STOCK_AMOUNT) {
             return new ContainerSetStockAmount(inventory, (InterfaceLogicHost) host);
         }
@@ -263,6 +272,10 @@ public class OpenGuiPacket extends ClientboundPacket {
         if (this.guiKey == GuiIds.GuiKey.CRAFTING_STATUS) {
             return new GuiCraftingStatus((ContainerCraftingStatus) container, inventory, this.guiTitle,
                 GuiStyleManager.loadStyleDoc("/screens/crafting_status.json"));
+        }
+        if (this.guiKey == GuiIds.GuiKey.OUTPUT_SIDES) {
+            return new GuiOutputSides((ContainerOutputSides) container, inventory,
+                this.guiTitle != null ? this.guiTitle : container.getGuiTitle());
         }
         if (this.guiKey == GuiIds.GuiKey.SET_STOCK_AMOUNT) {
             return new GuiSetStockAmount((ContainerSetStockAmount) container, inventory, this.guiTitle,

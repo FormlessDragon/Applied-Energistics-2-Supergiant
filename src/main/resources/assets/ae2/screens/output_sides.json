@@ -1,0 +1,69 @@
+{
+  "$schema": "schema.json",
+  "includes": ["common/common.json"],
+  "background": {
+    "texture": "guis/priority.png",
+    "srcRect": [0, 0, 176, 125]
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2.OutputSides"
+      },
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    }
+  },
+  "widgets": {
+    "returnToParent": {
+      "left": 152,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "clear": {
+      "left": 128,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "side_top": {
+      "left": 80,
+      "top": 26,
+      "width": 16,
+      "height": 16
+    },
+    "side_left": {
+      "left": 54,
+      "top": 50,
+      "width": 16,
+      "height": 16
+    },
+    "side_front": {
+      "left": 80,
+      "top": 50,
+      "width": 16,
+      "height": 16
+    },
+    "side_right": {
+      "left": 106,
+      "top": 50,
+      "width": 16,
+      "height": 16
+    },
+    "side_bottom": {
+      "left": 80,
+      "top": 74,
+      "width": 16,
+      "height": 16
+    },
+    "side_back": {
+      "left": 80,
+      "top": 98,
+      "width": 16,
+      "height": 16
+    }
+  }
+}

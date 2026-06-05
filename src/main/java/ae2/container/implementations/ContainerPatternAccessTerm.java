@@ -52,6 +52,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongList;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
@@ -74,6 +75,8 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
     implements ILinkStatusAwareContainer, PatternModifierPanel.Host {
 
     private static final String ACTION_OPEN_PROVIDER = "openProvider";
+    private static final String ACTION_RENAME_GROUP = "renameGroup";
+    private static final String ACTION_RENAME_PROVIDER = "renameProvider";
     private static long inventorySerial = Long.MIN_VALUE;
 
     private final IPatternAccessTermContainerHost host;
@@ -91,6 +94,8 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
         super(playerInventory, host);
         this.host = host;
         registerClientAction(ACTION_OPEN_PROVIDER, Long.class, this::openPatternProvider);
+        registerClientAction(ACTION_RENAME_GROUP, RenamePatternGroupPayload.class, this::renamePatternGroup);
+        registerClientAction(ACTION_RENAME_PROVIDER, RenamePatternProviderPayload.class, this::renamePatternProvider);
         if (host instanceof WirelessTerminalGuiHost<?> wirelessHost) {
             setupUpgrades(wirelessHost.getUpgrades());
             RestrictedInputSlot slot = new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.QE_SINGULARITY,
@@ -125,6 +130,59 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
         if (inv != null) {
             inv.container.openTerminalPatternContainerGui(getPlayer());
         }
+    }
+
+    public void renamePatternProvider(long inventoryId, String name) {
+        renamePatternProvider(new RenamePatternProviderPayload(inventoryId, name));
+    }
+
+    public void renamePatternGroup(long[] inventoryIds, String name) {
+        renamePatternGroup(new RenamePatternGroupPayload(inventoryIds, name));
+    }
+
+    public boolean canRenamePatternProvider(long inventoryId) {
+        ContainerTracker tracker = this.byId.get(inventoryId);
+        return tracker != null && tracker.container.canEditTerminalName();
+    }
+
+    private void renamePatternGroup(RenamePatternGroupPayload payload) {
+        if (isClientSide()) {
+            sendClientAction(ACTION_RENAME_GROUP, payload);
+            return;
+        }
+
+        LongOpenHashSet visited = new LongOpenHashSet(payload.inventoryIds().length);
+        boolean changedAny = false;
+        for (long inventoryId : payload.inventoryIds()) {
+            if (!visited.add(inventoryId)) {
+                continue;
+            }
+            ContainerTracker tracker = this.byId.get(inventoryId);
+            if (tracker == null || !tracker.container.canEditTerminalName()) {
+                continue;
+            }
+            tracker.container.setTerminalCustomName(payload.name());
+            changedAny = true;
+        }
+
+        if (changedAny) {
+            sendFullUpdate(getGrid());
+        }
+    }
+
+    private void renamePatternProvider(RenamePatternProviderPayload payload) {
+        if (isClientSide()) {
+            sendClientAction(ACTION_RENAME_PROVIDER, payload);
+            return;
+        }
+
+        ContainerTracker tracker = this.byId.get(payload.inventoryId());
+        if (tracker == null || !tracker.container.canEditTerminalName()) {
+            return;
+        }
+
+        tracker.container.setTerminalCustomName(payload.name());
+        sendFullUpdate(getGrid());
     }
 
     public ShowPatternProviders getShownProviders() {
@@ -170,6 +228,7 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
         boolean visible = container.isVisibleInTerminal();
         return switch (getShownProviders()) {
             case VISIBLE -> visible;
+            case HIDDEN -> !visible;
             case NOT_FULL -> visible && (this.pinnedHosts.contains(container) || !isFull(container));
             case ALL -> true;
         };
@@ -501,6 +560,12 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
         private boolean forceFullUpdate;
     }
 
+    public record RenamePatternProviderPayload(long inventoryId, String name) {
+    }
+
+    public record RenamePatternGroupPayload(long[] inventoryIds, String name) {
+    }
+
     private record QuickMoveTarget(ContainerTracker container, int slot) {
     }
 
@@ -563,8 +628,8 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
                 }
             }
 
-            return PatternAccessTerminalPacket.fullUpdate(this.serverId, this.server.size(), this.sortBy, this.group,
-                slots);
+            return PatternAccessTerminalPacket.fullUpdate(this.serverId, this.server.size(), this.sortBy,
+                this.container.canEditTerminalName(), this.group, slots);
         }
 
         @Nullable

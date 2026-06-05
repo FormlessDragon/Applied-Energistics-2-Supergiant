@@ -56,6 +56,8 @@ public interface PatternProviderLogicHost
     @Nullable
     ITextComponent getCustomName();
 
+    void setCustomName(@Nullable String name);
+
     void saveChanges();
 
     @Override
@@ -131,5 +133,16 @@ public interface PatternProviderLogicHost
     @Override
     default PatternContainerGroup getTerminalGroup() {
         return getLogic().getTerminalGroup();
+    }
+
+    @Override
+    default boolean canEditTerminalName() {
+        return true;
+    }
+
+    @Override
+    default void setTerminalCustomName(@Nullable String name) {
+        setCustomName(name);
+        saveChanges();
     }
 }

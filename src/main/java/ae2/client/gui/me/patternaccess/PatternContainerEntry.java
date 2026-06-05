@@ -22,6 +22,8 @@ import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.container.implementations.ContainerPatternAccessTerm;
 import ae2.util.inv.AppEngInternalInventory;
 
+import java.util.Locale;
+
 /**
  * This class is used on the client-side to represent a pattern provider and its inventory as it is shown in the
  * {@link GuiPatternAccessTerm}'s table for {@link ContainerPatternAccessTerm}.
@@ -33,13 +35,16 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
     private final long serverId;
     private final AppEngInternalInventory inventory;
     private final long order;
+    private final boolean editableTerminalName;
 
-    public PatternContainerEntry(long serverId, int slots, long order, PatternContainerGroup group) {
+    public PatternContainerEntry(long serverId, int slots, long order, boolean editableTerminalName,
+                                 PatternContainerGroup group) {
         this.inventory = new AppEngInternalInventory(slots);
         this.group = group;
-        this.searchName = group.name().getFormattedText().toLowerCase();
+        this.searchName = group.name().getFormattedText().toLowerCase(Locale.ROOT);
         this.serverId = serverId;
         this.order = order;
+        this.editableTerminalName = editableTerminalName;
     }
 
     public PatternContainerGroup getGroup() {
@@ -61,5 +66,9 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
 
     public AppEngInternalInventory getInventory() {
         return inventory;
+    }
+
+    public boolean canEditTerminalName() {
+        return this.editableTerminalName;
     }
 }

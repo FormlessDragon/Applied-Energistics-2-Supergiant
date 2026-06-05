@@ -59,11 +59,15 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
     @Nullable
     private Consumer<String> responder;
     @Nullable
-    private BiPredicate<Character, Integer> keyFilter;
+    private KeyFilter keyFilter;
     private int repeatingKeyCode = Keyboard.KEY_NONE;
     private char repeatingChar;
     private long repeatStartMillis;
     private long lastRepeatMillis;
+
+    public void setKeyFilter(@Nullable KeyFilter keyFilter) {
+        this.keyFilter = keyFilter;
+    }
 
     /**
      * Displayed with a muted text color when the text box is unfocused and has no content.
@@ -167,8 +171,9 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
         this.responder = responder;
     }
 
-    public void setKeyFilter(@Nullable BiPredicate<Character, Integer> keyFilter) {
-        this.keyFilter = keyFilter;
+    public void selectAll() {
+        this.setCursorPositionEnd();
+        this.setSelectionPos(0);
     }
 
     public void setTextFromClient(String text) {
@@ -197,11 +202,6 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
     public void resize(int width, int height) {
         this.width = width - 2 * PADDING - this.fontPad;
         this.height = height - 2 * PADDING;
-    }
-
-    public void selectAll() {
-        this.setCursorPositionZero();
-        this.setSelectionPos(this.getMaxStringLength());
     }
 
     @Override
@@ -233,11 +233,16 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
             BLITTER.copy().src(0, yOffset, 1, 12)
                    .dest(bounds.x, bounds.y)
                    .blit();
-            int backgroundWidth = Math.min(126, bounds.width - 2);
-
-            BLITTER.copy().src(1, yOffset, backgroundWidth, 12)
-                   .dest(bounds.x + 1, bounds.y)
-                   .blit();
+            int remainingWidth = bounds.width - 2;
+            int backgroundX = bounds.x + 1;
+            while (remainingWidth > 0) {
+                int backgroundWidth = Math.min(126, remainingWidth);
+                BLITTER.copy().src(1, yOffset, backgroundWidth, 12)
+                       .dest(backgroundX, bounds.y)
+                       .blit();
+                backgroundX += backgroundWidth;
+                remainingWidth -= backgroundWidth;
+            }
 
             BLITTER.copy().src(127, yOffset, 1, 12)
                    .dest(bounds.x + bounds.width - 1, bounds.y)
@@ -258,6 +263,17 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
             GlStateManager.popMatrix();
         }
+    }
+
+    @FunctionalInterface
+    public interface KeyFilter extends BiPredicate<Character, Integer> {
+
+        @Override
+        default boolean test(Character character, Integer integer) {
+            return test(character.charValue(), integer.intValue());
+        }
+
+        boolean test(char character, int integer);
     }
 
     @Override

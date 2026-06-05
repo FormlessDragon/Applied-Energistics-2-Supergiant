@@ -21,7 +21,7 @@ public final class SlotSemantics {
     public static final SlotSemantic MAGNET_PICKUP_CONFIG = register("MAGNET_PICKUP_CONFIG", false);
     public static final SlotSemantic MAGNET_INSERT_CONFIG = register("MAGNET_INSERT_CONFIG", false);
     public static final SlotSemantic WIRELESS_SINGULARITY = register("WIRELESS_SINGULARITY", false);
-    public static final SlotSemantic UPGRADE = register("UPGRADE", false);
+    public static final SlotSemantic UPGRADE = register("UPGRADE", false, 100);
     public static final SlotSemantic STORAGE_CELL = register("STORAGE_CELL", false);
     public static final SlotSemantic MACHINE_INPUT = register("MACHINE_INPUT", false);
     public static final SlotSemantic MACHINE_OUTPUT = register("MACHINE_OUTPUT", false);

@@ -3,7 +3,6 @@ package ae2.container.slot;
 import ae2.api.behaviors.ContainerItemStrategies;
 import ae2.api.behaviors.EmptyingAction;
 import ae2.api.stacks.GenericStack;
-import ae2.util.ConfigGuiInventory;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
@@ -14,11 +13,7 @@ public final class FakeSlotFilterSupport {
 
     @Nullable
     public static EmptyingAction getEmptyingAction(@Nullable Slot slot, ItemStack carried) {
-        if (!(slot instanceof AppEngSlot appEngSlot) || carried.isEmpty()) {
-            return null;
-        }
-
-        if (!(appEngSlot.getInventory() instanceof ConfigGuiInventory configInv)) {
+        if (!(slot instanceof FakeSlot fakeSlot) || carried.isEmpty()) {
             return null;
         }
 
@@ -30,7 +25,7 @@ public final class FakeSlotFilterSupport {
         ItemStack wrappedStack = GenericStack.wrapInItemStack(new GenericStack(
             emptyingAction.what(),
             emptyingAction.maxAmount()));
-        return configInv.isItemValid(appEngSlot.getSlotIndex(), wrappedStack) ? emptyingAction : null;
+        return fakeSlot.canSetFilterTo(wrappedStack) ? emptyingAction : null;
     }
 
     @Nullable

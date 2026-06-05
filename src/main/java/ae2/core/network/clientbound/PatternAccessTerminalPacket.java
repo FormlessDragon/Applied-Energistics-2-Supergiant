@@ -19,6 +19,7 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
     private long inventoryId;
     private int inventorySize;
     private long sortBy;
+    private boolean canEditTerminalName;
     private PatternContainerGroup group;
     private Int2ObjectMap<ItemStack> slots = new Int2ObjectOpenHashMap<>();
 
@@ -26,22 +27,26 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
     }
 
     private PatternAccessTerminalPacket(boolean fullUpdate, long inventoryId, int inventorySize, long sortBy,
-                                        PatternContainerGroup group, Int2ObjectMap<ItemStack> slots) {
+                                        boolean canEditTerminalName, PatternContainerGroup group,
+                                        Int2ObjectMap<ItemStack> slots) {
         this.fullUpdate = fullUpdate;
         this.inventoryId = inventoryId;
         this.inventorySize = inventorySize;
         this.sortBy = sortBy;
+        this.canEditTerminalName = canEditTerminalName;
         this.group = group;
         this.slots = slots;
     }
 
     public static PatternAccessTerminalPacket fullUpdate(long inventoryId, int inventorySize, long sortBy,
-                                                         PatternContainerGroup group, Int2ObjectMap<ItemStack> slots) {
-        return new PatternAccessTerminalPacket(true, inventoryId, inventorySize, sortBy, group, slots);
+                                                         boolean canEditTerminalName, PatternContainerGroup group,
+                                                         Int2ObjectMap<ItemStack> slots) {
+        return new PatternAccessTerminalPacket(true, inventoryId, inventorySize, sortBy, canEditTerminalName, group,
+            slots);
     }
 
     public static PatternAccessTerminalPacket incrementalUpdate(long inventoryId, Int2ObjectMap<ItemStack> slots) {
-        return new PatternAccessTerminalPacket(false, inventoryId, 0, 0, null, slots);
+        return new PatternAccessTerminalPacket(false, inventoryId, 0, 0, false, null, slots);
     }
 
     @Override
@@ -52,6 +57,7 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
         if (this.fullUpdate) {
             this.inventorySize = packetBuffer.readVarInt();
             this.sortBy = packetBuffer.readVarLong();
+            this.canEditTerminalName = packetBuffer.readBoolean();
             this.group = PatternContainerGroup.readFromPacket(packetBuffer);
         }
 
@@ -75,6 +81,7 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
         if (this.fullUpdate) {
             packetBuffer.writeVarInt(this.inventorySize);
             packetBuffer.writeVarLong(this.sortBy);
+            packetBuffer.writeBoolean(this.canEditTerminalName);
             this.group.writeToPacket(packetBuffer);
         }
 
@@ -90,8 +97,8 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
     public void handleClient(Minecraft minecraft) {
         if (minecraft.currentScreen instanceof GuiPatternAccessTerm<?> patternAccessTerminal) {
             if (this.fullUpdate) {
-                patternAccessTerminal.postFullUpdate(this.inventoryId, this.sortBy, this.group, this.inventorySize,
-                    this.slots);
+                patternAccessTerminal.postFullUpdate(this.inventoryId, this.sortBy, this.canEditTerminalName,
+                    this.group, this.inventorySize, this.slots);
             } else {
                 patternAccessTerminal.postIncrementalUpdate(this.inventoryId, this.slots);
             }

@@ -10,8 +10,8 @@ import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.BaseInternalInventory;
 import ae2.api.inventories.InternalInventory;
-import ae2.api.networking.IGrid;
 import ae2.api.networking.GridFlags;
+import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridNodeListener;
 import ae2.api.networking.crafting.ICraftingProvider;
@@ -364,6 +364,17 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     @Override
     public void openTerminalPatternContainerGui(EntityPlayer player) {
         GuiOpener.openGui(player, GuiIds.GuiKey.MOLECULAR_ASSEMBLER, this);
+    }
+
+    @Override
+    public boolean canEditTerminalName() {
+        return true;
+    }
+
+    @Override
+    public void setTerminalCustomName(@Nullable String name) {
+        setCustomName(name);
+        saveChanges();
     }
 
     @Override

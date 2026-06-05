@@ -30,11 +30,13 @@ import ae2.api.stacks.GenericStack;
 import ae2.api.storage.ILinkStatus;
 import ae2.api.upgrades.IUpgradeableObject;
 import ae2.client.gui.AEBaseGui;
+import ae2.client.gui.Icon;
 import ae2.client.gui.me.common.GuiTerminalSettings;
 import ae2.client.gui.me.items.WirelessUniversalTerminalSelectorWindow;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.ActionButton;
+import ae2.client.gui.widgets.ConfirmableTextField;
 import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.ITooltip;
 import ae2.client.gui.widgets.ItemStackButton;
@@ -68,7 +70,6 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
@@ -83,7 +84,6 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
@@ -103,7 +103,6 @@ import java.util.Set;
 public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends AEBaseGui<C> implements ITextFieldGui {
 
     private static final ResourceLocation TEXTURE = AppEng.makeId("textures/guis/ex_pattern_access_terminal.png");
-    private static final ResourceLocation EAE_NICONS_TEXTURE = AppEng.makeId("textures/guis/nicons.png");
 
     private static final int GUI_WIDTH = 195;
     private static final int GUI_PADDING_X = 8;
@@ -116,7 +115,15 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     private static final int MIN_VISIBLE_ROWS = 2;
     private static final int PATTERN_PROVIDER_NAME_MARGIN_X = 2;
     private static final int TEXT_MAX_WIDTH = 155;
-
+    private static final int ROW_ACTION_BUTTON_WIDTH = 6;
+    private static final int ROW_ACTION_BUTTON_HEIGHT = 11;
+    private static final int ROW_ACTION_BUTTON_Y_OFFSET = 3;
+    private static final int RENAME_FIELD_X_OFFSET = 10;
+    private static final int RENAME_FIELD_Y_OFFSET = 3;
+    private static final int RENAME_FIELD_HEIGHT = 12;
+    private static final int GROUP_RENAME_FIELD_X_OFFSET = 16;
+    private static final int GROUP_RENAME_FIELD_Y_OFFSET = 3;
+    private static final int GROUP_RENAME_FIELD_HEIGHT = 12;
     private static final Rectangle HEADER_BBOX = new Rectangle(0, 0, GUI_WIDTH, GUI_HEADER_HEIGHT);
     private static final Rectangle ROW_TEXT_TOP_BBOX = new Rectangle(0, 30, GUI_WIDTH, ROW_HEIGHT);
     private static final Rectangle ROW_INVENTORY_TOP_BBOX = new Rectangle(0, 48, GUI_WIDTH, ROW_HEIGHT);
@@ -137,20 +144,30 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     private final Map<Long, PatternProviderInfo> providerInfo = new Long2ObjectOpenHashMap<>();
     private final Set<MatchedPatternSlot> matchedPatternSlots = new HashSet<>();
     private final List<ProviderHighlightButton> providerHighlightButtons = new ObjectArrayList<>();
+    private final List<RenameProviderButton> renameButtons = new ObjectArrayList<>();
 
     private final ITextComponent title;
     private final Scrollbar scrollbar;
-    private final AETextField searchField;
-    private final AETextField providerSearchField;
-    private final SearchModeButton searchModeButton;
+    private final AETextField groupSearchField;
+    private final AETextField inputSearchField;
+    private final AETextField outputSearchField;
     private final ServerSettingToggleButton<ShowPatternProviders> showPatternProviders;
     private final PatternModifierPanelWidget patternModifierPanel;
 
     private int visibleRows = MIN_VISIBLE_ROWS;
     private int lastScroll = Integer.MIN_VALUE;
-    private String searchText = "";
-    private String providerSearchText = "";
-    private SearchMode searchMode = SearchMode.IN_OUT;
+    private String groupSearchText = "";
+    private String inputSearchText = "";
+    private String outputSearchText = "";
+    @Nullable
+    private ConfirmableTextField activeRenameField;
+    private long activeRenameContainerId = Long.MIN_VALUE;
+    private String activeRenameOriginalName = "";
+    @Nullable
+    private ConfirmableTextField activeGroupRenameField;
+    @Nullable
+    private PatternContainerGroup activeRenameGroup;
+    private String activeGroupRenameOriginalName = "";
 
     public GuiPatternAccessTerm(C container, InventoryPlayer playerInventory, @Nullable ITextComponent title,
                                 GuiStyle style) {
@@ -158,15 +175,18 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         this.title = title != null ? title : GuiText.PatternAccessTerminalShort.text();
 
         this.scrollbar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
-        this.searchField = this.widgets.addTextField("search");
-        this.searchField.setPlaceholder(GuiText.SearchPlaceholder.text());
-        this.searchField.setTooltipMessage(Collections.singletonList(this.searchMode.tooltip()));
-        this.providerSearchField = this.widgets.addTextField("providerSearch");
-        this.providerSearchField.setPlaceholder(GuiText.SearchPlaceholder.text());
-        this.providerSearchField.setTooltipMessage(Collections.singletonList(
-            new TextComponentTranslation("gui.ae2.PatternAccessTerminalProviderSearchTooltip")));
-        this.searchModeButton = new SearchModeButton(this::cycleSearchMode);
-        this.widgets.add("searchMode", this.searchModeButton);
+        this.groupSearchField = this.widgets.addTextField("search");
+        this.groupSearchField.setPlaceholder(GuiText.SearchPlaceholder.text());
+        this.groupSearchField.setTooltipMessage(Collections.singletonList(
+            GuiText.PatternAccessTerminalProviderSearchTooltip.text()));
+        this.inputSearchField = this.widgets.addTextField("inputSearch");
+        this.inputSearchField.setPlaceholder(GuiText.SearchPlaceholder.text());
+        this.inputSearchField.setTooltipMessage(Collections.singletonList(
+            GuiText.PatternAccessTerminalSearchTooltipInput.text()));
+        this.outputSearchField = this.widgets.addTextField("outputSearch");
+        this.outputSearchField.setPlaceholder(GuiText.SearchPlaceholder.text());
+        this.outputSearchField.setTooltipMessage(Collections.singletonList(
+            GuiText.PatternAccessTerminalSearchTooltipOutput.text()));
         this.patternModifierPanel = new PatternModifierPanelWidget(this, new PatternAccessPanelHost());
         this.patternModifierPanel.addButtons();
 
@@ -314,17 +334,27 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         }
 
         int entries = this.byGroup.get(group).size();
-        String displayName = group.name().getFormattedText();
-        if (entries > 1) {
-            displayName += " (" + entries + ")";
-        }
-
-        displayName = this.fontRenderer.trimStringToWidth(displayName, TEXT_MAX_WIDTH - 18);
+        boolean editingThisGroup = this.activeGroupRenameField != null && this.activeGroupRenameField.getVisible()
+            && Objects.equals(this.activeRenameGroup, group);
+        String displayName = editingThisGroup ? "" : group.name().getFormattedText();
+        String countText = entries > 1 ? " (" + entries + ")" : "";
+        int textX = GUI_PADDING_X + PATTERN_PROVIDER_NAME_MARGIN_X + 18;
+        int textY = GUI_HEADER_HEIGHT + GUI_PADDING_Y + rowIndex * ROW_HEIGHT;
+        int countWidth = this.fontRenderer.getStringWidth(countText);
+        int availableNameWidth = Math.max(0, TEXT_MAX_WIDTH - 18 - countWidth);
+        displayName = this.fontRenderer.trimStringToWidth(displayName, availableNameWidth);
         this.fontRenderer.drawString(
             displayName,
-            GUI_PADDING_X + PATTERN_PROVIDER_NAME_MARGIN_X + 18,
-            GUI_HEADER_HEIGHT + GUI_PADDING_Y + rowIndex * ROW_HEIGHT,
+            textX,
+            textY,
             4210752);
+        if (!countText.isEmpty()) {
+            this.fontRenderer.drawString(
+                countText,
+                textX + this.fontRenderer.getStringWidth(displayName),
+                textY,
+                4210752);
+        }
     }
 
     private void renderLinkStatus(ILinkStatus linkStatus) {
@@ -356,17 +386,34 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     }
 
     @Override
+    public void updateScreen() {
+        super.updateScreen();
+
+        if (this.activeRenameField != null && this.activeRenameField.getVisible()) {
+            this.activeRenameField.updateCursorCounter();
+            this.activeRenameField.tickKeyRepeat();
+        }
+        if (this.activeGroupRenameField != null && this.activeGroupRenameField.getVisible()) {
+            this.activeGroupRenameField.updateCursorCounter();
+            this.activeGroupRenameField.tickKeyRepeat();
+        }
+    }
+
+    @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
 
         this.showPatternProviders.set(this.container.getShownProviders());
         this.patternModifierPanel.update();
 
-        String text = this.searchField.getText();
-        String providerText = this.providerSearchField.getText();
-        if (!this.searchText.equals(text) || !this.providerSearchText.equals(providerText)) {
-            this.searchText = text;
-            this.providerSearchText = providerText;
+        String groupText = this.groupSearchField.getText();
+        String inputText = this.inputSearchField.getText();
+        String outputText = this.outputSearchField.getText();
+        if (!this.groupSearchText.equals(groupText) || !this.inputSearchText.equals(inputText)
+            || !this.outputSearchText.equals(outputText)) {
+            this.groupSearchText = groupText;
+            this.inputSearchText = inputText;
+            this.outputSearchText = outputText;
             refreshList();
             return;
         }
@@ -384,7 +431,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         if (x < 0 || y < 0) {
             return -1;
         }
-        if (x >= SLOT_SIZE * COLUMNS || y >= this.visibleRows * ROW_HEIGHT) {
+        if (x >= GUI_WIDTH - GUI_PADDING_X || y >= this.visibleRows * ROW_HEIGHT) {
             return -1;
         }
 
@@ -394,29 +441,58 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (this.activeGroupRenameField != null && this.activeGroupRenameField.getVisible()
+            && this.activeGroupRenameField.isMouseOver(mouseX, mouseY)) {
+            clearSearchFieldOnRightClick(this.activeGroupRenameField, mouseX, mouseY, mouseButton);
+            this.activeGroupRenameField.mouseClicked(mouseX, mouseY, mouseButton);
+            return;
+        }
+        if (this.activeRenameField != null && this.activeRenameField.getVisible()
+            && this.activeRenameField.isMouseOver(mouseX, mouseY)) {
+            clearSearchFieldOnRightClick(this.activeRenameField, mouseX, mouseY, mouseButton);
+            this.activeRenameField.mouseClicked(mouseX, mouseY, mouseButton);
+            return;
+        }
+
+        finishActiveGroupRename(true);
+        finishActiveRename(true);
         updateSearchFieldFocus(mouseX, mouseY);
 
-        if (mouseButton == 1 && this.searchField.isMouseOver(mouseX, mouseY)) {
-            this.searchField.setText("");
-            this.searchText = "";
-            refreshList();
-        }
-        if (mouseButton == 1 && this.providerSearchField.isMouseOver(mouseX, mouseY)) {
-            this.providerSearchField.setText("");
-            this.providerSearchText = "";
-            refreshList();
+        clearSearchFieldOnRightClick(this.groupSearchField, mouseX, mouseY, mouseButton);
+        clearSearchFieldOnRightClick(this.inputSearchField, mouseX, mouseY, mouseButton);
+        clearSearchFieldOnRightClick(this.outputSearchField, mouseX, mouseY, mouseButton);
+
+        if (mouseButton == 0) {
+            PatternContainerGroup clickedGroup = getClickedEditableGroupHeader(mouseX, mouseY);
+            if (clickedGroup != null) {
+                openGroupRenameField(clickedGroup);
+                return;
+            }
         }
 
         super.mouseClicked(mouseX, mouseY, mouseButton);
     }
 
+    private void clearSearchFieldOnRightClick(AETextField textField, int mouseX, int mouseY, int mouseButton) {
+        if (mouseButton == 1 && textField.isMouseOver(mouseX, mouseY)) {
+            textField.setText("");
+            refreshList();
+        }
+    }
+
     private void updateSearchFieldFocus(int mouseX, int mouseY) {
-        boolean searchClicked = this.searchField.isMouseOver(mouseX, mouseY);
-        boolean providerSearchClicked = this.providerSearchField.isMouseOver(mouseX, mouseY);
-        if (searchClicked) {
-            this.providerSearchField.setFocused(false);
-        } else if (providerSearchClicked) {
-            this.searchField.setFocused(false);
+        boolean groupClicked = this.groupSearchField.isMouseOver(mouseX, mouseY);
+        boolean inputClicked = this.inputSearchField.isMouseOver(mouseX, mouseY);
+        boolean outputClicked = this.outputSearchField.isMouseOver(mouseX, mouseY);
+        if (groupClicked) {
+            this.inputSearchField.setFocused(false);
+            this.outputSearchField.setFocused(false);
+        } else if (inputClicked) {
+            this.groupSearchField.setFocused(false);
+            this.outputSearchField.setFocused(false);
+        } else if (outputClicked) {
+            this.groupSearchField.setFocused(false);
+            this.inputSearchField.setFocused(false);
         }
     }
 
@@ -501,6 +577,14 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     }
 
     @Override
+    protected Slot findSlot(int mouseX, int mouseY) {
+        if (isMouseOverActiveRenameField(mouseX, mouseY)) {
+            return null;
+        }
+        return super.findSlot(mouseX, mouseY);
+    }
+
+    @Override
     public Slot MT_getSlotUnderMouse() {
         Slot slot = super.MT_getSlotUnderMouse();
         if (slot instanceof GuiPatternSlot patternSlot && !isVisiblePatternSlot(patternSlot)) {
@@ -515,8 +599,35 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             || slot instanceof GuiPatternSlot patternSlot && !isVisiblePatternSlot(patternSlot);
     }
 
+    private boolean isMouseOverActiveRenameField(int mouseX, int mouseY) {
+        return (this.activeRenameField != null && this.activeRenameField.getVisible()
+            && this.activeRenameField.isMouseOver(mouseX, mouseY))
+            || (this.activeGroupRenameField != null && this.activeGroupRenameField.getVisible()
+            && this.activeGroupRenameField.isMouseOver(mouseX, mouseY));
+    }
+
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        if (this.activeGroupRenameField != null && this.activeGroupRenameField.getVisible()
+            && this.activeGroupRenameField.isFocused()) {
+            if (keyCode == Keyboard.KEY_ESCAPE) {
+                finishActiveGroupRename(true);
+                return;
+            }
+            if (this.activeGroupRenameField.textboxKeyTyped(typedChar, keyCode)) {
+                return;
+            }
+        }
+        if (this.activeRenameField != null && this.activeRenameField.getVisible() && this.activeRenameField.isFocused()) {
+            if (keyCode == Keyboard.KEY_ESCAPE) {
+                finishActiveRename(true);
+                return;
+            }
+            if (this.activeRenameField.textboxKeyTyped(typedChar, keyCode)) {
+                return;
+            }
+        }
+
         AETextField focusedSearchField = getFocusedSearchField();
         if (keyCode == Keyboard.KEY_ESCAPE && focusedSearchField != null) {
             focusedSearchField.setFocused(false);
@@ -530,13 +641,23 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         super.keyTyped(typedChar, keyCode);
     }
 
+    @Override
+    public void onGuiClosed() {
+        finishActiveGroupRename(true);
+        finishActiveRename(true);
+        super.onGuiClosed();
+    }
+
     @Nullable
     private AETextField getFocusedSearchField() {
-        if (this.searchField.isFocused()) {
-            return this.searchField;
+        if (this.groupSearchField.isFocused()) {
+            return this.groupSearchField;
         }
-        if (this.providerSearchField.isFocused()) {
-            return this.providerSearchField;
+        if (this.inputSearchField.isFocused()) {
+            return this.inputSearchField;
+        }
+        if (this.outputSearchField.isFocused()) {
+            return this.outputSearchField;
         }
         return null;
     }
@@ -545,6 +666,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     public void initGui() {
         clearPatternSlots();
         clearProviderHighlightButtons();
+        clearRenameButtons();
 
         this.visibleRows = getConfiguredRows();
         this.xSize = GUI_WIDTH;
@@ -553,7 +675,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         super.initGui();
 
         if (AEConfig.instance().isAutoFocusSearch()) {
-            setInitialFocus(this.searchField);
+            setInitialFocus(this.groupSearchField);
         }
 
         resetScrollbar();
@@ -562,7 +684,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
     @Override
     public void drawFG(int offsetX, int offsetY, int mouseX, int mouseY) {
-        updateProviderHighlightButtons();
+        updateRowActionButtons();
         this.fontRenderer.drawString(getGuiDisplayName(this.title).getFormattedText(), 7, 6, 4210752);
 
         int scrollLevel = this.scrollbar.getCurrentScroll();
@@ -579,6 +701,8 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             }
         }
 
+        drawActiveRenameField();
+        drawActiveGroupRenameField();
         renderLinkStatus(this.container.getLinkStatus());
     }
 
@@ -589,7 +713,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             ItemStack pattern = slotsRow.container().getInventory().getStackInSlot(slotIndex);
             int x = GUI_PADDING_X + col * SLOT_SIZE;
             int y = GUI_HEADER_HEIGHT + rowIndex * ROW_HEIGHT + 1;
-            if (!this.searchText.trim().isEmpty()) {
+            if (hasActivePatternFilter()) {
                 if (this.matchedPatternSlots.contains(new MatchedPatternSlot(
                     slotsRow.container().getServerId(), slotIndex))) {
                     drawGradientRect(x - 1, y - 1, x + 17, y + 17, 0x669CD3FF, 0x669CD3FF);
@@ -605,8 +729,19 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
     @Override
     protected void renderHoveredToolTip(int mouseX, int mouseY) {
+        if (isMouseOverActiveRenameField(mouseX, mouseY)) {
+            return;
+        }
         if (!this.container.getLinkStatus().connected() && this.getSlotUnderMouse() instanceof GuiPatternSlot) {
             return;
+        }
+
+        for (RenameProviderButton button : this.renameButtons) {
+            if (button.visible && button.getTooltipArea().contains(mouseX, mouseY)) {
+                drawTooltipLines(mouseX, mouseY,
+                    button.getTooltipMessage().stream().map(ITextComponent::getFormattedText).toList());
+                return;
+            }
         }
 
         for (ProviderHighlightButton button : this.providerHighlightButtons) {
@@ -634,6 +769,8 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     }
 
     public void clear() {
+        finishActiveGroupRename(false);
+        finishActiveRename(false);
         this.byId.clear();
         this.providerInfo.clear();
         this.patternSearchText.clear();
@@ -645,9 +782,10 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         refreshVisiblePatternSlots();
     }
 
-    public void postFullUpdate(long inventoryId, long sortBy, PatternContainerGroup group, int inventorySize,
-                               Int2ObjectMap<ItemStack> slots) {
-        PatternContainerEntry patternContainer = new PatternContainerEntry(inventoryId, inventorySize, sortBy, group);
+    public void postFullUpdate(long inventoryId, long sortBy, boolean canEditTerminalName, PatternContainerGroup group,
+                               int inventorySize, Int2ObjectMap<ItemStack> slots) {
+        PatternContainerEntry patternContainer = new PatternContainerEntry(inventoryId, inventorySize, sortBy,
+            canEditTerminalName, group);
         this.byId.put(inventoryId, patternContainer);
 
         AppEngInternalInventory inventory = patternContainer.getInventory();
@@ -679,10 +817,11 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         this.byGroup.clear();
         this.matchedPatternSlots.clear();
 
-        String patternFilter = this.searchField.getText().trim().toLowerCase(Locale.ROOT);
-        String providerFilter = this.providerSearchField.getText().trim().toLowerCase(Locale.ROOT);
+        String groupFilter = this.groupSearchField.getText().trim().toLowerCase(Locale.ROOT);
+        String inputFilter = this.inputSearchField.getText().trim().toLowerCase(Locale.ROOT);
+        String outputFilter = this.outputSearchField.getText().trim().toLowerCase(Locale.ROOT);
         for (PatternContainerEntry entry : this.byId.values()) {
-            if (matchesSearch(entry, providerFilter, patternFilter)) {
+            if (matchesSearch(entry, groupFilter, inputFilter, outputFilter)) {
                 this.byGroup.put(entry.getGroup(), entry);
             }
         }
@@ -710,33 +849,58 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         refreshVisiblePatternSlots();
     }
 
-    private boolean matchesSearch(PatternContainerEntry entry, String providerFilter, String patternFilter) {
-        if (!providerFilter.isEmpty() && !entry.getSearchName().contains(providerFilter)) {
+    private boolean matchesSearch(PatternContainerEntry entry, String groupFilter, String inputFilter,
+                                  String outputFilter) {
+        if (!groupFilter.isEmpty() && !entry.getSearchName().contains(groupFilter)) {
             return false;
         }
 
-        if (patternFilter.isEmpty()) {
+        if (inputFilter.isEmpty() && outputFilter.isEmpty()) {
             return true;
         }
 
-        boolean matched = false;
+        boolean inputMatched = inputFilter.isEmpty();
+        boolean outputMatched = outputFilter.isEmpty();
+        Set<MatchedPatternSlot> matchedSlots = new HashSet<>();
         for (int slot = 0; slot < entry.getInventory().size(); slot++) {
             ItemStack stack = entry.getInventory().getStackInSlot(slot);
-            if (itemStackMatchesSearchTerm(stack, patternFilter)) {
-                this.matchedPatternSlots.add(new MatchedPatternSlot(entry.getServerId(), slot));
-                matched = true;
+            boolean slotInputMatched = stackMatchesInputFilter(stack, inputFilter);
+            boolean slotOutputMatched = stackMatchesOutputFilter(stack, outputFilter);
+            if (slotInputMatched || slotOutputMatched) {
+                matchedSlots.add(new MatchedPatternSlot(entry.getServerId(), slot));
             }
+            inputMatched |= slotInputMatched;
+            outputMatched |= slotOutputMatched;
         }
 
-        return matched;
+        if (!inputMatched || !outputMatched) {
+            return false;
+        }
+
+        this.matchedPatternSlots.addAll(matchedSlots);
+        return true;
     }
 
-    private boolean itemStackMatchesSearchTerm(ItemStack stack, String filter) {
+    private boolean stackMatchesInputFilter(ItemStack stack, String inputFilter) {
         if (stack.isEmpty()) {
             return false;
         }
+        if (inputFilter.isEmpty()) {
+            return true;
+        }
         PatternSearchData searchData = this.patternSearchText.computeIfAbsent(stack, this::getPatternSearchText);
-        return this.searchMode.matches(searchData, filter);
+        return searchData.inputs().contains(inputFilter);
+    }
+
+    private boolean stackMatchesOutputFilter(ItemStack stack, String outputFilter) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+        if (outputFilter.isEmpty()) {
+            return true;
+        }
+        PatternSearchData searchData = this.patternSearchText.computeIfAbsent(stack, this::getPatternSearchText);
+        return searchData.outputs().contains(outputFilter);
     }
 
     private void resetScrollbar() {
@@ -761,24 +925,46 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     private void refreshVisiblePatternSlots() {
         clearPatternSlots();
         clearProviderHighlightButtons();
+        clearRenameButtons();
 
         int scroll = this.scrollbar.getCurrentScroll();
+        boolean renameFieldVisible = false;
+        boolean groupRenameFieldVisible = false;
         for (int i = 0; i < this.visibleRows; i++) {
             if (scroll + i >= this.rows.size()) {
                 break;
             }
 
             Row row = this.rows.get(scroll + i);
+            if (row instanceof GroupHeaderRow(PatternContainerGroup group)) {
+                if (Objects.equals(this.activeRenameGroup, group)) {
+                    moveActiveGroupRenameField(group, i);
+                    groupRenameFieldVisible = true;
+                }
+                continue;
+            }
             if (row instanceof SlotsRow(PatternContainerEntry patternContainer, int offset, int slots)) {
                 if (offset == 0) {
+                    if (isEditable(patternContainer)) {
+                        RenameProviderButton renameButton = new RenameProviderButton(patternContainer);
+                        renameButton.x = this.guiLeft + GUI_PADDING_X - ROW_ACTION_BUTTON_WIDTH;
+                        renameButton.y = this.guiTop + GUI_HEADER_HEIGHT + i * ROW_HEIGHT + ROW_ACTION_BUTTON_Y_OFFSET;
+                        this.renameButtons.add(renameButton);
+                        this.buttonList.add(renameButton);
+                    }
                     PatternProviderInfo info = this.providerInfo.get(patternContainer.getServerId());
                     if (info != null) {
                         ProviderHighlightButton button = new ProviderHighlightButton(patternContainer.getServerId(),
                             info);
                         button.x = this.guiLeft + GUI_PADDING_X + SLOT_SIZE * COLUMNS - 1;
-                        button.y = this.guiTop + GUI_HEADER_HEIGHT + i * ROW_HEIGHT;
+                        button.y = this.guiTop + GUI_HEADER_HEIGHT + i * ROW_HEIGHT + ROW_ACTION_BUTTON_Y_OFFSET;
                         this.providerHighlightButtons.add(button);
                         this.buttonList.add(button);
+                    }
+
+                    if (this.activeRenameContainerId == patternContainer.getServerId()) {
+                        moveActiveRenameField(i);
+                        renameFieldVisible = true;
                     }
                 }
                 for (int col = 0; col < slots; col++) {
@@ -792,10 +978,21 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             }
         }
 
+        if (!groupRenameFieldVisible) {
+            finishActiveGroupRename(true);
+        }
+        if (!renameFieldVisible) {
+            finishActiveRename(true);
+        }
+
         this.lastScroll = scroll;
     }
 
-    private void updateProviderHighlightButtons() {
+    private void updateRowActionButtons() {
+        for (RenameProviderButton button : this.renameButtons) {
+            button.visible = true;
+            button.enabled = true;
+        }
         for (ProviderHighlightButton button : this.providerHighlightButtons) {
             button.visible = true;
             button.enabled = true;
@@ -851,6 +1048,14 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         this.providerHighlightButtons.clear();
     }
 
+    private void clearRenameButtons() {
+        if (this.renameButtons.isEmpty()) {
+            return;
+        }
+        this.buttonList.removeAll(this.renameButtons);
+        this.renameButtons.clear();
+    }
+
     private void toggleTerminalStyle(SettingToggleButton<TerminalStyle> button, boolean backwards) {
         TerminalStyle next = button.getNextValue(backwards);
         button.set(next);
@@ -890,62 +1095,23 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
     @Override
     public Collection<? extends GuiTextField> getTextFields() {
-        return List.of(this.searchField, this.providerSearchField);
+        if (this.activeRenameField != null && this.activeRenameField.getVisible()
+            && this.activeGroupRenameField != null && this.activeGroupRenameField.getVisible()) {
+            return List.of(this.groupSearchField, this.inputSearchField, this.outputSearchField, this.activeRenameField,
+                this.activeGroupRenameField);
+        }
+        if (this.activeRenameField != null && this.activeRenameField.getVisible()) {
+            return List.of(this.groupSearchField, this.inputSearchField, this.outputSearchField, this.activeRenameField);
+        }
+        if (this.activeGroupRenameField != null && this.activeGroupRenameField.getVisible()) {
+            return List.of(this.groupSearchField, this.inputSearchField, this.outputSearchField,
+                this.activeGroupRenameField);
+        }
+        return List.of(this.groupSearchField, this.inputSearchField, this.outputSearchField);
     }
 
-    private void cycleSearchMode() {
-        this.searchMode = this.searchMode.next();
-        this.searchModeButton.updateLabel();
-        this.searchField.setTooltipMessage(Collections.singletonList(this.searchMode.tooltip()));
-        this.patternSearchText.clear();
-        refreshList();
-    }
-
-    private enum SearchMode {
-        OUT("gui.ae2.PatternAccessTerminalSearchModeOutput",
-            "gui.ae2.PatternAccessTerminalSearchTooltipOutput") {
-            @Override
-            boolean matches(PatternSearchData data, String filter) {
-                return data.outputs().contains(filter);
-            }
-        },
-        IN("gui.ae2.PatternAccessTerminalSearchModeInput",
-            "gui.ae2.PatternAccessTerminalSearchTooltipInput") {
-            @Override
-            boolean matches(PatternSearchData data, String filter) {
-                return data.inputs().contains(filter);
-            }
-        },
-        IN_OUT("gui.ae2.PatternAccessTerminalSearchModeInputOutput",
-            "gui.ae2.PatternAccessTerminalSearchTooltipInputOutput") {
-            @Override
-            boolean matches(PatternSearchData data, String filter) {
-                return data.inputs().contains(filter) || data.outputs().contains(filter);
-            }
-        };
-
-        private final String titleKey;
-        private final String tooltipKey;
-
-        SearchMode(String titleKey, String tooltipKey) {
-            this.titleKey = titleKey;
-            this.tooltipKey = tooltipKey;
-        }
-
-        abstract boolean matches(PatternSearchData data, String filter);
-
-        SearchMode next() {
-            SearchMode[] values = values();
-            return values[(ordinal() + 1) % values.length];
-        }
-
-        ITextComponent title() {
-            return new TextComponentTranslation(this.titleKey);
-        }
-
-        ITextComponent tooltip() {
-            return new TextComponentTranslation(this.tooltipKey);
-        }
+    private boolean hasActivePatternFilter() {
+        return !this.inputSearchField.getText().trim().isEmpty() || !this.outputSearchField.getText().trim().isEmpty();
     }
 
     private interface Row {
@@ -964,6 +1130,220 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     }
 
     private record MatchedPatternSlot(long inventoryId, int slot) {
+    }
+
+    private boolean isEditable(PatternContainerEntry entry) {
+        return entry.canEditTerminalName();
+    }
+
+    @Nullable
+    private PatternContainerGroup getClickedEditableGroupHeader(int mouseX, int mouseY) {
+        int hoveredLine = getHoveredLineIndex(mouseX, mouseY);
+        if (hoveredLine < 0) {
+            return null;
+        }
+        Row row = this.rows.get(hoveredLine);
+        if (!(row instanceof GroupHeaderRow(PatternContainerGroup group)) || !canRenameGroup(group)) {
+            return null;
+        }
+        int visibleRow = hoveredLine - this.scrollbar.getCurrentScroll();
+        if (visibleRow < 0 || visibleRow >= this.visibleRows) {
+            return null;
+        }
+        if (!getGroupRenameFieldBounds(group, visibleRow).contains(mouseX, mouseY)) {
+            return null;
+        }
+        return group;
+    }
+
+    private boolean canRenameGroup(PatternContainerGroup group) {
+        for (PatternContainerEntry entry : this.byGroup.get(group)) {
+            if (entry.canEditTerminalName()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private long[] getEditableGroupServerIds(PatternContainerGroup group) {
+        LongList ids = new LongArrayList();
+        for (PatternContainerEntry entry : this.byGroup.get(group)) {
+            if (entry.canEditTerminalName()) {
+                ids.add(entry.getServerId());
+            }
+        }
+        return ids.toLongArray();
+    }
+
+    private void openGroupRenameField(PatternContainerGroup group) {
+        if (this.activeGroupRenameField != null && Objects.equals(this.activeRenameGroup, group)) {
+            this.activeGroupRenameField.setFocused(true);
+            this.activeGroupRenameField.selectAll();
+            return;
+        }
+
+        finishActiveRename(true);
+        finishActiveGroupRename(true);
+
+        long[] inventoryIds = getEditableGroupServerIds(group);
+        if (inventoryIds.length == 0) {
+            return;
+        }
+
+        this.activeRenameGroup = group;
+        this.activeGroupRenameOriginalName = group.name().getFormattedText();
+        ConfirmableTextField field = new ConfirmableTextField(this.style, this.fontRenderer, 0, 0, 0, 0);
+        field.setMaxStringLength(32);
+        field.setOnConfirm(() -> {
+            field.setFocused(false);
+            finishActiveGroupRename(true);
+        });
+        this.activeGroupRenameField = field;
+        refreshVisiblePatternSlots();
+        field.setText(this.activeGroupRenameOriginalName);
+        field.setVisible(true);
+        field.setFocused(true);
+        field.selectAll();
+    }
+
+    private void moveActiveGroupRenameField(PatternContainerGroup group, int visibleRow) {
+        if (this.activeGroupRenameField == null) {
+            return;
+        }
+
+        GroupRenameFieldLayout layout = getGroupRenameFieldLayout(group, visibleRow, true);
+        this.activeGroupRenameField.move(layout.x(), layout.y());
+        this.activeGroupRenameField.resize(layout.width(), GROUP_RENAME_FIELD_HEIGHT);
+        this.activeGroupRenameField.setVisible(true);
+    }
+
+    private GroupRenameFieldLayout getGroupRenameFieldLayout(PatternContainerGroup group, int visibleRow,
+                                                             boolean absolute) {
+        int entries = this.byGroup.get(group).size();
+        String countText = entries > 1 ? " (" + entries + ")" : "";
+        int countWidth = this.fontRenderer.getStringWidth(countText);
+        int x = GUI_PADDING_X + PATTERN_PROVIDER_NAME_MARGIN_X + GROUP_RENAME_FIELD_X_OFFSET;
+        int y = GUI_HEADER_HEIGHT + visibleRow * ROW_HEIGHT + GROUP_RENAME_FIELD_Y_OFFSET;
+        if (absolute) {
+            x += this.guiLeft;
+            y += this.guiTop;
+        }
+        return new GroupRenameFieldLayout(x, y, Math.max(24, TEXT_MAX_WIDTH - 18 - countWidth));
+    }
+
+    private Rectangle getGroupRenameFieldBounds(PatternContainerGroup group, int visibleRow) {
+        GroupRenameFieldLayout layout = getGroupRenameFieldLayout(group, visibleRow, true);
+        return new Rectangle(
+            layout.x() - 2,
+            layout.y() - 2,
+            layout.width() + 4 + this.fontRenderer.getStringWidth("_"),
+            GROUP_RENAME_FIELD_HEIGHT + 4);
+    }
+
+    private void finishActiveGroupRename(boolean apply) {
+        if (this.activeGroupRenameField == null || this.activeRenameGroup == null) {
+            return;
+        }
+
+        String newName = this.activeGroupRenameField.getText();
+        boolean changed = !Objects.equals(newName, this.activeGroupRenameOriginalName);
+        if (apply && changed) {
+            this.container.renamePatternGroup(getEditableGroupServerIds(this.activeRenameGroup), newName);
+        }
+
+        this.activeGroupRenameField.setFocused(false);
+        this.activeGroupRenameField.setVisible(false);
+        this.activeGroupRenameField = null;
+        this.activeRenameGroup = null;
+        this.activeGroupRenameOriginalName = "";
+    }
+
+    private void openRenameField(PatternContainerEntry entry) {
+        if (this.activeRenameField != null && this.activeRenameContainerId == entry.getServerId()) {
+            this.activeRenameField.setFocused(true);
+            this.activeRenameField.selectAll();
+            return;
+        }
+
+        finishActiveGroupRename(true);
+        finishActiveRename(true);
+
+        this.activeRenameContainerId = entry.getServerId();
+        this.activeRenameOriginalName = entry.getGroup().name().getFormattedText();
+        ConfirmableTextField field = new ConfirmableTextField(this.style, this.fontRenderer, 0, 0, 0, 0);
+        field.setMaxStringLength(32);
+        field.setOnConfirm(() -> {
+            field.setFocused(false);
+            finishActiveRename(true);
+        });
+        this.activeRenameField = field;
+        refreshVisiblePatternSlots();
+        field.setText(this.activeRenameOriginalName);
+        field.setVisible(true);
+        field.setFocused(true);
+        field.selectAll();
+    }
+
+    private void moveActiveRenameField(int visibleRow) {
+        if (this.activeRenameField == null) {
+            return;
+        }
+
+        int width = SLOT_SIZE * COLUMNS - 2 * RENAME_FIELD_X_OFFSET;
+        this.activeRenameField.move(
+            this.guiLeft + GUI_PADDING_X + RENAME_FIELD_X_OFFSET,
+            this.guiTop + GUI_HEADER_HEIGHT + visibleRow * ROW_HEIGHT + RENAME_FIELD_Y_OFFSET);
+        this.activeRenameField.resize(width, RENAME_FIELD_HEIGHT);
+        this.activeRenameField.setVisible(true);
+    }
+
+    private void drawActiveRenameField() {
+        if (this.activeRenameField == null || !this.activeRenameField.getVisible()) {
+            return;
+        }
+
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(-this.guiLeft, -this.guiTop, 0.0F);
+        try {
+            this.activeRenameField.drawTextBox();
+        } finally {
+            GlStateManager.popMatrix();
+        }
+    }
+
+    private void drawActiveGroupRenameField() {
+        if (this.activeGroupRenameField == null || !this.activeGroupRenameField.getVisible()) {
+            return;
+        }
+
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(-this.guiLeft, -this.guiTop, 0.0F);
+        try {
+            this.activeGroupRenameField.drawTextBox();
+        } finally {
+            GlStateManager.popMatrix();
+        }
+    }
+
+    private void finishActiveRename(boolean apply) {
+        if (this.activeRenameField == null) {
+            return;
+        }
+
+        String newName = this.activeRenameField.getText();
+        boolean changed = !Objects.equals(newName, this.activeRenameOriginalName);
+        if (apply && changed) {
+            this.container.renamePatternProvider(this.activeRenameContainerId, newName);
+        }
+
+        this.activeRenameField.setFocused(false);
+        this.activeRenameField.setVisible(false);
+        this.activeRenameField = null;
+        this.activeRenameContainerId = Long.MIN_VALUE;
+        this.activeRenameOriginalName = "";
+    }
+
+    private record GroupRenameFieldLayout(int x, int y, int width) {
     }
 
     private final class ProviderHighlightButton extends GuiButton implements ITooltip {
@@ -998,17 +1378,19 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             this.hovered = mouseX >= this.x && mouseY >= this.y && mouseX < this.x + this.width
                 && mouseY < this.y + this.height;
 
-            minecraft.getTextureManager().bindTexture(EAE_NICONS_TEXTURE);
-            GlStateManager.color(1.0F, 1.0F, 1.0F, this.enabled ? 1.0F : 0.5F);
-            Gui.drawModalRectWithCustomSizedTexture(this.x, this.y, 48, 32, this.width, this.height, 64, 64);
+            var blitter = Icon.PATTERN_PROVIDER_HIGHLIGHT.getBlitter().copy();
+            if (!this.enabled) {
+                blitter.opacity(0.5f);
+            }
+            blitter.dest(this.x, this.y).blit();
         }
 
         @Override
         public List<ITextComponent> getTooltipMessage() {
             String dimensionName = CraftingSupplierLocator.getDimensionName(this.info.dimensionId());
             return List.of(
-                new TextComponentTranslation("gui.ae2.PatternAccessTerminalHighlightProvider"),
-                new TextComponentTranslation("gui.ae2.PatternAccessTerminalOpenProvider"),
+                GuiText.PatternAccessTerminalHighlightProvider.text(),
+                GuiText.PatternAccessTerminalOpenProvider.text(),
                 new TextComponentString(this.info.pos().getX() + " " + this.info.pos().getY() + " "
                     + this.info.pos().getZ() + " (" + dimensionName + ")"));
         }
@@ -1024,25 +1406,21 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         }
     }
 
-    private final class SearchModeButton extends GuiButton implements ITooltip {
-        private final Runnable onPress;
+    private final class RenameProviderButton extends GuiButton implements ITooltip {
+        private final PatternContainerEntry entry;
 
-        SearchModeButton(Runnable onPress) {
-            super(0, 0, 0, 12, 12, "");
-            this.onPress = onPress;
+        RenameProviderButton(PatternContainerEntry entry) {
+            super(0, 0, 0, ROW_ACTION_BUTTON_WIDTH, ROW_ACTION_BUTTON_HEIGHT, "");
+            this.entry = entry;
         }
 
         @Override
-        public void mouseReleased(int mouseX, int mouseY) {
-            super.mouseReleased(mouseX, mouseY);
-            boolean releasedInside = this.enabled && this.visible
-                && mouseX >= this.x
-                && mouseY >= this.y
-                && mouseX < this.x + this.width
-                && mouseY < this.y + this.height;
-            if (releasedInside) {
-                this.onPress.run();
+        public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
+            if (super.mousePressed(minecraft, mouseX, mouseY)) {
+                openRenameField(this.entry);
+                return true;
             }
+            return false;
         }
 
         @Override
@@ -1054,43 +1432,18 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             this.hovered = mouseX >= this.x && mouseY >= this.y && mouseX < this.x + this.width
                 && mouseY < this.y + this.height;
 
-            minecraft.getTextureManager().bindTexture(EAE_NICONS_TEXTURE);
-            GlStateManager.color(1.0F, 1.0F, 1.0F, this.enabled ? 1.0F : 0.5F);
-            int yOffset = this.hovered ? 1 : 0;
-            Gui.drawModalRectWithCustomSizedTexture(this.x, this.y + yOffset, getBackgroundU(), 16,
-                this.width, this.height, 64, 64);
-            Gui.drawModalRectWithCustomSizedTexture(this.x, this.y + yOffset, getIconU(), getIconV(),
-                this.width, this.height, 64, 64);
-        }
-
-        private int getBackgroundU() {
-            if (this.hovered) {
-                return 40;
+            var blitter = Icon.PATTERN_PROVIDER_RENAME.getBlitter().copy();
+            if (!this.enabled) {
+                blitter.opacity(0.5f);
             }
-            return 16;
-        }
-
-        private int getIconU() {
-            return switch (GuiPatternAccessTerm.this.searchMode) {
-                case OUT -> 16;
-                case IN -> 0;
-                case IN_OUT -> 32;
-            };
-        }
-
-        private int getIconV() {
-            return 48;
-        }
-
-        void updateLabel() {
-            // The visible state is derived from searchMode in drawButton.
+            blitter.dest(this.x, this.y).blit();
         }
 
         @Override
         public List<ITextComponent> getTooltipMessage() {
             return List.of(
-                new TextComponentTranslation("gui.ae2.PatternAccessTerminalSearchMode"),
-                GuiPatternAccessTerm.this.searchMode.title());
+                GuiText.PatternAccessTerminalRenameProvider.text(),
+                GuiText.PatternAccessTerminalRenameProviderHint.text());
         }
 
         @Override
@@ -1126,4 +1479,3 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         }
     }
 }
-
