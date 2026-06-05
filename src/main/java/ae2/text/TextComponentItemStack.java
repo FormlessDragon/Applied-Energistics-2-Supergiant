@@ -180,6 +180,9 @@ public class TextComponentItemStack implements ICustomTextComponent {
     private ITextComponent resolve() {
         var i = new TextComponentString(itemStack.getDisplayName());
         i.setStyle(this.style);
+        for (ITextComponent sibling : this.siblings) {
+            i.appendSibling(sibling.createCopy());
+        }
         return i;
     }
 
