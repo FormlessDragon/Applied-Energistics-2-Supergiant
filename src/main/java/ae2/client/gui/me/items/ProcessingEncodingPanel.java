@@ -23,6 +23,7 @@ import java.util.List;
 
 public class ProcessingEncodingPanel extends EncodingModePanel {
     private static final Blitter BG = Blitter.texture("guis/pattern_modes.png").src(0, 70, 124, 66);
+    private static final Rectangle MOUSE_WHEEL_AREA = new Rectangle(-1, 1, 124, 66);
 
     private final ActionButton clearBtn;
     private final ActionButton cycleOutputBtn;
@@ -92,7 +93,23 @@ public class ProcessingEncodingPanel extends EncodingModePanel {
 
     @Override
     public boolean onMouseWheel(Point mousePos, double delta) {
+        if (!getMouseWheelArea().contains(mousePos.x(), mousePos.y())) {
+            return false;
+        }
         return this.scrollbar.onMouseWheel(mousePos, delta);
+    }
+
+    @Override
+    public boolean wantsAllMouseWheelEvents() {
+        return true;
+    }
+
+    private Rectangle getMouseWheelArea() {
+        return new Rectangle(
+            this.position.x() + MOUSE_WHEEL_AREA.x,
+            this.position.y() + MOUSE_WHEEL_AREA.y,
+            MOUSE_WHEEL_AREA.width,
+            MOUSE_WHEEL_AREA.height);
     }
 
     private void updateTooltipVisibility() {
