@@ -546,10 +546,6 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         }
 
         ObjectList<GenericStack> results = new ObjectArrayList<>();
-        ItemStack animationOutput = ItemStack.EMPTY;
-        if (this.currentMainOutput != null && this.currentMainOutput.what() instanceof AEItemKey itemKey) {
-            animationOutput = itemKey.toStack((int) Math.min(this.currentMainOutput.amount(), Integer.MAX_VALUE));
-        }
         for (GenericStack cachedOutput : this.cachedOutputs) {
             results.add(cachedOutput);
         }
@@ -564,10 +560,9 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
             this.outputBuffer.insert(result.what(), result.amount(), Actionable.MODULATE, this.actionSource);
         }
 
-        AEItemKey item = AEItemKey.of(animationOutput);
-        if (item != null && this.world != null) {
+        if (this.currentMainOutput != null && this.world != null) {
             InitNetwork.sendToAllNearExcept(null, this.pos.getX(), this.pos.getY(), this.pos.getZ(), 32,
-                this.world, new AssemblerAnimationPacket(this.pos, (byte) speed, item));
+                this.world, new AssemblerAnimationPacket(this.pos, (byte) speed, this.currentMainOutput.what()));
         }
         this.injectOutputBuffer();
         return true;

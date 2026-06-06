@@ -414,7 +414,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
         GenericStack genericStack = GenericStack.unwrapItemStack(displayStack);
         if (genericStack != null) {
-            drawKeyTooltipWithImages(mouseX, mouseY, genericStack.what(), AEKeyRendering.getTooltip(genericStack.what()));
+            drawKeyTooltipWithImages(mouseX, mouseY, genericStack.what(), getGenericStackTooltip(genericStack));
             return true;
         }
 
@@ -455,7 +455,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
         GenericStack genericStack = hei.ingredientToStack(ingredient);
         if (genericStack != null) {
-            drawKeyTooltipWithImages(mouseX, mouseY, genericStack.what(), AEKeyRendering.getTooltip(genericStack.what()));
+            drawKeyTooltipWithImages(mouseX, mouseY, genericStack.what(), getGenericStackTooltip(genericStack));
             return true;
         }
 
@@ -523,6 +523,14 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
     private void drawTooltip(int mouseX, int mouseY, List<ITextComponent> tooltip) {
         drawTooltipLines(mouseX, mouseY, tooltip.stream().map(ITextComponent::getFormattedText).collect(Collectors.toList()));
+    }
+
+    private List<ITextComponent> getGenericStackTooltip(GenericStack stack) {
+        List<ITextComponent> tooltip = new ObjectArrayList<>(AEKeyRendering.getTooltip(stack.what()));
+        if (stack.amount() > 1 || Tooltips.shouldShowAmountTooltip(stack.what(), stack.amount())) {
+            tooltip.add(Tooltips.getAmountTooltip(ButtonToolTips.Amount, stack));
+        }
+        return tooltip;
     }
 
     protected final void drawKeyTooltipWithImages(int mouseX, int mouseY, AEKey what, List<ITextComponent> tooltip) {
@@ -763,29 +771,14 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         renderAppEngSlotAmount(slot, appEngSlot, rawStack);
     }
 
-    private void renderAppEngSlotAmount(Slot slot, AppEngSlot appEngSlot, ItemStack rawStack) {
-        ItemStack displayStack = appEngSlot.getDisplayStack();
-        if (displayStack.isEmpty()) {
-            return;
-        }
-
-        if (this.dragSplitting && this.dragSplittingSlots.contains(slot) && this.dragSplittingSlots.size() > 1) {
-            return;
-        }
-
-        GenericStack genericStack = GenericStack.unwrapItemStack(rawStack);
-        String amountText;
-        if (genericStack != null) {
-            amountText = genericStack.what().formatAmount(genericStack.amount(), AmountFormat.SLOT);
-        } else {
-            int count = rawStack.getCount();
-            if (count <= 1) {
-                return;
-            }
-            amountText = Integer.toString(count);
-        }
-
-        StackSizeRenderer.renderSizeLabel(this.fontRenderer, slot.xPos, slot.yPos, amountText, false);
+    private static void restoreStateForVanillaItemRender() {
+        GlStateManager.colorMask(true, true, true, true);
+        GlStateManager.enableTexture2D();
+        GlStateManager.enableDepth();
+        GlStateManager.enableLighting();
+        GlStateManager.depthMask(true);
+        GlStateManager.depthFunc(GL11.GL_LEQUAL);
+        RenderHelper.enableGUIStandardItemLighting();
     }
 
     @Override
@@ -850,6 +843,34 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         return super.checkHotbarKeys(keyCode);
     }
 
+    private void renderAppEngSlotAmount(Slot slot, AppEngSlot appEngSlot, ItemStack rawStack) {
+        ItemStack displayStack = appEngSlot.getDisplayStack();
+        if (displayStack.isEmpty()) {
+            return;
+        }
+
+        if (this.dragSplitting && this.dragSplittingSlots.contains(slot) && this.dragSplittingSlots.size() > 1) {
+            return;
+        }
+
+        GenericStack genericStack = GenericStack.unwrapItemStack(rawStack);
+        String amountText;
+        if (genericStack != null) {
+            if (genericStack.amount() <= 1) {
+                return;
+            }
+            amountText = genericStack.what().formatAmount(genericStack.amount(), AmountFormat.SLOT);
+        } else {
+            int count = rawStack.getCount();
+            if (count <= 1) {
+                return;
+            }
+            amountText = Integer.toString(count);
+        }
+
+        StackSizeRenderer.renderSizeLabel(this.fontRenderer, slot.xPos, slot.yPos, amountText, false);
+    }
+
     @Override
     protected final void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
         widgets.drawForegroundLayer(getBounds(false), getMousePoint(mouseX, mouseY));
@@ -870,6 +891,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             GlStateManager.popMatrix();
         }
 
+        restoreStateForVanillaItemRender();
         if (!this.playerInventory.getItemStack().isEmpty()) {
             GlStateManager.depthMask(true);
             GlStateManager.depthFunc(GL11.GL_LEQUAL);

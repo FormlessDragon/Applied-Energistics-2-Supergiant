@@ -47,9 +47,14 @@ import net.minecraft.util.text.TextFormatting;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.Rectangle;
+import java.util.function.IntSupplier;
 
 public class CPUSelectionList implements ICompositeWidget {
-    private static final int ROWS = 6;
+    private static final int HEADER_HEIGHT = 19;
+    private static final int FOOTER_HEIGHT = 7;
+    private static final int SCROLLBAR_X = 77;
+    private static final int SCROLLBAR_WIDTH = 17;
+    private static final int CONTENT_WIDTH = SCROLLBAR_X;
     private static final float SMALL_TEXT_SCALE = 0.666f;
     private static final float MODE_BUTTON_SCALE = 0.5f;
     private static final int MODE_BUTTON_X = 55;
@@ -64,11 +69,18 @@ public class CPUSelectionList implements ICompositeWidget {
     private final Color textColor;
     private final int selectedColor;
     private final Scrollbar scrollbar;
+    private final IntSupplier visibleRowsSupplier;
     private Rectangle bounds = new Rectangle(0, 0, 0, 0);
 
     public CPUSelectionList(ContainerCraftingStatus container, Scrollbar scrollbar, GuiStyle style) {
+        this(container, scrollbar, style, () -> 6);
+    }
+
+    public CPUSelectionList(ContainerCraftingStatus container, Scrollbar scrollbar, GuiStyle style,
+                            IntSupplier visibleRowsSupplier) {
         this.container = container;
         this.scrollbar = scrollbar;
+        this.visibleRowsSupplier = visibleRowsSupplier;
         this.background = style.getImage("cpuList");
         this.buttonBg = style.getImage("cpuListButton");
         this.buttonBgSelected = style.getImage("cpuListButtonSelected");
@@ -221,8 +233,11 @@ public class CPUSelectionList implements ICompositeWidget {
 
     @Override
     public void updateBeforeRender() {
-        int hiddenRows = Math.max(0, container.cpuList.cpus().size() - ROWS);
-        scrollbar.setRange(0, hiddenRows, Math.max(1, ROWS / 3));
+        int rows = getVisibleRows();
+        this.bounds.height = HEADER_HEIGHT + rows * getButtonRowHeight() + FOOTER_HEIGHT;
+        this.scrollbar.setHeight(Math.max(1, rows * getButtonRowHeight() - 1));
+        int hiddenRows = Math.max(0, container.cpuList.cpus().size() - rows);
+        scrollbar.setRange(0, hiddenRows, Math.max(1, rows / 3));
     }
 
     @Override
@@ -230,14 +245,14 @@ public class CPUSelectionList implements ICompositeWidget {
         int x = screenBounds.x + this.bounds.x;
 
         int y = screenBounds.y + this.bounds.y;
-        background.dest(x, y, this.bounds.width, this.bounds.height).blit();
+        drawBackground(x, y);
 
         x += 8;
         y += 19;
 
         var cpus = container.cpuList.cpus().subList(
             MathHelper.clamp(scrollbar.getCurrentScroll(), 0, container.cpuList.cpus().size()),
-            MathHelper.clamp(scrollbar.getCurrentScroll() + ROWS, 0, container.cpuList.cpus().size()));
+            MathHelper.clamp(scrollbar.getCurrentScroll() + getVisibleRows(), 0, container.cpuList.cpus().size()));
         var hoveredModeButtonCpu = hitTestModeButton(mouse);
         for (var cpu : cpus) {
             if (cpu.serial() == container.getSelectedCpuSerial()) {
@@ -280,7 +295,7 @@ public class CPUSelectionList implements ICompositeWidget {
                     hoveredModeButtonCpu != null && hoveredModeButtonCpu.serial() == cpu.serial());
             }
 
-            y += buttonBg.getSrcHeight() + 1;
+            y += getButtonRowHeight();
         }
     }
 
@@ -292,9 +307,9 @@ public class CPUSelectionList implements ICompositeWidget {
         }
 
         int relY = mousePos.y() - bounds.y - 19;
-        int buttonHeight = buttonBg.getSrcHeight() + 1;
+        int buttonHeight = getButtonRowHeight();
         int buttonIdx = scrollbar.getCurrentScroll() + relY / buttonHeight;
-        if (relY < 0 || relY % buttonHeight == buttonBg.getSrcHeight()) {
+        if (relY < 0 || relY >= getVisibleRows() * buttonHeight || relY % buttonHeight == buttonBg.getSrcHeight()) {
             return null;
         }
 
@@ -315,7 +330,7 @@ public class CPUSelectionList implements ICompositeWidget {
         int relX = mousePos.x() - bounds.x - 8;
 
         int relY = mousePos.y() - bounds.y - 19;
-        int buttonHeight = buttonBg.getSrcHeight() + 1;
+        int buttonHeight = getButtonRowHeight();
         int rowY = relY % buttonHeight;
 
         if (relX < MODE_BUTTON_X || relX >= MODE_BUTTON_X + MODE_BUTTON_SIZE) {
@@ -358,6 +373,74 @@ public class CPUSelectionList implements ICompositeWidget {
     }
 
     private ITextComponent getCpuName(ContainerCraftingStatus.CraftingCpuListEntry cpu) {
-        return cpu.name() != null ? cpu.name() : GuiText.CPUs.text().appendText(" #" + cpu.serial());
+        return cpu.name() != null ? cpu.name() : GuiText.CpuFallbackName.text(cpu.serial());
+    }
+
+    private int getVisibleRows() {
+        return Math.max(1, visibleRowsSupplier.getAsInt());
+    }
+
+    private int getButtonRowHeight() {
+        return buttonBg.getSrcHeight() + 1;
+    }
+
+    private void drawBackground(int x, int y) {
+        background.copy()
+                  .src(0, 0, CONTENT_WIDTH, HEADER_HEIGHT)
+                  .dest(x, y)
+                  .blit();
+        drawScrollbarBackground(x + SCROLLBAR_X, y, getVisibleRows());
+
+        int rowY = y + HEADER_HEIGHT;
+        int rows = getVisibleRows();
+        int rowHeight = getButtonRowHeight();
+        int middleRowSourceY = HEADER_HEIGHT + rowHeight;
+        int lastRowSourceY = background.getSrcHeight() - FOOTER_HEIGHT - rowHeight;
+        for (int row = 0; row < rows; row++) {
+            int sourceY;
+            if (row == 0) {
+                sourceY = HEADER_HEIGHT;
+            } else if (row == rows - 1) {
+                sourceY = lastRowSourceY;
+            } else {
+                sourceY = middleRowSourceY;
+            }
+            background.copy()
+                      .src(0, sourceY, CONTENT_WIDTH, rowHeight)
+                      .dest(x, rowY)
+                      .blit();
+            rowY += rowHeight;
+        }
+
+        background.copy()
+                  .src(0, background.getSrcHeight() - FOOTER_HEIGHT, CONTENT_WIDTH, FOOTER_HEIGHT)
+                  .dest(x, rowY)
+                  .blit();
+        background.copy()
+                  .src(SCROLLBAR_X, background.getSrcHeight() - FOOTER_HEIGHT, SCROLLBAR_WIDTH, FOOTER_HEIGHT)
+                  .dest(x + SCROLLBAR_X, rowY)
+                  .blit();
+    }
+
+    private void drawScrollbarBackground(int x, int y, int rows) {
+        background.copy()
+                  .src(SCROLLBAR_X, 0, SCROLLBAR_WIDTH, HEADER_HEIGHT)
+                  .dest(x, y)
+                  .blit();
+
+        int rowY = y + HEADER_HEIGHT;
+        int rowHeight = getButtonRowHeight();
+        for (int row = 0; row < rows; row++) {
+            background.copy()
+                      .src(SCROLLBAR_X, HEADER_HEIGHT + rowHeight, SCROLLBAR_WIDTH, rowHeight)
+                      .dest(x, rowY)
+                      .blit();
+            rowY += rowHeight;
+        }
+
+        background.copy()
+                  .src(SCROLLBAR_X, background.getSrcHeight() - FOOTER_HEIGHT - 1, SCROLLBAR_WIDTH, 1)
+                  .dest(x, rowY - 1)
+                  .blit();
     }
 }

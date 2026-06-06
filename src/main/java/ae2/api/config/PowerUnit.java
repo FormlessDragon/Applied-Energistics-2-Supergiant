@@ -23,10 +23,10 @@
 
 package ae2.api.config;
 
+import ae2.core.localization.LocalizationEnum;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
 
-public enum PowerUnit {
+public enum PowerUnit implements LocalizationEnum {
     AE("gui.ae2.units.appliedenergistics", "AE"), // Native Units - AE Energy
     FE("gui.ae2.units.fe", "FE"); // Forge Energy
 
@@ -65,11 +65,16 @@ public enum PowerUnit {
     }
 
     public ITextComponent textComponent() {
-        return new TextComponentTranslation(unlocalizedName);
+        return text();
     }
 
     public String getSymbolName() {
         return symbolName;
+    }
+
+    @Override
+    public String getTranslationKey() {
+        return this.unlocalizedName;
     }
 
 }

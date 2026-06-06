@@ -19,7 +19,9 @@
 package ae2.core;
 
 import ae2.api.config.CondenserOutput;
+import ae2.api.config.CraftingPlanSortMode;
 import ae2.api.config.PowerUnit;
+import ae2.api.config.SortDir;
 import ae2.api.config.TerminalStyle;
 import ae2.api.networking.pathing.ChannelMode;
 import ae2.api.stacks.AEFluidKey;
@@ -340,6 +342,25 @@ public class AEConfig {
 
     public void setTerminalStyle(TerminalStyle terminalStyle) {
         TERMINALS.terminalStyle = terminalStyle == null ? TerminalStyle.SMALL : terminalStyle;
+        this.save();
+    }
+
+    public CraftingPlanSortMode getCraftingPlanSortMode() {
+        return TERMINALS.craftingPlanSortMode == null ? CraftingPlanSortMode.AVAILABILITY
+            : TERMINALS.craftingPlanSortMode;
+    }
+
+    public void setCraftingPlanSortMode(CraftingPlanSortMode sortMode) {
+        TERMINALS.craftingPlanSortMode = sortMode == null ? CraftingPlanSortMode.AVAILABILITY : sortMode;
+        this.save();
+    }
+
+    public SortDir getCraftingPlanSortDirection() {
+        return TERMINALS.craftingPlanSortDirection == null ? SortDir.ASCENDING : TERMINALS.craftingPlanSortDirection;
+    }
+
+    public void setCraftingPlanSortDirection(SortDir sortDirection) {
+        TERMINALS.craftingPlanSortDirection = sortDirection == null ? SortDir.ASCENDING : sortDirection;
         this.save();
     }
 
@@ -742,6 +763,12 @@ public class AEConfig {
         @Config.Name("terminalStyle")
         @Config.Comment("Size of ME terminal GUIs.")
         public TerminalStyle terminalStyle = TerminalStyle.SMALL;
+        @Config.Name("craftingPlanSortMode")
+        @Config.Comment("Sort mode used by the crafting plan GUI.")
+        public CraftingPlanSortMode craftingPlanSortMode = CraftingPlanSortMode.AVAILABILITY;
+        @Config.Name("craftingPlanSortDirection")
+        @Config.Comment("Sort direction used by the crafting plan GUI.")
+        public SortDir craftingPlanSortDirection = SortDir.ASCENDING;
     }
 
     public static final class Search {

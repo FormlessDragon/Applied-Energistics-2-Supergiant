@@ -8,21 +8,23 @@ import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.orientation.BlockOrientation;
 import ae2.api.orientation.IOrientationStrategy;
 import ae2.core.definitions.AEItems;
+import ae2.core.localization.Side;
 import ae2.integration.modules.theoneprobe.TopText;
 import ae2.me.InWorldGridNode;
 import ae2.me.helpers.IGridConnectedTile;
 import ae2.me.service.TickManagerService;
 import ae2.parts.AEBasePart;
 import ae2.util.Platform;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
@@ -69,7 +71,7 @@ public final class DebugProvider {
     public static void providePartData(EntityPlayer player, AEBasePart part, NBTTagCompound serverData) {
         if (DebugProvider.isVisible(player)) {
             DebugProvider.addServerDataMainNode(serverData, part.getMainNode());
-            DebugProvider.addServerDataNode(serverData, TopText.debug_external_node.getLocal(),
+            DebugProvider.addServerDataNode(serverData, TopText.debug_external_node,
                 part.getExternalFacingNode());
         }
     }
@@ -80,9 +82,9 @@ public final class DebugProvider {
         if (!strategy.getProperties().isEmpty()) {
             var orientation = BlockOrientation.get(strategy, blockState);
             tooltip.addLine(new TextComponentString("")
-                .appendSibling(styled(TopText.debug_forward.getLocal() + ": ", TextFormatting.WHITE))
-                .appendSibling(new TextComponentString(orientation.getSide(ae2.api.orientation.RelativeSide.FRONT).name()))
-                .appendSibling(styled(" " + TopText.debug_spin.getLocal() + ": ", TextFormatting.WHITE))
+                .appendSibling(label(TopText.debug_forward.text(), TextFormatting.WHITE))
+                .appendSibling(localizeSide(orientation.getSide(ae2.api.orientation.RelativeSide.FRONT)))
+                .appendSibling(spaceLabel(TopText.debug_spin.text(), TextFormatting.WHITE))
                 .appendSibling(new TextComponentString(String.valueOf(orientation.getSpin()))));
         }
     }
@@ -93,8 +95,8 @@ public final class DebugProvider {
         for (int i = 0; i < nodes.tagCount(); i++) {
             var nodeCompound = nodes.getCompoundTagAt(i);
             if (nodes.tagCount() > 1) {
-                var nodeName = nodeCompound.getString(TAG_NODE_NAME);
-                tooltip.addLine(styled(nodeName, TextFormatting.ITALIC));
+                var nodeNameKey = nodeCompound.getString(TAG_NODE_NAME);
+                tooltip.addLine(styled(new TextComponentTranslation(nodeNameKey), TextFormatting.ITALIC));
             }
             addNodeToTooltip(nodeCompound, tooltip);
         }
@@ -109,44 +111,46 @@ public final class DebugProvider {
                 var sum = tickTimes[2];
 
                 tooltip.addLine(new TextComponentString("")
-                    .appendSibling(styled(TopText.debug_tick_time.getLocal() + ": ", TextFormatting.WHITE))
-                    .appendSibling(styled(TopText.debug_avg.getLocal() + ": ", TextFormatting.ITALIC))
+                    .appendSibling(label(TopText.debug_tick_time.text(), TextFormatting.WHITE))
+                    .appendSibling(label(TopText.debug_avg.text(), TextFormatting.ITALIC))
                     .appendSibling(styled(Platform.formatTimeMeasurement(avg), TextFormatting.WHITE))
-                    .appendSibling(styled(" " + TopText.debug_max.getLocal() + ": ", TextFormatting.ITALIC))
+                    .appendSibling(spaceLabel(TopText.debug_max.text(), TextFormatting.ITALIC))
                     .appendSibling(styled(Platform.formatTimeMeasurement(max), TextFormatting.WHITE))
-                    .appendSibling(styled(" " + TopText.debug_sum.getLocal() + ": ", TextFormatting.ITALIC))
+                    .appendSibling(spaceLabel(TopText.debug_sum.text(), TextFormatting.ITALIC))
                     .appendSibling(styled(Platform.formatTimeMeasurement(sum), TextFormatting.WHITE)));
             }
         }
 
         if (tag.hasKey(TAG_TICK_QUEUED)) {
-            var status = new ObjectArrayList<String>();
+            ITextComponent status = new TextComponentString("");
             if (tag.getBoolean(TAG_TICK_SLEEPING)) {
-                status.add(TopText.debug_sleeping.getLocal());
+                appendStatus(status, TopText.debug_sleeping.text());
             }
             if (tag.getBoolean(TAG_TICK_ALERTABLE)) {
-                status.add(TopText.debug_alertable.getLocal());
+                appendStatus(status, TopText.debug_alertable.text());
             }
             if (tag.getBoolean(TAG_TICK_AWAKE)) {
-                status.add(TopText.debug_awake.getLocal());
+                appendStatus(status, TopText.debug_awake.text());
             }
             if (tag.getBoolean(TAG_TICK_QUEUED)) {
-                status.add(TopText.debug_queued.getLocal());
+                appendStatus(status, TopText.debug_queued.text());
             }
 
             tooltip.addLine(new TextComponentString("")
-                .appendSibling(styled(TopText.debug_tick_status.getLocal() + ": ", TextFormatting.WHITE))
-                .appendText(String.join(", ", status)));
+                .appendSibling(label(TopText.debug_tick_status.text(), TextFormatting.WHITE))
+                .appendSibling(status));
             tooltip.addLine(new TextComponentString("")
-                .appendSibling(styled(TopText.debug_tick_rate.getLocal() + ": ", TextFormatting.WHITE))
+                .appendSibling(label(TopText.debug_tick_rate.text(), TextFormatting.WHITE))
                 .appendText(String.valueOf(tag.getInteger(TAG_TICK_CURRENT_RATE)))
-                .appendSibling(styled(" " + TopText.debug_last.getLocal() + ": ", TextFormatting.WHITE))
-                .appendText(tag.getLong(TAG_TICK_LAST_TICK) + " " + TopText.debug_ticks_ago.getLocal()));
+                .appendSibling(spaceLabel(TopText.debug_last.text(), TextFormatting.WHITE))
+                .appendText(String.valueOf(tag.getLong(TAG_TICK_LAST_TICK)))
+                .appendText(" ")
+                .appendSibling(TopText.debug_ticks_ago.text()));
         }
 
         if (tag.hasKey(TAG_NODE_EXPOSED, Constants.NBT.TAG_INT)) {
             var exposedSides = tag.getInteger(TAG_NODE_EXPOSED);
-            var line = styled(TopText.debug_node_exposed.getLocal() + ": ", TextFormatting.WHITE);
+            var line = label(TopText.debug_node_exposed.text(), TextFormatting.WHITE);
             for (EnumFacing value : EnumFacing.values()) {
                 var sideText = new TextComponentString(value.name().substring(0, 1));
                 sideText.setStyle(new Style()
@@ -159,10 +163,10 @@ public final class DebugProvider {
     }
 
     private static void addServerDataMainNode(NBTTagCompound tag, IManagedGridNode managedGridNode) {
-        addServerDataNode(tag, TopText.debug_main_node.getLocal(), managedGridNode.getNode());
+        addServerDataNode(tag, TopText.debug_main_node, managedGridNode.getNode());
     }
 
-    private static void addServerDataNode(NBTTagCompound tag, String name, @Nullable IGridNode node) {
+    private static void addServerDataNode(NBTTagCompound tag, TopText name, @Nullable IGridNode node) {
         var nodeTag = toServerData(node, name);
         if (nodeTag != null) {
             NBTTagList nodes;
@@ -177,13 +181,13 @@ public final class DebugProvider {
     }
 
     @Nullable
-    private static NBTTagCompound toServerData(@Nullable IGridNode node, String name) {
+    private static NBTTagCompound toServerData(@Nullable IGridNode node, TopText name) {
         if (node == null) {
             return null;
         }
 
         NBTTagCompound tag = new NBTTagCompound();
-        tag.setString(TAG_NODE_NAME, name);
+        tag.setString(TAG_NODE_NAME, name.getTranslationKey());
 
         if (node.getService(IGridTickable.class) != null) {
             var tickManager = (TickManagerService) node.grid().getTickManager();
@@ -228,6 +232,38 @@ public final class DebugProvider {
         TextComponentString component = new TextComponentString(text);
         component.setStyle(new Style().setColor(formatting));
         return component;
+    }
+
+    private static ITextComponent styled(ITextComponent component, TextFormatting formatting) {
+        component.setStyle(new Style().setColor(formatting));
+        return component;
+    }
+
+    private static void appendStatus(ITextComponent line, ITextComponent status) {
+        if (!line.getSiblings().isEmpty()) {
+            line.appendSibling(new TextComponentString(", "));
+        }
+        line.appendSibling(status);
+    }
+
+    private static ITextComponent label(ITextComponent text, TextFormatting formatting) {
+        text.appendText(": ");
+        return styled(text, formatting);
+    }
+
+    private static ITextComponent spaceLabel(ITextComponent text, TextFormatting formatting) {
+        return new TextComponentString(" ").appendSibling(label(text, formatting));
+    }
+
+    private static ITextComponent localizeSide(EnumFacing side) {
+        return switch (side) {
+            case NORTH -> Side.North.text();
+            case SOUTH -> Side.South.text();
+            case EAST -> Side.East.text();
+            case WEST -> Side.West.text();
+            case UP -> Side.Up.text();
+            case DOWN -> Side.Down.text();
+        };
     }
 
     private static long[] readLongArray(NBTTagCompound tag) {

@@ -122,17 +122,47 @@ public enum PlayerMessages implements LocalizationEnum {
     DebugCardDelayedInitDetails,
     DebugCardQueuedForReady,
     DebugCardReadyInvoked,
+    DebugCardDivider,
+    DebugCardTimingSummary,
+    DebugCardBoolean,
+    DebugCardMachineCount,
     MeteoriteUnsuitableLocation,
     MeteoriteSpawned,
     CubeGeneratorSpawningIn,
     CubeGeneratorSize,
     CommandRequiresServerWorld,
-    ConfigModifierSuccess;
+    CraftingSupplierLocation,
+    CraftingSupplierLocationInDimension,
+    ConfigModifierSuccess,
+    CraftingSupplierNotFound,
+    ReplicatorCardReplications,
+    ReplicatorCardSourceSet,
+    ReplicatorCardNoGridHost,
+    ReplicatorCardSourceMissingGridBlock,
+    ReplicatorCardRequiresSpatialPylons,
+    ReplicatorCardNoGridNode,
+    ReplicatorCardNoSourceDefined,
+    MeteoriteModeSet,
+    MeteoriteTestSummary,
+    MeteoriteTestNearestSpacing,
+    MeteoriteTestEntry,
+    MeteoriteTestBoolean,
+    ThroughputMonitorRoutine("ThroughputMonitorRoutine"),
+    TickAnalyserBegin("tick_analyser.begin"),
+    TickAnalyserFinish("tick_analyser.finish"),
+    TickAnalyserWaiting("tick_analyser.waiting"),
+    TickAnalyserCancel("tick_analyser.cancel"),
+    TickAnalyserNoCancel("tick_analyser.no_cancel"),
+    TickAnalyserUserControl("tick_analyser.user_control");
 
     private final String translationKey;
 
     PlayerMessages() {
         this.translationKey = "chat.ae2." + name();
+    }
+
+    PlayerMessages(String translationKeySuffix) {
+        this.translationKey = "chat.ae2." + translationKeySuffix;
     }
 
     @Override

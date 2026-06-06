@@ -42,6 +42,10 @@ public final class Settings {
         AccessRestriction.READ, AccessRestriction.WRITE);
     public static final Setting<SortDir> SORT_DIRECTION = register("sort_direction", SortDir.class);
     public static final Setting<SortOrder> SORT_BY = register("sort_by", SortOrder.class);
+    public static final Setting<CraftingPlanSortMode> CRAFTING_PLAN_SORT_MODE = register("crafting_plan_sort_mode",
+        CraftingPlanSortMode.class);
+    public static final Setting<SortDir> CRAFTING_PLAN_SORT_DIRECTION = register("crafting_plan_sort_direction",
+        SortDir.class);
     @SuppressWarnings("unused")
     public static final Setting<YesNo> SEARCH_TOOLTIPS = register("search_tooltips", YesNo.YES, YesNo.NO);
     public static final Setting<ViewItems> VIEW_MODE = register("view_mode", ViewItems.class);

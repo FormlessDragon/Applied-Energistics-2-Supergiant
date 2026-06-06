@@ -3,8 +3,8 @@ package ae2.client.patternimport;
 import ae2.api.client.PatternImportPriority;
 import ae2.api.client.PatternImportPriorityContext;
 import ae2.api.stacks.GenericStack;
+import ae2.core.localization.GuiText;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
 
 import java.util.List;
 
@@ -14,9 +14,12 @@ final class DefaultPatternImportPriorities {
     static final String STORED_ID = "ae2:stored";
 
     private static final List<PatternImportPriority> DEFAULTS = List.of(
-        simple(HEI_BOOKMARKS_ID, "gui.ae2.PatternImportPriorityHeiBookmarks", PatternImportPriorityContext::isBookmarked),
-        simple(CRAFTABLES_ID, "gui.ae2.PatternImportPriorityCraftables", PatternImportPriorityContext::isCraftable),
-        simple(STORED_ID, "gui.ae2.PatternImportPriorityStored", PatternImportPriorityContext::isStored)
+        simple(HEI_BOOKMARKS_ID, GuiText.PatternImportPriorityHeiBookmarks, GuiText.PatternImportPriorityHeiBookmarksDesc,
+            PatternImportPriorityContext::isBookmarked),
+        simple(CRAFTABLES_ID, GuiText.PatternImportPriorityCraftables, GuiText.PatternImportPriorityCraftablesDesc,
+            PatternImportPriorityContext::isCraftable),
+        simple(STORED_ID, GuiText.PatternImportPriorityStored, GuiText.PatternImportPriorityStoredDesc,
+            PatternImportPriorityContext::isStored)
     );
 
     private DefaultPatternImportPriorities() {
@@ -26,7 +29,7 @@ final class DefaultPatternImportPriorities {
         return DEFAULTS;
     }
 
-    private static PatternImportPriority simple(String id, String translationKey, Matcher matcher) {
+    private static PatternImportPriority simple(String id, GuiText label, GuiText description, Matcher matcher) {
         return new PatternImportPriority() {
             @Override
             public String getId() {
@@ -35,14 +38,14 @@ final class DefaultPatternImportPriorities {
 
             @Override
             public ITextComponent getDisplayName() {
-                return new TextComponentTranslation(translationKey);
+                return label.text();
             }
 
             @Override
             public List<ITextComponent> getTooltipMessage() {
                 return List.of(
                     getDisplayName(),
-                    new TextComponentTranslation(translationKey + ".desc")
+                    description.text()
                 );
             }
 

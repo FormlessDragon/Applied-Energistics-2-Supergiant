@@ -31,6 +31,7 @@ import ae2.container.AEBaseContainer;
 import ae2.container.guisync.GuiSync;
 import ae2.container.me.common.IncrementalUpdateHelper;
 import ae2.container.me.crafting.CraftingStatus;
+import ae2.core.localization.PlayerMessages;
 import ae2.core.network.clientbound.CraftingStatusPacket;
 import ae2.core.network.clientbound.CraftingSupplierLocationsPacket;
 import ae2.crafting.execution.CraftingSupplierLocation;
@@ -39,7 +40,6 @@ import ae2.tile.crafting.ICraftingCPUTileEntity;
 import ae2.util.NullConfigManager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -212,7 +212,7 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
 
         List<CraftingSupplierLocation> locations = logic.findSupplierLocations(this.grid, key);
         if (locations.isEmpty()) {
-            player.sendStatusMessage(new TextComponentString("未找到可定位供应器"), true);
+            player.sendStatusMessage(PlayerMessages.CraftingSupplierNotFound.text(), true);
             return;
         }
 

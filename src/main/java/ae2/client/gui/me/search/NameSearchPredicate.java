@@ -1,23 +1,20 @@
 package ae2.client.gui.me.search;
 
 import ae2.api.stacks.AEKey;
-import ae2.container.me.common.GridInventoryEntry;
 
-import java.util.Objects;
+import java.util.Locale;
 import java.util.function.Predicate;
 
-final class NameSearchPredicate implements Predicate<GridInventoryEntry> {
+final class NameSearchPredicate implements Predicate<AEKey> {
     private final String term;
 
     public NameSearchPredicate(String term) {
-        this.term = term.toLowerCase();
+        this.term = term.toLowerCase(Locale.ROOT);
     }
 
     @Override
-    public boolean test(GridInventoryEntry gridInventoryEntry) {
-        AEKey entryInfo = Objects.requireNonNull(gridInventoryEntry.what());
-        String displayName = entryInfo.getDisplayName().getFormattedText();
-        return displayName.toLowerCase().contains(term);
+    public boolean test(AEKey what) {
+        String displayName = what.getDisplayName().getFormattedText();
+        return displayName.toLowerCase(Locale.ROOT).contains(term);
     }
 }
-

@@ -11,12 +11,12 @@ import ae2.container.SlotSemantics;
 import ae2.container.implementations.ContainerInterface;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.ButtonToolTips;
+import ae2.core.localization.GuiText;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 
 import java.util.List;
 
@@ -69,8 +69,7 @@ public class GuiInterface extends GuiUpgradeable<ContainerInterface> {
         this.fuzzyMode.set(container.getFuzzyMode());
         this.fuzzyMode.setVisibility(container.hasUpgrade(AEItems.FUZZY_CARD.item()));
         setTextContent("interface_config",
-            new TextComponentTranslation("gui.ae2.InterfaceConfigPage",
-                new TextComponentString(Integer.toString(container.getCurrentPage() + 1))));
+            GuiText.InterfaceConfigPage.text(new TextComponentString(Integer.toString(container.getCurrentPage() + 1))));
         this.previousPageButton.setVisibility(container.getPageCount() > 1 && container.getCurrentPage() > 0);
         this.nextPageButton.setVisibility(container.getPageCount() > 1
             && container.getCurrentPage() + 1 < container.getPageCount());
@@ -104,8 +103,7 @@ public class GuiInterface extends GuiUpgradeable<ContainerInterface> {
         PageButton(Icon icon, Runnable onPress) {
             super(onPress);
             this.icon = icon;
-            this.setMessage(new TextComponentTranslation(
-                icon == Icon.ARROW_LEFT ? "gui.ae2.InterfacePagePrevious" : "gui.ae2.InterfacePageNext"));
+            this.setMessage((icon == Icon.ARROW_LEFT ? GuiText.InterfacePagePrevious : GuiText.InterfacePageNext).text());
         }
 
         @Override

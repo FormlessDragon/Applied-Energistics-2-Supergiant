@@ -37,7 +37,7 @@ public final class InitUpgrades {
         String interfaceGroup = GuiText.Interface.getTranslationKey();
         String itemIoBusGroup = GuiText.IOBuses.getTranslationKey();
         String patternProviderGroup = GuiText.CraftingInterface.getTranslationKey();
-        String storageBusGroup = "gui.ae2.StorageBus";
+        String storageBusGroup = GuiText.StorageBus.getTranslationKey();
         String storageCellGroup = GuiText.StorageCells.getTranslationKey();
         String portableCellGroup = GuiText.PortableCells.getTranslationKey();
         Upgrades.add(AEItems.FUZZY_CARD.item(), AEItems.VIEW_CELL.item(), 1);

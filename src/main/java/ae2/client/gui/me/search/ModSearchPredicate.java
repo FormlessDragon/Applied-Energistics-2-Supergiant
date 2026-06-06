@@ -1,14 +1,12 @@
 package ae2.client.gui.me.search;
 
 import ae2.api.stacks.AEKey;
-import ae2.container.me.common.GridInventoryEntry;
 import ae2.util.Platform;
 
 import java.util.Locale;
-import java.util.Objects;
 import java.util.function.Predicate;
 
-final class ModSearchPredicate implements Predicate<GridInventoryEntry> {
+final class ModSearchPredicate implements Predicate<AEKey> {
     private final String term;
 
     public ModSearchPredicate(String term) {
@@ -20,9 +18,8 @@ final class ModSearchPredicate implements Predicate<GridInventoryEntry> {
     }
 
     @Override
-    public boolean test(GridInventoryEntry gridInventoryEntry) {
-        AEKey entryInfo = Objects.requireNonNull(gridInventoryEntry.what());
-        String modId = entryInfo.getModId();
+    public boolean test(AEKey what) {
+        String modId = what.getModId();
 
         if (modId != null) {
             if (modId.contains(term)) {
@@ -37,4 +34,3 @@ final class ModSearchPredicate implements Predicate<GridInventoryEntry> {
         return false;
     }
 }
-

@@ -22,6 +22,7 @@ import ae2.api.config.AccessRestriction;
 import ae2.api.config.BlockingMode;
 import ae2.api.config.CondenserOutput;
 import ae2.api.config.CpuSelectionMode;
+import ae2.api.config.CraftingPlanSortMode;
 import ae2.api.config.FormationPlaneMode;
 import ae2.api.config.FullnessMode;
 import ae2.api.config.FuzzyMode;
@@ -152,6 +153,22 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
                 ButtonToolTips.SortBy, ButtonToolTips.InventoryTweaks);
             registerApp(Icon.SORT_BY_MOD, Settings.SORT_BY, SortOrder.MOD,
                 ButtonToolTips.SortBy, ButtonToolTips.Mod);
+
+            registerAppWithoutTitle(Icon.CRAFTING_PLAN_SORT_AVAILABILITY, Settings.CRAFTING_PLAN_SORT_MODE,
+                CraftingPlanSortMode.AVAILABILITY,
+                ButtonToolTips.AvailabilityDescription.text());
+            registerAppWithoutTitle(Icon.CRAFTING_PLAN_SORT_USED_COUNT, Settings.CRAFTING_PLAN_SORT_MODE,
+                CraftingPlanSortMode.USED_COUNT,
+                ButtonToolTips.UsedResourceCountDescription.text());
+            registerAppWithoutTitle(Icon.CRAFTING_PLAN_SORT_USED_PERCENT, Settings.CRAFTING_PLAN_SORT_MODE,
+                CraftingPlanSortMode.USED_PERCENT,
+                ButtonToolTips.UsedResourcePercentDescription.text());
+            registerAppWithoutTitle(Icon.CRAFTING_PLAN_SORT_ASCENDING, Settings.CRAFTING_PLAN_SORT_DIRECTION,
+                SortDir.ASCENDING,
+                ButtonToolTips.SortOrderAscendingDescription.text());
+            registerAppWithoutTitle(Icon.CRAFTING_PLAN_SORT_DESCENDING, Settings.CRAFTING_PLAN_SORT_DIRECTION,
+                SortDir.DESCENDING,
+                ButtonToolTips.SortOrderDescendingDescription.text());
 
             registerApp(Icon.VIEW_MODE_STORED, Settings.VIEW_MODE, ViewItems.STORED,
                 ButtonToolTips.View, ButtonToolTips.StoredItems);
@@ -334,6 +351,14 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
                                                         LocalizationEnum title, ITextComponent... tooltipLines) {
         var lines = new ObjectArrayList<ITextComponent>();
         lines.add(title.text());
+        Collections.addAll(lines, tooltipLines);
+
+        appearances.put(new EnumPair<>(setting, val), new ButtonAppearance(icon, null, lines));
+    }
+
+    private static <T extends Enum<T>> void registerAppWithoutTitle(Icon icon, Setting<T> setting, T val,
+                                                                    ITextComponent... tooltipLines) {
+        var lines = new ObjectArrayList<ITextComponent>();
         Collections.addAll(lines, tooltipLines);
 
         appearances.put(new EnumPair<>(setting, val), new ButtonAppearance(icon, null, lines));

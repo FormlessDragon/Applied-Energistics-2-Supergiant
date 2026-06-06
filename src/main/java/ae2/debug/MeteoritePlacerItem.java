@@ -18,6 +18,7 @@
 
 package ae2.debug;
 
+import ae2.core.localization.GuiText;
 import ae2.core.localization.PlayerMessages;
 import ae2.items.AEBaseItem;
 import ae2.util.InteractionUtil;
@@ -36,7 +37,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
@@ -59,7 +60,7 @@ public class MeteoritePlacerItem extends AEBaseItem {
 
             byte mode = tag.hasKey(MODE_TAG) ? tag.getByte(MODE_TAG) : (byte) CraterType.NORMAL.ordinal();
             tag.setByte(MODE_TAG, (byte) ((mode + 1) % CraterType.values().length));
-            player.sendMessage(new TextComponentString(getCraterType(stack).name()));
+            player.sendMessage(PlayerMessages.MeteoriteModeSet.text(getCraterTypeName(getCraterType(stack))));
             return new ActionResult<>(EnumActionResult.SUCCESS, stack);
         }
 
@@ -111,5 +112,17 @@ public class MeteoritePlacerItem extends AEBaseItem {
         NBTTagCompound tag = stack.getTagCompound();
         return tag == null ? CraterType.values()[CraterType.NORMAL.ordinal()]
             : CraterType.values()[tag.getByte(MODE_TAG)];
+    }
+
+    private ITextComponent getCraterTypeName(CraterType craterType) {
+        return switch (craterType) {
+            case NONE -> GuiText.MeteoriteCraterNone.text();
+            case NORMAL -> GuiText.MeteoriteCraterNormal.text();
+            case LAVA -> GuiText.MeteoriteCraterLava.text();
+            case OBSIDIAN -> GuiText.MeteoriteCraterObsidian.text();
+            case WATER -> GuiText.MeteoriteCraterWater.text();
+            case SNOW -> GuiText.MeteoriteCraterSnow.text();
+            case ICE -> GuiText.MeteoriteCraterIce.text();
+        };
     }
 }

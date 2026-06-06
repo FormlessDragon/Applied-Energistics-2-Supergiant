@@ -83,7 +83,6 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
@@ -1391,8 +1390,11 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             return List.of(
                 GuiText.PatternAccessTerminalHighlightProvider.text(),
                 GuiText.PatternAccessTerminalOpenProvider.text(),
-                new TextComponentString(this.info.pos().getX() + " " + this.info.pos().getY() + " "
-                    + this.info.pos().getZ() + " (" + dimensionName + ")"));
+                GuiText.CraftingTreeLocationInDimension.text(
+                    this.info.pos().getX(),
+                    this.info.pos().getY(),
+                    this.info.pos().getZ(),
+                    dimensionName));
         }
 
         @Override

@@ -3,6 +3,7 @@ package ae2.client.gui.implementations;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AETextField;
 import ae2.container.implementations.ContainerModFilterBus;
+import ae2.core.localization.GuiText;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 
@@ -16,7 +17,7 @@ public class GuiModFilterBus extends GuiSpecialExportBus<ContainerModFilterBus<?
         this.modExpression.setResponder(container::setModExpression);
         this.modExpression.setMaxStringLength(512);
         this.modExpression.setText(container.modExpression);
-        this.modExpression.setPlaceholder(new net.minecraft.util.text.TextComponentTranslation("gui.ae2.ModFilterTooltip"));
+        this.modExpression.setPlaceholder(GuiText.ModFilterTooltip.text());
     }
 
     @Override

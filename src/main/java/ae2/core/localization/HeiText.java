@@ -8,14 +8,20 @@ public enum HeiText implements LocalizationEnum {
     EntropyManipulatorCool,
     RightClick,
     ShiftRightClick,
+    MoveItems("move_items"),
     TransformCategory,
     Explosion,
-    SubmergeIn;
+    SubmergeIn,
+    CrystalFixerSuccessChance("crystal_fixer.success_chance");
 
     private final String translationKey;
 
     HeiText() {
         this.translationKey = "ae2.hei." + name();
+    }
+
+    HeiText(String translationKeySuffix) {
+        this.translationKey = "ae2.hei." + translationKeySuffix;
     }
 
     @Override

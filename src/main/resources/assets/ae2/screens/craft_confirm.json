@@ -15,7 +15,7 @@
     "cpu_status": {
       "position": {
         "left": 109,
-        "top": 165
+        "bottom": 41
       },
       "align": "CENTER"
     }
@@ -23,8 +23,13 @@
   "widgets": {
     "scrollbar": {
       "left": 218,
-      "top": 19,
-      "height": 114
+      "top": 19
+    },
+    "search": {
+      "left": 132,
+      "top": 5,
+      "width": 81,
+      "height": 12
     },
     "selectCpu": {
       "left": 19,
@@ -56,6 +61,10 @@
       "hideEdge": false,
       "width": 20,
       "height": 20
+    },
+    "verticalToolbar": {
+      "left": 3,
+      "top": 1
     }
   }
 }

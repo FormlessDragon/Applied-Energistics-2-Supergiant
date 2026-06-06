@@ -24,6 +24,7 @@ import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.WidgetStyle;
 import ae2.client.gui.widgets.CommonButtons;
 import ae2.container.implementations.ContainerVibrationChamber;
+import ae2.core.localization.GuiText;
 import ae2.util.Platform;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
@@ -69,7 +70,11 @@ public class GuiVibrationChamber extends GuiUpgradeable<ContainerVibrationChambe
     @Override
     public void drawFG(int offsetX, int offsetY, int mouseX, int mouseY) {
         this.fontRenderer.drawString(Platform.formatPower(this.container.getPowerPerTick(), true), 8, 20, 0x404040);
-        this.fontRenderer.drawString("Eff: " + this.container.getFuelEfficiency() + "%", 8, 30, 0x404040);
+        this.fontRenderer.drawString(
+            GuiText.Efficiency.getLocal(this.container.getFuelEfficiency()),
+            8,
+            30,
+            0x404040);
 
         if (this.container.getRemainingBurnTime() > 0) {
             int f = Math.max(1, this.container.getRemainingBurnTime() * BURN_PROGRESS.getSrcHeight() / 100);

@@ -1,10 +1,10 @@
 package ae2.core.network.serverbound;
 
+import ae2.core.localization.PlayerMessages;
 import ae2.core.network.ServerboundPacket;
 import ae2.me.ticker.RequestBox;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.util.text.TextComponentTranslation;
 
 public class TickProfilerRequestPacket extends ServerboundPacket {
     private int duration;
@@ -30,17 +30,16 @@ public class TickProfilerRequestPacket extends ServerboundPacket {
     public void handleServer(EntityPlayerMP player) {
         if (duration < 0) {
             if (RequestBox.cancelProfile(player)) {
-                player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.cancel"));
+                player.sendMessage(PlayerMessages.TickAnalyserCancel.text());
             } else {
-                player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.no_cancel"));
+                player.sendMessage(PlayerMessages.TickAnalyserNoCancel.text());
             }
         } else {
             int clampedDuration = RequestBox.clampDurationSeconds(duration);
             switch (RequestBox.requestProfile(player, clampedDuration)) {
-                case OK -> player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.begin",
-                    clampedDuration));
-                case WAIT -> player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.waiting"));
-                case DENY -> player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.user_control"));
+                case OK -> player.sendMessage(PlayerMessages.TickAnalyserBegin.text(clampedDuration));
+                case WAIT -> player.sendMessage(PlayerMessages.TickAnalyserWaiting.text());
+                case DENY -> player.sendMessage(PlayerMessages.TickAnalyserUserControl.text());
             }
         }
     }

@@ -1,29 +1,27 @@
 package ae2.client.gui.me.search;
 
-import ae2.container.me.common.GridInventoryEntry;
-
 import java.util.List;
 import java.util.function.Predicate;
 
-final class OrSearchPredicate implements Predicate<GridInventoryEntry> {
-    private final List<Predicate<GridInventoryEntry>> terms;
+final class OrSearchPredicate<T> implements Predicate<T> {
+    private final List<Predicate<T>> terms;
 
-    private OrSearchPredicate(List<Predicate<GridInventoryEntry>> terms) {
+    private OrSearchPredicate(List<Predicate<T>> terms) {
         this.terms = terms;
     }
 
-    public static Predicate<GridInventoryEntry> of(List<Predicate<GridInventoryEntry>> filters) {
+    public static <T> Predicate<T> of(List<Predicate<T>> filters) {
         if (filters.isEmpty()) {
             return t -> false;
         }
         if (filters.size() == 1) {
             return filters.getFirst();
         }
-        return new OrSearchPredicate(filters);
+        return new OrSearchPredicate<>(filters);
     }
 
     @Override
-    public boolean test(GridInventoryEntry entry) {
+    public boolean test(T entry) {
         for (var term : terms) {
             if (term.test(entry)) {
                 return true;
@@ -33,4 +31,3 @@ final class OrSearchPredicate implements Predicate<GridInventoryEntry> {
         return false;
     }
 }
-

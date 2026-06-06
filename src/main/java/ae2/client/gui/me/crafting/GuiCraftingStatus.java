@@ -33,14 +33,22 @@ public class GuiCraftingStatus extends GuiCraftingCPU<ContainerCraftingStatus> {
         super(container, playerInventory, title, style);
 
         AESubGui.addBackButton(container, "back", widgets);
-
         var scrollbar = widgets.addScrollBar("selectCpuScrollbar", Scrollbar.BIG);
-        widgets.add("selectCpuList", new CPUSelectionList(container, scrollbar, style));
+        widgets.add("selectCpuList", new CPUSelectionList(container, scrollbar, style, this::getCpuListRows));
     }
 
     @Override
     protected ITextComponent getGuiDisplayName(ITextComponent in) {
         return in;
     }
-}
 
+    @Override
+    protected void addTerminalStyleButton() {
+        widgets.add("terminalStyle", getTerminalStyleButton());
+    }
+
+    private int getCpuListRows() {
+        return Math.max(1, getCraftingRows() - 1);
+    }
+
+}

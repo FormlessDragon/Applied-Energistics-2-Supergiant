@@ -3,9 +3,9 @@ package ae2.client.gui.implementations;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AETextField;
 import ae2.container.implementations.ContainerODFilterBus;
+import ae2.core.localization.GuiText;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
 
 public class GuiODFilterBus extends GuiSpecialExportBus<ContainerODFilterBus<?>> {
     protected final AETextField white;
@@ -22,8 +22,8 @@ public class GuiODFilterBus extends GuiSpecialExportBus<ContainerODFilterBus<?>>
         this.black.setMaxStringLength(512);
         this.white.setText(container.whiteExpression);
         this.black.setText(container.blackExpression);
-        this.white.setPlaceholder(new TextComponentTranslation("gui.ae2.ODFilterWhiteTooltip"));
-        this.black.setPlaceholder(new TextComponentTranslation("gui.ae2.ODFilterBlackTooltip"));
+        this.white.setPlaceholder(GuiText.ODFilterWhiteTooltip.text());
+        this.black.setPlaceholder(GuiText.ODFilterBlackTooltip.text());
     }
 
     @Override

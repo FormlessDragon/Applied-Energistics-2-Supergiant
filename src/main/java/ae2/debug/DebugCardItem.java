@@ -25,6 +25,7 @@ import ae2.api.networking.energy.IEnergyService;
 import ae2.api.networking.pathing.ControllerState;
 import ae2.api.parts.IPart;
 import ae2.api.parts.IPartHost;
+import ae2.core.localization.GuiText;
 import ae2.core.localization.PlayerMessages;
 import ae2.hooks.ticking.TickHandler;
 import ae2.items.AEBaseItem;
@@ -144,9 +145,9 @@ public class DebugCardItem extends AEBaseItem {
                 final Grid g = node.getInternalGrid();
                 final IGridNode center = g.getPivot();
                 this.outputPrimaryMessage(player, PlayerMessages.DebugCardGridPowered.text(),
-                    String.valueOf(g.getEnergyService().isNetworkPowered()));
+                    localizedBoolean(g.getEnergyService().isNetworkPowered()));
                 this.outputPrimaryMessage(player, PlayerMessages.DebugCardGridBooted.text(),
-                    String.valueOf(!g.getPathingService().isNetworkBooting()));
+                    localizedBoolean(!g.getPathingService().isNetworkBooting()));
                 this.outputPrimaryMessage(player, PlayerMessages.DebugCardNodesInGrid.text(),
                     String.valueOf(Iterables.size(g.getNodes())));
                 this.outputSecondaryMessage(player, PlayerMessages.DebugCardGridPivotNode.text(), String.valueOf(center));
@@ -163,13 +164,12 @@ public class DebugCardItem extends AEBaseItem {
                         singleMaximumTime = Math.max(singleMaximumTime, tmc.getMaximumTime(oj));
                     }
 
-                    String message = "#: " + o;
-
-                    if (totalAverageTime > 0) {
-                        message += "; average: " + Platform.formatTimeMeasurement(totalAverageTime);
-                    }
-                    if (singleMaximumTime > 0) {
-                        message += "; max: " + Platform.formatTimeMeasurement(singleMaximumTime);
+                    ITextComponent message = PlayerMessages.DebugCardMachineCount.text(o);
+                    if (totalAverageTime > 0 || singleMaximumTime > 0) {
+                        message.appendText(" ")
+                               .appendSibling(PlayerMessages.DebugCardTimingSummary.text(
+                                   Platform.formatTimeMeasurement(totalAverageTime),
+                                   Platform.formatTimeMeasurement(singleMaximumTime)));
                     }
 
                     this.outputSecondaryMessage(player, c.getSimpleName(), message);
@@ -178,7 +178,7 @@ public class DebugCardItem extends AEBaseItem {
                 this.outputMessage(player, PlayerMessages.DebugCardNodeDetails.text());
 
                 this.outputPrimaryMessage(player, PlayerMessages.DebugCardThisNode.text(), String.valueOf(node));
-                this.outputPrimaryMessage(player, PlayerMessages.DebugCardThisNodeActive.text(), String.valueOf(node.isActive()));
+                this.outputPrimaryMessage(player, PlayerMessages.DebugCardThisNodeActive.text(), localizedBoolean(node.isActive()));
                 this.outputSecondaryMessage(player, PlayerMessages.DebugCardNodeExposedOnSide.text(), side.getName());
 
                 var pg = g.getPathingService();
@@ -228,8 +228,10 @@ public class DebugCardItem extends AEBaseItem {
         TileEntity te = world.getTileEntity(pos);
         if (te instanceof IPartHost partHost) {
             this.outputMessage(player, PlayerMessages.DebugCardCableBusDetails.text());
-            outputSecondaryMessage(player, PlayerMessages.DebugCardInWorld.text(), Boolean.toString(partHost.isInWorld()));
-            outputSecondaryMessage(player, PlayerMessages.DebugCardHasRedstone.text(), Boolean.toString(partHost.hasRedstone()));
+            outputSecondaryMessage(player, PlayerMessages.DebugCardInWorld.text(),
+                localizedBoolean(partHost.isInWorld()));
+            outputSecondaryMessage(player, PlayerMessages.DebugCardHasRedstone.text(),
+                localizedBoolean(partHost.hasRedstone()));
             final IPart center = partHost.getPart(null);
             partHost.markForUpdate();
             if (center != null) {
@@ -280,7 +282,7 @@ public class DebugCardItem extends AEBaseItem {
     }
 
     private void divider(EntityPlayer player) {
-        this.outputMessage(player, "---------------------------------------------", TextFormatting.BOLD,
+        this.outputMessage(player, PlayerMessages.DebugCardDivider.text(), TextFormatting.BOLD,
             TextFormatting.DARK_PURPLE);
     }
 
@@ -288,31 +290,27 @@ public class DebugCardItem extends AEBaseItem {
         player.sendMessage(style(text, chatFormattings));
     }
 
-    private void outputMessage(Entity player, String string, TextFormatting... chatFormattings) {
-        this.outputMessage(player, new TextComponentString(string), chatFormattings);
-    }
-
     private void outputMessage(Entity player, ITextComponent text) {
         player.sendMessage(text);
-    }
-
-    private void outputMessage(Entity player, String string) {
-        this.outputMessage(player, new TextComponentString(string));
     }
 
     private void outputPrimaryMessage(Entity player, ITextComponent label, String value) {
         this.outputLabeledMessage(player, label, value, TextFormatting.BOLD, TextFormatting.LIGHT_PURPLE);
     }
 
-    private void outputPrimaryMessage(Entity player, String label, String value) {
-        this.outputPrimaryMessage(player, new TextComponentString(label), value);
+    private void outputPrimaryMessage(Entity player, ITextComponent label, ITextComponent value) {
+        this.outputLabeledMessage(player, label, value, TextFormatting.BOLD, TextFormatting.LIGHT_PURPLE);
     }
 
     private void outputSecondaryMessage(Entity player, ITextComponent label, String value) {
         this.outputLabeledMessage(player, label, value, TextFormatting.GRAY);
     }
 
-    private void outputSecondaryMessage(Entity player, String label, String value) {
+    private void outputSecondaryMessage(Entity player, ITextComponent label, ITextComponent value) {
+        this.outputLabeledMessage(player, label, value, TextFormatting.GRAY);
+    }
+
+    private void outputSecondaryMessage(Entity player, String label, ITextComponent value) {
         this.outputSecondaryMessage(player, new TextComponentString(label), value);
     }
 
@@ -321,5 +319,16 @@ public class DebugCardItem extends AEBaseItem {
         player.sendMessage(new TextComponentString("")
             .appendSibling(style(label.createCopy().appendText(": "), chatFormattings))
             .appendText(value));
+    }
+
+    private void outputLabeledMessage(Entity player, ITextComponent label, ITextComponent value,
+                                      TextFormatting... chatFormattings) {
+        player.sendMessage(new TextComponentString("")
+            .appendSibling(style(label.createCopy().appendText(": "), chatFormattings))
+            .appendSibling(value.createCopy()));
+    }
+
+    private ITextComponent localizedBoolean(boolean value) {
+        return PlayerMessages.DebugCardBoolean.text(value ? GuiText.Yes.text() : GuiText.No.text());
     }
 }

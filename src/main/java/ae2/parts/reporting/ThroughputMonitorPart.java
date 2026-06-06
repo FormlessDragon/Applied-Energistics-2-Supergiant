@@ -8,6 +8,8 @@ import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
 import ae2.api.stacks.AmountFormat;
 import ae2.core.AppEng;
+import ae2.core.localization.GuiText;
+import ae2.core.localization.PlayerMessages;
 import ae2.items.parts.PartModels;
 import ae2.parts.PartModel;
 import ae2.util.InteractionUtil;
@@ -18,7 +20,6 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
@@ -128,19 +129,19 @@ public class ThroughputMonitorPart extends AbstractMonitorPart implements IGridT
                 return true;
             }
             cycleWorkRoutine();
-            player.sendStatusMessage(new TextComponentTranslation("chat.ae2.ThroughputMonitorRoutine",
-                new TextComponentTranslation(getRoutineTranslationKey()).getFormattedText()), true);
+            player.sendStatusMessage(PlayerMessages.ThroughputMonitorRoutine.text(
+                getRoutineText().text()), true);
             return true;
         }
         return super.onUseWithoutItem(player, pos);
     }
 
-    private String getRoutineTranslationKey() {
+    private GuiText getRoutineText() {
         return switch (this.workRoutine) {
-            case TICK -> "gui.ae2.ThroughputMonitorRoutineTick";
-            case SECOND -> "gui.ae2.ThroughputMonitorRoutineSecond";
-            case MINUTE -> "gui.ae2.ThroughputMonitorRoutineMinute";
-            case TEN_MINUTE -> "gui.ae2.ThroughputMonitorRoutineTenMinute";
+            case TICK -> GuiText.ThroughputMonitorRoutineTick;
+            case SECOND -> GuiText.ThroughputMonitorRoutineSecond;
+            case MINUTE -> GuiText.ThroughputMonitorRoutineMinute;
+            case TEN_MINUTE -> GuiText.ThroughputMonitorRoutineTenMinute;
         };
     }
 
@@ -212,14 +213,10 @@ public class ThroughputMonitorPart extends AbstractMonitorPart implements IGridT
             ? getDisplayed().formatAmount(Math.round(Math.abs(this.lastReportedValue)), AmountFormat.SLOT)
             : String.format("%.2f", Math.abs(this.lastReportedValue));
         return switch (this.workRoutine) {
-            case TICK ->
-                new TextComponentTranslation("gui.ae2.ThroughputMonitorValueTick", sign, valueText).getFormattedText();
-            case SECOND ->
-                new TextComponentTranslation("gui.ae2.ThroughputMonitorValueSecond", sign, valueText).getFormattedText();
-            case MINUTE ->
-                new TextComponentTranslation("gui.ae2.ThroughputMonitorValueMinute", sign, valueText).getFormattedText();
-            case TEN_MINUTE ->
-                new TextComponentTranslation("gui.ae2.ThroughputMonitorValueTenMinute", sign, valueText).getFormattedText();
+            case TICK -> GuiText.ThroughputMonitorValueTick.getLocal(sign, valueText);
+            case SECOND -> GuiText.ThroughputMonitorValueSecond.getLocal(sign, valueText);
+            case MINUTE -> GuiText.ThroughputMonitorValueMinute.getLocal(sign, valueText);
+            case TEN_MINUTE -> GuiText.ThroughputMonitorValueTenMinute.getLocal(sign, valueText);
         };
     }
 

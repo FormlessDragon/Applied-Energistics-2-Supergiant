@@ -4,12 +4,13 @@ import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.color.ColorArea;
 import ae2.client.gui.color.ColorWindow;
 import ae2.client.gui.style.GuiStyleManager;
+import ae2.client.render.NetworkDataHandler;
+import ae2.container.implementations.ContainerNetworkAnalyser;
 import ae2.core.AEConfig;
+import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.AnalyserGenericPacket;
 import ae2.core.network.serverbound.NetworkConfigSavePacket;
-import ae2.client.render.NetworkDataHandler;
-import ae2.container.implementations.ContainerNetworkAnalyser;
 import ae2.items.tools.NetworkAnalyserConfig;
 import ae2.me.AnalyserMode;
 import ae2.me.netdata.LinkFlag;
@@ -19,7 +20,6 @@ import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 
 import java.util.List;
 
@@ -46,7 +46,7 @@ public class GuiNetworkAnalyser extends AEBaseGui<ContainerNetworkAnalyser> {
         this.widgets.addButton("mode_next", new TextComponentString(">"), () -> changeMode(1));
         this.widgets.addButton("size_decrease", new TextComponentString("<"), () -> changeSize(-0.1F));
         this.widgets.addButton("size_increase", new TextComponentString(">"), () -> changeSize(0.1F));
-        this.widgets.addButton("reset_colors", new TextComponentTranslation("gui.ae2.network_analyser.reset"),
+        this.widgets.addButton("reset_colors", GuiText.NetworkAnalyserReset.text(),
             this::loadDefault);
         for (int i = 0; i < COLOR_ORDER.size(); i++) {
             Enum<?> type = COLOR_ORDER.get(i);
@@ -112,22 +112,16 @@ public class GuiNetworkAnalyser extends AEBaseGui<ContainerNetworkAnalyser> {
         super.updateBeforeRender();
         setTextContent("mode_value", this.mode.getTranslatedName());
         setTextContent("node_size_value", new TextComponentString(String.valueOf((int) (this.size * 10))));
-        setTextContent("channel_mode", new TextComponentTranslation(
-            "gui.ae2.network_analyser.channel." + AEConfig.instance().getChannelMode().name()));
-        setTextContent("normal_nodes", new TextComponentTranslation(
-            "gui.ae2.network_analyser.state.normal_nodes",
+        setTextContent("channel_mode", GuiText.networkAnalyserChannel(AEConfig.instance().getChannelMode()).text());
+        setTextContent("normal_nodes", GuiText.NetworkAnalyserStateNormalNodes.text(
             NetworkDataHandler.pullData().countNode(NodeFlag.NORMAL)));
-        setTextContent("dense_nodes", new TextComponentTranslation(
-            "gui.ae2.network_analyser.state.dense_nodes",
+        setTextContent("dense_nodes", GuiText.NetworkAnalyserStateDenseNodes.text(
             NetworkDataHandler.pullData().countNode(NodeFlag.DENSE)));
-        setTextContent("missing_nodes", new TextComponentTranslation(
-            "gui.ae2.network_analyser.state.missing_nodes",
+        setTextContent("missing_nodes", GuiText.NetworkAnalyserStateMissingNodes.text(
             NetworkDataHandler.pullData().countNode(NodeFlag.MISSING)));
         for (int i = 0; i < COLOR_ORDER.size(); i++) {
             Enum<?> entry = COLOR_ORDER.get(i);
-            String type = entry instanceof NodeFlag ? "NODE" : "LINK";
-            setTextContent("color_label_" + i, new TextComponentTranslation(
-                "gui.ae2.network_analyser." + type + "." + entry.name()));
+            setTextContent("color_label_" + i, GuiText.networkAnalyserLabel(entry).text());
         }
     }
 

@@ -36,7 +36,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Renders a 3x5 table where each cell displays an item and some text next to it.
+ * Renders a 3-column table where each cell displays an item and some text next to it.
  */
 public abstract class AbstractTableRenderer<T> {
 
@@ -53,7 +53,7 @@ public abstract class AbstractTableRenderer<T> {
     private final float lineHeight;
     private final int x;
     private final int y;
-    private final int rows;
+    private int rows;
     @Nullable
     private StackWithBounds hoveredStack;
     @Nullable
@@ -164,6 +164,14 @@ public abstract class AbstractTableRenderer<T> {
 
     public int getScrollableRows(int size) {
         return getScrollableRows(size, this.rows);
+    }
+
+    public int getRows() {
+        return this.rows;
+    }
+
+    public void setRows(int rows) {
+        this.rows = Math.max(1, rows);
     }
 
     /**

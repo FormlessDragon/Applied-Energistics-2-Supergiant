@@ -1,9 +1,13 @@
 package ae2.server.subcommands;
 
+import ae2.core.localization.GuiText;
+import ae2.core.localization.PlayerMessages;
 import ae2.server.ISubCommand;
+import ae2.worldgen.meteorite.CraterType;
 import ae2.worldgen.meteorite.MeteoriteStructurePiece;
 import ae2.worldgen.meteorite.MeteoritesWorldData;
 import ae2.worldgen.meteorite.PlacedMeteoriteSettings;
+import ae2.worldgen.meteorite.fallout.FalloutMode;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.command.CommandBase;
@@ -14,12 +18,11 @@ import net.minecraft.command.WrongUsageException;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 
 public class TestMeteoritesCommand implements ISubCommand {
     private static final int DEFAULT_RADIUS = 100;
@@ -50,8 +53,8 @@ public class TestMeteoritesCommand implements ISubCommand {
         return best;
     }
 
-    private static void sendLine(ICommandSender sender, String format, Object... args) {
-        sender.sendMessage(new TextComponentString(String.format(Locale.ROOT, format, args)));
+    private static void sendLine(ICommandSender sender, PlayerMessages message, Object... args) {
+        sender.sendMessage(message.text(args));
     }
 
     private static int parseCoordinate(String input) throws CommandException {
@@ -79,6 +82,28 @@ public class TestMeteoritesCommand implements ISubCommand {
         }
 
         return ISubCommand.super.getTabCompletions(srv, sender, args, targetPos);
+    }
+
+    private static ITextComponent getCraterTypeName(CraterType craterType) {
+        return switch (craterType) {
+            case NONE -> GuiText.MeteoriteCraterNone.text();
+            case NORMAL -> GuiText.MeteoriteCraterNormal.text();
+            case LAVA -> GuiText.MeteoriteCraterLava.text();
+            case OBSIDIAN -> GuiText.MeteoriteCraterObsidian.text();
+            case WATER -> GuiText.MeteoriteCraterWater.text();
+            case SNOW -> GuiText.MeteoriteCraterSnow.text();
+            case ICE -> GuiText.MeteoriteCraterIce.text();
+        };
+    }
+
+    private static ITextComponent getFalloutModeName(FalloutMode falloutMode) {
+        return switch (falloutMode) {
+            case NONE -> GuiText.MeteoriteFalloutNone.text();
+            case DEFAULT -> GuiText.MeteoriteFalloutDefault.text();
+            case SAND -> GuiText.MeteoriteFalloutSand.text();
+            case TERRACOTTA -> GuiText.MeteoriteFalloutTerracotta.text();
+            case ICE_SNOW -> GuiText.MeteoriteFalloutIceSnow.text();
+        };
     }
 
     @Override
@@ -109,7 +134,7 @@ public class TestMeteoritesCommand implements ISubCommand {
         ObjectList<PlacedMeteoriteSettings> nearby = collectNearbyMeteorites(worldData, chunkPos.x, chunkPos.z,
             origin);
 
-        sendLine(sender, "AE2 meteorites: dim=%d chunk=%d,%d found=%d radius=%d",
+        sendLine(sender, PlayerMessages.MeteoriteTestSummary,
             world.provider.getDimension(), chunkPos.x, chunkPos.z, nearby.size(), DEFAULT_RADIUS);
 
         if (nearby.isEmpty()) {
@@ -136,7 +161,7 @@ public class TestMeteoritesCommand implements ISubCommand {
         }
 
         if (nearestCount > 0) {
-            sendLine(sender, "Nearest spacing: min=%.2f max=%.2f mean=%.2f",
+            sendLine(sender, PlayerMessages.MeteoriteTestNearestSpacing,
                 minNearest, maxNearest, sumNearest / nearestCount);
         }
 
@@ -148,7 +173,7 @@ public class TestMeteoritesCommand implements ISubCommand {
             boolean intersects = new MeteoriteStructurePiece(settings).intersectsChunk(chunkPos.x, chunkPos.z);
 
             double distance = Math.sqrt(pos.distanceSq(origin));
-            sendLine(sender, "#%d pos=%d,%d,%d chunk=%d,%d dist=%.2f radius=%.2f crater=%s fallout=%s coversCurrentChunk=%s",
+            sendLine(sender, PlayerMessages.MeteoriteTestEntry,
                 i + 1,
                 pos.getX(),
                 pos.getY(),
@@ -157,9 +182,9 @@ public class TestMeteoritesCommand implements ISubCommand {
                 meteorChunk.z,
                 distance,
                 settings.meteoriteRadius(),
-                settings.craterType().name().toLowerCase(Locale.ROOT),
-                settings.fallout().name().toLowerCase(Locale.ROOT),
-                intersects);
+                getCraterTypeName(settings.craterType()),
+                getFalloutModeName(settings.fallout()),
+                PlayerMessages.MeteoriteTestBoolean.text(intersects));
         }
     }
 }

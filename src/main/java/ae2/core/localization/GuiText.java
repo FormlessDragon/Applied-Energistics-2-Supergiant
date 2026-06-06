@@ -1,5 +1,14 @@
 package ae2.core.localization;
 
+import ae2.api.config.CondenserOutput;
+import ae2.api.networking.pathing.ChannelMode;
+import ae2.me.AnalyserMode;
+import ae2.me.netdata.LinkFlag;
+import ae2.me.netdata.NodeFlag;
+import ae2.parts.automation.special.ThresholdMode;
+import ae2.tile.crafting.requester.RequestStatus;
+import ae2.tile.misc.CanerMode;
+
 public enum GuiText implements LocalizationEnum {
     Items,
     Fluids,
@@ -30,6 +39,7 @@ public enum GuiText implements LocalizationEnum {
     ConfigureVisibleTypes,
     Condenser,
     ConfigModifier,
+    CpuFallbackName,
     ConfigModifierChangeMode,
     ConfigModifierModeAdd,
     ConfigModifierModeSub,
@@ -86,6 +96,7 @@ public enum GuiText implements LocalizationEnum {
     CraftingCardForceCrafting,
     CraftingCardForceCraftingHint,
     CraftingCardForceCraftingDesc,
+    CraftMonitorCraft,
     PseudoCraftingCardLine1,
     PseudoCraftingCardLine2,
     CraftingLockIsLocked,
@@ -97,7 +108,11 @@ public enum GuiText implements LocalizationEnum {
     CraftingTreeMissingOnly,
     CraftingTreeDefault,
     CraftingTreeBack,
+    CraftingTreeLocation,
+    CraftingTreeLocationInDimension,
+    CraftingTreeHighlightProvider,
     CraftingTreeRenderedNodes,
+    CraftingStatusHighlightSupplier,
     CraftingTreeTip0,
     CraftingTreeTip1,
     CraftingTreeTip2,
@@ -114,7 +129,11 @@ public enum GuiText implements LocalizationEnum {
     Error,
     ExportGrid,
     Interface,
+    InterfaceConfigPage,
+    InterfacePagePrevious,
+    InterfacePageNext,
     IOBuses,
+    StorageBus,
     StorageCells,
     StorageCellTooltipUpgrades,
     PortableCells,
@@ -137,6 +156,18 @@ public enum GuiText implements LocalizationEnum {
     MeteoriteCompassBeacon,
     MeteoriteCompassBeaconHint,
     MeteoriteCompassBeaconUpgradeHint,
+    MeteoriteCraterNone,
+    MeteoriteCraterNormal,
+    MeteoriteCraterLava,
+    MeteoriteCraterObsidian,
+    MeteoriteCraterWater,
+    MeteoriteCraterSnow,
+    MeteoriteCraterIce,
+    MeteoriteFalloutNone,
+    MeteoriteFalloutDefault,
+    MeteoriteFalloutSand,
+    MeteoriteFalloutTerracotta,
+    MeteoriteFalloutIceSnow,
     Next,
     NetworkDetails,
     NetworkTool,
@@ -165,9 +196,41 @@ public enum GuiText implements LocalizationEnum {
     PatternAccessTerminalProviderSearchTooltip,
     PatternAccessTerminalRenameProvider,
     PatternAccessTerminalRenameProviderHint,
+    PatternProviderPagePrevious,
+    PatternProviderPageNext,
+    PatternAmountTimesName,
     RequesterTerminal,
     RequesterTerminalShort,
+    RequesterFallbackName,
+    RequesterNoRequesters("requester.no_requesters"),
+    RequesterAmount("requester.amount"),
+    RequesterBatch("requester.batch"),
+    RequesterSubmit("requester.submit"),
+    RequesterToggleDisabled("requester.toggle.disabled"),
+    RequesterToggleEnabled("requester.toggle.enabled"),
+    RequesterForceStartDetailOn("requester.ForceStartDetailOn"),
+    RequesterForceStartDetailOff("requester.ForceStartDetailOff"),
+    RequesterStatus("requester.status"),
+    RequesterStatusShift("requester.status.shift"),
+    RequesterStatusIdle("requester.status.idle"),
+    RequesterStatusIdleDesc("requester.status.idle.desc"),
+    RequesterStatusMissing("requester.status.missing"),
+    RequesterStatusMissingDesc("requester.status.missing.desc"),
+    RequesterStatusNoPattern("requester.status.no_pattern"),
+    RequesterStatusNoPatternDesc("requester.status.no_pattern.desc"),
+    RequesterStatusCpu("requester.status.cpu"),
+    RequesterStatusCpuDesc("requester.status.cpu.desc"),
+    RequesterStatusCrafting("requester.status.crafting"),
+    RequesterStatusCraftingDesc("requester.status.crafting.desc"),
+    RequesterStatusExporting("requester.status.exporting"),
+    RequesterStatusExportingDesc("requester.status.exporting.desc"),
     PatternImportPrioritiesTitle,
+    PatternImportPriorityHeiBookmarks("PatternImportPriorityHeiBookmarks"),
+    PatternImportPriorityHeiBookmarksDesc("PatternImportPriorityHeiBookmarks.desc"),
+    PatternImportPriorityCraftables("PatternImportPriorityCraftables"),
+    PatternImportPriorityCraftablesDesc("PatternImportPriorityCraftables.desc"),
+    PatternImportPriorityStored("PatternImportPriorityStored"),
+    PatternImportPriorityStoredDesc("PatternImportPriorityStored.desc"),
     PatternTooltipFluidSubstitutions,
     PatternTooltipSubstitutions,
     Patterns,
@@ -194,6 +257,7 @@ public enum GuiText implements LocalizationEnum {
     SearchTooltipModId,
     SearchTooltipTag,
     SearchTooltipToolTips,
+    SetAmountButtonHint,
     SelectAmount,
     Set,
     SpatialAnchor,
@@ -271,6 +335,50 @@ public enum GuiText implements LocalizationEnum {
     WirelessMagnetCopyInsert,
     WirelessMagnetSwap,
     WirelessRange,
+    ThroughputMonitorValueTick("ValueTick"),
+    ThroughputMonitorValueSecond("ValueSecond"),
+    ThroughputMonitorValueMinute("ValueMinute"),
+    ThroughputMonitorValueTenMinute("ValueTenMinute"),
+    ThroughputMonitorRoutineTick("RoutineTick"),
+    ThroughputMonitorRoutineSecond("RoutineSecond"),
+    ThroughputMonitorRoutineMinute("RoutineMinute"),
+    ThroughputMonitorRoutineTenMinute("RoutineTenMinute"),
+    NetworkAnalyserReset("network_analyser.reset"),
+    NetworkAnalyserStateNormalNodes("network_analyser.state.normal_nodes"),
+    NetworkAnalyserStateDenseNodes("network_analyser.state.dense_nodes"),
+    NetworkAnalyserStateMissingNodes("network_analyser.state.missing_nodes"),
+    NetworkAnalyserModeFull("network_analyser.mode.FULL"),
+    NetworkAnalyserModeNodes("network_analyser.mode.NODES"),
+    NetworkAnalyserModeChannels("network_analyser.mode.CHANNELS"),
+    NetworkAnalyserModeNoNum("network_analyser.mode.NONUM"),
+    NetworkAnalyserModeP2p("network_analyser.mode.P2P"),
+    NetworkAnalyserLinkNormal("network_analyser.LINK.NORMAL"),
+    NetworkAnalyserLinkDense("network_analyser.LINK.DENSE"),
+    NetworkAnalyserLinkCompressed("network_analyser.LINK.COMPRESSED"),
+    NetworkAnalyserNodeNormal("network_analyser.NODE.NORMAL"),
+    NetworkAnalyserNodeDense("network_analyser.NODE.DENSE"),
+    NetworkAnalyserNodeMissing("network_analyser.NODE.MISSING"),
+    NetworkAnalyserChannelInfinite("network_analyser.channel.INFINITE"),
+    NetworkAnalyserChannelDefault("network_analyser.channel.DEFAULT"),
+    NetworkAnalyserChannelX2("network_analyser.channel.X2"),
+    NetworkAnalyserChannelX3("network_analyser.channel.X3"),
+    NetworkAnalyserChannelX4("network_analyser.channel.X4"),
+    TickAnalyserStart("tick_analyser.start"),
+    TickAnalyserCancel("tick_analyser.cancel"),
+    TickAnalyserRate("tick_analyser.rate"),
+    VoidCellModeTrash("VoidCell.mode.0"),
+    VoidCellModeMatterBall("VoidCell.mode.1"),
+    VoidCellModeSingularity("VoidCell.mode.2"),
+    VoidCellOpenGui("VoidCell.OpenGui"),
+    ModFilterTooltip,
+    ODFilterBlackTooltip,
+    ODFilterWhiteTooltip,
+    PreciseBusSetAmount,
+    ThresholdGreater,
+    ThresholdLower,
+    CrystalAssemblerAmount,
+    CanerFill("caner.fill"),
+    CanerEmpty("caner.empty"),
     MysteriousQuote,
     NotSoMysteriousQuote,
     Nothing,
@@ -290,6 +398,90 @@ public enum GuiText implements LocalizationEnum {
 
     GuiText() {
         this.translationKey = "gui.ae2." + name();
+    }
+
+    GuiText(String translationKeySuffix) {
+        this.translationKey = "gui.ae2." + translationKeySuffix;
+    }
+
+    public static GuiText requesterStatus(RequestStatus status) {
+        return switch (status) {
+            case IDLE, REQUESTING, PLANNING -> RequesterStatusIdle;
+            case MISSING -> RequesterStatusMissing;
+            case NO_PATTERN -> RequesterStatusNoPattern;
+            case CPU -> RequesterStatusCpu;
+            case CRAFTING -> RequesterStatusCrafting;
+            case EXPORTING -> RequesterStatusExporting;
+        };
+    }
+
+    public static GuiText requesterStatusDescription(RequestStatus status) {
+        return switch (status) {
+            case IDLE, REQUESTING, PLANNING -> RequesterStatusIdleDesc;
+            case MISSING -> RequesterStatusMissingDesc;
+            case NO_PATTERN -> RequesterStatusNoPatternDesc;
+            case CPU -> RequesterStatusCpuDesc;
+            case CRAFTING -> RequesterStatusCraftingDesc;
+            case EXPORTING -> RequesterStatusExportingDesc;
+        };
+    }
+
+    public static GuiText networkAnalyserMode(AnalyserMode mode) {
+        return switch (mode) {
+            case FULL -> NetworkAnalyserModeFull;
+            case NODES -> NetworkAnalyserModeNodes;
+            case CHANNELS -> NetworkAnalyserModeChannels;
+            case NONUM -> NetworkAnalyserModeNoNum;
+            case P2P -> NetworkAnalyserModeP2p;
+        };
+    }
+
+    public static GuiText networkAnalyserChannel(ChannelMode mode) {
+        return switch (mode) {
+            case INFINITE -> NetworkAnalyserChannelInfinite;
+            case DEFAULT -> NetworkAnalyserChannelDefault;
+            case X2 -> NetworkAnalyserChannelX2;
+            case X3 -> NetworkAnalyserChannelX3;
+            case X4 -> NetworkAnalyserChannelX4;
+        };
+    }
+
+    public static GuiText networkAnalyserLabel(Enum<?> type) {
+        if (type instanceof LinkFlag linkFlag) {
+            return switch (linkFlag) {
+                case NORMAL -> NetworkAnalyserLinkNormal;
+                case DENSE -> NetworkAnalyserLinkDense;
+                case COMPRESSED -> NetworkAnalyserLinkCompressed;
+            };
+        }
+
+        return switch ((NodeFlag) type) {
+            case NORMAL -> NetworkAnalyserNodeNormal;
+            case DENSE -> NetworkAnalyserNodeDense;
+            case MISSING -> NetworkAnalyserNodeMissing;
+        };
+    }
+
+    public static GuiText voidCellMode(CondenserOutput output) {
+        return switch (output) {
+            case TRASH -> VoidCellModeTrash;
+            case MATTER_BALLS -> VoidCellModeMatterBall;
+            case SINGULARITY -> VoidCellModeSingularity;
+        };
+    }
+
+    public static GuiText thresholdMode(ThresholdMode mode) {
+        return switch (mode) {
+            case GREATER -> ThresholdGreater;
+            case LOWER -> ThresholdLower;
+        };
+    }
+
+    public static GuiText canerMode(CanerMode mode) {
+        return switch (mode) {
+            case FILL -> CanerFill;
+            case EMPTY -> CanerEmpty;
+        };
     }
 
     @Override

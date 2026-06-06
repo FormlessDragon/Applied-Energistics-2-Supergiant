@@ -11,6 +11,7 @@ import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.container.implementations.ContainerCrystalAssembler;
 import ae2.core.localization.ButtonToolTips;
+import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.SwitchGuisPacket;
@@ -20,7 +21,6 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 
 public class GuiCrystalAssembler extends GuiUpgradeable<ContainerCrystalAssembler> {
     private final ProgressBar progressBar;
@@ -70,7 +70,7 @@ public class GuiCrystalAssembler extends GuiUpgradeable<ContainerCrystalAssemble
             var tooltip = new ObjectArrayList<>(getItemToolTip(slot.getStack()));
             GenericStack unwrapped = GenericStack.fromItemStack(slot.getStack());
             long amount = unwrapped == null ? 0 : unwrapped.amount();
-            tooltip.add(Tooltips.of(new TextComponentTranslation("gui.ae2.CrystalAssemblerAmount", amount,
+            tooltip.add(Tooltips.of(GuiText.CrystalAssemblerAmount.text(amount,
                 TileCrystalAssembler.TANK_CAPACITY)).getFormattedText());
             drawTooltipLines(mouseX, mouseY, tooltip);
             return;

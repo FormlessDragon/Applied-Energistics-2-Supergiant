@@ -1,5 +1,6 @@
 package ae2.client.render;
 
+import ae2.core.localization.GuiText;
 import ae2.items.tools.TickAnalyserItem;
 import ae2.me.ticker.ProfileData;
 import ae2.util.ColorData;
@@ -73,7 +74,7 @@ public final class ProfileRender {
         tessellator.draw();
         GlStateManager.enableTexture2D();
         for (ProfileData.ATick tick : visibleTicks) {
-            NetworkRender.INSTANCE.drawInWorldText((int) tick.rate() + "μs/t", WHITE,
+            NetworkRender.INSTANCE.drawInWorldText(GuiText.TickAnalyserRate.getLocal((int) tick.rate()), WHITE,
                 tick.pos().getX() + 0.5D, tick.pos().getY() + 0.5D, tick.pos().getZ() + 0.5D);
         }
         GlStateManager.disableTexture2D();

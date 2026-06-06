@@ -31,9 +31,8 @@ import net.minecraft.util.text.TextFormatting;
 import java.util.List;
 
 public class CraftConfirmTableRenderer extends AbstractTableRenderer<CraftingPlanSummaryEntry> {
-
     public CraftConfirmTableRenderer(AEBaseGui<?> screen, int x, int y) {
-        super(screen, x, y, 5);
+        super(screen, x, y, CraftingScreenLayout.MIN_ROWS);
     }
 
     private static void addInventoryUsageLine(CraftingPlanSummaryEntry entry, List<ITextComponent> lines) {

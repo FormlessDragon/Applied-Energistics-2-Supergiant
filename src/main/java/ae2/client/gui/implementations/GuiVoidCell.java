@@ -6,10 +6,10 @@ import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.IconButton;
 import ae2.container.implementations.ContainerVoidCell;
+import ae2.core.localization.GuiText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
 
 import java.util.List;
 
@@ -46,8 +46,7 @@ public class GuiVoidCell extends AEBaseGui<ContainerVoidCell> {
     public void drawFG(int offsetX, int offsetY, int mouseX, int mouseY) {
         super.drawFG(offsetX, offsetY, mouseX, mouseY);
 
-        String mode = new TextComponentTranslation("gui.ae2.VoidCell.mode." + this.container.getOutput().ordinal())
-            .getFormattedText();
+        String mode = GuiText.voidCellMode(this.container.getOutput()).getLocal();
         this.fontRenderer.drawString(mode, 5, 42, 0x404040);
     }
 
@@ -74,7 +73,7 @@ public class GuiVoidCell extends AEBaseGui<ContainerVoidCell> {
 
         @Override
         public List<ITextComponent> getTooltipMessage() {
-            return List.of(new TextComponentTranslation("gui.ae2.VoidCell.mode." + this.output.ordinal()));
+            return List.of(GuiText.voidCellMode(this.output).text());
         }
     }
 }

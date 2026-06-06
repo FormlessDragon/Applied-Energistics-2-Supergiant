@@ -5,6 +5,7 @@ import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.ToggleButton;
+import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.RequesterUpdatePacket;
 import ae2.tile.crafting.requester.Request;
@@ -12,7 +13,6 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.util.text.Style;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.text.TextFormatting;
 
 import java.util.List;
@@ -51,23 +51,23 @@ public final class RequestRowWidget {
         this.currentY = currentY;
         this.request = request;
 
-        this.amountField = new NumberField(this.offsetX, this.offsetY, "amount", style, this::amountFieldSubmitted);
-        this.batchField = new NumberField(this.offsetX, this.offsetY, "batch", style, this::batchFieldSubmitted);
+        this.amountField = new NumberField(this.offsetX, this.offsetY, GuiText.RequesterAmount, style, this::amountFieldSubmitted);
+        this.batchField = new NumberField(this.offsetX, this.offsetY, GuiText.RequesterBatch, style, this::batchFieldSubmitted);
 
         this.enableBtn = new ToggleButton(Icon.ENABLED, Icon.DISABLED, this::enableBtnChanged);
         this.enableBtn.setDisableBackground(true);
-        this.enableBtn.setTooltipOn(List.of(new TextComponentTranslation("gui.ae2.requester.toggle.enabled")));
-        this.enableBtn.setTooltipOff(List.of(new TextComponentTranslation("gui.ae2.requester.toggle.disabled")));
+        this.enableBtn.setTooltipOn(List.of(GuiText.RequesterToggleEnabled.text()));
+        this.enableBtn.setTooltipOff(List.of(GuiText.RequesterToggleDisabled.text()));
 
         this.forceStartBtn = new ToggleButton(Icon.ENABLED, Icon.DISABLED, this::forceStartBtnChanged);
         this.forceStartBtn.setDisableBackground(true);
         this.forceStartBtn.setTooltipOn(List.of(
-            new TextComponentTranslation("gui.ae2.ForceStart"),
-            new TextComponentTranslation("gui.ae2.requester.ForceStartDetailOn")
+            GuiText.ForceStart.text(),
+            GuiText.RequesterForceStartDetailOn.text()
                 .setStyle(new Style().setColor(TextFormatting.GRAY))));
         this.forceStartBtn.setTooltipOff(List.of(
-            new TextComponentTranslation("gui.ae2.ForceStart"),
-            new TextComponentTranslation("gui.ae2.requester.ForceStartDetailOff")
+            GuiText.ForceStart.text(),
+            GuiText.RequesterForceStartDetailOff.text()
                 .setStyle(new Style().setColor(TextFormatting.GRAY))));
 
         this.buttons.add(this.enableBtn);

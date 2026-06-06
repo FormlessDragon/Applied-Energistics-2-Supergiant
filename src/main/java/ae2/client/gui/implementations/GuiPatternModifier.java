@@ -17,7 +17,6 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 
 import java.awt.Rectangle;
 import java.util.Collections;
@@ -224,8 +223,9 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
         PageButton(Icon icon, Runnable onPress) {
             super(onPress);
             this.icon = icon;
-            this.setMessage(new TextComponentTranslation(
-                icon == Icon.ARROW_LEFT ? "gui.ae2.PatternProviderPagePrevious" : "gui.ae2.PatternProviderPageNext"));
+            this.setMessage((icon == Icon.ARROW_LEFT
+                ? GuiText.PatternProviderPagePrevious
+                : GuiText.PatternProviderPageNext).text());
         }
 
         @Override

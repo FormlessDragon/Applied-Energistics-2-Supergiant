@@ -2,13 +2,17 @@ package ae2.client.gui.me.requester;
 
 import ae2.api.behaviors.ContainerItemStrategies;
 import ae2.api.behaviors.EmptyingAction;
+import ae2.api.stacks.AmountFormat;
+import ae2.api.stacks.GenericStack;
 import ae2.client.gui.AEBaseGui;
+import ae2.client.gui.me.common.StackSizeRenderer;
 import ae2.client.gui.style.Blitter;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.container.me.common.AbstractContainerRequester;
 import ae2.container.slot.RequestSlot;
 import ae2.core.AppEng;
+import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.core.network.serverbound.RequesterSlotUpdatePacket;
@@ -26,7 +30,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
@@ -180,7 +183,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
         super.drawFG(offsetX, offsetY, mouseX, mouseY);
 
         if (this.lines.isEmpty()) {
-            String text = new TextComponentTranslation("gui.ae2.requester.no_requesters").getFormattedText();
+            String text = GuiText.RequesterNoRequesters.getLocal();
             int textWidth = this.fontRenderer.getStringWidth(text);
             this.fontRenderer.drawString(text, (GUI_WIDTH - textWidth) / 2 - 10,
                 GUI_PADDING_Y + GUI_HEADER_HEIGHT, 0xe0e0e0);
@@ -229,6 +232,12 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
         GlStateManager.enableDepth();
         this.itemRender.renderItemAndEffectIntoGUI(this.mc.player, stack, slot.xPos, slot.yPos);
         this.itemRender.renderItemOverlayIntoGUI(this.fontRenderer, stack, slot.xPos, slot.yPos, "");
+
+        GenericStack genericStack = GenericStack.unwrapItemStack(appEngSlot.getRawStack());
+        if (genericStack != null && genericStack.amount() > 1) {
+            String amount = genericStack.what().formatAmount(genericStack.amount(), AmountFormat.SLOT);
+            StackSizeRenderer.renderSizeLabel(this.fontRenderer, slot.xPos, slot.yPos, amount, false);
+        }
     }
 
     @Override

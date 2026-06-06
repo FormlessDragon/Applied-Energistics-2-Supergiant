@@ -1,6 +1,7 @@
 package ae2.me.ticker;
 
 import ae2.api.networking.IGridNode;
+import ae2.core.localization.PlayerMessages;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.clientbound.ProfileDataUpdatePacket;
 import ae2.items.tools.TickAnalyserConfig;
@@ -11,7 +12,6 @@ import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
@@ -92,7 +92,7 @@ public final class RequestBox {
     private static void sendData(EntityPlayer player, ProfileData data) {
         if (player instanceof EntityPlayerMP serverPlayer) {
             InitNetwork.sendToClient(serverPlayer, new ProfileDataUpdatePacket(data));
-            player.sendMessage(new TextComponentTranslation("chat.ae2.tick_analyser.finish"));
+            player.sendMessage(PlayerMessages.TickAnalyserFinish.text());
         }
     }
 

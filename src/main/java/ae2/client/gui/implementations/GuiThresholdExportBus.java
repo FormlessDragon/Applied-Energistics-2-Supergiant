@@ -7,10 +7,10 @@ import ae2.client.gui.style.PaletteColor;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.container.implementations.ContainerThresholdExportBus;
+import ae2.core.localization.GuiText;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
 
 import java.util.List;
 
@@ -46,8 +46,7 @@ public class GuiThresholdExportBus extends GuiSpecialExportBus<ContainerThreshol
         int color = this.style != null
             ? this.style.getColor(PaletteColor.DEFAULT_TEXT_COLOR).toARGB() & 0xFFFFFF
             : 0x404040;
-        this.fontRenderer.drawString(new TextComponentTranslation("gui.ae2.PreciseBusSetAmount").getFormattedText(),
-            0, 0, color);
+        this.fontRenderer.drawString(GuiText.PreciseBusSetAmount.getLocal(), 0, 0, color);
         GlStateManager.popMatrix();
     }
 
@@ -71,10 +70,7 @@ public class GuiThresholdExportBus extends GuiSpecialExportBus<ContainerThreshol
 
         @Override
         public List<ITextComponent> getTooltipMessage() {
-            String key = this.container.mode == ae2.parts.automation.special.ThresholdMode.GREATER
-                ? "gui.ae2.ThresholdGreater"
-                : "gui.ae2.ThresholdLower";
-            return List.of(new TextComponentTranslation(key));
+            return List.of(GuiText.thresholdMode(this.container.mode).text());
         }
     }
 }

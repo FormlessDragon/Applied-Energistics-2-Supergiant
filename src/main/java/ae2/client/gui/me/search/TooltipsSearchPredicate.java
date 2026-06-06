@@ -2,7 +2,6 @@ package ae2.client.gui.me.search;
 
 import ae2.api.client.AEKeyRendering;
 import ae2.api.stacks.AEKey;
-import ae2.container.me.common.GridInventoryEntry;
 import ae2.core.AEConfig;
 import ae2.util.Platform;
 import net.minecraft.util.text.ITextComponent;
@@ -14,7 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Predicate;
 
-final class TooltipsSearchPredicate implements Predicate<GridInventoryEntry> {
+final class TooltipsSearchPredicate implements Predicate<AEKey> {
     private final String tooltip;
     private final Map<AEKey, String> tooltipCache;
 
@@ -28,10 +27,8 @@ final class TooltipsSearchPredicate implements Predicate<GridInventoryEntry> {
     }
 
     @Override
-    public boolean test(GridInventoryEntry gridInventoryEntry) {
-        AEKey entryInfo = Objects.requireNonNull(gridInventoryEntry.what());
-        String tooltipText = getTooltipText(entryInfo);
-
+    public boolean test(AEKey what) {
+        String tooltipText = getTooltipText(what);
         return tooltipText.contains(tooltip);
     }
 

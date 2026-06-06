@@ -19,6 +19,7 @@ public enum TopText implements LocalizationEnum {
     p2p_output,
     p2p_unlinked,
     quantum_link_dimension,
+    quantum_link_dimension_id,
     quantum_link_missing,
     quantum_link_position,
     showing,

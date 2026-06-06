@@ -29,7 +29,6 @@ import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
@@ -53,11 +52,11 @@ public class VoidCellItem extends AEBaseItem implements ICellWorkbenchItem, ISta
     private static ITextComponent createTypesLine() {
         return number()
             .appendText(" ")
-            .appendSibling(new TextComponentString(GuiText.Of.getLocal()))
+            .appendSibling(GuiText.Of.text())
             .appendText(" ")
             .appendSibling(obfuscatedMax())
             .appendText(" ")
-            .appendSibling(new TextComponentString(GuiText.Types.getLocal()));
+            .appendSibling(GuiText.Types.text());
     }
 
     private static ITextComponent number() {
@@ -156,10 +155,10 @@ public class VoidCellItem extends AEBaseItem implements ICellWorkbenchItem, ISta
     @Override
     public void addToTooltip(ItemStack stack, List<String> lines) {
         CondenserOutput mode = getMode(stack);
-        lines.add(new TextComponentTranslation("gui.ae2.VoidCell.mode." + mode.ordinal())
+        lines.add(GuiText.voidCellMode(mode).text()
             .setStyle(new Style().setColor(TextFormatting.GREEN).setItalic(false))
             .getFormattedText());
-        lines.add(new TextComponentTranslation("gui.ae2.VoidCell.OpenGui")
+        lines.add(GuiText.VoidCellOpenGui.text()
             .setStyle(new Style().setColor(TextFormatting.GRAY).setItalic(false))
             .getFormattedText());
         lines.add(createUsageLine(GuiText.BytesUsed.text(number())).getFormattedText());

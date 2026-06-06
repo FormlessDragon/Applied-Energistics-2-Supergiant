@@ -36,7 +36,6 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.items.CapabilityItemHandler;
@@ -380,7 +379,7 @@ public class TileCaner extends AENetworkedPoweredTile
     @Override
     public PatternContainerGroup getCraftingMachineInfo() {
         return new PatternContainerGroup(AEItemKey.of(AEBlocks.CANER.stack()),
-            new TextComponentTranslation("tile.ae2.caner.name"), List.of());
+            AEBlocks.CANER.stack().getTextComponent(), List.of());
     }
 
     @Override

@@ -1,5 +1,6 @@
 package ae2.integration.modules.hei;
 
+import ae2.core.localization.HeiText;
 import it.unimi.dsi.fastutil.ints.IntCollection;
 import it.unimi.dsi.fastutil.ints.IntCollections;
 import mezz.jei.api.gui.IRecipeLayout;
@@ -8,7 +9,6 @@ import mezz.jei.gui.TooltipRenderer;
 import mezz.jei.gui.recipes.RecipeLayout;
 import mezz.jei.gui.recipes.RecipeTransferButton;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.I18n;
 import org.jspecify.annotations.NonNull;
 
 final class PatternRecipeTransferUserError implements IRecipeTransferError {
@@ -34,7 +34,7 @@ final class PatternRecipeTransferUserError implements IRecipeTransferError {
                           int recipeY) {
         RecipeTransferHighlightHelper.drawHighlights(minecraft, recipeLayout, missingGuiSlots, craftableGuiSlots,
             recipeX, recipeY);
-        TooltipRenderer.drawHoveringText(minecraft, I18n.format("jei.tooltip.transfer"), mouseX, mouseY);
+        TooltipRenderer.drawHoveringText(minecraft, HeiText.MoveItems.getLocal(), mouseX, mouseY);
     }
 
     private void enableTransferButton() {

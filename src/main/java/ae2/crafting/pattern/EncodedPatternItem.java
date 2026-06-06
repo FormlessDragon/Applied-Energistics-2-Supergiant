@@ -76,9 +76,7 @@ public class EncodedPatternItem<T extends IPatternDetails> extends AEBaseItem {
         if (amount > 0) {
             String amountText = amountType != null ? amountType.formatAmount(amount, AmountFormat.FULL)
                 : String.valueOf(amount);
-            return new TextComponentString(amountText)
-                .appendText(" x ")
-                .appendSibling(displayName.createCopy());
+            return GuiText.PatternAmountTimesName.text(amountText, displayName.createCopy());
         }
         return displayName.createCopy();
     }

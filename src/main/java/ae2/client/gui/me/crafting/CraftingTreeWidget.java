@@ -33,7 +33,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.fml.client.config.GuiUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -1292,7 +1291,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
                             lines.add(formatMachineLocation(location));
                         }
                     } else {
-                        lines.add(new TextComponentTranslation("gui.ae2.CraftingTreeHighlightProvider"));
+                        lines.add(GuiText.CraftingTreeHighlightProvider.text());
                     }
                 }
                 return new Tooltip(lines);
@@ -1333,8 +1332,8 @@ public class CraftingTreeWidget implements ICompositeWidget {
 
         private ITextComponent formatMachineLocation(CraftingSupplierLocation location) {
             String dimensionName = CraftingSupplierLocator.getDimensionName(location.dimensionId());
-            return new TextComponentString(location.x() + " " + location.y() + " " + location.z()
-                + " (" + dimensionName + ")");
+            return GuiText.CraftingTreeLocationInDimension.text(
+                location.x(), location.y(), location.z(), dimensionName);
         }
     }
 

@@ -23,6 +23,7 @@
 
 package ae2.api.util;
 
+import ae2.core.localization.LocalizationEnum;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.item.EnumDyeColor;
 
@@ -32,7 +33,7 @@ import net.minecraft.item.EnumDyeColor;
  * Should be the same order as Dyes, excluding Transparent.
  */
 
-public enum AEColor {
+public enum AEColor implements LocalizationEnum {
     WHITE("White", "gui.ae2.White", "white", EnumDyeColor.WHITE, 0xb4b4b4, 0xe0e0e0, 0xf9f9f9, 0x000000),
     LIGHT_GRAY("Light Gray", "gui.ae2.LightGray", "light_gray", EnumDyeColor.SILVER, 0x7e7e7e, 0xa09fa0, 0xc4c4c4,
         0x000000),
@@ -170,6 +171,11 @@ public enum AEColor {
 
     public String getEnglishName() {
         return englishName;
+    }
+
+    @Override
+    public String getTranslationKey() {
+        return this.translationKey;
     }
 
     @Override

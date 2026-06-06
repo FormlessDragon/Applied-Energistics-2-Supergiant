@@ -22,6 +22,7 @@ import ae2.api.client.AEKeyRendering;
 import ae2.api.orientation.BlockOrientation;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AmountFormat;
+import ae2.core.localization.GuiText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.GlStateManager;
@@ -86,7 +87,8 @@ public final class BlockEntityRenderHelper {
                                               float spacing, int textColor) {
         renderItem2d(what, itemScale);
 
-        String renderedAmount = amount == 0 && canCraft ? "Craft" : what.formatAmount(amount, AmountFormat.SLOT);
+        String renderedAmount = amount == 0 && canCraft ? GuiText.CraftMonitorCraft.getLocal()
+            : what.formatAmount(amount, AmountFormat.SLOT);
         FontRenderer fontRenderer = Minecraft.getMinecraft().fontRenderer;
         int width = fontRenderer.getStringWidth(renderedAmount);
 

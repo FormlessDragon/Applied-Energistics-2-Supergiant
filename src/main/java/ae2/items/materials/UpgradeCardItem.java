@@ -29,6 +29,7 @@ import ae2.container.SlotSemantics;
 import ae2.container.slot.AppEngSlot;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.InGameTooltip;
+import ae2.core.localization.ItemTooltip;
 import ae2.core.localization.PlayerMessages;
 import ae2.items.AEBaseItem;
 import net.minecraft.client.util.ITooltipFlag;
@@ -106,7 +107,7 @@ public class UpgradeCardItem extends AEBaseItem {
             lines.add(TextFormatting.GRAY + GuiText.PseudoCraftingCardLine1.getLocal());
             lines.add(TextFormatting.DARK_GRAY + GuiText.PseudoCraftingCardLine2.getLocal());
         } else if (AEItemIds.PARALLEL_CARD.equals(stack.getItem().getRegistryName())) {
-            lines.add(TextFormatting.GRAY + net.minecraft.client.resources.I18n.format("item.ae2.parallel_card.tooltip"));
+            lines.add(TextFormatting.GRAY + ItemTooltip.ParallelCard.getLocal());
         }
 
         var supportedBy = Upgrades.getTooltipLinesForCard(this);

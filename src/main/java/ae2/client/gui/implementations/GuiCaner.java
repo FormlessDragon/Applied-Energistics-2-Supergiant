@@ -5,10 +5,10 @@ import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.IconButton;
 import ae2.container.implementations.ContainerCaner;
+import ae2.core.localization.GuiText;
 import ae2.tile.misc.CanerMode;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
 
 public class GuiCaner extends AEBaseGui<ContainerCaner> {
     private final ModeButton modeButton;
@@ -34,9 +34,7 @@ public class GuiCaner extends AEBaseGui<ContainerCaner> {
 
         private void setMode(CanerMode mode) {
             this.mode = mode;
-            setMessage(new TextComponentTranslation(mode == CanerMode.FILL
-                ? "gui.ae2.caner.fill"
-                : "gui.ae2.caner.empty"));
+            setMessage(GuiText.canerMode(mode).text());
         }
 
         @Override

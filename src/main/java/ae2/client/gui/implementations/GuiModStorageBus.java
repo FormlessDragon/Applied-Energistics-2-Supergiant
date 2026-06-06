@@ -5,9 +5,9 @@ import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.container.implementations.ContainerModStorageBus;
+import ae2.core.localization.GuiText;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
 
 public class GuiModStorageBus extends GuiSpecialStorageBus<ContainerModStorageBus> {
     private final AETextField modExpression;
@@ -20,7 +20,7 @@ public class GuiModStorageBus extends GuiSpecialStorageBus<ContainerModStorageBu
         this.modExpression.setResponder(container::setModExpression);
         this.modExpression.setMaxStringLength(512);
         this.modExpression.setText(container.modExpression);
-        this.modExpression.setPlaceholder(new TextComponentTranslation("gui.ae2.ModFilterTooltip"));
+        this.modExpression.setPlaceholder(GuiText.ModFilterTooltip.text());
     }
 
     @Override

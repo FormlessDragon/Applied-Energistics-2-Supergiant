@@ -26,7 +26,6 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
 
 import java.util.List;
 
@@ -144,8 +143,9 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
         PageButton(Icon icon, Runnable onPress) {
             super(onPress);
             this.icon = icon;
-            this.setMessage(new TextComponentTranslation(
-                icon == Icon.ARROW_LEFT ? "gui.ae2.PatternProviderPagePrevious" : "gui.ae2.PatternProviderPageNext"));
+            this.setMessage((icon == Icon.ARROW_LEFT
+                ? GuiText.PatternProviderPagePrevious
+                : GuiText.PatternProviderPageNext).text());
         }
 
         @Override

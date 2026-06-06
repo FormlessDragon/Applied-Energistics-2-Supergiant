@@ -1,7 +1,7 @@
 package ae2.me;
 
+import ae2.core.localization.GuiText;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
 
 public enum AnalyserMode {
     FULL,
@@ -16,6 +16,6 @@ public enum AnalyserMode {
     }
 
     public ITextComponent getTranslatedName() {
-        return new TextComponentTranslation("gui.ae2.network_analyser.mode." + name());
+        return GuiText.networkAnalyserMode(this).text();
     }
 }

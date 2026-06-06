@@ -1,5 +1,6 @@
 package ae2.integration.modules.hei;
 
+import ae2.core.localization.HeiText;
 import ae2.core.localization.ItemModText;
 import it.unimi.dsi.fastutil.ints.IntCollection;
 import it.unimi.dsi.fastutil.ints.IntCollections;
@@ -9,7 +10,6 @@ import mezz.jei.api.recipe.transfer.IRecipeTransferError;
 import mezz.jei.gui.recipes.RecipeLayout;
 import mezz.jei.gui.recipes.RecipeTransferButton;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.fml.client.config.GuiUtils;
 import org.jspecify.annotations.NonNull;
@@ -34,7 +34,7 @@ final class CraftingRecipeTransferUserError implements IRecipeTransferError {
 
     static IRecipeTransferError create(IRecipeLayout recipeLayout, CraftingRecipeTransferAnalysis analysis) {
         List<String> tooltip = new ObjectArrayList<>();
-        tooltip.add(I18n.format("jei.tooltip.transfer"));
+        tooltip.add(HeiText.MoveItems.getLocal());
 
         if (analysis.outcome() == CraftingRecipeTransferAnalysis.Outcome.READY) {
             throw new IllegalArgumentException("Ready transfers do not need a user-facing error");

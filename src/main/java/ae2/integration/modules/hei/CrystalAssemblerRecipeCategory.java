@@ -1,6 +1,7 @@
 package ae2.integration.modules.hei;
 
 import ae2.core.AppEng;
+import ae2.core.definitions.AEBlocks;
 import mezz.jei.api.IGuiHelper;
 import mezz.jei.api.gui.IDrawable;
 import mezz.jei.api.gui.IDrawableAnimated;
@@ -11,7 +12,6 @@ import mezz.jei.api.gui.IRecipeLayout;
 import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.recipe.IRecipeCategory;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 
@@ -41,7 +41,7 @@ class CrystalAssemblerRecipeCategory implements IRecipeCategory<CrystalAssembler
 
     @Override
     public String getTitle() {
-        return I18n.format("tile.ae2.crystal_assembler.name");
+        return AEBlocks.CRYSTAL_ASSEMBLER.stack().getDisplayName();
     }
 
     @Override

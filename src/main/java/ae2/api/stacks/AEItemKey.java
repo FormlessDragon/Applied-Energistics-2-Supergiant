@@ -15,11 +15,13 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
 import net.minecraftforge.oredict.OreDictionary;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
 public final class AEItemKey extends AEKey {
+    @NotNull
     private final ItemStack stack;
     private final int hashCode;
     private final int maxStackSize;
@@ -126,6 +128,7 @@ public final class AEItemKey extends AEKey {
         return ingredient.apply(getReadOnlyStack());
     }
 
+    @NotNull
     public ItemStack getReadOnlyStack() {
         return stack;
     }

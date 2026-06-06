@@ -22,6 +22,7 @@ import ae2.api.networking.GridHelper;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.spatial.ISpatialService;
+import ae2.core.localization.PlayerMessages;
 import ae2.items.AEBaseItem;
 import ae2.util.InteractionUtil;
 import net.minecraft.block.state.IBlockState;
@@ -36,7 +37,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.DimensionManager;
@@ -50,7 +51,7 @@ public class ReplicatorCardItem extends AEBaseItem {
             NBTTagCompound tag = getOrCreateTag(stack);
             int replications = tag.hasKey("r") ? (tag.getInteger("r") + 1) % 4 : 0;
             tag.setInteger("r", replications);
-            player.sendMessage(new TextComponentString(replications + 1 + "³ Replications"));
+            player.sendMessage(PlayerMessages.ReplicatorCardReplications.text(replications + 1));
         }
 
         return new ActionResult<>(EnumActionResult.SUCCESS, player.getHeldItem(hand));
@@ -81,9 +82,9 @@ public class ReplicatorCardItem extends AEBaseItem {
                 tag.setInteger("side", side.ordinal());
                 tag.setInteger("dim", world.provider.getDimension());
                 tag.setInteger("r", 0);
-                outputMsg(player, "Set replicator source");
+                outputMsg(player, PlayerMessages.ReplicatorCardSourceSet.text());
             } else {
-                outputMsg(player, "This does not host a grid node");
+                outputMsg(player, PlayerMessages.ReplicatorCardNoGridHost.text());
             }
         } else {
             NBTTagCompound tag = player.getHeldItem(hand).getTagCompound();
@@ -97,7 +98,7 @@ public class ReplicatorCardItem extends AEBaseItem {
 
                 WorldServer srcWorld = DimensionManager.getWorld(dimension);
                 if (srcWorld == null) {
-                    outputMsg(player, "Src is no longer a grid block?");
+                    outputMsg(player, PlayerMessages.ReplicatorCardSourceMissingGridBlock.text());
                     return EnumActionResult.SUCCESS;
                 }
 
@@ -164,16 +165,16 @@ public class ReplicatorCardItem extends AEBaseItem {
                                 }
                             }
                         } else {
-                            outputMsg(player, "requires valid spatial pylon setup.");
+                            outputMsg(player, PlayerMessages.ReplicatorCardRequiresSpatialPylons.text());
                         }
                     } else {
-                        outputMsg(player, "No grid node?");
+                        outputMsg(player, PlayerMessages.ReplicatorCardNoGridNode.text());
                     }
                 } else {
-                    outputMsg(player, "Src is no longer a grid block?");
+                    outputMsg(player, PlayerMessages.ReplicatorCardSourceMissingGridBlock.text());
                 }
             } else {
-                outputMsg(player, "No Source Defined");
+                outputMsg(player, PlayerMessages.ReplicatorCardNoSourceDefined.text());
             }
         }
 
@@ -189,7 +190,7 @@ public class ReplicatorCardItem extends AEBaseItem {
         return tag;
     }
 
-    private void outputMsg(Entity player, String string) {
-        player.sendMessage(new TextComponentString(string));
+    private void outputMsg(Entity player, ITextComponent message) {
+        player.sendMessage(message);
     }
 }

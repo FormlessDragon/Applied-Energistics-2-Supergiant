@@ -5,6 +5,7 @@ import ae2.client.gui.color.ColorArea;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.widgets.AETextField;
 import ae2.container.implementations.ContainerTickAnalyser;
+import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.AnalyserGenericPacket;
 import ae2.core.network.serverbound.TickConfigSavePacket;
@@ -12,7 +13,6 @@ import ae2.core.network.serverbound.TickProfilerRequestPacket;
 import ae2.items.tools.TickAnalyserConfig;
 import ae2.util.ColorData;
 import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.util.text.TextComponentTranslation;
 import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
@@ -29,11 +29,11 @@ public class GuiTickAnalyser extends AEBaseGui<ContainerTickAnalyser> {
 
     public GuiTickAnalyser(ContainerTickAnalyser container, InventoryPlayer playerInventory) {
         super(container, playerInventory, GuiStyleManager.loadStyleDoc(STYLE_PATH));
-        this.widgets.addButton("start", new TextComponentTranslation("gui.ae2.tick_analyser.start"), () -> {
+        this.widgets.addButton("start", GuiText.TickAnalyserStart.text(), () -> {
             syncDuration();
             InitNetwork.sendToServer(new TickProfilerRequestPacket(this.duration));
         });
-        this.widgets.addButton("cancel", new TextComponentTranslation("gui.ae2.tick_analyser.cancel"),
+        this.widgets.addButton("cancel", GuiText.TickAnalyserCancel.text(),
             () -> InitNetwork.sendToServer(new TickProfilerRequestPacket(-1)));
         for (int i = 0; i < this.dots.length; i++) {
             final int index = i;

@@ -1,12 +1,12 @@
 package ae2.integration.modules.hei;
 
+import ae2.core.localization.HeiText;
 import ae2.recipes.handlers.CrystalFixerRecipe;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.ingredients.VanillaTypes;
 import mezz.jei.api.recipe.IRecipeWrapper;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.item.ItemStack;
 import org.jspecify.annotations.NonNull;
 
@@ -69,8 +69,7 @@ class CrystalFixerRecipeWrapper implements IRecipeWrapper {
 
     @Override
     public void drawInfo(@NonNull Minecraft minecraft, int recipeWidth, int recipeHeight, int mouseX, int mouseY) {
-        String chance = I18n.format("ae2.hei.crystal_fixer.success_chance",
-            PERCENT.format(this.recipe.getChancePercent()));
+        String chance = HeiText.CrystalFixerSuccessChance.getLocal(PERCENT.format(this.recipe.getChancePercent()));
         minecraft.fontRenderer.drawString(chance, 1, 2, 0x7E7E7E);
     }
 }

@@ -1,6 +1,5 @@
 package ae2.client.gui.me.requester;
 
-import ae2.api.stacks.AEFluidKey;
 import ae2.api.stacks.AEKey;
 import ae2.client.gui.MathExpressionParser;
 import ae2.client.gui.NumberEntryType;
@@ -13,7 +12,6 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.text.TextFormatting;
 import org.jetbrains.annotations.Nullable;
 
@@ -30,7 +28,6 @@ import java.util.function.Consumer;
 
 public class NumberField extends ConfirmableTextField {
 
-    private static final int PADDING = 8;
     private static final int WIDTH = 50;
     private static final int HEIGHT = 12;
 
@@ -39,15 +36,16 @@ public class NumberField extends ConfirmableTextField {
 
     private static final int MIN_VALUE = 0;
 
-    private final String name;
+    private final GuiText label;
     private final DecimalFormat decimalFormat;
 
     private NumberEntryType type = NumberEntryType.UNITLESS;
-    private boolean isFluid;
+    @Nullable
+    private String unitSymbol;
 
-    NumberField(int x, int y, String name, GuiStyle style, Consumer<Long> onConfirm) {
+    NumberField(int x, int y, GuiText label, GuiStyle style, Consumer<Long> onConfirm) {
         super(style, Minecraft.getMinecraft().fontRenderer, x, y, WIDTH, HEIGHT);
-        this.name = name;
+        this.label = label;
 
         this.decimalFormat = new DecimalFormat("#.######", new DecimalFormatSymbols());
         this.decimalFormat.setParseBigDecimal(true);
@@ -68,10 +66,10 @@ public class NumberField extends ConfirmableTextField {
 
     public void renderWidget(FontRenderer font) {
         super.drawTextBox();
-        if (!isFluid) {
+        if (unitSymbol == null) {
             return;
         }
-        font.drawString("B", getX() + WIDTH - PADDING, getY(), 0x54_5454);
+        font.drawString(unitSymbol, getX() + WIDTH - font.getStringWidth(unitSymbol), getY(), 0x54_5454);
     }
 
     private void validate() {
@@ -146,7 +144,7 @@ public class NumberField extends ConfirmableTextField {
 
     @Override
     public void setTooltipMessage(List<ITextComponent> tooltipMessage) {
-        tooltipMessage.addFirst(new TextComponentTranslation("gui.ae2.requester." + name));
+        tooltipMessage.addFirst(this.label.text());
         super.setTooltipMessage(tooltipMessage);
         if (!isFocused() || (tooltipMessage.size() > 1 && !tooltipMessage.getFirst().getFormattedText().startsWith("="))) {
             return;
@@ -155,7 +153,7 @@ public class NumberField extends ConfirmableTextField {
             new TextComponentString("» ")
                 .setStyle(new Style().setColor(TextFormatting.AQUA))
                 .appendSibling(
-                    new TextComponentTranslation("gui.ae2.requester.submit")
+                    GuiText.RequesterSubmit.text()
                         .setStyle(new Style().setColor(TextFormatting.GRAY))
                 )
         );
@@ -170,12 +168,14 @@ public class NumberField extends ConfirmableTextField {
     }
 
     void adjustToType(@Nullable AEKey key) {
-        this.isFluid = key instanceof AEFluidKey;
         this.type = NumberEntryType.of(key);
-        if (isFluid) {
+        this.unitSymbol = this.type.unit();
+        if (unitSymbol != null) {
+            int unitWidth = Minecraft.getMinecraft().fontRenderer.getStringWidth(unitSymbol);
             this.setMaxStringLength(5);
-            resize(WIDTH - PADDING, HEIGHT);
+            resize(WIDTH - unitWidth, HEIGHT);
         } else {
+            this.setMaxStringLength(7);
             resize(WIDTH, HEIGHT);
         }
     }

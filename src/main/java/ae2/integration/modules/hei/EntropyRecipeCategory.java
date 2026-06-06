@@ -1,6 +1,7 @@
 package ae2.integration.modules.hei;
 
 import ae2.core.AppEng;
+import ae2.core.definitions.AEItems;
 import ae2.core.localization.HeiText;
 import mezz.jei.api.IGuiHelper;
 import mezz.jei.api.gui.IDrawable;
@@ -10,7 +11,6 @@ import mezz.jei.api.gui.IRecipeLayout;
 import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.recipe.IRecipeCategory;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 
@@ -31,7 +31,7 @@ class EntropyRecipeCategory implements IRecipeCategory<EntropyRecipeWrapper> {
         this.background = new HeiBackgroundDrawable(130, 60);
         this.slotDrawable = guiHelper.createDrawable(location, 0, 34, 18, 18);
         this.arrow = guiHelper.createDrawable(location, 0, 0, 24, 17);
-        this.localizedName = I18n.format("item.ae2.entropy_manipulator.name");
+        this.localizedName = AEItems.ENTROPY_MANIPULATOR.stack().getDisplayName();
     }
 
     @Override

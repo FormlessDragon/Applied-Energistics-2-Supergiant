@@ -70,7 +70,6 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.common.capabilities.Capability;
 
 import javax.annotation.Nullable;
@@ -420,7 +419,7 @@ public class TileInscriber extends AENetworkedPoweredTile
     @Override
     public PatternContainerGroup getCraftingMachineInfo() {
         return new PatternContainerGroup(AEItemKey.of(AEBlocks.INSCRIBER.stack()),
-            new TextComponentTranslation("tile.ae2.inscriber.name"), List.of());
+            AEBlocks.INSCRIBER.stack().getTextComponent(), List.of());
     }
 
     @Override

@@ -195,7 +195,8 @@ public class GuiNetworkStatus<T extends AEBaseContainer & INetworkStatusContaine
             return Platform.formatPower(value, isRate);
         }
 
-        return "Infinity " + AEConfig.instance().getSelectedEnergyUnit().getSymbolName() + (isRate ? "/t" : "");
+        return GuiText.ChannelModeInfinite.getLocal() + " "
+            + AEConfig.instance().getSelectedEnergyUnit().getSymbolName() + (isRate ? "/t" : "");
     }
 }
 

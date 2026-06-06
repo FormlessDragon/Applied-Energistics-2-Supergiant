@@ -23,12 +23,10 @@ import ae2.api.client.AEKeyRendering;
 import ae2.api.stacks.AEFluidKey;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKeyType;
-import ae2.api.stacks.GenericStack;
 import ae2.client.gui.style.FluidBlitter;
 import ae2.core.definitions.AEItems;
 import ae2.core.definitions.ItemDefinition;
 import ae2.crafting.pattern.EncodedPatternItem;
-import ae2.items.misc.WrappedGenericStack;
 import ae2.util.Platform;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
@@ -64,7 +62,6 @@ public final class InitStackRenderHandlers {
         AEKeyRendering.register(AEKeyType.fluids(), AEFluidKey.class, new FluidKeyRenderHandler());
         installDelegatingRenderer(AEItems.CRAFTING_PATTERN, InitStackRenderHandlers::resolveEncodedPatternOutput);
         installDelegatingRenderer(AEItems.PROCESSING_PATTERN, InitStackRenderHandlers::resolveEncodedPatternOutput);
-        installDelegatingRenderer(AEItems.WRAPPED_GENERIC_STACK, InitStackRenderHandlers::resolveWrappedStackItem);
     }
 
     private static void installDelegatingRenderer(ItemDefinition<?> definition, Function<ItemStack, ItemStack> resolver) {
@@ -86,19 +83,6 @@ public final class InitStackRenderHandlers {
         }
 
         return encodedPattern.getOutput(stack, level);
-    }
-
-    private static ItemStack resolveWrappedStackItem(ItemStack stack) {
-        if (!(stack.getItem() instanceof WrappedGenericStack)) {
-            return ItemStack.EMPTY;
-        }
-
-        GenericStack genericStack = GenericStack.unwrapItemStack(stack);
-        if (genericStack == null || !(genericStack.what() instanceof AEItemKey itemKey)) {
-            return ItemStack.EMPTY;
-        }
-
-        return itemKey.toStack();
     }
 
     static GuiRenderCleanupState getGuiRenderCleanupState() {

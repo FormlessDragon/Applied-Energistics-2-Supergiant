@@ -10,7 +10,6 @@ import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.recipe.IRecipeCategory;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.util.ResourceLocation;
 
 import javax.annotation.Nonnull;
@@ -34,7 +33,7 @@ class CrystalFixerRecipeCategory implements IRecipeCategory<CrystalFixerRecipeWr
 
     @Override
     public String getTitle() {
-        return I18n.format("tile.ae2.crystal_fixer.name");
+        return AEBlocks.CRYSTAL_FIXER.stack().getDisplayName();
     }
 
     @Override

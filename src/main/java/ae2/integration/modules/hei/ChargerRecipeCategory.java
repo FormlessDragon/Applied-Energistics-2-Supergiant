@@ -1,6 +1,7 @@
 package ae2.integration.modules.hei;
 
 import ae2.core.AppEng;
+import ae2.core.definitions.AEBlocks;
 import ae2.core.localization.HeiText;
 import ae2.tile.misc.TileCharger;
 import ae2.tile.misc.TileCrank;
@@ -11,7 +12,6 @@ import mezz.jei.api.gui.IRecipeLayout;
 import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.recipe.IRecipeCategory;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.util.ResourceLocation;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -43,7 +43,7 @@ class ChargerRecipeCategory implements IRecipeCategory<ChargerRecipeWrapper> {
 
     @Override
     public String getTitle() {
-        return I18n.format("tile.ae2.charger.name");
+        return AEBlocks.CHARGER.stack().getDisplayName();
     }
 
     @Override

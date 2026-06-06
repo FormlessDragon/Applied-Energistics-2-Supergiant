@@ -2,13 +2,13 @@ package ae2.client.gui.me.requester;
 
 import ae2.api.util.AEColor;
 import ae2.client.gui.widgets.ITooltip;
+import ae2.core.localization.GuiText;
 import ae2.tile.crafting.requester.RequestStatus;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.text.TextFormatting;
 
 import java.awt.Rectangle;
@@ -38,14 +38,13 @@ public final class StatusDisplay implements ITooltip {
     }
 
     private static void addStatusTooltipLine(List<ITextComponent> tooltip, RequestStatus status) {
-        tooltip.add(statusText(status));
-        tooltip.add(new TextComponentTranslation("gui.ae2.requester.status." + status.name().toLowerCase() + ".desc"));
+        tooltip.add(GuiText.requesterStatus(status).text().setStyle(new Style().setColor(statusFormatting(status))));
+        tooltip.add(GuiText.requesterStatusDescription(status).text());
         tooltip.add(new TextComponentString(" "));
     }
 
     private static ITextComponent statusText(RequestStatus status) {
-        return new TextComponentTranslation("gui.ae2.requester.status." + status.name().toLowerCase())
-            .setStyle(new Style().setColor(statusFormatting(status)));
+        return GuiText.requesterStatus(status).text().setStyle(new Style().setColor(statusFormatting(status)));
     }
 
     private static TextFormatting statusFormatting(RequestStatus status) {
@@ -112,7 +111,7 @@ public final class StatusDisplay implements ITooltip {
     @Override
     public List<ITextComponent> getTooltipMessage() {
         List<ITextComponent> tooltip = new ArrayList<>();
-        tooltip.add(new TextComponentTranslation("gui.ae2.requester.status"));
+        tooltip.add(GuiText.RequesterStatus.text());
         if (GuiScreen.isShiftKeyDown()) {
             tooltip.add(new TextComponentString(" "));
             addStatusTooltipLine(tooltip, RequestStatus.IDLE);
@@ -124,7 +123,7 @@ public final class StatusDisplay implements ITooltip {
         } else {
             tooltip.add(statusText(getVisibleStatus()));
             tooltip.add(new TextComponentString(" "));
-            tooltip.add(new TextComponentTranslation("gui.ae2.requester.status.shift").setStyle(
+            tooltip.add(GuiText.RequesterStatusShift.text().setStyle(
                 new Style().setColor(TextFormatting.GRAY)));
         }
         return tooltip;

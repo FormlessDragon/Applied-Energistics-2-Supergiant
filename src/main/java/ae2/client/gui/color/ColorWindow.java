@@ -7,11 +7,12 @@ import ae2.client.gui.style.Blitter;
 import ae2.client.gui.style.WidgetStyle;
 import ae2.client.gui.widgets.IconButton;
 import ae2.core.AppEng;
+import ae2.core.localization.GuiText;
 import ae2.util.ColorData;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.gui.GuiButton;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.ITextComponent;
 
 import java.awt.Rectangle;
 import java.util.ArrayList;
@@ -43,9 +44,9 @@ public class ColorWindow extends ClickableArea {
         addElement("color_preview", this.preview = new ColorArea(0, 0, 0, 0, parent, () -> {
         }));
         this.buttons.add(new ColorActionButton(Icon.ENTER,
-            new TextComponentTranslation("gui.ae2.Set"), apply));
+            GuiText.Set.text(), apply));
         this.buttons.add(new ColorActionButton(Icon.CLEAR,
-            new TextComponentTranslation("gui.ae2.Cancel"), cancel));
+            GuiText.Cancel.text(), cancel));
     }
 
     private void addElement(String id, ClickableArea area) {
@@ -227,7 +228,7 @@ public class ColorWindow extends ClickableArea {
     private static final class ColorActionButton extends IconButton {
         private final Icon icon;
 
-        private ColorActionButton(Icon icon, TextComponentTranslation message, Runnable onPress) {
+        private ColorActionButton(Icon icon, ITextComponent message, Runnable onPress) {
             super(onPress);
             this.icon = icon;
             setMessage(message);

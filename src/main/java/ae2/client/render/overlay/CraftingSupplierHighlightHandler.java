@@ -1,5 +1,6 @@
 package ae2.client.render.overlay;
 
+import ae2.core.localization.PlayerMessages;
 import ae2.crafting.execution.CraftingSupplierLocation;
 import ae2.crafting.execution.CraftingSupplierLocator;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -7,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.text.ITextComponent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.lwjgl.opengl.GL11;
@@ -35,17 +37,18 @@ public class CraftingSupplierHighlightHandler {
         this.expiresAt = System.currentTimeMillis() + DURATION_MS;
 
         for (var location : locations) {
-            String base = "供应器位置: " + location.x() + " " + location.y() + " " + location.z();
+            ITextComponent base = PlayerMessages.CraftingSupplierLocation.text(
+                location.x(), location.y(), location.z());
             if (location.dimensionId() == currentDimension) {
-                minecraft.player.sendStatusMessage(new net.minecraft.util.text.TextComponentString(base), true);
-                minecraft.player.sendMessage(new net.minecraft.util.text.TextComponentString(base));
+                minecraft.player.sendStatusMessage(base.createCopy(), true);
+                minecraft.player.sendMessage(base);
                 this.currentDimensionLocations.add(location);
             } else {
                 String dimensionName = CraftingSupplierLocator.getDimensionName(location.dimensionId());
-                String otherDim = "供应器位置: " + location.x() + " " + location.y() + " " + location.z()
-                    + " (维度 " + location.dimensionId() + " - " + dimensionName + ")";
-                minecraft.player.sendStatusMessage(new net.minecraft.util.text.TextComponentString(otherDim), true);
-                minecraft.player.sendMessage(new net.minecraft.util.text.TextComponentString(otherDim));
+                ITextComponent otherDim = PlayerMessages.CraftingSupplierLocationInDimension.text(
+                    location.x(), location.y(), location.z(), location.dimensionId(), dimensionName);
+                minecraft.player.sendStatusMessage(otherDim.createCopy(), true);
+                minecraft.player.sendMessage(otherDim);
             }
         }
     }

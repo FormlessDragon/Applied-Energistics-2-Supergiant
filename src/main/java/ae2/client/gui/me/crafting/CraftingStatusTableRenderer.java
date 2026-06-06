@@ -24,14 +24,10 @@ import ae2.api.stacks.AmountFormat;
 import ae2.api.util.AEColor;
 import ae2.client.gui.AEBaseGui;
 import ae2.container.me.crafting.CraftingStatusEntry;
-import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.Style;
-import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextFormatting;
 
 import java.util.List;
 import java.util.Objects;
@@ -40,7 +36,7 @@ public class CraftingStatusTableRenderer extends AbstractTableRenderer<CraftingS
     private static final int BACKGROUND_ALPHA = 0x5A000000;
 
     public CraftingStatusTableRenderer(AEBaseGui<?> screen, int x, int y) {
-        super(screen, x, y, 6);
+        super(screen, x, y, CraftingScreenLayout.MIN_ROWS);
     }
 
     @Override
@@ -84,12 +80,7 @@ public class CraftingStatusTableRenderer extends AbstractTableRenderer<CraftingS
                 what.getType().formatAmount(entry.pendingAmount(), AmountFormat.FULL)));
         }
         if (entry.activeAmount() > 0 || entry.pendingAmount() > 0) {
-            lines.add(new TextComponentString("")
-                .appendSibling(Tooltips.of(new TextComponentString("Shift + ")
-                    .setStyle(new Style().setColor(TextFormatting.GRAY))))
-                .appendSibling(Tooltips.of(ButtonToolTips.LeftClick.text()))
-                .appendSibling(Tooltips.of(new TextComponentString(" 定位供应器")
-                    .setStyle(new Style().setColor(TextFormatting.GRAY)))));
+            lines.add(Tooltips.of(GuiText.CraftingStatusHighlightSupplier));
         }
         return lines;
     }

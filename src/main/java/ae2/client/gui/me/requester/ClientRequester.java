@@ -1,8 +1,8 @@
 package ae2.client.gui.me.requester;
 
+import ae2.core.localization.GuiText;
 import ae2.tile.crafting.requester.RequestList;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
 
 public final class ClientRequester implements Comparable<ClientRequester> {
@@ -31,7 +31,7 @@ public final class ClientRequester implements Comparable<ClientRequester> {
     }
 
     public ITextComponent getDisplayName() {
-        return this.displayName == null ? new TextComponentString("Requester") : this.displayName;
+        return this.displayName == null ? GuiText.RequesterFallbackName.text() : this.displayName;
     }
 
     public String getSearchName() {

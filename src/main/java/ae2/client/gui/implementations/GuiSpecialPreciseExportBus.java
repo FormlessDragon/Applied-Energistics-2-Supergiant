@@ -14,6 +14,7 @@ import ae2.container.implementations.ContainerIOBus;
 import ae2.core.definitions.AEItems;
 import ae2.core.definitions.AEParts;
 import ae2.core.localization.ButtonToolTips;
+import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;
@@ -24,7 +25,6 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.ClickType;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
 
 import java.io.IOException;
 
@@ -69,8 +69,7 @@ public class GuiSpecialPreciseExportBus extends GuiSpecialExportBus<ContainerIOB
         int color = this.style != null
             ? this.style.getColor(PaletteColor.DEFAULT_TEXT_COLOR).toARGB() & 0xFFFFFF
             : 0x404040;
-        this.fontRenderer.drawString(new TextComponentTranslation("gui.ae2.PreciseBusSetAmount").getFormattedText(),
-            0, 0, color);
+        this.fontRenderer.drawString(GuiText.PreciseBusSetAmount.getLocal(), 0, 0, color);
         GlStateManager.popMatrix();
     }
 
