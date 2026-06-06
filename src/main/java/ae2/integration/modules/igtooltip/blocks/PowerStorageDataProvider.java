@@ -33,7 +33,7 @@ public final class PowerStorageDataProvider implements BodyProvider<TileEntity>,
             var formatCurrentPower = Platform.formatPower(currentPower, false);
             var formatMaxPower = Platform.formatPower(maxPower, false);
 
-            tooltip.addLine(TopText.stored_energy.text(formatCurrentPower, formatMaxPower));
+            tooltip.addLabel(TopText.stored_energy, formatCurrentPower + " / " + formatMaxPower);
         }
     }
 

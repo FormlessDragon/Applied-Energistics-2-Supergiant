@@ -11,7 +11,6 @@ import ae2.me.service.PathingService;
 import ae2.parts.networking.IUsedChannelProvider;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.common.util.Constants;
 
@@ -29,7 +28,7 @@ public final class ChannelDataProvider
         var serverData = context.serverData();
         if (serverData.hasKey(TAG_ERROR, Constants.NBT.TAG_STRING)) {
             var error = ChannelError.valueOf(serverData.getString(TAG_ERROR));
-            tooltip.addLine(error.text.text().setStyle(new Style().setColor(TextFormatting.RED)));
+            tooltip.addLine(error.text, TextFormatting.RED);
             return;
         }
 
@@ -38,9 +37,9 @@ public final class ChannelDataProvider
             var maxChannels = serverData.getInteger(TAG_MAX_CHANNELS);
             // Even in the maxChannels=0 case, we'll show as infinite
             if (maxChannels <= 0) {
-                tooltip.addLine(TopText.channels.text(usedChannels));
+                tooltip.addLabel(TopText.channels, Integer.toString(usedChannels));
             } else {
-                tooltip.addLine(TopText.channels_of.text(usedChannels, maxChannels));
+                tooltip.addLabel(TopText.channels_of, usedChannels + " / " + maxChannels);
             }
         }
     }

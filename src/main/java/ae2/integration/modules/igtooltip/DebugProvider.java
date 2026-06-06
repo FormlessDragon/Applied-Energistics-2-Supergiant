@@ -21,10 +21,6 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.Style;
-import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
@@ -81,11 +77,11 @@ public final class DebugProvider {
         var strategy = IOrientationStrategy.get(blockState);
         if (!strategy.getProperties().isEmpty()) {
             var orientation = BlockOrientation.get(strategy, blockState);
-            tooltip.addLine(new TextComponentString("")
-                .appendSibling(label(TopText.debug_forward.text(), TextFormatting.WHITE))
-                .appendSibling(localizeSide(orientation.getSide(ae2.api.orientation.RelativeSide.FRONT)))
-                .appendSibling(spaceLabel(TopText.debug_spin.text(), TextFormatting.WHITE))
-                .appendSibling(new TextComponentString(String.valueOf(orientation.getSpin()))));
+            tooltip.addLine(label(tooltip, TopText.debug_forward, TextFormatting.WHITE)
+                + localizeSide(tooltip, orientation.getSide(ae2.api.orientation.RelativeSide.FRONT))
+                + " "
+                + label(tooltip, TopText.debug_spin, TextFormatting.WHITE)
+                + orientation.getSpin());
         }
     }
 
@@ -96,7 +92,7 @@ public final class DebugProvider {
             var nodeCompound = nodes.getCompoundTagAt(i);
             if (nodes.tagCount() > 1) {
                 var nodeNameKey = nodeCompound.getString(TAG_NODE_NAME);
-                tooltip.addLine(styled(new TextComponentTranslation(nodeNameKey), TextFormatting.ITALIC));
+                tooltip.addLine(TextFormatting.ITALIC + tooltip.localize(nodeNameKey));
             }
             addNodeToTooltip(nodeCompound, tooltip);
         }
@@ -110,55 +106,51 @@ public final class DebugProvider {
                 var max = tickTimes[1];
                 var sum = tickTimes[2];
 
-                tooltip.addLine(new TextComponentString("")
-                    .appendSibling(label(TopText.debug_tick_time.text(), TextFormatting.WHITE))
-                    .appendSibling(label(TopText.debug_avg.text(), TextFormatting.ITALIC))
-                    .appendSibling(styled(Platform.formatTimeMeasurement(avg), TextFormatting.WHITE))
-                    .appendSibling(spaceLabel(TopText.debug_max.text(), TextFormatting.ITALIC))
-                    .appendSibling(styled(Platform.formatTimeMeasurement(max), TextFormatting.WHITE))
-                    .appendSibling(spaceLabel(TopText.debug_sum.text(), TextFormatting.ITALIC))
-                    .appendSibling(styled(Platform.formatTimeMeasurement(sum), TextFormatting.WHITE)));
+                tooltip.addLine(label(tooltip, TopText.debug_tick_time, TextFormatting.WHITE)
+                    + label(tooltip, TopText.debug_avg, TextFormatting.ITALIC)
+                    + value(Platform.formatTimeMeasurement(avg), TextFormatting.WHITE)
+                    + " "
+                    + label(tooltip, TopText.debug_max, TextFormatting.ITALIC)
+                    + value(Platform.formatTimeMeasurement(max), TextFormatting.WHITE)
+                    + " "
+                    + label(tooltip, TopText.debug_sum, TextFormatting.ITALIC)
+                    + value(Platform.formatTimeMeasurement(sum), TextFormatting.WHITE));
             }
         }
 
         if (tag.hasKey(TAG_TICK_QUEUED)) {
-            ITextComponent status = new TextComponentString("");
+            var status = new StringBuilder();
             if (tag.getBoolean(TAG_TICK_SLEEPING)) {
-                appendStatus(status, TopText.debug_sleeping.text());
+                appendStatus(status, tooltip.localize(TopText.debug_sleeping));
             }
             if (tag.getBoolean(TAG_TICK_ALERTABLE)) {
-                appendStatus(status, TopText.debug_alertable.text());
+                appendStatus(status, tooltip.localize(TopText.debug_alertable));
             }
             if (tag.getBoolean(TAG_TICK_AWAKE)) {
-                appendStatus(status, TopText.debug_awake.text());
+                appendStatus(status, tooltip.localize(TopText.debug_awake));
             }
             if (tag.getBoolean(TAG_TICK_QUEUED)) {
-                appendStatus(status, TopText.debug_queued.text());
+                appendStatus(status, tooltip.localize(TopText.debug_queued));
             }
 
-            tooltip.addLine(new TextComponentString("")
-                .appendSibling(label(TopText.debug_tick_status.text(), TextFormatting.WHITE))
-                .appendSibling(status));
-            tooltip.addLine(new TextComponentString("")
-                .appendSibling(label(TopText.debug_tick_rate.text(), TextFormatting.WHITE))
-                .appendText(String.valueOf(tag.getInteger(TAG_TICK_CURRENT_RATE)))
-                .appendSibling(spaceLabel(TopText.debug_last.text(), TextFormatting.WHITE))
-                .appendText(String.valueOf(tag.getLong(TAG_TICK_LAST_TICK)))
-                .appendText(" ")
-                .appendSibling(TopText.debug_ticks_ago.text()));
+            tooltip.addLine(label(tooltip, TopText.debug_tick_status, TextFormatting.WHITE) + status);
+            tooltip.addLine(label(tooltip, TopText.debug_tick_rate, TextFormatting.WHITE)
+                + tag.getInteger(TAG_TICK_CURRENT_RATE)
+                + " "
+                + label(tooltip, TopText.debug_last, TextFormatting.WHITE)
+                + tag.getLong(TAG_TICK_LAST_TICK)
+                + " "
+                + tooltip.localize(TopText.debug_ticks_ago));
         }
 
         if (tag.hasKey(TAG_NODE_EXPOSED, Constants.NBT.TAG_INT)) {
             var exposedSides = tag.getInteger(TAG_NODE_EXPOSED);
-            var line = label(TopText.debug_node_exposed.text(), TextFormatting.WHITE);
+            var line = new StringBuilder(label(tooltip, TopText.debug_node_exposed, TextFormatting.WHITE));
             for (EnumFacing value : EnumFacing.values()) {
-                var sideText = new TextComponentString(value.name().substring(0, 1));
-                sideText.setStyle(new Style()
-                    .setColor((exposedSides & (1 << value.ordinal())) == 0 ? TextFormatting.GRAY
-                        : TextFormatting.GREEN));
-                line.appendSibling(sideText);
+                line.append((exposedSides & (1 << value.ordinal())) == 0 ? TextFormatting.GRAY : TextFormatting.GREEN);
+                line.append(value.name().charAt(0));
             }
-            tooltip.addLine(line);
+            tooltip.addLine(line.toString());
         }
     }
 
@@ -228,41 +220,29 @@ public final class DebugProvider {
             || AEItems.DEBUG_CARD.is(player.getHeldItem(EnumHand.MAIN_HAND));
     }
 
-    private static TextComponentString styled(String text, TextFormatting formatting) {
-        TextComponentString component = new TextComponentString(text);
-        component.setStyle(new Style().setColor(formatting));
-        return component;
+    private static String value(String text, TextFormatting formatting) {
+        return formatting + text + TextFormatting.WHITE;
     }
 
-    private static ITextComponent styled(ITextComponent component, TextFormatting formatting) {
-        component.setStyle(new Style().setColor(formatting));
-        return component;
-    }
-
-    private static void appendStatus(ITextComponent line, ITextComponent status) {
-        if (!line.getSiblings().isEmpty()) {
-            line.appendSibling(new TextComponentString(", "));
+    private static void appendStatus(StringBuilder line, String status) {
+        if (!line.isEmpty()) {
+            line.append(", ");
         }
-        line.appendSibling(status);
+        line.append(status);
     }
 
-    private static ITextComponent label(ITextComponent text, TextFormatting formatting) {
-        text.appendText(": ");
-        return styled(text, formatting);
+    private static String label(TooltipBuilder tooltip, TopText text, TextFormatting formatting) {
+        return formatting + tooltip.localize(text) + ": " + TextFormatting.WHITE;
     }
 
-    private static ITextComponent spaceLabel(ITextComponent text, TextFormatting formatting) {
-        return new TextComponentString(" ").appendSibling(label(text, formatting));
-    }
-
-    private static ITextComponent localizeSide(EnumFacing side) {
+    private static String localizeSide(TooltipBuilder tooltip, EnumFacing side) {
         return switch (side) {
-            case NORTH -> Side.North.text();
-            case SOUTH -> Side.South.text();
-            case EAST -> Side.East.text();
-            case WEST -> Side.West.text();
-            case UP -> Side.Up.text();
-            case DOWN -> Side.Down.text();
+            case NORTH -> tooltip.localize(Side.North);
+            case SOUTH -> tooltip.localize(Side.South);
+            case EAST -> tooltip.localize(Side.East);
+            case WEST -> tooltip.localize(Side.West);
+            case UP -> tooltip.localize(Side.Up);
+            case DOWN -> tooltip.localize(Side.Down);
         };
     }
 

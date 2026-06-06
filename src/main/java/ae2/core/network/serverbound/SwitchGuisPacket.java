@@ -33,6 +33,7 @@ import net.minecraft.inventory.ContainerPlayer;
 import net.minecraft.inventory.IContainerListener;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.IWorldNameable;
 import org.jspecify.annotations.Nullable;
 
@@ -211,15 +212,19 @@ public class SwitchGuisPacket extends ServerboundPacket {
         }
         if (host instanceof AEBaseTile tile) {
             if (tile.hasCustomName()) {
-                return tile.getCustomName();
+                return customTitle(tile.getCustomName());
             }
         }
         if (host instanceof AEBasePart part) {
             if (part.hasCustomName()) {
-                return part.getCustomName();
+                return customTitle(part.getCustomName());
             }
         }
         return null;
+    }
+
+    private static @Nullable ITextComponent customTitle(@Nullable String customName) {
+        return customName == null || customName.isEmpty() ? null : new TextComponentString(customName);
     }
 
     private static byte[] getInitialData(GuiIds.GuiKey guiKey, Object host) {

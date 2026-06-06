@@ -20,7 +20,11 @@ package ae2.block;
 
 import ae2.api.implementations.items.IMemoryCard;
 import ae2.api.implementations.items.MemoryCardMessages;
+import ae2.block.networking.CableBusBlock;
+import ae2.container.GuiIds;
+import ae2.core.gui.GuiOpener;
 import ae2.items.tools.MemoryCardItem;
+import ae2.items.tools.quartz.QuartzCuttingKnifeItem;
 import ae2.tile.AEBaseInvTile;
 import ae2.tile.AEBaseTile;
 import ae2.util.InteractionUtil;
@@ -161,6 +165,18 @@ public abstract class AEBaseTileBlock<T extends AEBaseTile> extends AEBaseBlock 
                                     EnumFacing side, float hitX, float hitY, float hitZ) {
         ItemStack heldItem = player.getHeldItem(hand);
         if (!heldItem.isEmpty() && this.useMemoryCard(world, pos, heldItem, player)) {
+            return true;
+        }
+        if (!heldItem.isEmpty()
+            && heldItem.getItem() instanceof QuartzCuttingKnifeItem
+            && !(this instanceof CableBusBlock)) {
+            T tile = this.getTileEntity(world, pos);
+            if (tile == null) {
+                return true;
+            }
+            if (!world.isRemote) {
+                GuiOpener.openGui(player, GuiIds.GuiKey.RENAMER, tile);
+            }
             return true;
         }
         return super.onBlockActivated(world, pos, state, player, hand, side, hitX, hitY, hitZ);

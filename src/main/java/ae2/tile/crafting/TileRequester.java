@@ -40,6 +40,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
@@ -156,7 +157,7 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
     @Override
     public ITextComponent getRequesterName() {
         return this.hasCustomName()
-            ? this.getCustomName()
+            ? new TextComponentString(this.getCustomName())
             : TextComponentItemStack.of(AEBlocks.REQUESTER.stack());
     }
 

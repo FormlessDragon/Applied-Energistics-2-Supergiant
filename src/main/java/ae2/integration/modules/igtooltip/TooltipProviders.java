@@ -121,27 +121,12 @@ public final class TooltipProviders implements TooltipProvider {
         }
 
         for (var clazz : baseClasses.getPartHostClasses()) {
-            LOG.debug("Registering part host provider for {} and sub-classes", clazz);
-            registration.addBlockEntityName(
-                clazz.blockEntity(),
-                clazz.block(),
-                TooltipIds.PART_NAME,
-                PartHostTooltips::getName);
-            registration.addBlockEntityIcon(
-                clazz.blockEntity(),
-                clazz.block(),
-                TooltipIds.PART_ICON,
-                PartHostTooltips::getIcon);
+            LOG.debug("Registering part host body provider for {} and sub-classes", clazz);
             registration.addBlockEntityBody(
                 clazz.blockEntity(),
                 clazz.block(),
                 TooltipIds.PART_TOOLTIP,
                 PartHostTooltips::buildTooltip);
-            registration.addBlockEntityModName(
-                clazz.blockEntity(),
-                clazz.block(),
-                TooltipIds.PART_MOD_NAME,
-                PartHostTooltips::getModName);
         }
     }
 

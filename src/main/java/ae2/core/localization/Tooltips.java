@@ -113,6 +113,11 @@ public enum Tooltips implements LocalizationEnum {
         return muted(ButtonToolTips.ModifyAmountAction.text(getMouseButtonText(2)));
     }
 
+    public static ITextComponent getRenameTooltip() {
+        ITextComponent input = new TextComponentString("Alt + ").appendSibling(getMouseButtonText(2));
+        return muted(ButtonToolTips.RenameAction.text(input));
+    }
+
     public static ITextComponent getAmountTooltip(LocalizationEnum baseText, AEKey what, long amount) {
         return muted(baseText.text(what.formatAmount(amount, AmountFormat.FULL)));
     }

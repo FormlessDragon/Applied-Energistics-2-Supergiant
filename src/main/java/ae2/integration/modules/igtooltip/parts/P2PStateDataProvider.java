@@ -5,14 +5,12 @@ import ae2.api.integrations.igtooltip.TooltipContext;
 import ae2.api.integrations.igtooltip.providers.BodyProvider;
 import ae2.api.integrations.igtooltip.providers.ServerDataProvider;
 import ae2.integration.modules.theoneprobe.TopText;
+import ae2.integration.modules.theoneprobe.TopTooltipFormatter;
 import ae2.parts.p2p.MEP2PTunnelPart;
 import ae2.parts.p2p.P2PTunnelPart;
-import ae2.util.Platform;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.Style;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 
 @SuppressWarnings("rawtypes")
 public final class P2PStateDataProvider implements BodyProvider<P2PTunnelPart>, ServerDataProvider<P2PTunnelPart> {
@@ -25,13 +23,6 @@ public final class P2PStateDataProvider implements BodyProvider<P2PTunnelPart>, 
     private static final byte STATE_OUTPUT = 1;
     private static final byte STATE_INPUT = 2;
 
-    private static ITextComponent getOutputText(int outputs) {
-        if (outputs <= 1) {
-            return TopText.p2p_input_one_output.text();
-        }
-        return TopText.p2p_input_many_outputs.text(outputs);
-    }
-
     @Override
     public void buildTooltip(P2PTunnelPart object, TooltipContext context, TooltipBuilder tooltip) {
         NBTTagCompound serverData = context.serverData();
@@ -41,25 +32,32 @@ public final class P2PStateDataProvider implements BodyProvider<P2PTunnelPart>, 
             int outputs = serverData.getInteger(TAG_P2P_OUTPUTS);
 
             switch (state) {
-                case STATE_UNLINKED -> tooltip.addLine(TopText.p2p_unlinked.text());
-                case STATE_OUTPUT -> tooltip.addLine(TopText.p2p_output.text());
-                case STATE_INPUT -> tooltip.addLine(getOutputText(outputs));
+                case STATE_UNLINKED -> tooltip.addLine(TopText.p2p_unlinked);
+                case STATE_OUTPUT -> tooltip.addLine(TopText.p2p_output);
+                case STATE_INPUT -> {
+                    if (outputs <= 1) {
+                        tooltip.addLine(TopText.p2p_input_one_output);
+                    } else {
+                        tooltip.addLabel(TopText.p2p_input_many_outputs, Integer.toString(outputs));
+                    }
+                }
                 default -> {
                 }
             }
 
             short freq = serverData.getShort(TAG_P2P_FREQUENCY);
-            ITextComponent freqTooltip = Platform.p2p().toColoredHexString(freq).setStyle(new Style().setBold(true));
+            String freqTooltip = TopTooltipFormatter.p2pFrequency(freq);
             if (serverData.hasKey(TAG_P2P_FREQUENCY_NAME, 8)) {
                 String freqName = serverData.getString(TAG_P2P_FREQUENCY_NAME);
-                freqTooltip = new TextComponentString(freqName).appendText(" (").appendSibling(freqTooltip).appendText(")");
+                freqTooltip = TextFormatting.GREEN + freqName + TextFormatting.WHITE + " (" + freqTooltip
+                    + TextFormatting.WHITE + ")";
             }
 
-            tooltip.addLine(TopText.p2p_frequency.text(freqTooltip));
+            tooltip.addLine(tooltip.localize(TopText.p2p_frequency) + ": " + freqTooltip);
 
             if (serverData.hasKey(TAG_P2P_ME_CARRIED_CHANNELS, 3)) {
                 int carriedChannels = serverData.getInteger(TAG_P2P_ME_CARRIED_CHANNELS);
-                tooltip.addLine(TopText.p2p_me_carried_channels.text(carriedChannels));
+                tooltip.addLabel(TopText.p2p_me_carried_channels, Integer.toString(carriedChannels));
             }
         }
     }
@@ -81,14 +79,14 @@ public final class P2PStateDataProvider implements BodyProvider<P2PTunnelPart>, 
             }
 
             if (part.getCustomName() != null) {
-                serverData.setString(TAG_P2P_FREQUENCY_NAME, part.getCustomName().getFormattedText());
+                serverData.setString(TAG_P2P_FREQUENCY_NAME, part.getCustomName());
             }
         } else {
             var input = part.getInput();
             if (input != null) {
                 state = STATE_OUTPUT;
                 if (input.getCustomName() != null) {
-                    serverData.setString(TAG_P2P_FREQUENCY_NAME, input.getCustomName().getFormattedText());
+                    serverData.setString(TAG_P2P_FREQUENCY_NAME, input.getCustomName());
                 }
             }
         }

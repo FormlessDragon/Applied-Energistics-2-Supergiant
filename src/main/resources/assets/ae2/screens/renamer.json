@@ -1,0 +1,33 @@
+{
+  "$schema": "schema.json",
+  "includes": ["common/common.json"],
+  "background": {
+    "texture": "guis/renamer.png",
+    "srcRect": [0, 0, 176, 61]
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2.Renamer"
+      },
+      "position": {
+        "left": 12,
+        "top": 8
+      }
+    }
+  },
+  "widgets": {
+    "back": {
+      "left": 152,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "name": {
+      "left": 9,
+      "top": 33,
+      "width": 158,
+      "height": 12
+    }
+  }
+}

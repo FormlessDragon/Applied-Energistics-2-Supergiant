@@ -23,8 +23,8 @@
 
 package ae2.api.integrations.igtooltip;
 
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.text.ITextComponent;
+import ae2.core.localization.LocalizationEnum;
+import net.minecraft.util.text.TextFormatting;
 import org.jetbrains.annotations.ApiStatus;
 
 /**
@@ -32,7 +32,17 @@ import org.jetbrains.annotations.ApiStatus;
  */
 @ApiStatus.Experimental
 public interface TooltipBuilder {
-    void addLine(ITextComponent line);
+    String localize(LocalizationEnum text);
 
-    void addLine(ITextComponent line, ResourceLocation id);
+    String localize(String translationKey);
+
+    void addLine(String line);
+
+    void addLine(LocalizationEnum line);
+
+    void addLine(LocalizationEnum line, TextFormatting formatting);
+
+    void addLabel(LocalizationEnum label, String value);
+
+    void addLabel(LocalizationEnum label, String value, TextFormatting valueFormatting);
 }

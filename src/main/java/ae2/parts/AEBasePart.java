@@ -36,7 +36,10 @@ import ae2.api.util.AECableType;
 import ae2.api.util.AEColor;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.definitions.AEParts;
+import ae2.container.GuiIds;
+import ae2.core.gui.GuiOpener;
 import ae2.items.tools.MemoryCardItem;
+import ae2.items.tools.quartz.QuartzCuttingKnifeItem;
 import ae2.util.Platform;
 import ae2.util.SettingsFrom;
 import net.minecraft.crash.CrashReportCategory;
@@ -50,9 +53,6 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.MustBeInvokedByOverriders;
 import org.jetbrains.annotations.Nullable;
@@ -77,7 +77,7 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
     @Nullable
     private EnumFacing side;
     @Nullable
-    private ITextComponent customName;
+    private String customName;
     private boolean clientSidePowered;
     private boolean clientSideMissingChannel;
 
@@ -157,11 +157,7 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
         this.mainNode.loadFromNBT(data);
 
         if (data.hasKey(CUSTOM_NAME_TAG, 8)) {
-            try {
-                this.customName = ITextComponent.Serializer.jsonToComponent(data.getString(CUSTOM_NAME_TAG));
-            } catch (Exception ignored) {
-                this.customName = new TextComponentString(data.getString(CUSTOM_NAME_TAG));
-            }
+            this.setCustomName(data.getString(CUSTOM_NAME_TAG));
         } else {
             this.customName = null;
         }
@@ -176,7 +172,7 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
         this.mainNode.saveToNBT(data);
 
         if (this.customName != null) {
-            data.setString(CUSTOM_NAME_TAG, ITextComponent.Serializer.componentToJson(this.customName));
+            data.setString(CUSTOM_NAME_TAG, this.customName);
         }
     }
 
@@ -264,11 +260,11 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
     public void exportSettings(SettingsFrom mode, NBTTagCompound output) {
         if (mode == SettingsFrom.DISMANTLE_ITEM) {
             if (this.customName != null) {
-                output.setString(CUSTOM_NAME_TAG, this.customName.getFormattedText());
+                output.setString(CUSTOM_NAME_TAG, this.customName);
             }
         } else if (mode == SettingsFrom.MEMORY_CARD) {
             if (this.customName != null) {
-                output.setString(MEMORY_CARD_CUSTOM_NAME_TAG, this.customName.getFormattedText());
+                output.setString(MEMORY_CARD_CUSTOM_NAME_TAG, this.customName);
             }
             MemoryCardItem.exportGenericSettings(this, output);
         }
@@ -287,6 +283,12 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
     @Override
     public boolean onUseItemOn(ItemStack heldItem, EntityPlayer player, EnumHand hand, Vec3d pos) {
         if (useMemoryCard(heldItem, player)) {
+            return true;
+        }
+        if (heldItem.getItem() instanceof QuartzCuttingKnifeItem) {
+            if (!isClientSide()) {
+                GuiOpener.openPartGui(player, GuiIds.GuiKey.RENAMER, this);
+            }
             return true;
         }
         return IPart.super.onUseItemOn(heldItem, player, hand, pos);
@@ -337,29 +339,25 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
 
     public String getName() {
         ItemStack stack = this.partItem.asItemStack();
-        return this.customName != null ? this.customName.getFormattedText() : stack.getTranslationKey();
+        return this.customName != null ? this.customName : stack.getTranslationKey();
     }
 
-    public ITextComponent getDisplayName() {
+    public String getDisplayName() {
         if (this.customName != null) {
             return this.customName;
         }
 
         ItemStack stack = this.partItem.asItemStack();
-        return new TextComponentTranslation(stack.getTranslationKey() + ".name");
+        return stack.getDisplayName();
     }
 
     @Nullable
-    public ITextComponent getCustomName() {
+    public String getCustomName() {
         return this.customName;
     }
 
-    public void setCustomName(@Nullable ITextComponent customName) {
-        this.customName = customName;
-    }
-
     public void setCustomName(@Nullable String customName) {
-        this.customName = customName == null || customName.isEmpty() ? null : new TextComponentString(customName);
+        this.customName = customName == null || customName.isEmpty() ? null : customName;
     }
 
     public boolean hasCustomName() {
@@ -454,4 +452,3 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
         }
     }
 }
-

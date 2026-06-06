@@ -10,7 +10,6 @@ import ae2.me.helpers.IGridConnectedTile;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.common.util.Constants;
 
@@ -25,7 +24,7 @@ public final class GridNodeStateDataProvider implements BodyProvider<TileEntity>
         var tag = context.serverData();
         if (tag.hasKey(TAG_STATE, Constants.NBT.TAG_BYTE)) {
             var state = GridNodeState.values()[tag.getByte(TAG_STATE)];
-            tooltip.addLine(state.textComponent().setStyle(new Style().setColor(TextFormatting.GRAY)));
+            tooltip.addLine(state.text(), TextFormatting.GRAY);
         }
     }
 

@@ -82,7 +82,9 @@ public record PatternContainerGroup(
                 return null;
             }
 
-            if (part instanceof IWorldNameable nameable) {
+            if (part instanceof ae2.parts.AEBasePart aePart) {
+                name = new net.minecraft.util.text.TextComponentString(aePart.getDisplayName());
+            } else if (part instanceof IWorldNameable nameable) {
                 name = nameable.getDisplayName();
             } else {
                 name = icon.getDisplayName();

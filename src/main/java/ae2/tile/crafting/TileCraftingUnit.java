@@ -22,6 +22,7 @@ import ae2.api.networking.GridFlags;
 import ae2.api.networking.IGridMultiblock;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridNodeListener;
+import ae2.api.networking.events.GridCraftingCpuChange;
 import ae2.api.orientation.BlockOrientation;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigurableObject;
@@ -97,6 +98,10 @@ public class TileCraftingUnit extends AENetworkedTile
         this.setCustomName(name);
         if (this.cluster != null) {
             this.cluster.updateName();
+            IGridNode node = this.cluster.getNode();
+            if (node != null) {
+                node.grid().postEvent(new GridCraftingCpuChange(node));
+            }
         }
     }
 

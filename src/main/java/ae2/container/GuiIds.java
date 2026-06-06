@@ -94,7 +94,8 @@ public final class GuiIds {
         ANNIHILATION_PLANE,
         THRESHOLD_LEVEL_EMITTER,
         CONFIG_MODIFIER,
-        PATTERN_MODIFIER;
+        PATTERN_MODIFIER,
+        RENAMER;
 
         public static @NotNull GuiKey fromId(int guiId) {
             int baseGuiId = getBaseGuiId(guiId);

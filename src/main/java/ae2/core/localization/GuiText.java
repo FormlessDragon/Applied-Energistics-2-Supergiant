@@ -283,6 +283,7 @@ public enum GuiText implements LocalizationEnum {
     Installed,
     inWorldCraftingPresses,
     RequiredPower,
+    Renamer,
     Recipe,
     SelectedCraftingCPU,
     SCSInvalid,

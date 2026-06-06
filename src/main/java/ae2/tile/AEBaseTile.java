@@ -43,8 +43,6 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ITickable;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
 import net.minecraftforge.common.capabilities.Capability;
 import org.jetbrains.annotations.Nullable;
@@ -59,7 +57,7 @@ public class AEBaseTile extends TileEntity implements ITickable {
     private static final String UP_TAG = "up";
 
     @Nullable
-    private ITextComponent customName;
+    private String customName;
     private boolean markDirtyQueued = false;
     private byte queuedForReady = 0;
     private byte readyInvoked = 0;
@@ -111,7 +109,7 @@ public class AEBaseTile extends TileEntity implements ITickable {
         }
 
         if (data.hasKey(CUSTOM_NAME_TAG)) {
-            this.customName = new TextComponentString(data.getString(CUSTOM_NAME_TAG));
+            this.setCustomName(data.getString(CUSTOM_NAME_TAG));
         } else {
             this.customName = null;
         }
@@ -130,7 +128,7 @@ public class AEBaseTile extends TileEntity implements ITickable {
         }
 
         if (this.customName != null) {
-            data.setString(CUSTOM_NAME_TAG, this.customName.getFormattedText());
+            data.setString(CUSTOM_NAME_TAG, this.customName);
         }
     }
 
@@ -271,12 +269,12 @@ public class AEBaseTile extends TileEntity implements ITickable {
     }
 
     @Nullable
-    public ITextComponent getCustomName() {
+    public String getCustomName() {
         return this.customName;
     }
 
     public void setCustomName(@Nullable String name) {
-        this.customName = (name == null || name.isEmpty()) ? null : new TextComponentString(name);
+        this.customName = (name == null || name.isEmpty()) ? null : name;
     }
 
     public boolean hasCustomName() {
@@ -296,11 +294,11 @@ public class AEBaseTile extends TileEntity implements ITickable {
     public void exportSettings(SettingsFrom mode, NBTTagCompound output) {
         if (mode == SettingsFrom.DISMANTLE_ITEM) {
             if (this.customName != null) {
-                output.setString(CUSTOM_NAME_TAG, this.customName.getFormattedText());
+                output.setString(CUSTOM_NAME_TAG, this.customName);
             }
         } else if (mode == SettingsFrom.MEMORY_CARD) {
             if (this.customName != null) {
-                output.setString(MEMORY_CARD_CUSTOM_NAME_TAG, this.customName.getFormattedText());
+                output.setString(MEMORY_CARD_CUSTOM_NAME_TAG, this.customName);
             }
             MemoryCardItem.exportGenericSettings(this, output);
         }

@@ -25,6 +25,7 @@ import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.helpers.InventoryAction;
 import ae2.integration.Integrations;
 import ae2.parts.encoding.EncodingMode;
+import ae2.text.TextComponentItemStack;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.ClickType;
@@ -133,6 +134,11 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
         if (mouseButton == 2) {
             Slot slot = findSlot(mouseX, mouseY);
+            if (isAltDown() && slot != null && this.container.isProcessingPatternItemSlot(slot)) {
+                switchToScreen(new GuiPatternItemRenamer(this, slot,
+                    TextComponentItemStack.of(this.container.getHost().getMainContainerIcon())));
+                return;
+            }
             if (slot != null && this.container.canModifyAmountForSlot(slot)) {
                 GenericStack currentStack = GenericStack.fromItemStack(slot.getStack());
                 if (currentStack != null) {
@@ -148,6 +154,10 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
         }
 
         super.mouseClicked(mouseX, mouseY, mouseButton);
+    }
+
+    private static boolean isAltDown() {
+        return Keyboard.isKeyDown(Keyboard.KEY_LMENU) || Keyboard.isKeyDown(Keyboard.KEY_RMENU);
     }
 
     @Override
@@ -182,6 +192,9 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
                 itemTooltip.add(Tooltips.getAmountTooltip(ButtonToolTips.Amount, unwrapped).getFormattedText());
             }
             itemTooltip.add(Tooltips.getSetAmountTooltip().getFormattedText());
+            if (this.container.isProcessingPatternItemSlot(slot)) {
+                itemTooltip.add(Tooltips.getRenameTooltip().getFormattedText());
+            }
             drawItemTooltipWithImages(mouseX, mouseY, slot.getStack(), itemTooltip);
             return;
         }

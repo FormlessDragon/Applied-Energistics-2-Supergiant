@@ -8,7 +8,6 @@ import ae2.api.parts.IPart;
 import ae2.integration.modules.igtooltip.GridNodeState;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.common.util.Constants;
 
@@ -23,7 +22,7 @@ public final class GridNodeStateProvider implements BodyProvider<IPart>, ServerD
         var serverData = context.serverData();
         if (serverData.hasKey(TAG_STATE, Constants.NBT.TAG_BYTE)) {
             var state = GridNodeState.values()[serverData.getByte(TAG_STATE)];
-            tooltip.addLine(state.textComponent().setStyle(new Style().setColor(TextFormatting.GRAY)));
+            tooltip.addLine(state.text(), TextFormatting.GRAY);
         }
     }
 

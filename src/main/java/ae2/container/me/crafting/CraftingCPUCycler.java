@@ -26,6 +26,7 @@ import net.minecraft.util.text.TextComponentString;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 public class CraftingCPUCycler {
@@ -56,6 +57,9 @@ public class CraftingCPUCycler {
             for (CraftingCPURecord cpuRecord : this.cpus) {
                 if (cpuRecord.getCpu() == cpu) {
                     found = true;
+                    if (!Objects.equals(cpuRecord.getRawName(), cpu.getName())) {
+                        changed = true;
+                    }
                     break;
                 }
             }

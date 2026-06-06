@@ -27,13 +27,16 @@ public class CraftingCPURecord implements Comparable<CraftingCPURecord> {
     private final long size;
     private final int processors;
     @Nullable
+    private final ITextComponent rawName;
+    @Nullable
     private ITextComponent name;
 
     public CraftingCPURecord(long size, int processors, ICraftingCPU cpu) {
         this.size = size;
         this.processors = processors;
         this.cpu = cpu;
-        this.name = cpu.getName();
+        this.rawName = cpu.getName();
+        this.name = this.rawName;
     }
 
     @Override
@@ -62,8 +65,12 @@ public class CraftingCPURecord implements Comparable<CraftingCPURecord> {
         return this.name;
     }
 
+    @Nullable
+    public ITextComponent getRawName() {
+        return this.rawName;
+    }
+
     public void setName(@Nullable ITextComponent name) {
         this.name = name;
     }
 }
-

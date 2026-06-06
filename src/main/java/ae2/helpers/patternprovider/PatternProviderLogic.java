@@ -1080,9 +1080,9 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     public PatternContainerGroup getTerminalGroup() {
         TileEntity blockEntity = this.host.getTileEntity();
         if (this.host.hasCustomName()) {
-            ITextComponent name = this.host.getCustomName();
+            String name = this.host.getCustomName();
             if (name != null) {
-                return new PatternContainerGroup(this.host.getTerminalIcon(), name.createCopy(),
+                return new PatternContainerGroup(this.host.getTerminalIcon(), new TextComponentString(name),
                     Collections.emptyList());
             }
         }

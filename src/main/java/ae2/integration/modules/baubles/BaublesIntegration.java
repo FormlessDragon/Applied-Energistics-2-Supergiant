@@ -1,5 +1,6 @@
 package ae2.integration.modules.baubles;
 
+import baubles.api.BaublesApi;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.common.Loader;
@@ -18,14 +19,14 @@ public final class BaublesIntegration {
         if (!isEnabled()) {
             return 0;
         }
-        return baubles.api.BaublesApi.getBaublesHandler(player).getSlots();
+        return BaublesApi.getBaublesHandler(player).getSlots();
     }
 
     public static ItemStack getStackInSlot(EntityPlayer player, int slot) {
         if (!isEnabled()) {
             return ItemStack.EMPTY;
         }
-        var handler = baubles.api.BaublesApi.getBaublesHandler(player);
+        var handler = BaublesApi.getBaublesHandler(player);
         if (slot < 0 || slot >= handler.getSlots()) {
             return ItemStack.EMPTY;
         }

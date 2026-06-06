@@ -141,6 +141,7 @@ public enum ButtonToolTips implements LocalizationEnum {
     ReportInaccessibleItemsYes,
     RequestableAmount,
     ModifyAmountAction,
+    RenameAction,
     SchedulingMode,
     SchedulingModeDefault,
     SchedulingModeRandom,

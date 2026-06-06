@@ -22,6 +22,7 @@ import mcjty.theoneprobe.api.ITheOneProbe;
 
 import java.util.function.Function;
 
+@SuppressWarnings("unused")
 public class TheOneProbeModule implements Function<ITheOneProbe, Void> {
 
     @Override
@@ -29,7 +30,6 @@ public class TheOneProbeModule implements Function<ITheOneProbe, Void> {
         input.registerProbeConfigProvider(new AEConfigProvider());
         var provider = new BlockEntityInfoProvider();
         input.registerProvider(provider);
-        input.registerBlockDisplayOverride(provider);
         return null;
     }
 }

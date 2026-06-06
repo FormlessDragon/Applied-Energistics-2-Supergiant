@@ -9,7 +9,6 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
@@ -58,7 +57,7 @@ public interface ICraftingCPUTileEntity
     boolean hasCustomName();
 
     @Nullable
-    ITextComponent getCustomName();
+    String getCustomName();
 
     World getWorld();
 

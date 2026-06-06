@@ -21,14 +21,10 @@ import ae2.tile.storage.TileDrive;
 import ae2.tile.storage.TileIOPort;
 import ae2.tile.storage.TileMEChest;
 import ae2.util.Platform;
-import mcjty.theoneprobe.api.IProbeInfo;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.Style;
-import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 import org.jetbrains.annotations.Nullable;
 
@@ -58,58 +54,48 @@ public final class TopNetworkDebugProvider {
 
         var snapshot = buildSnapshot(concreteGrid);
         if (snapshot.pivotPos() != null) {
-            addLine(tooltipBuilder,
-                line(topLocal(TopText.netdebug_grid_pivot_pos), ": ")
-                    .appendSibling(axis("X", snapshot.pivotPos().getX(), TextFormatting.RED))
-                    .appendText(" ")
-                    .appendSibling(axis("Y", snapshot.pivotPos().getY(), TextFormatting.GREEN))
-                    .appendText(" ")
-                    .appendSibling(axis("Z", snapshot.pivotPos().getZ(), TextFormatting.AQUA))
-                    .appendSibling(context.isPivot() ? value(" [C]", TextFormatting.GRAY) : new TextComponentString("")));
+            tooltipBuilder.addLine(label(TopText.netdebug_grid_pivot_pos)
+                + axis("X", snapshot.pivotPos().getX(), TextFormatting.RED)
+                + " " + axis("Y", snapshot.pivotPos().getY(), TextFormatting.GREEN)
+                + " " + axis("Z", snapshot.pivotPos().getZ(), TextFormatting.AQUA)
+                + (context.isPivot() ? TextFormatting.GRAY + " [C]" : ""));
         }
-        addLine(tooltipBuilder, labeledValue(topLocal(TopText.netdebug_grid_id), Integer.toString(snapshot.gridId())));
-        addLine(tooltipBuilder, labeledValue(topLocal(TopText.netdebug_grid_nodes), Integer.toString(snapshot.gridNodes())));
-        addLine(tooltipBuilder, line(topLocal(TopText.netdebug_grid_cpu_avg_max), ": ")
-            .appendSibling(value(snapshot.cpuAverage(), TextFormatting.GREEN))
-            .appendText(" / ")
-            .appendSibling(value(snapshot.cpuMax(), TextFormatting.AQUA)));
-        addLine(tooltipBuilder, labeledValue(topLocal(TopText.netdebug_storage), snapshot.storage()));
-        addLine(tooltipBuilder, labeledValue(topLocal(TopText.netdebug_crafting), snapshot.crafting()));
-        addLine(tooltipBuilder, labeledValue(topLocal(TopText.netdebug_tick), snapshot.tick()));
-        addLine(tooltipBuilder, labeledValue(topLocal(TopText.netdebug_misc), snapshot.misc()));
+        tooltipBuilder.addLine(labeledValue(TopText.netdebug_grid_id, Integer.toString(snapshot.gridId())));
+        tooltipBuilder.addLine(labeledValue(TopText.netdebug_grid_nodes, Integer.toString(snapshot.gridNodes())));
+        tooltipBuilder.addLine(label(TopText.netdebug_grid_cpu_avg_max)
+            + value(snapshot.cpuAverage(), TextFormatting.GREEN)
+            + " / "
+            + value(snapshot.cpuMax(), TextFormatting.AQUA));
+        tooltipBuilder.addLine(labeledValue(TopText.netdebug_storage, snapshot.storage()));
+        tooltipBuilder.addLine(labeledValue(TopText.netdebug_crafting, snapshot.crafting()));
+        tooltipBuilder.addLine(labeledValue(TopText.netdebug_tick, snapshot.tick()));
+        tooltipBuilder.addLine(labeledValue(TopText.netdebug_misc, snapshot.misc()));
     }
 
     private static void addQuantumBridgeInfo(TileQuantumBridge quantumBridge, TopTooltipBuilder tooltipBuilder) {
         var cluster = quantumBridge.getCluster();
         if (cluster == null) {
-            addLine(tooltipBuilder, value(topLocal(TopText.quantum_link_missing), TextFormatting.RED));
+            tooltipBuilder.addLine(value(local(TopText.quantum_link_missing), TextFormatting.RED));
             return;
         }
 
         TileQuantumBridge linkedCenter = cluster.getLinkedCenter();
         if (linkedCenter == null || linkedCenter.getWorld() == null) {
-            addLine(tooltipBuilder, value(topLocal(TopText.quantum_link_missing), TextFormatting.RED));
+            tooltipBuilder.addLine(value(local(TopText.quantum_link_missing), TextFormatting.RED));
             return;
         }
 
         String dimensionName = linkedCenter.getWorld().provider.getDimensionType().getName();
         int dimensionId = linkedCenter.getWorld().provider.getDimension();
-        addLine(tooltipBuilder, line(topLocal(TopText.quantum_link_dimension), ": ")
-            .appendSibling(value(dimensionName, TextFormatting.GREEN))
-            .appendText(" ")
-            .appendSibling(value(TopText.quantum_link_dimension_id.getLocal(dimensionId), TextFormatting.GREEN)));
+        tooltipBuilder.addLine(label(TopText.quantum_link_dimension)
+            + value(dimensionName, TextFormatting.GREEN)
+            + " " + value("(" + dimensionId + ")", TextFormatting.GREEN));
 
         BlockPos linkedPos = linkedCenter.getPos();
-        addLine(tooltipBuilder, line(topLocal(TopText.quantum_link_position), ": ")
-            .appendSibling(axis("X", linkedPos.getX(), TextFormatting.RED))
-            .appendText(" ")
-            .appendSibling(axis("Y", linkedPos.getY(), TextFormatting.GREEN))
-            .appendText(" ")
-            .appendSibling(axis("Z", linkedPos.getZ(), TextFormatting.AQUA)));
-    }
-
-    private static void addLine(TopTooltipBuilder tooltipBuilder, ITextComponent line) {
-        tooltipBuilder.addLine(line);
+        tooltipBuilder.addLine(label(TopText.quantum_link_position)
+            + axis("X", linkedPos.getX(), TextFormatting.RED)
+            + " " + axis("Y", linkedPos.getY(), TextFormatting.GREEN)
+            + " " + axis("Z", linkedPos.getZ(), TextFormatting.AQUA));
     }
 
     private static @Nullable ResolvedContext resolveContext(TileEntity blockEntity, Vec3d hitLocation) {
@@ -205,28 +191,24 @@ public final class TopNetworkDebugProvider {
         return Category.MISC;
     }
 
-    private static ITextComponent labeledValue(String label, String value) {
-        return line(label, ": ").appendSibling(value(value, TextFormatting.GREEN));
+    private static String labeledValue(TopText label, String value) {
+        return label(label) + value(value, TextFormatting.GREEN);
     }
 
-    private static ITextComponent axis(String axis, int value, TextFormatting color) {
-        return line(axis, ":").appendSibling(value(Integer.toString(value), color));
+    private static String axis(String axis, int value, TextFormatting color) {
+        return axis + ":" + value(Integer.toString(value), color);
     }
 
-    private static TextComponentString line(String label, String suffix) {
-        TextComponentString component = new TextComponentString(label + suffix);
-        component.setStyle(new Style().setColor(TextFormatting.WHITE));
-        return component;
+    private static String label(TopText label) {
+        return local(label) + ": ";
     }
 
-    private static TextComponentString value(String value, TextFormatting color) {
-        TextComponentString component = new TextComponentString(value);
-        component.setStyle(new Style().setColor(color));
-        return component;
+    private static String value(String value, TextFormatting color) {
+        return color + value + TextFormatting.WHITE;
     }
 
-    private static String topLocal(TopText text) {
-        return IProbeInfo.STARTLOC + text.getTranslationKey() + IProbeInfo.ENDLOC;
+    private static String local(TopText text) {
+        return TopTooltipFormatter.localize(text);
     }
 
     private enum Category {

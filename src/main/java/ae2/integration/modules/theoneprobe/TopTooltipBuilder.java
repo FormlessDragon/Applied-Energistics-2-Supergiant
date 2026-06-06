@@ -19,9 +19,9 @@
 package ae2.integration.modules.theoneprobe;
 
 import ae2.api.integrations.igtooltip.TooltipBuilder;
+import ae2.core.localization.LocalizationEnum;
 import mcjty.theoneprobe.api.IProbeInfo;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextFormatting;
 
 public class TopTooltipBuilder implements TooltipBuilder {
     private final IProbeInfo probeInfo;
@@ -31,12 +31,37 @@ public class TopTooltipBuilder implements TooltipBuilder {
     }
 
     @Override
-    public void addLine(ITextComponent line) {
-        probeInfo.text(line.getFormattedText());
+    public String localize(LocalizationEnum text) {
+        return TopTooltipFormatter.localize(text);
     }
 
     @Override
-    public void addLine(ITextComponent line, ResourceLocation id) {
-        probeInfo.text(line.getFormattedText());
+    public String localize(String translationKey) {
+        return TopTooltipFormatter.localize(translationKey);
+    }
+
+    @Override
+    public void addLine(String line) {
+        probeInfo.text(line);
+    }
+
+    @Override
+    public void addLine(LocalizationEnum line) {
+        addLine(TopTooltipFormatter.localize(line));
+    }
+
+    @Override
+    public void addLine(LocalizationEnum line, TextFormatting formatting) {
+        addLine(TopTooltipFormatter.style(TopTooltipFormatter.localize(line), formatting));
+    }
+
+    @Override
+    public void addLabel(LocalizationEnum label, String value) {
+        addLabel(label, value, TextFormatting.WHITE);
+    }
+
+    @Override
+    public void addLabel(LocalizationEnum label, String value, TextFormatting valueFormatting) {
+        addLine(TopTooltipFormatter.labeledValue(label, value, valueFormatting));
     }
 }

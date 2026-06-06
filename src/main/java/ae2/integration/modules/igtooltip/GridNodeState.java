@@ -3,7 +3,6 @@ package ae2.integration.modules.igtooltip;
 import ae2.api.networking.IGridNode;
 import ae2.core.localization.LocalizationEnum;
 import ae2.integration.modules.theoneprobe.TopText;
-import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
 public enum GridNodeState {
@@ -32,8 +31,8 @@ public enum GridNodeState {
         return state;
     }
 
-    public ITextComponent textComponent() {
-        return text.text();
+    public LocalizationEnum text() {
+        return text;
     }
 
 }

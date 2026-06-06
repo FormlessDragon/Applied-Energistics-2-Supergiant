@@ -60,6 +60,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     private static final String ACTION_PROCESSING_DIVIDE_2 = "processingDivide2";
     private static final String ACTION_PROCESSING_DIVIDE_3 = "processingDivide3";
     private static final String ACTION_PROCESSING_DIVIDE_5 = "processingDivide5";
+    private static final String ACTION_RENAME_PROCESSING_PATTERN_ITEM = "renameProcessingPatternItem";
 
     private static final Container DUMMY_CONTAINER = new Container() {
         @Override
@@ -151,6 +152,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
             () -> modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation.DIVIDE_3));
         registerClientAction(ACTION_PROCESSING_DIVIDE_5,
             () -> modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation.DIVIDE_5));
+        registerClientAction(ACTION_RENAME_PROCESSING_PATTERN_ITEM, RenamePatternItemRequest.class,
+            this::renameProcessingPatternItem);
         this.patternModifierPanel = new PatternModifierPanel(this);
         this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
 
@@ -656,6 +659,50 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         return this.craftingGridSlots;
     }
 
+    public void renameProcessingPatternItem(int slotNumber, String name) {
+        if (isClientSide()) {
+            sendClientAction(ACTION_RENAME_PROCESSING_PATTERN_ITEM, new RenamePatternItemRequest(slotNumber, name));
+        }
+    }
+
+    private void renameProcessingPatternItem(RenamePatternItemRequest request) {
+        if (isClientSide()) {
+            return;
+        }
+
+        Slot slot = getSlotByNumber(request.slotNumber);
+        if (slot == null) {
+            return;
+        }
+        if (!isProcessingPatternItemSlot(slot)) {
+            return;
+        }
+
+        GenericStack stack = getProcessingStack(slot);
+        if (stack == null || !(stack.what() instanceof AEItemKey itemKey)) {
+            return;
+        }
+
+        ItemStack renamed = itemKey.toStack((int) Math.min(stack.amount(), Integer.MAX_VALUE));
+        if (request.name == null || request.name.isEmpty()) {
+            renamed.clearCustomName();
+        } else {
+            renamed.setStackDisplayName(request.name);
+        }
+        setProcessingStack(slot, GenericStack.fromItemStack(renamed));
+        getAndUpdateOutput();
+        broadcastChanges();
+    }
+
+    public boolean isProcessingPatternItemSlot(@Nullable Slot slot) {
+        if (slot == null || this.mode != EncodingMode.PROCESSING) {
+            return false;
+        }
+
+        GenericStack stack = getProcessingStack(slot);
+        return stack != null && stack.what() instanceof AEItemKey;
+    }
+
     public FakeSlot[] getProcessingInputSlots() {
         return this.processingInputSlots;
     }
@@ -755,5 +802,54 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
             }
         }
         return false;
+    }
+
+    @Nullable
+    private GenericStack getProcessingStack(Slot slot) {
+        for (int i = 0; i < this.processingInputSlots.length; i++) {
+            if (this.processingInputSlots[i] == slot) {
+                return this.encodedInputsInv.getStack(i);
+            }
+        }
+        for (int i = 0; i < this.processingOutputSlots.length; i++) {
+            if (this.processingOutputSlots[i] == slot) {
+                return this.encodedOutputsInv.getStack(i);
+            }
+        }
+        return null;
+    }
+
+    private void setProcessingStack(Slot slot, @Nullable GenericStack stack) {
+        for (int i = 0; i < this.processingInputSlots.length; i++) {
+            if (this.processingInputSlots[i] == slot) {
+                this.encodedInputsInv.setStack(i, stack);
+                return;
+            }
+        }
+        for (int i = 0; i < this.processingOutputSlots.length; i++) {
+            if (this.processingOutputSlots[i] == slot) {
+                this.encodedOutputsInv.setStack(i, stack);
+                return;
+            }
+        }
+    }
+
+    private Slot getSlotByNumber(int slotNumber) {
+        for (Slot slot : this.inventorySlots) {
+            if (slot.slotNumber == slotNumber) {
+                return slot;
+            }
+        }
+        return null;
+    }
+
+    private static final class RenamePatternItemRequest {
+        private final int slotNumber;
+        private final String name;
+
+        private RenamePatternItemRequest(int slotNumber, String name) {
+            this.slotNumber = slotNumber;
+            this.name = name;
+        }
     }
 }

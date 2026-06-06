@@ -10,7 +10,6 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.text.TextComponentString;
 import net.minecraftforge.common.util.Constants;
 
 public class AnnihilationPlaneDataProvider
@@ -21,14 +20,14 @@ public class AnnihilationPlaneDataProvider
     public void buildTooltip(AnnihilationPlanePart plane, TooltipContext context, TooltipBuilder tooltip) {
         var serverData = context.serverData();
         if (serverData.hasKey(TAG_ENCHANTMENTS, Constants.NBT.TAG_COMPOUND)) {
-            tooltip.addLine(InGameTooltip.EnchantedWith.text());
+            tooltip.addLine(InGameTooltip.EnchantedWith);
 
             var enchantments = serverData.getCompoundTag(TAG_ENCHANTMENTS);
             for (var enchantmentId : enchantments.getKeySet()) {
                 var enchantment = Enchantment.getEnchantmentByLocation(enchantmentId);
                 var level = enchantments.getInteger(enchantmentId);
                 if (enchantment != null) {
-                    tooltip.addLine(new TextComponentString(enchantment.getTranslatedName(level)));
+                    tooltip.addLine(tooltip.localize(enchantment.getName()) + " " + level);
                 }
             }
         }

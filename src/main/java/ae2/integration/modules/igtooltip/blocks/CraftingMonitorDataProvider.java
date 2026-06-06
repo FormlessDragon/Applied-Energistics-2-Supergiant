@@ -4,7 +4,9 @@ import ae2.api.integrations.igtooltip.TooltipBuilder;
 import ae2.api.integrations.igtooltip.TooltipContext;
 import ae2.api.integrations.igtooltip.providers.BodyProvider;
 import ae2.integration.modules.theoneprobe.TopText;
+import ae2.integration.modules.theoneprobe.TopTooltipFormatter;
 import ae2.tile.crafting.TileCraftingMonitor;
+import net.minecraft.util.text.TextFormatting;
 
 /**
  * Shows the name of the item being crafted.
@@ -15,7 +17,7 @@ public final class CraftingMonitorDataProvider implements BodyProvider<TileCraft
         var displayStack = monitor.getJobProgress();
 
         if (displayStack != null) {
-            tooltip.addLine(TopText.crafting.text(displayStack.what().getDisplayName()));
+            tooltip.addLabel(TopText.crafting, TopTooltipFormatter.displayName(displayStack.what()), TextFormatting.GREEN);
         }
     }
 }

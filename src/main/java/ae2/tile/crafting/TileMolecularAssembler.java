@@ -58,6 +58,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 
@@ -379,7 +380,9 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
 
     @Override
     public PatternContainerGroup getTerminalGroup() {
-        ITextComponent name = hasCustomName() ? getCustomName() : TextComponentItemStack.of(AEBlocks.MOLECULAR_ASSEMBLER.stack());
+        ITextComponent name = hasCustomName()
+            ? new TextComponentString(getCustomName())
+            : TextComponentItemStack.of(AEBlocks.MOLECULAR_ASSEMBLER.stack());
         return new PatternContainerGroup(
             AEItemKey.of(AEBlocks.MOLECULAR_ASSEMBLER.item()),
             name,

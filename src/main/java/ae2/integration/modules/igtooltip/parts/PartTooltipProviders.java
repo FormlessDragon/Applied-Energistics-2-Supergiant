@@ -1,8 +1,6 @@
 package ae2.integration.modules.igtooltip.parts;
 
 import ae2.api.integrations.igtooltip.providers.BodyProvider;
-import ae2.api.integrations.igtooltip.providers.IconProvider;
-import ae2.api.integrations.igtooltip.providers.NameProvider;
 import ae2.api.integrations.igtooltip.providers.ServerDataProvider;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
@@ -18,8 +16,6 @@ public final class PartTooltipProviders {
     private static final ReentrantReadWriteLock.ReadLock readLock = lock.readLock();
     private static final ObjectArrayList<Registration<ServerDataProvider<?>>> serverDataProviders = new ObjectArrayList<>();
     private static final ObjectArrayList<Registration<BodyProvider<?>>> bodyProviders = new ObjectArrayList<>();
-    private static final ObjectArrayList<Registration<NameProvider<?>>> nameProviders = new ObjectArrayList<>();
-    private static final ObjectArrayList<Registration<IconProvider<?>>> iconProviders = new ObjectArrayList<>();
     private static final Reference2ObjectOpenHashMap<Class<?>, CachedProviders<?>> cache = new Reference2ObjectOpenHashMap<>();
 
     private PartTooltipProviders() {
@@ -31,14 +27,6 @@ public final class PartTooltipProviders {
 
     public static <T> void addBody(Class<T> baseClass, BodyProvider<? super T> provider, int priority) {
         add(bodyProviders, baseClass, provider, priority);
-    }
-
-    public static <T> void addName(Class<T> baseClass, NameProvider<? super T> provider, int priority) {
-        add(nameProviders, baseClass, provider, priority);
-    }
-
-    public static <T> void addIcon(Class<T> baseClass, IconProvider<? super T> provider, int priority) {
-        add(iconProviders, baseClass, provider, priority);
     }
 
     private static <T> void add(List<Registration<T>> registrations, Class<?> baseClass, T provider, int priority) {
@@ -91,24 +79,10 @@ public final class PartTooltipProviders {
     @SuppressWarnings("unchecked")
     private static <U> CachedProviders<U> createProviderLists(Class<U> clazz) {
 
-        ObjectArrayList<NameProvider<? super U>> compatibleNameProviders = new ObjectArrayList<>();
-        for (Registration<NameProvider<?>> registration : nameProviders) {
-            if (registration.baseClass().isAssignableFrom(clazz)) {
-                compatibleNameProviders.add((NameProvider<? super U>) registration.provider());
-            }
-        }
-
         ObjectArrayList<BodyProvider<? super U>> compatibleBodyProviders = new ObjectArrayList<>();
         for (Registration<BodyProvider<?>> registration : bodyProviders) {
             if (registration.baseClass().isAssignableFrom(clazz)) {
                 compatibleBodyProviders.add((BodyProvider<? super U>) registration.provider());
-            }
-        }
-
-        ObjectArrayList<IconProvider<? super U>> compatibleIconProviders = new ObjectArrayList<>();
-        for (Registration<IconProvider<?>> registration : iconProviders) {
-            if (registration.baseClass().isAssignableFrom(clazz)) {
-                compatibleIconProviders.add((IconProvider<? super U>) registration.provider());
             }
         }
 
@@ -121,9 +95,7 @@ public final class PartTooltipProviders {
 
         return new CachedProviders<>(
             compatibleServerDataProviders,
-            compatibleBodyProviders,
-            compatibleIconProviders,
-            compatibleNameProviders);
+            compatibleBodyProviders);
     }
 
     private record Registration<T>(Class<?> baseClass, T provider, int priority) {
@@ -131,8 +103,6 @@ public final class PartTooltipProviders {
 
     public record CachedProviders<U>(
         List<ServerDataProvider<? super U>> serverDataProviders,
-        List<BodyProvider<? super U>> bodyProviders,
-        List<IconProvider<? super U>> iconProviders,
-        List<NameProvider<? super U>> nameProviders) {
+        List<BodyProvider<? super U>> bodyProviders) {
     }
 }

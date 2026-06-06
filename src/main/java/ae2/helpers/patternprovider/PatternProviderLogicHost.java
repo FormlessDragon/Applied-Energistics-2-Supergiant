@@ -38,7 +38,6 @@ import ae2.parts.AEBasePart;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
-import net.minecraft.util.text.ITextComponent;
 
 import javax.annotation.Nullable;
 import java.util.EnumSet;
@@ -54,7 +53,7 @@ public interface PatternProviderLogicHost
     boolean hasCustomName();
 
     @Nullable
-    ITextComponent getCustomName();
+    String getCustomName();
 
     void setCustomName(@Nullable String name);
 

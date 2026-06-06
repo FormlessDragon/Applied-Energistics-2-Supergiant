@@ -5,90 +5,17 @@ import ae2.api.integrations.igtooltip.TooltipContext;
 import ae2.api.parts.IPart;
 import ae2.api.parts.IPartHost;
 import ae2.api.parts.SelectedPart;
-import ae2.text.TextComponentItemStack;
 import ae2.util.Platform;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
-import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
 public final class PartHostTooltips {
 
     private PartHostTooltips() {
-    }
-
-    public static @Nullable ITextComponent getName(TileEntity object, TooltipContext context) {
-        return getName((IPartHost) object, context);
-    }
-
-    public static @Nullable ITextComponent getName(IPartHost object, TooltipContext context) {
-        var selected = getPart(object, context.hitLocation());
-
-        if (selected.facade != null) {
-            return TextComponentItemStack.of(selected.facade.getItemStack());
-        } else if (selected.part != null) {
-            for (var provider : PartTooltipProviders.getProviders(selected.part).nameProviders()) {
-                var name = provider.getName(selected.part, context);
-                if (name != null) {
-                    return name;
-                }
-            }
-
-            return TextComponentItemStack.of(selected.part.getPartItem().asItemStack());
-        } else {
-            return null;
-        }
-    }
-
-    public static @Nullable String getModName(TileEntity blockEntity, TooltipContext context) {
-        return getModName((IPartHost) blockEntity, context);
-    }
-
-    public static @Nullable String getModName(IPartHost object, TooltipContext context) {
-        var selected = getPart(object, context.hitLocation());
-
-        Item item;
-        if (selected.facade != null) {
-            item = selected.facade.getItemStack().getItem();
-        } else if (selected.part != null) {
-            item = selected.part.getPartItem().asItem();
-        } else {
-            return null;
-        }
-
-        ResourceLocation id = item.getRegistryName();
-        if (id == null) {
-            return null;
-        }
-        return Platform.getModName(id.getNamespace());
-    }
-
-    public static @Nullable ItemStack getIcon(TileEntity object, TooltipContext context) {
-        return getIcon((IPartHost) object, context);
-    }
-
-    public static @Nullable ItemStack getIcon(IPartHost object, TooltipContext context) {
-        var selected = getPart(object, context.hitLocation());
-        if (selected.facade != null) {
-            return selected.facade.getItemStack();
-        } else if (selected.part != null) {
-            for (var provider : PartTooltipProviders.getProviders(selected.part).iconProviders()) {
-                var icon = provider.getIcon(selected.part, context);
-                if (icon != null) {
-                    return icon;
-                }
-            }
-
-            return selected.part.getPartItem().asItemStack();
-        } else {
-            return null;
-        }
     }
 
     public static void buildTooltip(TileEntity object, TooltipContext context, TooltipBuilder tooltip) {

@@ -45,6 +45,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
@@ -301,13 +302,13 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
         this.myName = null;
         for (ICraftingCPUTileEntity tile : this.blockEntities) {
             if (tile.hasCustomName()) {
-                var customName = tile.getCustomName();
+                String customName = tile.getCustomName();
                 if (this.myName == null) {
                     if (customName != null) {
-                        this.myName = customName.createCopy();
+                        this.myName = new TextComponentString(customName);
                     }
                 } else if (customName != null) {
-                    this.myName.appendText(" ").appendSibling(customName.createCopy());
+                    this.myName.appendText(" ").appendText(customName);
                 }
             }
         }
