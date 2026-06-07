@@ -61,6 +61,7 @@ import ae2.parts.networking.SmartCablePart;
 import ae2.parts.networking.SmartDenseCablePart;
 import ae2.parts.p2p.FEP2PTunnelPart;
 import ae2.parts.p2p.FluidP2PTunnelPart;
+import ae2.parts.p2p.IC2P2PTunnelPart;
 import ae2.parts.p2p.ItemP2PTunnelPart;
 import ae2.parts.p2p.LightP2PTunnelPart;
 import ae2.parts.p2p.MEP2PTunnelPart;
@@ -198,6 +199,8 @@ public final class AEParts {
         AEPartIds.FLUID_P2P_TUNNEL, FluidP2PTunnelPart.class, FluidP2PTunnelPart::new);
     public static final ItemDefinition<PartItem<FEP2PTunnelPart>> FE_P2P_TUNNEL = createPart(
         AEPartIds.FE_P2P_TUNNEL, FEP2PTunnelPart.class, FEP2PTunnelPart::new);
+    public static final ItemDefinition<PartItem<IC2P2PTunnelPart>> IC2_P2P_TUNNEL = createPart(
+        AEPartIds.IC2_P2P_TUNNEL, IC2P2PTunnelPart.class, IC2P2PTunnelPart::new);
     public static final ItemDefinition<PartItem<LightP2PTunnelPart>> LIGHT_P2P_TUNNEL = createPart(
         AEPartIds.LIGHT_P2P_TUNNEL, LightP2PTunnelPart.class, LightP2PTunnelPart::new);
 
@@ -243,6 +246,7 @@ public final class AEParts {
         ITEM_P2P_TUNNEL,
         FLUID_P2P_TUNNEL,
         FE_P2P_TUNNEL,
+        IC2_P2P_TUNNEL,
         LIGHT_P2P_TUNNEL
     };
 

@@ -280,6 +280,7 @@ public final class AEPartIds {
     public static final ResourceLocation ITEM_P2P_TUNNEL = id("item_p2p_tunnel");
     public static final ResourceLocation FLUID_P2P_TUNNEL = id("fluid_p2p_tunnel");
     public static final ResourceLocation FE_P2P_TUNNEL = id("fe_p2p_tunnel");
+    public static final ResourceLocation IC2_P2P_TUNNEL = id("ic2_p2p_tunnel");
     public static final ResourceLocation LIGHT_P2P_TUNNEL = id("light_p2p_tunnel");
 
     private static ResourceLocation id(String id) {

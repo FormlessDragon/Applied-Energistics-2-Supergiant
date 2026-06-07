@@ -24,6 +24,8 @@ import ae2.api.config.PowerMultiplier;
 import ae2.api.config.PowerUnit;
 import ae2.api.networking.energy.IAEPowerStorage;
 import ae2.api.networking.events.GridPowerStorageStateChanged.PowerEventType;
+import ae2.integration.Integrations;
+import ae2.integration.abstraction.IC2PowerSink;
 import ae2.me.energy.StoredEnergyAmount;
 import ae2.tile.AEBaseInvTile;
 import com.google.common.collect.ImmutableSet;
@@ -44,6 +46,7 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
     // the current power buffer.
     private final StoredEnergyAmount stored = new StoredEnergyAmount(0, 10000, this::emitPowerStateEvent);
     private final IEnergyStorage forgeEnergyAdapter;
+    private final IC2PowerSink ic2Sink;
     private boolean internalPublicPowerStorage = false;
     private AccessRestriction internalPowerFlow = AccessRestriction.READ_WRITE;
     private Set<EnumFacing> internalPowerSides = ALL_SIDES;
@@ -51,6 +54,8 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
     public AEBasePoweredTile() {
         super();
         this.forgeEnergyAdapter = new ForgeEnergyAdapter(this);
+        this.ic2Sink = Integrations.ic2().createPowerSink(this, this);
+        this.ic2Sink.setValidFaces(this.internalPowerSides);
     }
 
     protected final Set<EnumFacing> getPowerSides() {
@@ -59,6 +64,7 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
 
     protected void setPowerSides(Set<EnumFacing> sides) {
         this.internalPowerSides = ImmutableSet.copyOf(sides);
+        this.ic2Sink.setValidFaces(this.internalPowerSides);
     }
 
     @Override
@@ -98,6 +104,24 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
     }
 
     protected void emitPowerStateEvent(PowerEventType x) {
+    }
+
+    @Override
+    public void onReady() {
+        super.onReady();
+        this.ic2Sink.onLoad();
+    }
+
+    @Override
+    protected void onChunkUnloaded() {
+        super.onChunkUnloaded();
+        this.ic2Sink.onChunkUnload();
+    }
+
+    @Override
+    protected void setRemoved() {
+        super.setRemoved();
+        this.ic2Sink.invalidate();
     }
 
     @Override

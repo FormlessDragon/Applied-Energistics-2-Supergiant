@@ -282,13 +282,17 @@ public abstract class P2PTunnelPart<T extends P2PTunnelPart<T>> extends AEBasePa
     }
 
     protected void deductEnergyCost(double energyTransported) {
+        deductEnergyCost(PowerUnit.FE, energyTransported);
+    }
+
+    protected void deductEnergyCost(PowerUnit unit, double energyTransported) {
         double costFactor = AEConfig.instance().getP2PTunnelEnergyTax();
         if (costFactor <= 0) {
             return;
         }
 
         getMainNode().ifPresent(grid -> {
-            double tax = PowerUnit.FE.convertTo(PowerUnit.AE, energyTransported * costFactor);
+            double tax = unit.convertTo(PowerUnit.AE, energyTransported * costFactor);
             grid.getEnergyService().extractAEPower(tax, Actionable.MODULATE, PowerMultiplier.CONFIG);
         });
     }

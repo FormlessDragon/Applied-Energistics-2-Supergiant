@@ -28,7 +28,8 @@ import net.minecraft.util.text.ITextComponent;
 
 public enum PowerUnit implements LocalizationEnum {
     AE("gui.ae2.units.appliedenergistics", "AE"), // Native Units - AE Energy
-    FE("gui.ae2.units.fe", "FE"); // Forge Energy
+    FE("gui.ae2.units.fe", "FE"), // Forge Energy
+    EU("gui.ae2.units.ic2", "EU", 4.0); // IndustrialCraft 2 Energy Units
 
     /**
      * unlocalized name for the power unit.
@@ -42,11 +43,16 @@ public enum PowerUnit implements LocalizationEnum {
     /**
      * please do not edit this value, it is set when AE loads its config files.
      */
-    public final double conversionRatio = 1.0;
+    public final double conversionRatio;
 
     PowerUnit(String un, String symbolName) {
+        this(un, symbolName, 1.0);
+    }
+
+    PowerUnit(String un, String symbolName, double conversionRatio) {
         this.unlocalizedName = un;
         this.symbolName = symbolName;
+        this.conversionRatio = conversionRatio;
     }
 
     /**

@@ -22,6 +22,7 @@ import ae2.api.features.P2PTunnelAttunement;
 import ae2.api.ids.AEBlockIds;
 import ae2.api.ids.AEPartIds;
 import ae2.core.localization.GuiText;
+import ae2.integration.Integrations;
 import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.util.ResourceLocation;
@@ -40,8 +41,10 @@ public final class InitP2PAttunements {
         P2PTunnelAttunement.registerAttunementTag(AEPartIds.REDSTONE_P2P_TUNNEL);
         P2PTunnelAttunement.registerAttunementTag(AEPartIds.FLUID_P2P_TUNNEL);
         P2PTunnelAttunement.registerAttunementTag(AEPartIds.ITEM_P2P_TUNNEL);
+        P2PTunnelAttunement.registerAttunementTag(AEPartIds.IC2_P2P_TUNNEL);
         P2PTunnelAttunement.registerAttunementTag(AEPartIds.LIGHT_P2P_TUNNEL);
         registerTagAttunementBridges();
+        Integrations.ic2().registerP2PAttunements();
 
         P2PTunnelAttunement.registerAttunementApi(P2PTunnelAttunement.ENERGY_TUNNEL,
             CapabilityEnergy.ENERGY,
