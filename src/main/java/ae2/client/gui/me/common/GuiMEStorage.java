@@ -593,7 +593,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         long storedAmount = entry.storedAmount();
         boolean craftable = entry.craftable();
         boolean useLargeFonts = AEConfig.instance().isUseLargeFonts();
-        if (craftable && (isViewOnlyCraftable() || storedAmount <= 0)) {
+        if (shouldTreatAsZeroAmountCraftable(entry)) {
             StackSizeRenderer.renderSizeLabel(this.fontRenderer, slot.xPos, slot.yPos, "+");
         } else {
             AmountFormat format = useLargeFonts ? AmountFormat.SLOT_LARGE_FONT : AmountFormat.SLOT;
@@ -690,6 +690,15 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             return;
         }
 
+        if (mouseButton == 0
+            && clickType == ClickType.PICKUP
+            && entry != null
+            && shouldCraftOnClick(entry)
+            && this.playerInventory.getItemStack().isEmpty()) {
+            this.container.handleInteraction(entry.serial(), InventoryAction.AUTO_CRAFT);
+            return;
+        }
+
         if (mouseButton == 0 && entry != null && ContainerItemStrategies.isKeySupported(entry.what())) {
             InventoryAction action = clickType != ClickType.QUICK_MOVE
                 ? InventoryAction.FILL_ITEM
@@ -724,15 +733,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
         InventoryAction action = null;
         switch (clickType) {
-            case PICKUP -> {
-                action = mouseButton == 1 ? InventoryAction.SPLIT_OR_PLACE_SINGLE : InventoryAction.PICKUP_OR_SET_DOWN;
-                if (action == InventoryAction.PICKUP_OR_SET_DOWN
-                    && shouldCraftOnClick(entry)
-                    && this.playerInventory.getItemStack().isEmpty()) {
-                    this.container.handleInteraction(entry.serial(), InventoryAction.AUTO_CRAFT);
-                    return;
-                }
-            }
+            case PICKUP -> action = mouseButton == 1 ? InventoryAction.SPLIT_OR_PLACE_SINGLE : InventoryAction.PICKUP_OR_SET_DOWN;
             case QUICK_MOVE -> action = mouseButton == 1 ? InventoryAction.PICKUP_SINGLE : InventoryAction.SHIFT_CLICK;
             case CLONE -> {
                 if (entry.craftable()) {
@@ -753,10 +754,11 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     }
 
     private boolean shouldCraftOnClick(GridInventoryEntry entry) {
-        if (isViewOnlyCraftable()) {
-            return true;
-        }
-        return entry.storedAmount() == 0 && entry.craftable();
+        return shouldTreatAsZeroAmountCraftable(entry);
+    }
+
+    private boolean shouldTreatAsZeroAmountCraftable(GridInventoryEntry entry) {
+        return entry.craftable() && (isViewOnlyCraftable() || isAltKeyDown() || entry.storedAmount() <= 0);
     }
 
     @Override
@@ -844,7 +846,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             tooltip.add(muted(ButtonToolTips.RequestableAmount.text(formattedAmount)));
         }
 
-        if (entry.craftable() && !(isViewOnlyCraftable() || entry.storedAmount() <= 0)) {
+        if (entry.craftable() && !shouldTreatAsZeroAmountCraftable(entry)) {
             tooltip.add(muted(ButtonToolTips.Craftable.text()));
         }
 
