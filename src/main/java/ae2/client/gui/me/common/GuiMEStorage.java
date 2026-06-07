@@ -44,6 +44,7 @@ import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.ISortSource;
 import ae2.client.gui.widgets.ITextFieldGui;
+import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.ItemStackButton;
 import ae2.client.gui.widgets.KeyTypeSelectionButton;
 import ae2.client.gui.widgets.Scrollbar;
@@ -58,7 +59,6 @@ import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.me.common.GridInventoryEntry;
 import ae2.core.AEConfig;
 import ae2.core.AELog;
-import ae2.core.AppEng;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
@@ -75,10 +75,13 @@ import ae2.util.Platform;
 import ae2.util.prioritylist.IPartitionList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderHelper;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.ClickType;
 import net.minecraft.inventory.Slot;
@@ -90,7 +93,9 @@ import net.minecraft.util.text.TextFormatting;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.GL11;
 
+import java.awt.Color;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -103,6 +108,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     private static final String TEXT_ID_ENTRIES_SHOWN = "entriesShown";
     private static final int MIN_ROWS = 2;
     private static final int DEFAULT_ROWS = 5;
+    private static final int RAINBOW_BORDER_PIXELS = 72;
     private static String rememberedSearch = "";
 
     protected final Repo repo;
@@ -138,6 +144,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         this.scrollbar = widgets.addScrollBar("scrollbar", Scrollbar.BIG);
         this.repo = new Repo(scrollbar, this);
         this.repo.setRowSize(this.terminalStyle.getSlotsPerRow());
+        this.repo.setTerminalRows(this.rows);
         this.repo.setEnabled(canInteractWithRepo());
         container.setClientRepo(this.repo);
         this.repo.setUpdateViewListener(this::updateScrollbar);
@@ -190,6 +197,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
         this.sortDirToggle = this.addToLeftToolbar(
             new SettingToggleButton<>(Settings.SORT_DIRECTION, getSortDir(), this::toggleServerSetting));
+        this.addToLeftToolbar(new PlayerPinButton());
         this.addToLeftToolbar(new ActionButton(ActionItems.TERMINAL_SETTINGS, this::showSettings));
         this.addToLeftToolbar(new SettingToggleButton<>(
             Settings.TERMINAL_STYLE, AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
@@ -233,17 +241,15 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
-    @Override
-    public void initGui() {
-        this.rows = getConfiguredRows();
-        this.xSize = this.terminalStyle.getScreenWidth();
-        this.ySize = this.terminalStyle.getScreenHeight(this.rows);
-        refreshRepoSlots();
-        super.initGui();
-        if (shouldAutoFocusSearch()) {
-            setInitialFocus(this.searchField);
-        }
-        updateScrollbar();
+    private static int[] getRainbowBorderPoint(int x, int y, int index) {
+        int side = index / 18;
+        int offset = index % 18;
+        return switch (side) {
+            case 0 -> new int[]{x + offset, y};
+            case 1 -> new int[]{x + 17, y + offset};
+            case 2 -> new int[]{x + 17 - offset, y + 17};
+            default -> new int[]{x, y + 17 - offset};
+        };
     }
 
     private int getConfiguredRows() {
@@ -252,24 +258,12 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         return Math.max(MIN_ROWS, AEConfig.instance().getTerminalStyle().getRows(possibleRows));
     }
 
-    private void refreshRepoSlots() {
-        List<RepoSlot> existingSlots = new ObjectArrayList<>();
-        for (Slot slot : this.container.inventorySlots) {
-            if (slot instanceof RepoSlot) {
-                existingSlots.add((RepoSlot) slot);
-            }
-        }
-        for (int i = existingSlots.size() - 1; i >= 0; i--) {
-            this.container.removeClientSideSlot(existingSlots.get(i));
-        }
-
-        int repoIndex = 0;
-        for (int row = 0; row < this.rows; row++) {
-            for (int col = 0; col < this.terminalStyle.getSlotsPerRow(); col++) {
-                Point pos = this.terminalStyle.getSlotPos(row, col);
-                this.container.addClientSideSlot(new RepoSlot(this.repo, repoIndex++, pos.x(), pos.y()), null);
-            }
-        }
+    private static void addColoredQuad(BufferBuilder buffer, int left, int top, int right, int bottom,
+                                       int red, int green, int blue, int alpha) {
+        buffer.pos(left, bottom, 0).color(red, green, blue, alpha).endVertex();
+        buffer.pos(right, bottom, 0).color(red, green, blue, alpha).endVertex();
+        buffer.pos(right, top, 0).color(red, green, blue, alpha).endVertex();
+        buffer.pos(left, top, 0).color(red, green, blue, alpha).endVertex();
     }
 
     private void onContainerReceivedClientUpdate() {
@@ -361,14 +355,18 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         updateScrollbar();
     }
 
-    private void updateScrollbar() {
-        int totalRows = (this.repo.size() + this.terminalStyle.getSlotsPerRow() - 1)
-            / this.terminalStyle.getSlotsPerRow();
-        int scrollRows = Math.max(0, totalRows - this.rows);
-        int slotsPerPage = Math.max(1, this.rows / 6);
-        this.scrollbar.setHeight(this.rows * 18);
-        this.scrollbar.setRange(0, scrollRows, slotsPerPage);
-        setTextContent(TEXT_ID_ENTRIES_SHOWN, new TextComponentString(Integer.toString(this.repo.size())));
+    @Override
+    public void initGui() {
+        this.rows = getConfiguredRows();
+        this.xSize = this.terminalStyle.getScreenWidth();
+        this.ySize = this.terminalStyle.getScreenHeight(this.rows);
+        this.repo.setTerminalRows(this.rows);
+        refreshRepoSlots();
+        super.initGui();
+        if (shouldAutoFocusSearch()) {
+            setInitialFocus(this.searchField);
+        }
+        updateScrollbar();
     }
 
     void onCloseTerminalSettings() {
@@ -433,25 +431,24 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         return AEConfig.instance().isUseExternalSearch() && ItemListMod.isEnabled();
     }
 
-    @Override
-    public void drawBG(int offsetX, int offsetY, int mouseX, int mouseY, float partialTicks) {
-        this.terminalStyle.getHeader().dest(offsetX, offsetY).blit();
-        int y = offsetY + this.terminalStyle.getHeader().getSrcHeight();
-        this.terminalStyle.getFirstRow().dest(offsetX, y).blit();
-        y += this.terminalStyle.getFirstRow().getSrcHeight();
-        for (int row = 0; row < Math.max(0, this.rows - 2); row++) {
-            this.terminalStyle.getRow().dest(offsetX, y).blit();
-            y += this.terminalStyle.getRow().getSrcHeight();
+    private void refreshRepoSlots() {
+        this.repo.setTerminalRows(this.rows);
+        List<RepoSlot> existingSlots = new ObjectArrayList<>();
+        for (Slot slot : this.container.inventorySlots) {
+            if (slot instanceof RepoSlot) {
+                existingSlots.add((RepoSlot) slot);
+            }
         }
-        this.terminalStyle.getLastRow().dest(offsetX, y).blit();
-        y += this.terminalStyle.getLastRow().getSrcHeight();
-        this.terminalStyle.getBottom().dest(offsetX, y).blit();
+        for (int i = existingSlots.size() - 1; i >= 0; i--) {
+            this.container.removeClientSideSlot(existingSlots.get(i));
+        }
 
-        if (this.repo.hasPinnedRow()) {
-            Blitter.texture("guis/terminal.png")
-                   .src(0, 204, 162, 18)
-                   .dest(offsetX + 7, offsetY + this.terminalStyle.getHeader().getSrcHeight())
-                   .blit();
+        int repoIndex = 0;
+        for (int row = 0; row < this.rows; row++) {
+            for (int col = 0; col < this.terminalStyle.getSlotsPerRow(); col++) {
+                Point pos = this.terminalStyle.getSlotPos(row, col);
+                this.container.addClientSideSlot(new RepoSlot(this.repo, repoIndex++, pos.x(), pos.y()), null);
+            }
         }
     }
 
@@ -479,26 +476,86 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         renderLinkStatus(this.container.getLinkStatus());
     }
 
+    private void updateScrollbar() {
+        int normalRows = Math.max(1, this.rows - this.repo.getPinnedRowCount());
+        int totalRows = (this.repo.getScrollableSize() + this.terminalStyle.getSlotsPerRow() - 1)
+            / this.terminalStyle.getSlotsPerRow();
+        int scrollRows = Math.max(0, totalRows - normalRows);
+        int slotsPerPage = Math.max(1, normalRows / 6);
+        this.scrollbar.setHeight(this.rows * 18);
+        this.scrollbar.setRange(0, scrollRows, slotsPerPage);
+        setTextContent(TEXT_ID_ENTRIES_SHOWN, new TextComponentString(Integer.toString(this.repo.size())));
+    }
+
+    @Override
+    public void drawBG(int offsetX, int offsetY, int mouseX, int mouseY, float partialTicks) {
+        this.terminalStyle.getHeader().dest(offsetX, offsetY).blit();
+        int y = offsetY + this.terminalStyle.getHeader().getSrcHeight();
+        this.terminalStyle.getFirstRow().dest(offsetX, y).blit();
+        y += this.terminalStyle.getFirstRow().getSrcHeight();
+        for (int row = 0; row < Math.max(0, this.rows - 2); row++) {
+            this.terminalStyle.getRow().dest(offsetX, y).blit();
+            y += this.terminalStyle.getRow().getSrcHeight();
+        }
+        this.terminalStyle.getLastRow().dest(offsetX, y).blit();
+        y += this.terminalStyle.getLastRow().getSrcHeight();
+        this.terminalStyle.getBottom().dest(offsetX, y).blit();
+
+        int pinnedRowCount = this.repo.getPinnedRowCount();
+        for (int row = 0; row < pinnedRowCount; row++) {
+            Blitter.texture("guis/terminal.png")
+                   .src(0, 204, 162, 18)
+                   .dest(offsetX + 7, offsetY + this.terminalStyle.getHeader().getSrcHeight() + row * 18)
+                   .blit();
+        }
+    }
+
     private void renderPinnedRowDecorations() {
         for (Slot slot : this.container.inventorySlots) {
             if (!(slot instanceof RepoSlot repoSlot)) {
                 continue;
             }
             GridInventoryEntry entry = repoSlot.getEntry();
-            if (entry == null || entry.what() == null || !PendingCraftingJobs.hasPendingJob(entry.what())) {
+            if (entry == null || entry.what() == null
+                || this.repo.getPinReason(entry) != PinnedKeys.PinReason.CRAFTING) {
                 continue;
             }
 
-            TextureAtlasSprite sprite = this.mc.getTextureMapBlocks().getAtlasSprite(
-                AppEng.makeId("block/molecular_assembler_lights").toString());
-            if (sprite != null && sprite != this.mc.getTextureMapBlocks().getMissingSprite()) {
-                Blitter.sprite(sprite, 2, 2, Math.max(0, sprite.getIconWidth() - 4),
-                           Math.max(0, sprite.getIconHeight() - 4))
-                       .dest(slot.xPos - 1, slot.yPos - 1, 18, 18)
-                       .zOffset(150)
-                       .blit();
-            }
+            boolean animated = PendingCraftingJobs.hasPendingJob(entry.what());
+            renderRainbowBorder(slot.xPos - 1, slot.yPos - 1, animated);
         }
+    }
+
+    private void renderRainbowBorder(int x, int y, boolean animated) {
+        float phase = animated ? (Minecraft.getSystemTime() % 2400L) / 2400.0F : 0.0F;
+
+        GlStateManager.pushMatrix();
+        GlStateManager.disableTexture2D();
+        GlStateManager.disableLighting();
+        GlStateManager.disableDepth();
+        GlStateManager.enableBlend();
+        GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA,
+            GL11.GL_ONE, GL11.GL_ZERO);
+        GlStateManager.translate(0.0F, 0.0F, 180.0F);
+
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder buffer = tessellator.getBuffer();
+        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
+        for (int i = 0; i < RAINBOW_BORDER_PIXELS; i++) {
+            int[] point = getRainbowBorderPoint(x, y, i);
+            int color = Color.HSBtoRGB((i / (float) RAINBOW_BORDER_PIXELS + phase) % 1.0F, 0.95F, 1.0F);
+            int r = color >> 16 & 0xFF;
+            int g = color >> 8 & 0xFF;
+            int b = color & 0xFF;
+            addColoredQuad(buffer, point[0], point[1], point[0] + 1, point[1] + 1, r, g, b, 220);
+        }
+        tessellator.draw();
+
+        GlStateManager.enableTexture2D();
+        GlStateManager.enableDepth();
+        GlStateManager.disableBlend();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        GlStateManager.popMatrix();
     }
 
     @Override
@@ -618,6 +675,18 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     private void handleGridInventoryEntryMouseClick(@Nullable GridInventoryEntry entry, int mouseButton,
                                                     ClickType clickType) {
         if (!canInteractWithRepo()) {
+            return;
+        }
+
+        if (mouseButton == 0
+            && clickType == ClickType.PICKUP
+            && entry != null
+            && entry.what() != null
+            && isCtrlKeyDown()) {
+            if (PinnedKeys.togglePlayerPin(entry.what(), this.repo.getPlayerPinCapacity())) {
+                this.repo.updateView();
+                updateScrollbar();
+            }
             return;
         }
 
@@ -783,6 +852,10 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             tooltip.add(muted(ButtonToolTips.Serial.text(entry.serial())));
         }
 
+        if (canInteractWithRepo()) {
+            tooltip.add(muted(ButtonToolTips.TogglePlayerPin.text()));
+        }
+
         return tooltip;
     }
 
@@ -861,6 +934,63 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     @Override
     public Collection<? extends GuiTextField> getTextFields() {
         return ObjectLists.singleton(this.searchField);
+    }
+
+    private final class PlayerPinButton extends IconButton {
+        private boolean handledRightClick;
+
+        private PlayerPinButton() {
+            super(() -> {
+                if (canInteractWithRepo() && PinnedKeys.getPlayerPinRows() < PinnedKeys.MAX_PLAYER_PIN_ROWS) {
+                    PinnedKeys.addPlayerPinRow();
+                    repo.updateView();
+                    updateScrollbar();
+                }
+            });
+        }
+
+        @Override
+        public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
+            if (isHandlingRightClick()) {
+                boolean pressed = this.enabled && this.visible
+                    && mouseX >= this.x
+                    && mouseY >= this.y
+                    && mouseX < this.x + this.width
+                    && mouseY < this.y + this.height;
+                if (pressed) {
+                    this.handledRightClick = true;
+                    if (canInteractWithRepo()
+                        && PinnedKeys.removeEmptyPlayerPinRow(terminalStyle.getSlotsPerRow())) {
+                        repo.updateView();
+                        updateScrollbar();
+                    }
+                }
+                return pressed;
+            }
+            return super.mousePressed(minecraft, mouseX, mouseY);
+        }
+
+        @Override
+        public void mouseReleased(int mouseX, int mouseY) {
+            if (this.handledRightClick) {
+                this.handledRightClick = false;
+                return;
+            }
+            super.mouseReleased(mouseX, mouseY);
+        }
+
+        @Override
+        public List<ITextComponent> getTooltipMessage() {
+            return Arrays.asList(
+                ButtonToolTips.PlayerPin.text(),
+                ButtonToolTips.PlayerPinAddRow.text(),
+                ButtonToolTips.PlayerPinRemoveRow.text());
+        }
+
+        @Override
+        protected Icon getIcon() {
+            return Icon.PLAYER_PIN;
+        }
     }
 }
 

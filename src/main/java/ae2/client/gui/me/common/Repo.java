@@ -67,12 +67,15 @@ public class Repo implements IClientRepo {
     public static final Comparator<GridInventoryEntry> AMOUNT_DESC = AMOUNT_ASC.reversed();
 
     private static final Comparator<GridInventoryEntry> PINNED_ROW_COMPARATOR = Comparator.comparing(entry -> {
-        var pinInfo = PinnedKeys.getPinInfo(entry.what());
+        var pinInfo = PinnedKeys.getCraftingPinInfo(entry.what());
         return pinInfo != null ? pinInfo.since : Instant.MAX;
     });
     private final BiMap<Long, GridInventoryEntry> entries = HashBiMap.create();
     private final ObjectList<GridInventoryEntry> view = new ObjectArrayList<>();
-    private final ObjectList<GridInventoryEntry> pinnedRow = new ObjectArrayList<>();
+    private final ObjectList<GridInventoryEntry> pinnedSlots = new ObjectArrayList<>();
+    private final ObjectList<GridInventoryEntry> craftingPinnedEntries = new ObjectArrayList<>();
+    private final ObjectList<GridInventoryEntry> playerPinnedEntries = new ObjectArrayList<>();
+    private final Map<AEKey, PinnedKeys.PinReason> pinnedReasons = new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap<>();
     /**
      * Entries by item ID to speed up ingredient matching.
      */
@@ -81,6 +84,9 @@ public class Repo implements IClientRepo {
     private final IScrollSource src;
     private final ISortSource sortSrc;
     private int rowSize = 9;
+    private int terminalRows = 1;
+    private int pinnedRowCount;
+    private int visiblePlayerPinRows;
     private boolean enabled = false;
     private boolean entriesByItemIdNeedsUpdate = true;
     private IPartitionList partitionList;
@@ -159,16 +165,28 @@ public class Repo implements IClientRepo {
         }
     }
 
+    @Nullable
+    private static GridInventoryEntry findPinnedEntry(List<GridInventoryEntry> entries, AEKey key) {
+        for (GridInventoryEntry entry : entries) {
+            if (key.equals(entry.what())) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
     public final void updateView() {
         // While the view is paused, we try to only append to the view list in order to avoid mis-clicks by the
         // player due to items shifting under their mouse cursor.
         if (isPaused()) {
             // First pass -> detect and update
             var visibleSerials = new LongOpenHashSet(this.view.size());
-            updateEntriesWhilePaused(pinnedRow, visibleSerials);
+            updateEntriesWhilePaused(craftingPinnedEntries, visibleSerials);
+            updateEntriesWhilePaused(playerPinnedEntries, visibleSerials);
             updateEntriesWhilePaused(view, visibleSerials);
 
-            var pinnedRowFreeSlots = getFreeSlots(pinnedRow);
+            var craftingPinnedFreeSlots = getFreeSlots(craftingPinnedEntries);
+            var playerPinnedFreeSlots = getFreeSlots(playerPinnedEntries);
             var viewFreeSlots = getFreeSlots(view);
 
             ObjectList<GridInventoryEntry> entriesToAdd = new ObjectArrayList<>();
@@ -181,7 +199,8 @@ public class Repo implements IClientRepo {
 
                 // First, try to find an empty/meaningless slot in the view that is visually indistinguishable
                 // and fill it
-                if (takeOverSlotOccupiedByRemovedItem(serverEntry, pinnedRowFreeSlots, pinnedRow)
+                if (takeOverSlotOccupiedByRemovedItem(serverEntry, craftingPinnedFreeSlots, craftingPinnedEntries)
+                    || takeOverSlotOccupiedByRemovedItem(serverEntry, playerPinnedFreeSlots, playerPinnedEntries)
                     || takeOverSlotOccupiedByRemovedItem(serverEntry, viewFreeSlots, view)) {
                     continue;
                 }
@@ -193,7 +212,8 @@ public class Repo implements IClientRepo {
             addEntriesToView(entriesToAdd);
         } else {
             this.view.clear();
-            this.pinnedRow.clear();
+            this.craftingPinnedEntries.clear();
+            this.playerPinnedEntries.clear();
 
             addEntriesToView(this.entries.values());
         }
@@ -201,13 +221,15 @@ public class Repo implements IClientRepo {
         // Don't re-sort while being paused
         if (!isPaused()) {
             // Sort older entries first in the pinned row
-            pinnedRow.sort(PINNED_ROW_COMPARATOR);
+            craftingPinnedEntries.sort(PINNED_ROW_COMPARATOR);
 
             var sortOrder = this.sortSrc.getSortBy();
             var sortDir = this.sortSrc.getSortDir();
 
             this.view.sort(getComparator(sortOrder, sortDir));
         }
+
+        rebuildPinnedSlots();
 
         if (this.updateViewListener != null) {
             this.updateViewListener.run();
@@ -218,12 +240,14 @@ public class Repo implements IClientRepo {
         var viewMode = this.sortSrc.getSortDisplay();
         var typeFilter = this.sortSrc.getSortKeyTypes();
 
-        var hasPinnedRow = !PinnedKeys.isEmpty();
-
         for (var entry : entries) {
             // Pinned keys ignore all filters & search
-            if (hasPinnedRow && pinnedRow.size() < rowSize && PinnedKeys.isPinned(entry.what())) {
-                pinnedRow.add(entry);
+            if (PinnedKeys.isCraftingPinned(entry.what())) {
+                craftingPinnedEntries.add(entry);
+                continue;
+            }
+            if (PinnedKeys.isPlayerPinned(entry.what())) {
+                playerPinnedEntries.add(entry);
                 continue;
             }
 
@@ -252,16 +276,60 @@ public class Repo implements IClientRepo {
         // Any pinned entry that has not yet been added to the pinned row will be represented by a fake
         // entry. Pinned crafting jobs are excluded from this because they *should* have a grid-entry
         // with craftable=true if they're craftable on this grid.
-        if (hasPinnedRow) {
-            for (var pinnedKey : PinnedKeys.getPinnedKeys()) {
-                var info = PinnedKeys.getPinInfo(pinnedKey);
-                if (info != null && info.reason != PinnedKeys.PinReason.CRAFTING
-                    && pinnedRow.stream().noneMatch(r -> pinnedKey.equals(r.what()))) {
-                    this.pinnedRow.add(new GridInventoryEntry(
-                        -1, pinnedKey, 0, 0, false));
-                }
+        for (var pinnedKey : PinnedKeys.getPlayerPinnedKeys()) {
+            if (!PinnedKeys.isCraftingPinned(pinnedKey)
+                && playerPinnedEntries.stream().noneMatch(r -> pinnedKey.equals(r.what()))) {
+                this.playerPinnedEntries.add(new GridInventoryEntry(
+                    -1, pinnedKey, 0, 0, false));
             }
         }
+    }
+
+    private void rebuildPinnedSlots() {
+        this.pinnedSlots.clear();
+        this.pinnedReasons.clear();
+
+        int craftingRows = getRowsFor(craftingPinnedEntries.size());
+        int maxPlayerRows = Math.max(0, this.terminalRows - 1 - craftingRows);
+        this.visiblePlayerPinRows = Math.min(PinnedKeys.getPlayerPinRows(),
+            Math.min(PinnedKeys.MAX_PLAYER_PIN_ROWS, maxPlayerRows));
+        this.pinnedRowCount = craftingRows + this.visiblePlayerPinRows;
+
+        for (GridInventoryEntry entry : craftingPinnedEntries) {
+            if (pinnedSlots.size() >= craftingRows * rowSize) {
+                break;
+            }
+            pinnedSlots.add(entry);
+            pinnedReasons.put(entry.what(), PinnedKeys.PinReason.CRAFTING);
+        }
+        while (pinnedSlots.size() < craftingRows * rowSize) {
+            pinnedSlots.add(null);
+        }
+
+        int playerCapacity = getPlayerPinCapacity();
+        int playerAdded = 0;
+        for (AEKey key : PinnedKeys.getPlayerPinnedKeys()) {
+            if (PinnedKeys.isCraftingPinned(key) || playerAdded >= playerCapacity) {
+                continue;
+            }
+            GridInventoryEntry entry = findPinnedEntry(playerPinnedEntries, key);
+            if (entry == null) {
+                entry = new GridInventoryEntry(-1, key, 0, 0, false);
+            }
+            pinnedSlots.add(entry);
+            pinnedReasons.put(key, PinnedKeys.PinReason.PLAYER);
+            playerAdded++;
+        }
+        while (pinnedSlots.size() < this.pinnedRowCount * rowSize) {
+            pinnedSlots.add(null);
+        }
+    }
+
+    private int getRowsFor(int entryCount) {
+        if (entryCount <= 0) {
+            return 0;
+        }
+        return (entryCount + this.rowSize - 1) / this.rowSize;
     }
 
     private void updateEntriesWhilePaused(List<GridInventoryEntry> shownEntries, LongSet visibleSerials) {
@@ -319,21 +387,25 @@ public class Repo implements IClientRepo {
     }
 
     public List<GridInventoryEntry> getPinnedEntries() {
-        return Collections.unmodifiableList(this.pinnedRow);
+        ObjectArrayList<GridInventoryEntry> entries = new ObjectArrayList<>();
+        for (GridInventoryEntry entry : this.pinnedSlots) {
+            if (entry != null) {
+                entries.add(entry);
+            }
+        }
+        return Collections.unmodifiableList(entries);
     }
 
     @Nullable
     public final GridInventoryEntry get(int idx) {
-        if (!this.pinnedRow.isEmpty()) {
-            // First row of slots is reserved for pinned keys
-            if (idx < this.rowSize) {
-                if (idx < this.pinnedRow.size()) {
-                    return this.pinnedRow.get(idx);
-                }
-                return null;
+        int pinnedSlots = this.pinnedRowCount * this.rowSize;
+        if (idx < pinnedSlots) {
+            if (idx < this.pinnedSlots.size()) {
+                return this.pinnedSlots.get(idx);
             }
-            idx -= this.rowSize;
+            return null;
         }
+        idx -= pinnedSlots;
 
         idx += this.src.getCurrentScroll() * this.rowSize;
 
@@ -344,19 +416,46 @@ public class Repo implements IClientRepo {
     }
 
     public final int size() {
-        return this.view.size() + this.pinnedRow.size();
+        return this.view.size() + this.pinnedRowCount * this.rowSize;
+    }
+
+    public final int getScrollableSize() {
+        return this.view.size();
     }
 
     public final void clear() {
         this.entries.clear();
         this.view.clear();
-        this.pinnedRow.clear();
+        this.pinnedSlots.clear();
+        this.craftingPinnedEntries.clear();
+        this.playerPinnedEntries.clear();
+        this.pinnedReasons.clear();
+        this.pinnedRowCount = 0;
+        this.visiblePlayerPinRows = 0;
         this.entriesByItemId.clear();
         this.entriesByItemIdNeedsUpdate = true;
     }
 
     public final boolean hasPinnedRow() {
-        return !this.pinnedRow.isEmpty();
+        return this.pinnedRowCount > 0;
+    }
+
+    public final int getPinnedRowCount() {
+        return this.pinnedRowCount;
+    }
+
+    public final int getPlayerPinCapacity() {
+        return this.visiblePlayerPinRows * this.rowSize;
+    }
+
+    public final boolean canRemoveEmptyPlayerPinRow() {
+        return PinnedKeys.getPlayerPinRows() > 0
+            && PinnedKeys.getPlayerPinnedKeys().size() <= Math.max(0, PinnedKeys.getPlayerPinRows() - 1) * this.rowSize;
+    }
+
+    @Nullable
+    public final PinnedKeys.PinReason getPinReason(GridInventoryEntry entry) {
+        return entry != null && entry.what() != null ? this.pinnedReasons.get(entry.what()) : null;
     }
 
     public boolean isEnabled() {
@@ -374,6 +473,10 @@ public class Repo implements IClientRepo {
 
     public final void setRowSize(int rowSize) {
         this.rowSize = rowSize;
+    }
+
+    public final void setTerminalRows(int terminalRows) {
+        this.terminalRows = Math.max(1, terminalRows);
     }
 
     public final String getSearchString() {
