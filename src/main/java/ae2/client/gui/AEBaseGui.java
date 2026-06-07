@@ -853,22 +853,29 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return;
         }
 
-        GenericStack genericStack = GenericStack.unwrapItemStack(rawStack);
-        String amountText;
-        if (genericStack != null) {
-            if (genericStack.amount() <= 1) {
-                return;
-            }
-            amountText = genericStack.what().formatAmount(genericStack.amount(), AmountFormat.SLOT);
-        } else {
-            int count = rawStack.getCount();
-            if (count <= 1) {
-                return;
-            }
-            amountText = Integer.toString(count);
+        String amountText = getSlotAmountText(slot, appEngSlot, rawStack, displayStack);
+        if (amountText == null) {
+            return;
         }
 
         StackSizeRenderer.renderSizeLabel(this.fontRenderer, slot.xPos, slot.yPos, amountText, false);
+    }
+
+    @Nullable
+    protected String getSlotAmountText(Slot slot, AppEngSlot appEngSlot, ItemStack rawStack, ItemStack displayStack) {
+        GenericStack genericStack = GenericStack.unwrapItemStack(rawStack);
+        if (genericStack != null) {
+            if (genericStack.amount() <= 1) {
+                return null;
+            }
+            return genericStack.what().formatAmount(genericStack.amount(), AmountFormat.SLOT);
+        } else {
+            int count = rawStack.getCount();
+            if (count <= 1) {
+                return null;
+            }
+            return Integer.toString(count);
+        }
     }
 
     @Override

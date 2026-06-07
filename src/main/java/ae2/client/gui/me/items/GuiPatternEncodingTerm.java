@@ -5,6 +5,8 @@ import ae2.api.behaviors.EmptyingAction;
 import ae2.api.config.ActionItems;
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
+import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
 import ae2.client.gui.Icon;
 import ae2.client.gui.me.common.GuiMEStorage;
@@ -16,7 +18,9 @@ import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.TabButton;
 import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.slot.AppEngSlot;
 import ae2.core.AEConfig;
+import ae2.core.definitions.AEItems;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
@@ -123,6 +127,27 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     public void drawBG(int offsetX, int offsetY, int mouseX, int mouseY, float partialTicks) {
         super.drawBG(offsetX, offsetY, mouseX, mouseY, partialTicks);
         this.patternModifierPanel.drawBackground();
+    }
+
+    @Override
+    @Nullable
+    protected String getSlotAmountText(Slot slot, AppEngSlot appEngSlot, ItemStack rawStack, ItemStack displayStack) {
+        if (this.container.isBlankPatternSlot(slot)
+            && this.container.getAutoFillPatterns() == YesNo.YES
+            && AEItems.BLANK_PATTERN.is(rawStack)) {
+            long total = this.container.getSyncedNetworkBlankPatternCount() + rawStack.getCount();
+            if (total <= 1) {
+                return null;
+            }
+
+            AEItemKey blankPatternKey = AEItemKey.of(AEItems.BLANK_PATTERN.stack(1));
+            if (blankPatternKey == null) {
+                return Long.toString(total);
+            }
+            return blankPatternKey.formatAmount(total, AmountFormat.SLOT);
+        }
+
+        return super.getSlotAmountText(slot, appEngSlot, rawStack, displayStack);
     }
 
     @Override

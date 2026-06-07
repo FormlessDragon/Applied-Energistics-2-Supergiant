@@ -89,6 +89,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     public YesNo autoFillPatterns = YesNo.NO;
     @GuiSync(93)
     public boolean patternModifierPanelAvailable;
+    @GuiSync(92)
+    public long networkBlankPatternCount;
     @Nullable
     private IRecipe currentRecipe;
     private boolean clearOnClose;
@@ -196,6 +198,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
             this.substituteFluids = this.encodingLogic.isFluidSubstitution();
             this.autoFillPatterns = getHost().getConfigManager().getSetting(Settings.PATTERN_AUTO_FILL);
             this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
+            this.networkBlankPatternCount = this.autoFillPatterns == YesNo.YES ? computeNetworkBlankPatternCount() : 0;
         }
     }
 
@@ -595,6 +598,22 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
 
     public YesNo getAutoFillPatterns() {
         return this.autoFillPatterns;
+    }
+
+    public boolean isBlankPatternSlot(@Nullable Slot slot) {
+        return slot == this.blankPatternSlot;
+    }
+
+    public long getSyncedNetworkBlankPatternCount() {
+        return this.networkBlankPatternCount;
+    }
+
+    private long computeNetworkBlankPatternCount() {
+        AEItemKey blankPatternKey = AEItemKey.of(AEItems.BLANK_PATTERN.stack(1));
+        if (blankPatternKey == null) {
+            return 0;
+        }
+        return getPreviousAvailableStacks().get(blankPatternKey);
     }
 
     public boolean isPatternModifierPanelAvailable() {
