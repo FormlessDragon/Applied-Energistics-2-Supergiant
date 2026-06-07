@@ -635,6 +635,7 @@ gui.ae2.requester.status.blocking=阻塞
 gui.ae2.requester.status.blocking.desc=该请求被已有库存或待插入物品阻塞。
 gui.ae2.RequiredPower=所需能源：%s
 gui.ae2.Recipe=配方
+gui.ae2.RecipeType=配方类型
 gui.ae2.RestoredGenericSettingConfigInv=配置物品栏
 gui.ae2.RestoredGenericSettingPriority=优先级
 gui.ae2.RestoredGenericSettingSettings=设置

@@ -133,7 +133,7 @@ public class AECraftingPattern implements IAssemblerPattern {
                 tooltip.addProperty(GuiText.PatternTooltipFluidSubstitutions.text());
             }
 
-            if (flags && encoded.hasKey("recipeId", 8)) {
+            if (encoded.hasKey("recipeId", 8)) {
                 tooltip.addProperty(GuiText.Recipe.text(),
                     new TextComponentString(encoded.getString("recipeId")));
             }
@@ -469,7 +469,7 @@ public class AECraftingPattern implements IAssemblerPattern {
             tooltip.addProperty(GuiText.PatternTooltipFluidSubstitutions.text());
         }
 
-        if (flags.isAdvanced() && recipe.getRegistryName() != null) {
+        if (recipe.getRegistryName() != null) {
             tooltip.addProperty(GuiText.Recipe.text(),
                 new TextComponentString(recipe.getRegistryName().toString()));
         }

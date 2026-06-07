@@ -2,6 +2,7 @@ package ae2.integration.modules.hei;
 
 import ae2.api.client.PatternImportPriorityContext;
 import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.client.patternimport.PatternImportPriorityContextImpl;
 import ae2.client.patternimport.PatternImportPrioritySelector;
@@ -70,10 +71,11 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
         PatternImportPriorityContext context = PatternImportPriorityContextImpl.create(container,
             HeiBookmarkHelper.getBookmarkedStacks());
 
-        encodeSelectedStacksIntoSlots(container, getGenericInputs(recipeLayout), context,
-            container.getProcessingInputSlots());
+        List<List<String>> inputCandidateKeyTags = encodeProcessingInputsIntoSlots(container,
+            getGenericInputs(recipeLayout), context, container.getProcessingInputSlots());
         encodeSelectedStacksIntoSlots(container, getGenericOutputs(recipeLayout), context,
             container.getProcessingOutputSlots());
+        container.setHeiProcessingRecipe(recipeLayout.getRecipeCategory().getUid(), inputCandidateKeyTags);
     }
 
     private static List<List<GenericStack>> getGenericInputs(IRecipeLayout recipeLayout) {
@@ -183,6 +185,83 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
                 : ItemStack.EMPTY;
             setFilter(container, slots[i], stack);
         }
+    }
+
+    private static List<List<String>> encodeProcessingInputsIntoSlots(ContainerPatternEncodingTerm container,
+                                                                      List<List<GenericStack>> possibleInputsBySlot,
+                                                                      PatternImportPriorityContext context,
+                                                                      FakeSlot[] slots) {
+        List<GenericStack> encodedInputs = new ObjectArrayList<>();
+        List<List<AEKey>> candidatesByEncodedSlot = new ObjectArrayList<>();
+        for (List<GenericStack> genericIngredient : possibleInputsBySlot) {
+            if (!genericIngredient.isEmpty()) {
+                addOrMergeInput(encodedInputs, candidatesByEncodedSlot,
+                    PatternImportPrioritySelector.selectIngredient(genericIngredient, context, false),
+                    genericIngredient);
+            }
+        }
+
+        for (int i = 0; i < slots.length; i++) {
+            ItemStack stack = i < encodedInputs.size() ? GenericStack.wrapInItemStack(encodedInputs.get(i))
+                : ItemStack.EMPTY;
+            setFilter(container, slots[i], stack);
+        }
+
+        List<List<String>> candidateKeyTags = new ObjectArrayList<>(candidatesByEncodedSlot.size());
+        for (List<AEKey> candidates : candidatesByEncodedSlot) {
+            List<String> tags = new ObjectArrayList<>(candidates.size());
+            for (AEKey candidate : candidates) {
+                tags.add(candidate.toTagGeneric().toString());
+            }
+            candidateKeyTags.add(tags);
+        }
+        return candidateKeyTags;
+    }
+
+    private static void addOrMergeInput(List<GenericStack> stacks, List<List<AEKey>> candidatesByEncodedSlot,
+                                        GenericStack newStack, List<GenericStack> possibleInputs) {
+        List<AEKey> newCandidates = getCandidateKeys(possibleInputs);
+        if (!newCandidates.contains(newStack.what())) {
+            newCandidates.add(newStack.what());
+        }
+        for (int i = 0; i < stacks.size(); i++) {
+            GenericStack existingStack = stacks.get(i);
+            if (Objects.equals(existingStack.what(), newStack.what())) {
+                long newAmount = LongMath.saturatedAdd(existingStack.amount(), newStack.amount());
+                stacks.set(i, new GenericStack(newStack.what(), newAmount));
+                candidatesByEncodedSlot.set(i, intersectCandidates(candidatesByEncodedSlot.get(i), newCandidates));
+
+                long overflow = newStack.amount() - (newAmount - existingStack.amount());
+                if (overflow > 0) {
+                    stacks.add(new GenericStack(newStack.what(), overflow));
+                    candidatesByEncodedSlot.add(new ObjectArrayList<>(newCandidates));
+                }
+                return;
+            }
+        }
+
+        stacks.add(newStack);
+        candidatesByEncodedSlot.add(new ObjectArrayList<>(newCandidates));
+    }
+
+    private static List<AEKey> getCandidateKeys(List<GenericStack> possibleInputs) {
+        List<AEKey> candidates = new ObjectArrayList<>();
+        for (GenericStack possibleInput : possibleInputs) {
+            if (possibleInput != null && !candidates.contains(possibleInput.what())) {
+                candidates.add(possibleInput.what());
+            }
+        }
+        return candidates;
+    }
+
+    private static List<AEKey> intersectCandidates(List<AEKey> first, List<AEKey> second) {
+        List<AEKey> result = new ObjectArrayList<>();
+        for (AEKey key : first) {
+            if (second.contains(key)) {
+                result.add(key);
+            }
+        }
+        return result;
     }
 
     private static void addOrMerge(List<GenericStack> stacks, GenericStack newStack) {

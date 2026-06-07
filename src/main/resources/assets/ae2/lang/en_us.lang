@@ -635,6 +635,7 @@ gui.ae2.requester.status.blocking=Blocking
 gui.ae2.requester.status.blocking.desc=The request is blocked by existing stored or pending items.
 gui.ae2.RequiredPower=Required Power: %s
 gui.ae2.Recipe=Recipe
+gui.ae2.RecipeType=RecipeType
 gui.ae2.RestoredGenericSettingConfigInv=config inventory
 gui.ae2.RestoredGenericSettingPriority=priority
 gui.ae2.RestoredGenericSettingSettings=settings

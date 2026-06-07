@@ -114,8 +114,16 @@ public final class PatternDetailsHelper {
      * @throws IllegalArgumentException If either in or out contain only empty ItemStacks, or no primary output
      */
     public static ItemStack encodeProcessingPattern(List<GenericStack> sparseInputs, List<GenericStack> sparseOutputs) {
+        return encodeProcessingPattern(sparseInputs, sparseOutputs, null);
+    }
+
+    /**
+     * Encodes a processing pattern with optional recipe category metadata supplied by HEI recipe transfer.
+     */
+    public static ItemStack encodeProcessingPattern(List<GenericStack> sparseInputs, List<GenericStack> sparseOutputs,
+                                                    @Nullable String recipeTypeUid) {
         var stack = AEItems.PROCESSING_PATTERN.stack();
-        AEProcessingPattern.encode(stack, sparseInputs, sparseOutputs);
+        AEProcessingPattern.encode(stack, sparseInputs, sparseOutputs, recipeTypeUid);
         return stack;
     }
 

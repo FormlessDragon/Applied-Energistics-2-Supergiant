@@ -37,4 +37,9 @@ public interface HeiAdapter {
 
     default void addBookmarkGroup(List<GenericStack> stacks) {
     }
+
+    @Nullable
+    default String getRecipeCategoryTitle(String uid) {
+        return null;
+    }
 }

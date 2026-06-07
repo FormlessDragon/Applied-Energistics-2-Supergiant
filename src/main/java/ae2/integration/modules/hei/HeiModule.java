@@ -44,4 +44,24 @@ public class HeiModule implements HeiAdapter {
     public void addBookmarkGroup(List<GenericStack> stacks) {
         HeiBookmarkHelper.addBookmarkGroup(stacks);
     }
+
+    @Override
+    public @Nullable String getRecipeCategoryTitle(String uid) {
+        try {
+            var runtime = HeiPlugin.getRuntime();
+            if (runtime == null) {
+                return null;
+            }
+
+            var category = runtime.getRecipeRegistry().getRecipeCategory(uid);
+            if (category == null) {
+                return null;
+            }
+
+            String title = category.getTitle();
+            return title == null || title.isEmpty() ? null : title;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
 }

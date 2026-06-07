@@ -285,6 +285,7 @@ public enum GuiText implements LocalizationEnum {
     RequiredPower,
     Renamer,
     Recipe,
+    RecipeType,
     SelectedCraftingCPU,
     SCSInvalid,
     SCSSize,

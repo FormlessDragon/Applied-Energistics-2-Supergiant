@@ -6,9 +6,13 @@ import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.core.localization.GuiText;
+import ae2.integration.Integrations;
+import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,12 +23,15 @@ public class AEProcessingPattern implements IPatternDetails {
     public static final int MAX_INPUT_SLOTS = 9 * 9;
     public static final int MAX_OUTPUT_SLOTS = 3 * 9;
     private static final String ENCODED_PROCESSING_PATTERN = "encoded_processing_pattern";
+    private static final String TAG_RECIPE_TYPE_UID = "recipeTypeUid";
 
     private final AEItemKey definition;
     private final List<GenericStack> sparseInputs;
     private final List<GenericStack> sparseOutputs;
     private final Input[] inputs;
     private final List<GenericStack> condensedOutputs;
+    @Nullable
+    private final String recipeTypeUid;
 
     public AEProcessingPattern(AEItemKey definition) {
         this.definition = definition;
@@ -36,6 +43,9 @@ public class AEProcessingPattern implements IPatternDetails {
 
         this.sparseInputs = readGenericStackList(encodedPattern.getTagList("inputs", 10));
         this.sparseOutputs = readGenericStackList(encodedPattern.getTagList("outputs", 10));
+        this.recipeTypeUid = encodedPattern.hasKey(TAG_RECIPE_TYPE_UID, 8)
+            ? encodedPattern.getString(TAG_RECIPE_TYPE_UID)
+            : null;
         var condensedInputs = AEPatternHelper.condenseStacks(sparseInputs);
         this.inputs = new Input[condensedInputs.size()];
         for (int i = 0; i < inputs.length; ++i) {
@@ -46,6 +56,11 @@ public class AEProcessingPattern implements IPatternDetails {
     }
 
     public static void encode(ItemStack stack, List<GenericStack> sparseInputs, List<GenericStack> sparseOutputs) {
+        encode(stack, sparseInputs, sparseOutputs, null);
+    }
+
+    public static void encode(ItemStack stack, List<GenericStack> sparseInputs, List<GenericStack> sparseOutputs,
+                              @Nullable String recipeTypeUid) {
         if (sparseInputs.stream().noneMatch(Objects::nonNull)) {
             throw new IllegalArgumentException("At least one input must be non-null.");
         }
@@ -54,6 +69,9 @@ public class AEProcessingPattern implements IPatternDetails {
         var encoded = new NBTTagCompound();
         encoded.setTag("inputs", writeGenericStackList(sparseInputs));
         encoded.setTag("outputs", writeGenericStackList(sparseOutputs));
+        if (recipeTypeUid != null && !recipeTypeUid.isEmpty()) {
+            encoded.setString(TAG_RECIPE_TYPE_UID, recipeTypeUid);
+        }
         stack.setTagInfo(ENCODED_PROCESSING_PATTERN, encoded);
     }
 
@@ -65,8 +83,20 @@ public class AEProcessingPattern implements IPatternDetails {
             var tag = encoded.getCompoundTag(ENCODED_PROCESSING_PATTERN);
             readGenericStackList(tag.getTagList("inputs", 10)).stream().filter(Objects::nonNull).forEach(tooltip::addInput);
             readGenericStackList(tag.getTagList("outputs", 10)).stream().filter(Objects::nonNull).forEach(tooltip::addOutput);
+            addRecipeTypeProperty(tooltip, tag.hasKey(TAG_RECIPE_TYPE_UID, 8) ? tag.getString(TAG_RECIPE_TYPE_UID) : null);
         }
         return tooltip;
+    }
+
+    private static void addRecipeTypeProperty(PatternDetailsTooltip tooltip, @Nullable String recipeTypeUid) {
+        if (recipeTypeUid == null || recipeTypeUid.isEmpty()) {
+            return;
+        }
+
+        String title = Integrations.hei().getRecipeCategoryTitle(recipeTypeUid);
+        if (title != null && !title.isEmpty()) {
+            tooltip.addProperty(GuiText.RecipeType.text(), new TextComponentString(title));
+        }
     }
 
     @Nullable
@@ -118,6 +148,13 @@ public class AEProcessingPattern implements IPatternDetails {
 
     public List<GenericStack> getSparseOutputs() {
         return sparseOutputs;
+    }
+
+    @Override
+    public PatternDetailsTooltip getTooltip(World level, ITooltipFlag flags) {
+        var tooltip = IPatternDetails.super.getTooltip(level, flags);
+        addRecipeTypeProperty(tooltip, this.recipeTypeUid);
+        return tooltip;
     }
 
     @Override

@@ -36,6 +36,8 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.CraftingManager;
 import net.minecraft.item.crafting.IRecipe;
+import net.minecraft.nbt.JsonToNBT;
+import net.minecraft.nbt.NBTException;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -61,6 +63,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     private static final String ACTION_PROCESSING_DIVIDE_3 = "processingDivide3";
     private static final String ACTION_PROCESSING_DIVIDE_5 = "processingDivide5";
     private static final String ACTION_RENAME_PROCESSING_PATTERN_ITEM = "renameProcessingPatternItem";
+    private static final String ACTION_SET_HEI_PROCESSING_RECIPE = "setHeiProcessingRecipe";
 
     private static final Container DUMMY_CONTAINER = new Container() {
         @Override
@@ -93,6 +96,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     public long networkBlankPatternCount;
     @Nullable
     private IRecipe currentRecipe;
+    @Nullable
+    private HeiProcessingRecipeSnapshot heiProcessingRecipeSnapshot;
     private boolean clearOnClose;
 
     public ContainerPatternEncodingTerm(InventoryPlayer ip, IPatternTerminalGuiHost host) {
@@ -156,6 +161,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
             () -> modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation.DIVIDE_5));
         registerClientAction(ACTION_RENAME_PROCESSING_PATTERN_ITEM, RenamePatternItemRequest.class,
             this::renameProcessingPatternItem);
+        registerClientAction(ACTION_SET_HEI_PROCESSING_RECIPE, HeiProcessingRecipeRequest.class,
+            this::setHeiProcessingRecipe);
         this.patternModifierPanel = new PatternModifierPanel(this);
         this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
 
@@ -496,7 +503,32 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
             return null;
         }
 
-        return PatternDetailsHelper.encodeProcessingPattern(Arrays.asList(inputs), Arrays.asList(outputs));
+        String recipeTypeUid = getValidHeiProcessingRecipeTypeUid();
+        return PatternDetailsHelper.encodeProcessingPattern(Arrays.asList(inputs), Arrays.asList(outputs),
+            recipeTypeUid);
+    }
+
+    @Nullable
+    private String getValidHeiProcessingRecipeTypeUid() {
+        if (this.mode != EncodingMode.PROCESSING || this.heiProcessingRecipeSnapshot == null) {
+            return null;
+        }
+
+        List<List<AEKey>> candidatesBySlot = this.heiProcessingRecipeSnapshot.inputCandidatesBySlot;
+        int nonEmptyInputs = 0;
+        for (int slot = 0; slot < this.encodedInputsInv.size(); slot++) {
+            AEKey currentKey = this.encodedInputsInv.getKey(slot);
+            if (currentKey == null) {
+                continue;
+            }
+
+            if (slot >= candidatesBySlot.size() || !candidatesBySlot.get(slot).contains(currentKey)) {
+                return null;
+            }
+            nonEmptyInputs++;
+        }
+
+        return nonEmptyInputs == candidatesBySlot.size() ? this.heiProcessingRecipeSnapshot.recipeTypeUid : null;
     }
 
     @Nullable
@@ -676,6 +708,63 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
 
     public FakeSlot[] getCraftingGridSlots() {
         return this.craftingGridSlots;
+    }
+
+    public void setHeiProcessingRecipe(String recipeTypeUid, List<List<String>> inputCandidateKeyTags) {
+        if (isClientSide()) {
+            sendClientAction(ACTION_SET_HEI_PROCESSING_RECIPE,
+                new HeiProcessingRecipeRequest(recipeTypeUid, inputCandidateKeyTags));
+        }
+    }
+
+    private void setHeiProcessingRecipe(HeiProcessingRecipeRequest request) {
+        if (isClientSide()) {
+            return;
+        }
+
+        this.heiProcessingRecipeSnapshot = parseHeiProcessingRecipeSnapshot(request);
+    }
+
+    @Nullable
+    private static HeiProcessingRecipeSnapshot parseHeiProcessingRecipeSnapshot(@Nullable HeiProcessingRecipeRequest request) {
+        if (request == null || request.recipeTypeUid == null || request.recipeTypeUid.isEmpty()
+            || request.inputCandidateKeyTags == null || request.inputCandidateKeyTags.isEmpty()) {
+            return null;
+        }
+
+        List<List<AEKey>> candidatesBySlot = new ArrayList<>(request.inputCandidateKeyTags.size());
+        for (List<String> candidateTags : request.inputCandidateKeyTags) {
+            if (candidateTags == null || candidateTags.isEmpty()) {
+                return null;
+            }
+
+            List<AEKey> candidates = new ArrayList<>(candidateTags.size());
+            for (String candidateTag : candidateTags) {
+                AEKey key = parseKey(candidateTag);
+                if (key != null && !candidates.contains(key)) {
+                    candidates.add(key);
+                }
+            }
+            if (candidates.isEmpty()) {
+                return null;
+            }
+            candidatesBySlot.add(candidates);
+        }
+
+        return new HeiProcessingRecipeSnapshot(request.recipeTypeUid, candidatesBySlot);
+    }
+
+    @Nullable
+    private static AEKey parseKey(@Nullable String serializedKey) {
+        if (serializedKey == null || serializedKey.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return AEKey.fromTagGeneric(JsonToNBT.getTagFromJson(serializedKey));
+        } catch (NBTException ignored) {
+            return null;
+        }
     }
 
     public void renameProcessingPatternItem(int slotNumber, String name) {
@@ -870,5 +959,18 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
             this.slotNumber = slotNumber;
             this.name = name;
         }
+    }
+
+    private static final class HeiProcessingRecipeRequest {
+        private final String recipeTypeUid;
+        private final List<List<String>> inputCandidateKeyTags;
+
+        private HeiProcessingRecipeRequest(String recipeTypeUid, List<List<String>> inputCandidateKeyTags) {
+            this.recipeTypeUid = recipeTypeUid;
+            this.inputCandidateKeyTags = inputCandidateKeyTags;
+        }
+    }
+
+    private record HeiProcessingRecipeSnapshot(String recipeTypeUid, List<List<AEKey>> inputCandidatesBySlot) {
     }
 }
