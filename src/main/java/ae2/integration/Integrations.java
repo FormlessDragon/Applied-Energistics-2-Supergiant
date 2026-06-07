@@ -22,6 +22,7 @@ import ae2.integration.abstraction.HeiAdapter;
 import ae2.integration.abstraction.IInvTweaks;
 import ae2.integration.modules.inventorytweaks.InventoryTweaksModule;
 import ae2.integration.modules.theoneprobe.TOP;
+import ae2.integration.modules.waila.Waila;
 import net.minecraftforge.fml.common.Loader;
 
 public final class Integrations {
@@ -46,6 +47,7 @@ public final class Integrations {
 
     public static void enqueueIMC() {
         TOP.enqueueIMC();
+        Waila.enqueueIMC();
     }
 
     public static void initOptionalIntegrations() {

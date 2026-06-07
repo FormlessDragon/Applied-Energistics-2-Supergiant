@@ -58,6 +58,7 @@ public enum PlayerMessages implements LocalizationEnum {
     GuiOverlaysDisabled,
     ChunkLoggerEnabled,
     ChunkLoggerDisabled,
+    TickMonitoringCurrent,
     TickMonitoringEnabled,
     TickMonitoringDisabled,
     GridsExporting,

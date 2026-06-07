@@ -56,4 +56,9 @@ public interface ITickManager extends IGridService {
      * @param node gridnode
      */
     void wakeDevice(IGridNode node);
+
+    /**
+     * Timing statistics collected by this tick manager while tick monitoring is enabled.
+     */
+    TickSnapshot getStatistics();
 }

@@ -25,6 +25,7 @@ public class GuiSetStockAmount extends AEBaseGui<ContainerSetStockAmount> {
         this.amount = widgets.addNumberEntryWidget("amountToStock", NumberEntryType.UNITLESS);
         this.amount.setLongValue(1);
         this.amount.setTextFieldStyle(style.getWidget("amountToStockInput"));
+        this.amount.setPreviewFieldStyle(style.getWidget("amountToStockPreview"));
         this.amount.setMinValue(0);
         this.amount.setHideValidationIcon(true);
         this.amount.setOnConfirm(this::confirm);
@@ -49,4 +50,3 @@ public class GuiSetStockAmount extends AEBaseGui<ContainerSetStockAmount> {
         this.amount.getIntValue().ifPresent(container::confirm);
     }
 }
-

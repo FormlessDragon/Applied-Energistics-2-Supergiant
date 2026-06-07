@@ -22,12 +22,15 @@ import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridServiceProvider;
 import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.networking.ticking.ITickManager;
+import ae2.api.networking.ticking.TickSnapshot;
 import ae2.api.networking.ticking.TickRateModulation;
 import ae2.me.GridNode;
 import ae2.me.service.helpers.TickTracker;
 import ae2.me.ticker.RequestBox;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterators;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.crash.CrashReport;
@@ -45,21 +48,20 @@ import java.util.concurrent.TimeUnit;
 public class TickManagerService implements ITickManager, IGridServiceProvider {
 
     private static final long MONITORING_RESET_INTERVAL_TICKS = 20L * 60L;
+    private static final int SERVER_TICK_QUEUE_KEY = Integer.MIN_VALUE;
     private static final int TICK_RATE_SPEED_UP_FACTOR = 2;
     private static final int TICK_RATE_SLOW_DOWN_FACTOR = 1;
     public static boolean MONITORING_ENABLED = false;
     private final Reference2ObjectMap<IGridNode, TickTracker> alertable = new Reference2ObjectOpenHashMap<>();
     private final Reference2ObjectMap<IGridNode, TickTracker> sleeping = new Reference2ObjectOpenHashMap<>();
     private final Reference2ObjectMap<IGridNode, TickTracker> awake = new Reference2ObjectOpenHashMap<>();
-    private final Reference2ObjectMap<World, PriorityQueue<TickTracker>> upcomingTicks = new Reference2ObjectOpenHashMap<>();
+    private final Int2ObjectMap<PriorityQueue<TickTracker>> upcomingTicks = new Int2ObjectOpenHashMap<>();
+    private final TickSnapshot statistics = new TickSnapshot();
     private final Stopwatch stopWatch = Stopwatch.createUnstarted();
     private PriorityQueue<TickTracker> currentlyTickingQueue = null;
     private long currentTick = 0;
     @Nullable
     private IGridNode currentlyTicking;
-
-    public TickManagerService() {
-    }
 
     @Override
     public void onServerStartTick() {
@@ -70,8 +72,8 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
     }
 
     @Override
-    public void onLevelEndTick(World level) {
-        this.tickLevelQueue(level);
+    public void onLevelEndTick(World world) {
+        this.tickLevelQueue(world);
     }
 
     @Override
@@ -79,8 +81,9 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
         this.tickLevelQueue(null);
     }
 
-    private void tickLevelQueue(@Nullable World level) {
-        PriorityQueue<TickTracker> queue = this.upcomingTicks.get(level);
+    private void tickLevelQueue(@Nullable World world) {
+        int queueKey = getQueueKey(world);
+        PriorityQueue<TickTracker> queue = this.upcomingTicks.get(queueKey);
 
         if (queue != null) {
             currentlyTickingQueue = queue;
@@ -92,7 +95,7 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
             }
 
             if (queue.isEmpty()) {
-                this.upcomingTicks.remove(level);
+                this.upcomingTicks.remove(queueKey);
             }
         }
     }
@@ -148,12 +151,15 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
     public void removeNode(IGridNode gridNode) {
         IGridTickable tickable = gridNode.getService(IGridTickable.class);
         if (tickable != null) {
+            this.statistics.remove(gridNode);
             this.alertable.remove(gridNode);
             this.sleeping.remove(gridNode);
 
             // Also remove the tracker from the queue to not tick it again.
             TickTracker tt = this.awake.remove(gridNode);
-            this.removeFromQueue(gridNode, tt);
+            if (tt != null) {
+                this.removeFromQueue(gridNode, tt);
+            }
         }
     }
 
@@ -258,7 +264,7 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
      * @return average time spent ticking this node in nanoseconds, or 0 for an unknown node
      */
     public long getAverageTime(IGridNode node) {
-        LongSummaryStatistics stats = this.getStatistics(node);
+        LongSummaryStatistics stats = this.getNodeStatistics(node);
         if (stats == null) {
             return 0;
         }
@@ -272,7 +278,7 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
      * @return 0 if the node isn't ticking or doesn't belong to this grid.
      */
     public long getOverallTime(IGridNode node) {
-        LongSummaryStatistics stats = this.getStatistics(node);
+        LongSummaryStatistics stats = this.getNodeStatistics(node);
         if (stats == null) {
             return 0;
         }
@@ -286,7 +292,7 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
      * @return maximum time or 0 for an unknown node
      */
     public long getMaximumTime(IGridNode node) {
-        LongSummaryStatistics stats = this.getStatistics(node);
+        LongSummaryStatistics stats = this.getNodeStatistics(node);
         if (stats == null) {
             return 0;
         }
@@ -295,11 +301,15 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
     }
 
     @Nullable
-    private LongSummaryStatistics getStatistics(IGridNode node) {
+    private LongSummaryStatistics getNodeStatistics(IGridNode node) {
         TickTracker tt = this.awake.get(node);
 
         if (tt == null) {
             tt = this.sleeping.get(node);
+        }
+
+        if (tt == null) {
+            tt = this.alertable.get(node);
         }
 
         if (tt == null) {
@@ -309,11 +319,16 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
         return tt.getStatistics();
     }
 
+    @Override
+    public TickSnapshot getStatistics() {
+        return this.statistics;
+    }
+
     /**
-     * null as level could be used for virtual nodes.
+     * null as world could be used for virtual nodes.
      */
-    private PriorityQueue<TickTracker> getQueue(@Nullable World level) {
-        return this.upcomingTicks.computeIfAbsent(level, ignored -> new PriorityQueue<>());
+    private PriorityQueue<TickTracker> getQueue(@Nullable World world) {
+        return this.upcomingTicks.computeIfAbsent(getQueueKey(world), ignored -> new PriorityQueue<>());
     }
 
     private void addToQueue(IGridNode node, TickTracker tt) {
@@ -322,14 +337,18 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
     }
 
     private void removeFromQueue(IGridNode node, TickTracker tt) {
-        World level = node.getLevel();
-        PriorityQueue<TickTracker> queue = getQueue(level);
+        int queueKey = getQueueKey(node.getLevel());
+        PriorityQueue<TickTracker> queue = this.upcomingTicks.get(queueKey);
+        if (queue == null) {
+            return;
+        }
+
         queue.remove(tt);
 
-        // Make sure we don't cleanup a queue we are iterating over,
+        // Make sure we don't clean up a queue we are iterating over,
         // as something might be added to it later even if it's empty now.
         if (currentlyTickingQueue != queue && queue.isEmpty()) {
-            this.upcomingTicks.remove(level);
+            this.upcomingTicks.remove(queueKey);
         }
     }
 
@@ -357,7 +376,10 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
             stopWatch.stop();
             long elapsedTime = stopWatch.elapsed(TimeUnit.NANOSECONDS);
             if (MONITORING_ENABLED) {
-                tt.getStatistics().accept(elapsedTime);
+                LongSummaryStatistics nodeStatistics = tt.getStatistics();
+                nodeStatistics.accept(elapsedTime);
+                this.statistics.update(tt.getNode(), classify(tt.getNode().getOwner()),
+                    (long) nodeStatistics.getAverage(), nodeStatistics.getMax());
             }
             RequestBox.acceptTick(elapsedTime, diff, tt.getNode());
 
@@ -382,7 +404,7 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
         // Also check if the node is _really_ queued for ticking. If it's awake
         // and not queued, this indicates a bug.
         boolean isQueued = false;
-        PriorityQueue<TickTracker> tickQueue = upcomingTicks.get(node.getLevel());
+        PriorityQueue<TickTracker> tickQueue = upcomingTicks.get(getQueueKey(node.getLevel()));
         if (awakeTracker != null && tickQueue != null) {
             isQueued = Iterators.contains(tickQueue.iterator(), awakeTracker);
         }
@@ -408,8 +430,7 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
 
     public void resetMonitoringStatistics() {
         resetStatistics(this.alertable);
-        resetStatistics(this.sleeping);
-        resetStatistics(this.awake);
+        this.statistics.reset();
     }
 
     private void resetStatistics(Reference2ObjectMap<IGridNode, TickTracker> trackers) {
@@ -425,6 +446,33 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
         boolean queued,
         int currentRate,
         long lastTick) {
+    }
+
+    private static TickSnapshot.Category classify(Object owner) {
+        if (owner instanceof ae2.parts.storagebus.StorageBusPart
+            || owner instanceof ae2.tile.storage.TileDrive
+            || owner instanceof ae2.tile.storage.TileMEChest
+            || owner instanceof ae2.tile.storage.TileIOPort) {
+            return TickSnapshot.Category.STORAGE;
+        }
+
+        if (owner instanceof ae2.tile.crafting.TileMolecularAssembler
+            || owner instanceof ae2.tile.crafting.TilePatternProvider
+            || owner instanceof ae2.tile.crafting.ICraftingCPUTileEntity) {
+            return TickSnapshot.Category.CRAFTING;
+        }
+
+        if (owner instanceof ae2.parts.networking.CablePart
+            || owner instanceof ae2.parts.p2p.P2PTunnelPart
+            || owner instanceof ae2.tile.networking.TileCableBus) {
+            return TickSnapshot.Category.TICK;
+        }
+
+        return TickSnapshot.Category.MISC;
+    }
+
+    private static int getQueueKey(@Nullable World world) {
+        return world == null ? SERVER_TICK_QUEUE_KEY : world.provider.getDimension();
     }
 
 }

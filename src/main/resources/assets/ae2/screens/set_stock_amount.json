@@ -46,6 +46,12 @@
       "top": 55,
       "width": 66,
       "height": 12
+    },
+    "amountToStockPreview": {
+      "left": 20,
+      "top": 112,
+      "width": 138,
+      "height": 12
     }
   }
 }

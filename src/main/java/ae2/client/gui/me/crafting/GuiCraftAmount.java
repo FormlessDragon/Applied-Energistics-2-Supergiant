@@ -53,6 +53,7 @@ public class GuiCraftAmount extends AEBaseGui<ContainerCraftAmount> {
         this.amountToCraft.setMaxValue(Integer.MAX_VALUE);
         this.amountToCraft.setLongValue(1);
         this.amountToCraft.setTextFieldStyle(style.getWidget("amountToCraftInput"));
+        this.amountToCraft.setPreviewFieldStyle(style.getWidget("amountToCraftPreview"));
         this.amountToCraft.setHideValidationIcon(true);
         this.amountToCraft.setOnConfirm(this::confirm);
     }

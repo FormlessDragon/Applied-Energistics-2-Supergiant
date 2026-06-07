@@ -14,6 +14,12 @@ import java.util.Optional;
 public class MathExpressionParser {
     private static final BigDecimal THIRTY = BigDecimal.valueOf(30);
     private static final BigDecimal ONE_BILLION = BigDecimal.valueOf(1e9);
+    private static final BigDecimal KILO = BigDecimal.valueOf(1_000L);
+    private static final BigDecimal MEGA = BigDecimal.valueOf(1_000_000L);
+    private static final BigDecimal GIGA = BigDecimal.valueOf(1_000_000_000L);
+    private static final BigDecimal TERA = BigDecimal.valueOf(1_000_000_000_000L);
+    private static final BigDecimal PETA = BigDecimal.valueOf(1_000_000_000_000_000L);
+    private static final BigDecimal EXA = BigDecimal.valueOf(1_000_000_000_000_000_000L);
 
     public static Optional<BigDecimal> parse(String expression, DecimalFormat decimalFormat) {
         List<Object> output = new ObjectArrayList<>();
@@ -27,14 +33,10 @@ public class MathExpressionParser {
             }
 
             if (!wasNumberOrRightBracket && expression.charAt(i) != '-') {
-                var position = new ParsePosition(i);
-                Number parsedNumber = decimalFormat.parse(expression, position);
-                if (position.getErrorIndex() == -1) {
-                    if (!(parsedNumber instanceof BigDecimal decimal)) {
-                        return Optional.empty();
-                    }
-                    output.add(decimal);
-                    i = position.getIndex();
+                var parsedNumber = parseNumber(expression, i, decimalFormat);
+                if (parsedNumber.isPresent()) {
+                    output.add(parsedNumber.get().value());
+                    i = parsedNumber.get().nextIndex();
                     wasNumberOrRightBracket = true;
                     continue;
                 }
@@ -158,5 +160,77 @@ public class MathExpressionParser {
 
     private static boolean precedenceCheck(char first, char second) {
         return getPrecedence(first) <= getPrecedence(second);
+    }
+
+    private static Optional<ParsedNumber> parseNumber(String expression, int start, DecimalFormat decimalFormat) {
+        var position = new ParsePosition(start);
+        Number parsedNumber = decimalFormat.parse(expression, position);
+        if (position.getErrorIndex() != -1 || !(parsedNumber instanceof BigDecimal decimal)) {
+            return Optional.empty();
+        }
+
+        int next = position.getIndex();
+        if (next < expression.length()
+            && (expression.charAt(next) == 'e' || expression.charAt(next) == 'E')
+            && isScientificNotationExponent(expression, next + 1)) {
+            int exponentStart = next + 1;
+            int exponentIndex = exponentStart;
+            if (exponentIndex < expression.length()
+                && (expression.charAt(exponentIndex) == '+' || expression.charAt(exponentIndex) == '-')) {
+                exponentIndex++;
+            }
+
+            int exponentDigitsStart = exponentIndex;
+            while (exponentIndex < expression.length() && Character.isDigit(expression.charAt(exponentIndex))) {
+                exponentIndex++;
+            }
+
+            if (exponentIndex == exponentDigitsStart) {
+                return Optional.empty();
+            }
+
+            try {
+                int exponent = Integer.parseInt(expression.substring(exponentStart, exponentIndex));
+                decimal = decimal.scaleByPowerOfTen(exponent);
+                next = exponentIndex;
+            } catch (NumberFormatException | ArithmeticException ignored) {
+                return Optional.empty();
+            }
+        }
+
+        if (next < expression.length()) {
+            BigDecimal suffixMultiplier = getSuffixMultiplier(expression.charAt(next));
+            if (suffixMultiplier != null) {
+                decimal = decimal.multiply(suffixMultiplier);
+                next++;
+            }
+        }
+
+        return Optional.of(new ParsedNumber(decimal, next));
+    }
+
+    private static boolean isScientificNotationExponent(String expression, int exponentStart) {
+        int exponentIndex = exponentStart;
+        if (exponentIndex < expression.length()
+            && (expression.charAt(exponentIndex) == '+' || expression.charAt(exponentIndex) == '-')) {
+            exponentIndex++;
+        }
+
+        return exponentIndex < expression.length() && Character.isDigit(expression.charAt(exponentIndex));
+    }
+
+    private static BigDecimal getSuffixMultiplier(char suffix) {
+        return switch (Character.toLowerCase(suffix)) {
+            case 'k' -> KILO;
+            case 'm' -> MEGA;
+            case 'g' -> GIGA;
+            case 't' -> TERA;
+            case 'p' -> PETA;
+            case 'e' -> EXA;
+            default -> null;
+        };
+    }
+
+    private record ParsedNumber(BigDecimal value, int nextIndex) {
     }
 }

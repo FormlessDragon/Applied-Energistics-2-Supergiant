@@ -167,6 +167,7 @@ chat.ae2.GuiOverlaysDisabled=GUI overlays disabled.
 chat.ae2.GuiOverlaysEnabled=GUI overlays enabled.
 chat.ae2.ChunkLoggerDisabled=AE2 chunk logger disabled.
 chat.ae2.ChunkLoggerEnabled=AE2 chunk logger enabled.
+chat.ae2.TickMonitoringCurrent=Current AE2 tick monitoring mode: %s
 chat.ae2.TickMonitoringDisabled=AE2 tick monitoring disabled.
 chat.ae2.TickMonitoringEnabled=AE2 tick monitoring enabled.
 chat.ae2.SpatialPlotSummary=Plot #%d size=%s origin=%s

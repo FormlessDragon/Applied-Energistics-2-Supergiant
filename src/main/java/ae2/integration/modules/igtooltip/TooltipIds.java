@@ -11,9 +11,6 @@ public final class TooltipIds {
     public static final ResourceLocation PATTERN_PROVIDER = makeId("pattern_provider");
     public static final ResourceLocation CHARGER = makeId("charger");
     public static final ResourceLocation CRYSTAL_RESONANCE_GENERATOR = makeId("crystal_resonance_generator");
-    public static final ResourceLocation PART_NAME = makeId("part_name");
-    public static final ResourceLocation PART_ICON = makeId("part_icon");
-    public static final ResourceLocation PART_MOD_NAME = makeId("part_mod_name");
     public static final ResourceLocation PART_TOOLTIP = makeId("part_tooltip");
 
     private TooltipIds() {

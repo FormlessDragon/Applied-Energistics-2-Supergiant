@@ -62,6 +62,7 @@ public class NumberEntryWidget implements ICompositeWidget {
     private static final long[] STEPS_64 = new long[]{1, 16, 32, 64};
     private static final ITextComponent PLUS = new TextComponentString("+");
     private static final ITextComponent MINUS = new TextComponentString("-");
+    private static final String PREVIEW_ERROR = "error";
     private static final int UNIT_PADDING = 3;
     private static final int UNIT_COLOR = 0x555555;
     private final ITextComponent[] components1000;
@@ -70,6 +71,7 @@ public class NumberEntryWidget implements ICompositeWidget {
     private final int normalTextColor;
 
     private final ConfirmableTextField textField;
+    private final AETextField previewField;
     private final DecimalFormat decimalFormat;
     private NumberEntryType type;
     private BigDecimal amountPerUnit;
@@ -90,9 +92,17 @@ public class NumberEntryWidget implements ICompositeWidget {
     private Rectangle bounds = new Rectangle(0, 0, 0, 0);
 
     private Rectangle textFieldBounds = Rects.ZERO;
+    private Rectangle previewFieldBounds = Rects.ZERO;
     private Point currentScreenOrigin = Point.ZERO;
 
     private List<AE2Button> amountButtons = ObjectLists.emptyList();
+    private boolean previewFieldConfigured;
+    private boolean validationCacheDirty = true;
+    private String validationCacheText = "";
+    private NumberEntryType validationCacheType;
+    private long validationCacheMinValue;
+    private long validationCacheMaxValue;
+    private CachedValidation validationCache;
 
     public NumberEntryWidget(GuiStyle style, NumberEntryType type) {
         this.errorTextColor = style.getColor(PaletteColor.TEXTFIELD_ERROR).toARGB();
@@ -118,10 +128,18 @@ public class NumberEntryWidget implements ICompositeWidget {
             }
         });
         this.textField.setOnConfirm(() -> {
-            if (this.onConfirm != null && getLongValue().isPresent()) {
+            if (this.onConfirm != null && getCachedValidation().value().externalValue().isPresent()) {
                 this.onConfirm.run();
             }
         });
+
+        this.previewField = new AETextField(style, font, 0, 0, 0, font.FONT_HEIGHT);
+        this.previewField.setEnableBackgroundDrawing(false);
+        this.previewField.setMaxStringLength(64);
+        this.previewField.setTextColor(normalTextColor);
+        this.previewField.setEnabled(false);
+        this.previewField.setVisible(false);
+
         validate();
 
         components1000 = new ITextComponent[]{
@@ -211,15 +229,41 @@ public class NumberEntryWidget implements ICompositeWidget {
             style.getHeight()));
     }
 
+    public void setPreviewFieldStyle(WidgetStyle style) {
+        int left = 0;
+        if (style.getLeft() != null) {
+            left = style.getLeft();
+        }
+        int top = 0;
+        if (style.getTop() != null) {
+            top = style.getTop();
+        }
+        setPreviewFieldBounds(new Rectangle(
+            left,
+            top,
+            style.getWidth(),
+            style.getHeight()));
+    }
+
+    private void setPreviewFieldBounds(Rectangle bounds) {
+        this.previewFieldConfigured = true;
+        this.previewFieldBounds = bounds;
+        this.previewField.move(currentScreenOrigin.move(bounds.x, bounds.y));
+        this.previewField.resize(bounds.width, bounds.height);
+        updatePreviewField();
+    }
+
     public void setMinValue(long minValue) {
         this.minValue = minValue;
         refreshBoundsCache();
+        invalidateValidationCache();
         validate();
     }
 
     public void setMaxValue(long maxValue) {
         this.maxValue = maxValue;
         refreshBoundsCache();
+        invalidateValidationCache();
         validate();
     }
 
@@ -262,7 +306,10 @@ public class NumberEntryWidget implements ICompositeWidget {
 
         this.currentScreenOrigin = Point.fromTopLeft(bounds);
         setTextFieldBounds(this.textFieldBounds);
-        screen.setInitialFocus(this.textField);
+        this.textField.setFocused(true);
+        if (this.previewFieldConfigured) {
+            setPreviewFieldBounds(this.previewFieldBounds);
+        }
 
         amountButtons.add(new AE2Button(left, top + 42, 22, 20, components1000[4],
             () -> addQty(hasShiftOrControlDown() ? -STEPS_64[0] : -STEPS_1000[0])));
@@ -299,6 +346,14 @@ public class NumberEntryWidget implements ICompositeWidget {
         }
     }
 
+    @Override
+    public void tick() {
+        if (this.textField.getVisible()) {
+            this.textField.updateCursorCounter();
+            this.textField.tickKeyRepeat();
+        }
+    }
+
     /**
      * Returns whether the text field begins with an equals sign. This is used by crafting request screens in order to
      * request just enough of an item to bring the total stored amount to the input amount, rather than requesting the
@@ -329,7 +384,7 @@ public class NumberEntryWidget implements ICompositeWidget {
      * value.
      */
     public OptionalLong getLongValue() {
-        var value = validateValue().externalValue();
+        var value = getCachedValidation().value().externalValue();
         if (value.isEmpty()) {
             return OptionalLong.empty();
         }
@@ -366,35 +421,71 @@ public class NumberEntryWidget implements ICompositeWidget {
      * Retrieves the numeric representation of the value entered by the user, if it is convertible.
      */
     private Optional<BigDecimal> getValueInternal() {
-        var textValue = textField.getText();
-        if (textValue.startsWith("=")) {
-            textValue = textValue.substring(1);
-        }
-        return MathExpressionParser.parse(textValue, decimalFormat);
+        return getCachedValidation().value().internalValue();
     }
 
     /**
      * Changes the value displayed to the user.
      */
     private void setValueInternal(BigDecimal value) {
+        invalidateValidationCache();
         textField.setText(decimalFormat.format(value));
+    }
+
+    private Optional<BigDecimal> getValueInternal(String textValue) {
+        if (textValue.startsWith("=")) {
+            textValue = textValue.substring(1);
+        }
+        return MathExpressionParser.parse(textValue, decimalFormat);
     }
 
     /*
      * Return true if the value entered by the user is a single numeric number and not a mathematical expression
      */
-    private boolean isNumber() {
+    private boolean isNumber(String textValue) {
         var position = new ParsePosition(0);
-        var textValue = textField.getText().trim();
+        textValue = textValue.trim();
         decimalFormat.parse(textValue, position);
         return position.getErrorIndex() == -1 && position.getIndex() == textValue.length();
     }
 
     private void validate() {
+        var validation = getCachedValidation();
+        boolean valid = validation.valid();
+        var tooltip = validation.tooltip();
+        this.textField.setTextColor(valid ? normalTextColor : errorTextColor);
+        this.textField.setTooltipMessage(tooltip);
+
+        if (this.validationIcon != null) {
+            this.validationIcon.setValid(valid);
+            this.validationIcon.setTooltip(tooltip);
+        }
+    }
+
+    private CachedValidation getCachedValidation() {
+        String text = this.textField.getText();
+        if (this.validationCacheDirty
+            || this.validationCache == null
+            || !text.equals(this.validationCacheText)
+            || !this.type.equals(this.validationCacheType)
+            || this.minValue != this.validationCacheMinValue
+            || this.maxValue != this.validationCacheMaxValue) {
+            this.validationCacheText = text;
+            this.validationCacheType = this.type;
+            this.validationCacheMinValue = this.minValue;
+            this.validationCacheMaxValue = this.maxValue;
+            this.validationCache = computeValidation(text);
+            this.validationCacheDirty = false;
+            updatePreviewField();
+        }
+        return this.validationCache;
+    }
+
+    private CachedValidation computeValidation(String text) {
         List<ITextComponent> validationErrors = new ObjectArrayList<>();
         List<ITextComponent> infoMessages = new ObjectArrayList<>();
 
-        var possibleValue = validateValue();
+        var possibleValue = validateValue(text);
         if (possibleValue.internalValue().isPresent()) {
             var internalValue = possibleValue.internalValue().get();
             if (possibleValue.notAnInteger()) {
@@ -409,7 +500,7 @@ public class NumberEntryWidget implements ICompositeWidget {
                 } else if (value > maxValue) {
                     var formatted = decimalFormat.format(maxInternalValue);
                     validationErrors.add(GuiText.NumberGreaterThanMaxValue.text(formatted));
-                } else if (!isNumber()) {
+                } else if (!isNumber(text)) {
                     infoMessages.add(new TextComponentString("= " + decimalFormat.format(internalValue)));
                 }
             }
@@ -419,12 +510,21 @@ public class NumberEntryWidget implements ICompositeWidget {
 
         boolean valid = validationErrors.isEmpty();
         var tooltip = valid ? infoMessages : validationErrors;
-        this.textField.setTextColor(valid ? normalTextColor : errorTextColor);
-        this.textField.setTooltipMessage(tooltip);
+        var preview = valid && possibleValue.externalValue().isPresent()
+            ? Long.toString(possibleValue.externalValue().getAsLong())
+            : PREVIEW_ERROR;
+        return new CachedValidation(possibleValue, valid, List.copyOf(tooltip), preview);
+    }
 
-        if (this.validationIcon != null) {
-            this.validationIcon.setValid(valid);
-            this.validationIcon.setTooltip(tooltip);
+    private void invalidateValidationCache() {
+        this.validationCacheDirty = true;
+    }
+
+    private void updatePreviewField() {
+        if (this.previewFieldConfigured && this.validationCache != null) {
+            this.previewField.setText(this.validationCache.previewText());
+            this.previewField.setCursorPositionEnd();
+            this.previewField.setSelectionPos(this.previewField.getCursorPosition());
         }
     }
 
@@ -448,6 +548,10 @@ public class NumberEntryWidget implements ICompositeWidget {
         this.type = type;
         refreshUnitCache();
         setTextFieldBounds(this.textFieldBounds);
+        if (this.previewFieldConfigured) {
+            setPreviewFieldBounds(this.previewFieldBounds);
+        }
+        invalidateValidationCache();
         if (onChange != null) {
             onChange.run();
         }
@@ -475,8 +579,8 @@ public class NumberEntryWidget implements ICompositeWidget {
         this.maxButtonValue = maxInternalValue.setScale(0, RoundingMode.FLOOR);
     }
 
-    private ValidatedValue validateValue() {
-        var internalValue = getValueInternal();
+    private ValidatedValue validateValue(String text) {
+        var internalValue = getValueInternal(text);
         if (internalValue.isEmpty()) {
             return new ValidatedValue(Optional.empty(), OptionalLong.empty(), false);
         }
@@ -503,14 +607,32 @@ public class NumberEntryWidget implements ICompositeWidget {
     @Override
     public void drawAbsoluteLayer(Rectangle bounds, Point mouse) {
         this.textField.drawTextBox();
+        this.previewField.setVisible(this.previewFieldConfigured);
+        this.previewField.setFocused(false);
+        this.previewField.drawTextBox();
     }
 
     @Override
     public boolean onMouseDown(Point mousePos, int button) {
+        if (button == 1 && this.textFieldBounds.contains(mousePos.x(), mousePos.y())) {
+            this.textField.setText("");
+            this.textField.setFocused(true);
+            return true;
+        }
+
+        if (!this.textFieldBounds.contains(mousePos.x(), mousePos.y())) {
+            return false;
+        }
+
         return this.textField.mouseClicked(
             this.currentScreenOrigin.x() + mousePos.x(),
             this.currentScreenOrigin.y() + mousePos.y(),
             button);
+    }
+
+    @Override
+    public boolean wantsAllMouseDownEvents() {
+        return this.previewFieldConfigured;
     }
 
     @Override
@@ -536,5 +658,9 @@ public class NumberEntryWidget implements ICompositeWidget {
 
     private record ValidatedValue(Optional<BigDecimal> internalValue, OptionalLong externalValue,
                                   boolean notAnInteger) {
+    }
+
+    private record CachedValidation(ValidatedValue value, boolean valid, List<ITextComponent> tooltip,
+                                    String previewText) {
     }
 }

@@ -167,6 +167,7 @@ chat.ae2.GuiOverlaysDisabled=GUI 覆盖层已禁用。
 chat.ae2.GuiOverlaysEnabled=GUI 覆盖层已启用。
 chat.ae2.ChunkLoggerDisabled=AE2 区块日志已禁用。
 chat.ae2.ChunkLoggerEnabled=AE2 区块日志已启用。
+chat.ae2.TickMonitoringCurrent=当前 AE2 Tick 监控模式：%s
 chat.ae2.TickMonitoringDisabled=AE2 Tick 监控已禁用。
 chat.ae2.TickMonitoringEnabled=AE2 Tick 监控已启用。
 chat.ae2.SpatialPlotSummary=区域 #%d 大小=%s 原点=%s

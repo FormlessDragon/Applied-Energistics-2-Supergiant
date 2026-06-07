@@ -26,6 +26,7 @@ import ae2.api.integrations.igtooltip.providers.BodyProvider;
 import ae2.api.integrations.igtooltip.providers.ServerDataProvider;
 import ae2.core.AppEng;
 import ae2.integration.modules.igtooltip.TooltipProviders;
+import ae2.integration.modules.igtooltip.NetworkDebugProvider;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import mcjty.theoneprobe.api.IProbeHitData;
@@ -92,7 +93,7 @@ public final class BlockEntityInfoProvider implements IProbeInfoProvider {
             for (var customizer : bodyCustomizers) {
                 customizer.buildTooltip(blockEntity, context, tooltipBuilder);
             }
-            TopNetworkDebugProvider.addProbeInfo(player, blockEntity, data.getHitVec(), tooltipBuilder);
+            NetworkDebugProvider.addProbeInfo(player, blockEntity, data.getHitVec(), tooltipBuilder);
         }
     }
 

@@ -26,6 +26,7 @@ import ae2.api.config.TerminalStyle;
 import ae2.api.networking.pathing.ChannelMode;
 import ae2.api.stacks.AEFluidKey;
 import ae2.core.settings.TickRates;
+import ae2.me.service.TickManagerService;
 import net.minecraftforge.common.config.Config;
 import net.minecraftforge.common.config.ConfigManager;
 import net.minecraftforge.fml.client.event.ConfigChangedEvent;
@@ -128,6 +129,8 @@ public class AEConfig {
             tickRate.setMin(Math.max(1, range.min));
             tickRate.setMax(Math.max(tickRate.getMin(), range.max));
         }
+
+        TickManagerService.MONITORING_ENABLED = DEBUG.tickMonitoring;
     }
 
     @SuppressWarnings("unused")
@@ -154,6 +157,17 @@ public class AEConfig {
 
     public boolean isCraftingPerformanceLogEnabled() {
         return DEBUG.craftingPerformanceLog;
+    }
+
+    public boolean isTickMonitoringEnabled() {
+        return DEBUG.tickMonitoring;
+    }
+
+    public void setTickMonitoringEnabled(boolean enabled) {
+        DEBUG.tickMonitoring = enabled;
+        TickManagerService.MONITORING_ENABLED = enabled;
+        this.save();
+        TickManagerService.MONITORING_ENABLED = enabled;
     }
 
     public double getGridEnergyStoragePerNode() {
@@ -524,6 +538,10 @@ public class AEConfig {
         @Config.Name("craftingPerformanceLog")
         @Config.Comment("Enable server-side autocrafting performance timing logs.")
         public boolean craftingPerformanceLog;
+
+        @Config.Name("tickMonitoring")
+        @Config.Comment("Enable server-side AE network tick timing sampling.")
+        public boolean tickMonitoring;
     }
 
     public static final class Battery {
