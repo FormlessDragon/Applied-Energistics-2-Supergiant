@@ -9,6 +9,8 @@ import ae2.client.gui.me.common.ClientDisplaySlot;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.widgets.NumberEntryWidget;
+import ae2.client.gui.widgets.GuiNumberEntryButtonSettings;
+import ae2.client.gui.widgets.NumberEntryButtonConfigButton;
 import ae2.client.gui.widgets.TabButton;
 import ae2.container.AEBaseContainer;
 import ae2.container.SlotSemantics;
@@ -43,6 +45,7 @@ public class GuiSetProcessingPatternAmount extends AEBaseGui<AEBaseContainer> {
 
         widgets.addButton("save", GuiText.Set.text(), this::confirm);
         widgets.add("back", new TabButton(Icon.BACK, parentIconTooltip, this::returnToParent));
+        widgets.add("numberEntryButtonConfig", new NumberEntryButtonConfigButton(this::openNumberEntryButtonSettings));
 
         this.amount = widgets.addNumberEntryWidget("amountToStock", NumberEntryType.of(currentStack.what()));
         this.amount.setLongValue(currentStack.amount());
@@ -68,6 +71,10 @@ public class GuiSetProcessingPatternAmount extends AEBaseGui<AEBaseContainer> {
             this.setter.accept(constrained <= 0 ? null : new GenericStack(this.currentStack.what(), constrained));
             returnToParent();
         });
+    }
+
+    private void openNumberEntryButtonSettings() {
+        switchToScreen(new GuiNumberEntryButtonSettings(this));
     }
 
     private long getMaxAmount() {

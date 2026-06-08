@@ -35,6 +35,12 @@
       "width": 20,
       "height": 20
     },
+    "numberEntryButtonConfig": {
+      "left": 130,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
     "amountToStock": {
       "left": 20,
       "top": 30,

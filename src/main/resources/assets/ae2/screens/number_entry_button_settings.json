@@ -1,0 +1,171 @@
+{
+  "$schema": "schema.json",
+  "includes": ["common/common.json"],
+  "generatedBackground": {
+    "width": 176,
+    "height": 183
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2.NumberEntryButtonSettings"
+      },
+      "position": {
+        "left": 8,
+        "top": 7
+      }
+    },
+    "default_label": {
+      "text": {
+        "translate": "gui.ae2.NumberEntryButtonSettingsDefault"
+      },
+      "position": {
+        "left": 8,
+        "top": 33
+      }
+    },
+    "shift_label": {
+      "text": {
+        "translate": "gui.ae2.NumberEntryButtonSettingsShift"
+      },
+      "position": {
+        "left": 8,
+        "top": 62
+      }
+    },
+    "ctrl_label": {
+      "text": {
+        "translate": "gui.ae2.NumberEntryButtonSettingsCtrl"
+      },
+      "position": {
+        "left": 8,
+        "top": 91
+      }
+    },
+    "alt_label": {
+      "text": {
+        "translate": "gui.ae2.NumberEntryButtonSettingsAlt"
+      },
+      "position": {
+        "left": 8,
+        "top": 120
+      }
+    }
+  },
+  "widgets": {
+    "back": {
+      "left": 152,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "default0": {
+      "left": 58,
+      "top": 30,
+      "width": 24,
+      "height": 12
+    },
+    "default1": {
+      "left": 84,
+      "top": 30,
+      "width": 24,
+      "height": 12
+    },
+    "default2": {
+      "left": 110,
+      "top": 30,
+      "width": 24,
+      "height": 12
+    },
+    "default3": {
+      "left": 136,
+      "top": 30,
+      "width": 24,
+      "height": 12
+    },
+    "shift0": {
+      "left": 58,
+      "top": 59,
+      "width": 24,
+      "height": 12
+    },
+    "shift1": {
+      "left": 84,
+      "top": 59,
+      "width": 24,
+      "height": 12
+    },
+    "shift2": {
+      "left": 110,
+      "top": 59,
+      "width": 24,
+      "height": 12
+    },
+    "shift3": {
+      "left": 136,
+      "top": 59,
+      "width": 24,
+      "height": 12
+    },
+    "ctrl0": {
+      "left": 58,
+      "top": 88,
+      "width": 24,
+      "height": 12
+    },
+    "ctrl1": {
+      "left": 84,
+      "top": 88,
+      "width": 24,
+      "height": 12
+    },
+    "ctrl2": {
+      "left": 110,
+      "top": 88,
+      "width": 24,
+      "height": 12
+    },
+    "ctrl3": {
+      "left": 136,
+      "top": 88,
+      "width": 24,
+      "height": 12
+    },
+    "alt0": {
+      "left": 58,
+      "top": 117,
+      "width": 24,
+      "height": 12
+    },
+    "alt1": {
+      "left": 84,
+      "top": 117,
+      "width": 24,
+      "height": 12
+    },
+    "alt2": {
+      "left": 110,
+      "top": 117,
+      "width": 24,
+      "height": 12
+    },
+    "alt3": {
+      "left": 136,
+      "top": 117,
+      "width": 24,
+      "height": 12
+    },
+    "resetDefaults": {
+      "left": 12,
+      "top": 152,
+      "width": 78,
+      "height": 20
+    },
+    "save": {
+      "left": 108,
+      "top": 152,
+      "width": 50,
+      "height": 20
+    }
+  }
+}

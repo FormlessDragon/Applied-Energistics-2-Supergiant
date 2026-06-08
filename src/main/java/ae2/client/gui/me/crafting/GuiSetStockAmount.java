@@ -4,6 +4,8 @@ import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.NumberEntryType;
 import ae2.client.gui.implementations.AESubGui;
 import ae2.client.gui.style.GuiStyle;
+import ae2.client.gui.widgets.GuiNumberEntryButtonSettings;
+import ae2.client.gui.widgets.NumberEntryButtonConfigButton;
 import ae2.client.gui.widgets.NumberEntryWidget;
 import ae2.container.implementations.ContainerSetStockAmount;
 import ae2.core.localization.GuiText;
@@ -21,6 +23,7 @@ public class GuiSetStockAmount extends AEBaseGui<ContainerSetStockAmount> {
 
         widgets.addButton("save", GuiText.Set.text(), this::confirm);
         AESubGui.addBackButton(container, "back", widgets);
+        widgets.add("numberEntryButtonConfig", new NumberEntryButtonConfigButton(this::openNumberEntryButtonSettings));
 
         this.amount = widgets.addNumberEntryWidget("amountToStock", NumberEntryType.UNITLESS);
         this.amount.setLongValue(1);
@@ -48,5 +51,9 @@ public class GuiSetStockAmount extends AEBaseGui<ContainerSetStockAmount> {
 
     private void confirm() {
         this.amount.getIntValue().ifPresent(container::confirm);
+    }
+
+    private void openNumberEntryButtonSettings() {
+        switchToScreen(new GuiNumberEntryButtonSettings(this));
     }
 }

@@ -23,7 +23,9 @@ import ae2.client.gui.NumberEntryType;
 import ae2.client.gui.implementations.AESubGui;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AE2Button;
+import ae2.client.gui.widgets.GuiNumberEntryButtonSettings;
 import ae2.client.gui.widgets.NumberEntryWidget;
+import ae2.client.gui.widgets.NumberEntryButtonConfigButton;
 import ae2.container.implementations.ContainerCraftAmount;
 import ae2.core.localization.GuiText;
 import net.minecraft.client.gui.GuiScreen;
@@ -47,6 +49,7 @@ public class GuiCraftAmount extends AEBaseGui<ContainerCraftAmount> {
 
         AESubGui.addBackButton(container, "back", widgets,
             container.hasExternalGuiReturn() ? GuiText.ReturnToPreviousGui.text() : null);
+        widgets.add("numberEntryButtonConfig", new NumberEntryButtonConfigButton(this::openNumberEntryButtonSettings));
 
         this.amountToCraft = widgets.addNumberEntryWidget("amountToCraft", NumberEntryType.UNITLESS);
         this.amountToCraft.setMinValue(1);
@@ -82,5 +85,9 @@ public class GuiCraftAmount extends AEBaseGui<ContainerCraftAmount> {
             return;
         }
         container.confirm(amount, craftMissingAmount, GuiScreen.isShiftKeyDown());
+    }
+
+    private void openNumberEntryButtonSettings() {
+        switchToScreen(new GuiNumberEntryButtonSettings(this));
     }
 }

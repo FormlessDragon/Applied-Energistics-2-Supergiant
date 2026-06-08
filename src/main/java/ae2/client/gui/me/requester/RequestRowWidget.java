@@ -51,8 +51,10 @@ public final class RequestRowWidget {
         this.currentY = currentY;
         this.request = request;
 
-        this.amountField = new NumberField(this.offsetX, this.offsetY, GuiText.RequesterAmount, style, this::amountFieldSubmitted);
-        this.batchField = new NumberField(this.offsetX, this.offsetY, GuiText.RequesterBatch, style, this::batchFieldSubmitted);
+        this.amountField = new NumberField(this.offsetX, this.offsetY, GuiText.RequesterAmount, style, 0,
+            this::amountFieldSubmitted);
+        this.batchField = new NumberField(this.offsetX, this.offsetY, GuiText.RequesterBatch, style, 1,
+            this::batchFieldSubmitted);
 
         this.enableBtn = new ToggleButton(Icon.ENABLED, Icon.DISABLED, this::enableBtnChanged);
         this.enableBtn.setDisableBackground(true);
@@ -154,6 +156,14 @@ public final class RequestRowWidget {
         this.amountField.renderWidget(this.font);
         this.batchField.renderWidget(this.font);
         this.statusDisplay.renderWidget();
+    }
+
+    public void drawPreview() {
+        if (!this.visible) {
+            return;
+        }
+        this.amountField.renderPreview();
+        this.batchField.renderPreview();
     }
 
     public boolean mouseClicked(int mouseX, int mouseY, int button) {

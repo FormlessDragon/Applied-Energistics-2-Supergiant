@@ -209,6 +209,10 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
                     GUI_PADDING_Y + GUI_HEADER_HEIGHT + i * ROW_HEIGHT, 0xe0e0e0);
             }
         }
+
+        for (RequestRowWidget row : this.requestWidgets) {
+            row.drawPreview();
+        }
     }
 
     @Override

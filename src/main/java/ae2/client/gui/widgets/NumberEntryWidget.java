@@ -24,6 +24,7 @@ import ae2.client.gui.ICompositeWidget;
 import ae2.client.gui.MathExpressionParser;
 import ae2.client.gui.NumberEntryType;
 import ae2.client.gui.Rects;
+import ae2.client.gui.Tooltip;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.PaletteColor;
 import ae2.client.gui.style.WidgetStyle;
@@ -36,7 +37,9 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 
 import java.awt.Rectangle;
 import java.math.BigDecimal;
@@ -45,6 +48,8 @@ import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.ParsePosition;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -58,15 +63,15 @@ import java.util.function.Consumer;
  */
 public class NumberEntryWidget implements ICompositeWidget {
 
-    private static final long[] STEPS_1000 = new long[]{1, 10, 100, 1000};
-    private static final long[] STEPS_64 = new long[]{1, 16, 32, 64};
     private static final ITextComponent PLUS = new TextComponentString("+");
     private static final ITextComponent MINUS = new TextComponentString("-");
+    private static final ITextComponent MULTIPLY = new TextComponentString("*");
+    private static final ITextComponent DIVIDE = new TextComponentString("/");
+    private static final ITextComponent CEIL = new TextComponentString("C");
+    private static final ITextComponent FLOOR = new TextComponentString("F");
     private static final String PREVIEW_ERROR = "error";
     private static final int UNIT_PADDING = 3;
     private static final int UNIT_COLOR = 0x555555;
-    private final ITextComponent[] components1000;
-    private final ITextComponent[] components64;
     private final int errorTextColor;
     private final int normalTextColor;
 
@@ -96,6 +101,12 @@ public class NumberEntryWidget implements ICompositeWidget {
     private Point currentScreenOrigin = Point.ZERO;
 
     private List<AE2Button> amountButtons = ObjectLists.emptyList();
+    private AE2Button ceilButton;
+    private AE2Button floorButton;
+    private Rectangle ceilButtonBounds = Rects.ZERO;
+    private Rectangle floorButtonBounds = Rects.ZERO;
+    private ButtonMode lastButtonMode;
+    private long[] lastButtonValues = new long[0];
     private boolean previewFieldConfigured;
     private boolean validationCacheDirty = true;
     private String validationCacheText = "";
@@ -142,30 +153,16 @@ public class NumberEntryWidget implements ICompositeWidget {
 
         validate();
 
-        components1000 = new ITextComponent[]{
-            makeLabel(PLUS, 0, true),
-            makeLabel(PLUS, 1, true),
-            makeLabel(PLUS, 2, true),
-            makeLabel(PLUS, 3, true),
-            makeLabel(MINUS, 0, true),
-            makeLabel(MINUS, 1, true),
-            makeLabel(MINUS, 2, true),
-            makeLabel(MINUS, 3, true),
-        };
-        components64 = new ITextComponent[]{
-            makeLabel(PLUS, 0, false),
-            makeLabel(PLUS, 1, false),
-            makeLabel(PLUS, 2, false),
-            makeLabel(PLUS, 3, false),
-            makeLabel(MINUS, 0, false),
-            makeLabel(MINUS, 1, false),
-            makeLabel(MINUS, 2, false),
-            makeLabel(MINUS, 3, false),
-        };
     }
 
-    private static boolean hasShiftOrControlDown() {
-        return GuiScreen.isShiftKeyDown() || GuiScreen.isCtrlKeyDown();
+    private static ButtonMode getButtonMode() {
+        if (GuiScreen.isCtrlKeyDown()) {
+            return ButtonMode.MULTIPLY;
+        }
+        if (GuiScreen.isAltKeyDown()) {
+            return ButtonMode.ALT_MULTIPLY;
+        }
+        return GuiScreen.isShiftKeyDown() ? ButtonMode.SHIFT_ADD : ButtonMode.ADD;
     }
 
     static OptionalLong toExternalValue(BigDecimal internalValue, int amountPerUnit) {
@@ -292,14 +289,14 @@ public class NumberEntryWidget implements ICompositeWidget {
         List<GuiButton> buttons = new ObjectArrayList<>(9);
         List<AE2Button> amountButtons = new ObjectArrayList<>(8);
 
-        amountButtons.add(new AE2Button(left, top, 22, 20, components1000[0],
-            () -> addQty(hasShiftOrControlDown() ? STEPS_64[0] : STEPS_1000[0])));
-        amountButtons.add(new AE2Button(left + 28, top, 28, 20, components1000[1],
-            () -> addQty(hasShiftOrControlDown() ? STEPS_64[1] : STEPS_1000[1])));
-        amountButtons.add(new AE2Button(left + 62, top, 32, 20, components1000[2],
-            () -> addQty(hasShiftOrControlDown() ? STEPS_64[2] : STEPS_1000[2])));
-        amountButtons.add(new AE2Button(left + 100, top, 38, 20, components1000[3],
-            () -> addQty(hasShiftOrControlDown() ? STEPS_64[3] : STEPS_1000[3])));
+        amountButtons.add(new AE2Button(left, top, 22, 20, makeButtonLabel(PLUS, getCurrentButtonValues()[0]),
+            () -> applyButton(0, true)));
+        amountButtons.add(new AE2Button(left + 25, top, 26, 20, makeButtonLabel(PLUS, getCurrentButtonValues()[1]),
+            () -> applyButton(1, true)));
+        amountButtons.add(new AE2Button(left + 54, top, 30, 20, makeButtonLabel(PLUS, getCurrentButtonValues()[2]),
+            () -> applyButton(2, true)));
+        amountButtons.add(new AE2Button(left + 86, top, 34, 20, makeButtonLabel(PLUS, getCurrentButtonValues()[3]),
+            () -> applyButton(3, true)));
 
         buttons.addAll(amountButtons);
         amountButtons.forEach(addWidget);
@@ -311,14 +308,14 @@ public class NumberEntryWidget implements ICompositeWidget {
             setPreviewFieldBounds(this.previewFieldBounds);
         }
 
-        amountButtons.add(new AE2Button(left, top + 42, 22, 20, components1000[4],
-            () -> addQty(hasShiftOrControlDown() ? -STEPS_64[0] : -STEPS_1000[0])));
-        amountButtons.add(new AE2Button(left + 28, top + 42, 28, 20, components1000[5],
-            () -> addQty(hasShiftOrControlDown() ? -STEPS_64[1] : -STEPS_1000[1])));
-        amountButtons.add(new AE2Button(left + 62, top + 42, 32, 20, components1000[6],
-            () -> addQty(hasShiftOrControlDown() ? -STEPS_64[2] : -STEPS_1000[2])));
-        amountButtons.add(new AE2Button(left + 100, top + 42, 38, 20, components1000[7],
-            () -> addQty(hasShiftOrControlDown() ? -STEPS_64[3] : -STEPS_1000[3])));
+        amountButtons.add(new AE2Button(left, top + 42, 22, 20, makeButtonLabel(MINUS, getCurrentButtonValues()[0]),
+            () -> applyButton(0, false)));
+        amountButtons.add(new AE2Button(left + 25, top + 42, 26, 20, makeButtonLabel(MINUS, getCurrentButtonValues()[1]),
+            () -> applyButton(1, false)));
+        amountButtons.add(new AE2Button(left + 54, top + 42, 30, 20, makeButtonLabel(MINUS, getCurrentButtonValues()[2]),
+            () -> applyButton(2, false)));
+        amountButtons.add(new AE2Button(left + 86, top + 42, 34, 20, makeButtonLabel(MINUS, getCurrentButtonValues()[3]),
+            () -> applyButton(3, false)));
 
         this.amountButtons = List.copyOf(amountButtons);
 
@@ -330,6 +327,12 @@ public class NumberEntryWidget implements ICompositeWidget {
             this.validationIcon.y = top + 27;
             buttons.add(this.validationIcon);
         }
+        this.ceilButtonBounds = new Rectangle(this.bounds.x + 124, this.bounds.y, 14, 20);
+        this.floorButtonBounds = new Rectangle(this.bounds.x + 124, this.bounds.y + 42, 14, 20);
+        this.ceilButton = new AE2Button(left + 124, top, 14, 20, CEIL, () -> roundValue(RoundingMode.CEILING));
+        this.floorButton = new AE2Button(left + 124, top + 42, 14, 20, FLOOR, () -> roundValue(RoundingMode.FLOOR));
+        buttons.add(this.ceilButton);
+        buttons.add(this.floorButton);
 
         buttons.subList(4, buttons.size()).forEach(addWidget);
 
@@ -340,9 +343,20 @@ public class NumberEntryWidget implements ICompositeWidget {
 
     @Override
     public void updateBeforeRender() {
-        ITextComponent[] messages = hasShiftOrControlDown() ? components64 : components1000;
+        ButtonMode mode = getButtonMode();
+        long[] values = getValues(mode);
+        if (mode == this.lastButtonMode && Arrays.equals(values, this.lastButtonValues)) {
+            return;
+        }
+        this.lastButtonMode = mode;
+        this.lastButtonValues = Arrays.copyOf(values, values.length);
         for (int i = 0; i < amountButtons.size(); i++) {
-            amountButtons.get(i).setMessage(messages[i]);
+            boolean positive = i < 4;
+            ITextComponent prefix = switch (mode) {
+                case ADD, SHIFT_ADD -> positive ? PLUS : MINUS;
+                case MULTIPLY, ALT_MULTIPLY -> positive ? MULTIPLY : DIVIDE;
+            };
+            amountButtons.get(i).setMessage(makeButtonLabel(prefix, values[i % 4]));
         }
     }
 
@@ -405,7 +419,11 @@ public class NumberEntryWidget implements ICompositeWidget {
     }
 
     private void addQty(long delta) {
-        var currentValue = getValueInternal().orElse(BigDecimal.ZERO);
+        var operableValue = getOperableValue();
+        if (operableValue.isEmpty()) {
+            return;
+        }
+        var currentValue = operableValue.get();
         var newValue = currentValue.add(BigDecimal.valueOf(delta));
         if (newValue.compareTo(minButtonValue) < 0) {
             newValue = minButtonValue;
@@ -417,6 +435,40 @@ public class NumberEntryWidget implements ICompositeWidget {
         setValueInternal(newValue);
     }
 
+    private void applyButton(int amountIndex, boolean positive) {
+        ButtonMode mode = getButtonMode();
+        long value = getValues(mode)[amountIndex];
+        switch (mode) {
+            case ADD, SHIFT_ADD -> addQty(positive ? value : -value);
+            case MULTIPLY, ALT_MULTIPLY -> multiplyQty(BigDecimal.valueOf(value), !positive);
+        }
+    }
+
+    private void multiplyQty(BigDecimal factor, boolean divide) {
+        var operableValue = getOperableValue();
+        if (operableValue.isEmpty()) {
+            return;
+        }
+        var currentValue = operableValue.get();
+        var newValue = divide
+            ? currentValue.divide(factor, MathContext.DECIMAL128)
+            : currentValue.multiply(factor, MathContext.DECIMAL128);
+        if (newValue.compareTo(minInternalValue) < 0) {
+            newValue = minInternalValue;
+        } else if (newValue.compareTo(maxInternalValue) > 0) {
+            newValue = maxInternalValue;
+        }
+        setValueInternal(newValue);
+    }
+
+    private void roundValue(RoundingMode roundingMode) {
+        var currentValue = getOperableValue();
+        if (currentValue.isEmpty()) {
+            return;
+        }
+        setValueInternal(currentValue.get().setScale(0, roundingMode));
+    }
+
     /**
      * Retrieves the numeric representation of the value entered by the user, if it is convertible.
      */
@@ -424,12 +476,19 @@ public class NumberEntryWidget implements ICompositeWidget {
         return getCachedValidation().value().internalValue();
     }
 
+    private Optional<BigDecimal> getOperableValue() {
+        if (textField.getText().trim().isEmpty()) {
+            return Optional.of(BigDecimal.ZERO);
+        }
+        return getValueInternal();
+    }
+
     /**
      * Changes the value displayed to the user.
      */
     private void setValueInternal(BigDecimal value) {
         invalidateValidationCache();
-        textField.setText(decimalFormat.format(value));
+        textField.setText(decimalFormat.format(value.stripTrailingZeros()));
     }
 
     private Optional<BigDecimal> getValueInternal(String textValue) {
@@ -528,9 +587,22 @@ public class NumberEntryWidget implements ICompositeWidget {
         }
     }
 
-    private ITextComponent makeLabel(ITextComponent prefix, int amountIndex, boolean useDecimalSteps) {
-        return new TextComponentString(prefix.getFormattedText()
-            + decimalFormat.format(useDecimalSteps ? STEPS_1000[amountIndex] : STEPS_64[amountIndex]));
+    private ITextComponent makeButtonLabel(ITextComponent prefix, long amount) {
+        return new TextComponentString(prefix.getFormattedText() + decimalFormat.format(amount));
+    }
+
+    private long[] getCurrentButtonValues() {
+        return getValues(getButtonMode());
+    }
+
+    private long[] getValues(ButtonMode mode) {
+        NumberEntryButtonConfig.Data config = NumberEntryButtonConfig.get();
+        return switch (mode) {
+            case ADD -> config.defaultAddSteps();
+            case SHIFT_ADD -> config.shiftAddSteps();
+            case MULTIPLY -> config.ctrlMultiplyFactors();
+            case ALT_MULTIPLY -> config.altMultiplyFactors();
+        };
     }
 
     public void setHideValidationIcon(boolean hideValidationIcon) {
@@ -656,6 +728,42 @@ public class NumberEntryWidget implements ICompositeWidget {
         return false;
     }
 
+    @Override
+    public Tooltip getTooltip(int mouseX, int mouseY) {
+        if (this.ceilButtonBounds.contains(mouseX, mouseY)) {
+            return new Tooltip(Collections.singletonList(GuiText.NumberEntryCeil.text()));
+        }
+        if (this.floorButtonBounds.contains(mouseX, mouseY)) {
+            return new Tooltip(Collections.singletonList(GuiText.NumberEntryFloor.text()));
+        }
+        if (this.textFieldBounds.contains(mouseX, mouseY)) {
+            return new Tooltip(getTextFieldTooltip());
+        }
+        return null;
+    }
+
+    private List<ITextComponent> getTextFieldTooltip() {
+        CachedValidation validation = getCachedValidation();
+        List<ITextComponent> tooltip = new ObjectArrayList<>();
+        tooltip.add(GuiText.SelectAmount.text());
+        if (validation.valid()) {
+            tooltip.add(new TextComponentString("= " + validation.previewText()));
+            if (this.textField.isFocused()) {
+                tooltip.add(
+                    new TextComponentString("» ")
+                        .setStyle(new Style().setColor(TextFormatting.AQUA))
+                        .appendSibling(
+                            GuiText.Set.text()
+                                .setStyle(new Style().setColor(TextFormatting.GRAY))
+                        )
+                );
+            }
+        } else {
+            tooltip.addAll(validation.tooltip());
+        }
+        return tooltip;
+    }
+
     private record ValidatedValue(Optional<BigDecimal> internalValue, OptionalLong externalValue,
                                   boolean notAnInteger) {
     }
@@ -663,4 +771,12 @@ public class NumberEntryWidget implements ICompositeWidget {
     private record CachedValidation(ValidatedValue value, boolean valid, List<ITextComponent> tooltip,
                                     String previewText) {
     }
+
+    private enum ButtonMode {
+        ADD,
+        SHIFT_ADD,
+        MULTIPLY,
+        ALT_MULTIPLY
+    }
+
 }
