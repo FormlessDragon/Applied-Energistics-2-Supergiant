@@ -19,6 +19,7 @@
 package ae2.me.cells;
 
 import ae2.api.stacks.GenericStack;
+import ae2.api.storage.cells.IBasicCellItem;
 import ae2.api.storage.cells.ICellHandler;
 import ae2.api.storage.cells.ICellWorkbenchItem;
 import ae2.api.storage.cells.ISaveProvider;
@@ -58,6 +59,15 @@ public class BasicCellHandler implements ICellHandler {
         lines.add(Tooltips.typesUsed(inventory.getStoredItemTypes(), inventory.getTotalItemTypes()).getFormattedText());
 
         if (stack.getItem() instanceof ICellWorkbenchItem workbenchItem) {
+            if (workbenchItem instanceof IBasicCellItem basicCellItem) {
+                IBasicCellItem.CellRestriction restriction = basicCellItem.getCellRestrictionOrNull(stack);
+                if (restriction != null) {
+                    lines.add(Tooltips.of(GuiText.CellRestrictionAmount.text(
+                        Tooltips.ofUnformattedNumber(restriction.amount()))).getFormattedText());
+                    lines.add(Tooltips.of(GuiText.CellRestrictionTypes.text(
+                        Tooltips.ofUnformattedNumber(restriction.types()))).getFormattedText());
+                }
+            }
             addPartitionInformation(stack, workbenchItem, lines);
         }
     }

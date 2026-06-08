@@ -25,11 +25,15 @@ package ae2.api.storage.cells;
 
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKeyType;
+import ae2.core.localization.GuiText;
 import ae2.items.storage.StorageCellTooltipComponent;
 import ae2.me.cells.BasicCellHandler;
 import ae2.util.CellWorkbenchFilter;
 import com.google.common.base.Preconditions;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.text.TextFormatting;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +46,10 @@ import java.util.Optional;
  * The standard AE implementation also only provides 1-63 Types.
  */
 public interface IBasicCellItem extends ICellWorkbenchItem, IStackTooltipDataProvider {
+    String CELL_RESTRICTION_TAG = "storage_cell_restriction";
+    String CELL_RESTRICTION_AMOUNT_TAG = "amount";
+    String CELL_RESTRICTION_TYPES_TAG = "types";
+
     /**
      * Basic cell items are limited to a single {@link AEKeyType}.
      */
@@ -72,6 +80,106 @@ public interface IBasicCellItem extends ICellWorkbenchItem, IStackTooltipDataPro
      * @return number of types
      */
     int getTotalTypes(ItemStack cellItem);
+
+    static long getAllocatedBytesForRestriction(long amount, int types, int amountPerByte, int bytesPerType) {
+        long typeBytes = (long) types * bytesPerType;
+        long amountBytes = amount / amountPerByte + (amount % amountPerByte == 0 ? 0 : 1);
+        return typeBytes + amountBytes;
+    }
+
+    default Optional<CellRestriction> getCellRestriction(ItemStack cellItem) {
+        return Optional.ofNullable(getCellRestrictionOrNull(cellItem));
+    }
+
+    @Nullable
+    default CellRestriction getCellRestrictionOrNull(ItemStack cellItem) {
+        Preconditions.checkArgument(cellItem.getItem() == this);
+        NBTTagCompound tag = cellItem.getTagCompound();
+        if (tag == null || !tag.hasKey(CELL_RESTRICTION_TAG, 10)) {
+            return null;
+        }
+
+        NBTTagCompound restriction = tag.getCompoundTag(CELL_RESTRICTION_TAG);
+        if (!restriction.hasKey(CELL_RESTRICTION_AMOUNT_TAG, 99)
+            || !restriction.hasKey(CELL_RESTRICTION_TYPES_TAG, 99)) {
+            return null;
+        }
+
+        long amount = restriction.getLong(CELL_RESTRICTION_AMOUNT_TAG);
+        int types = restriction.getInteger(CELL_RESTRICTION_TYPES_TAG);
+        if (amount < 0 || amount > getNativeAmountLimit(cellItem) || types < 0 || types > getTotalTypes(cellItem)) {
+            return null;
+        }
+
+        long allocatedBytes = getAllocatedBytesForRestriction(amount, types, getKeyType().getAmountPerByte(),
+            getBytesPerType(cellItem));
+        if (allocatedBytes > getBytes(cellItem)) {
+            return null;
+        }
+
+        return new CellRestriction(amount, types);
+    }
+
+    default void setCellRestriction(ItemStack cellItem, long amount, int types) {
+        Preconditions.checkArgument(cellItem.getItem() == this);
+        Preconditions.checkArgument(amount >= 0 && amount <= getNativeAmountLimit(cellItem));
+        Preconditions.checkArgument(types >= 0 && types <= getTotalTypes(cellItem));
+        Preconditions.checkArgument(getAllocatedBytesForRestriction(amount, types, getKeyType().getAmountPerByte(),
+            getBytesPerType(cellItem)) <= getBytes(cellItem));
+
+        NBTTagCompound tag = cellItem.getTagCompound();
+        if (tag == null) {
+            tag = new NBTTagCompound();
+            cellItem.setTagCompound(tag);
+        }
+
+        NBTTagCompound restriction = new NBTTagCompound();
+        restriction.setLong(CELL_RESTRICTION_AMOUNT_TAG, amount);
+        restriction.setInteger(CELL_RESTRICTION_TYPES_TAG, types);
+        tag.setTag(CELL_RESTRICTION_TAG, restriction);
+    }
+
+    default void clearCellRestriction(ItemStack cellItem) {
+        Preconditions.checkArgument(cellItem.getItem() == this);
+        NBTTagCompound tag = cellItem.getTagCompound();
+        if (tag != null) {
+            tag.removeTag(CELL_RESTRICTION_TAG);
+        }
+    }
+
+    default boolean hasCellRestriction(ItemStack cellItem) {
+        return getCellRestrictionOrNull(cellItem) != null;
+    }
+
+    default long getNativeAmountLimit(ItemStack cellItem) {
+        return (long) getBytes(cellItem) * getKeyType().getAmountPerByte();
+    }
+
+    default long getEffectiveBytes(ItemStack cellItem) {
+        CellRestriction restriction = getCellRestrictionOrNull(cellItem);
+        if (restriction == null) {
+            return getBytes(cellItem);
+        }
+        return getAllocatedBytesForRestriction(restriction.amount(), restriction.types(),
+            getKeyType().getAmountPerByte(), getBytesPerType(cellItem));
+    }
+
+    default long getEffectiveTotalTypes(ItemStack cellItem) {
+        CellRestriction restriction = getCellRestrictionOrNull(cellItem);
+        return restriction != null ? restriction.types() : getTotalTypes(cellItem);
+    }
+
+    default Optional<Long> getEffectiveAmountLimit(ItemStack cellItem) {
+        CellRestriction restriction = getCellRestrictionOrNull(cellItem);
+        return restriction != null ? Optional.of(restriction.amount()) : Optional.empty();
+    }
+
+    default String getRestrictedDisplayName(ItemStack cellItem, String baseName) {
+        if (!hasCellRestriction(cellItem)) {
+            return baseName;
+        }
+        return baseName + " " + TextFormatting.GRAY + GuiText.RestrictedSuffix.getLocal() + TextFormatting.RESET;
+    }
 
     /**
      * Allows you to fine tune which items are allowed on a given cell, if you don't care, just return false; As the
@@ -132,6 +240,9 @@ public interface IBasicCellItem extends ICellWorkbenchItem, IStackTooltipDataPro
      * @return drain in ae/t this storage cell will use.
      */
     double getIdleDrain();
+
+    record CellRestriction(long amount, int types) {
+    }
 
     /**
      * Convenient helper to append useful tooltip information.

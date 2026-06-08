@@ -108,6 +108,7 @@ public class NumberEntryWidget implements ICompositeWidget {
     private ButtonMode lastButtonMode;
     private long[] lastButtonValues = new long[0];
     private boolean previewFieldConfigured;
+    private boolean focused = true;
     private boolean validationCacheDirty = true;
     private String validationCacheText = "";
     private NumberEntryType validationCacheType;
@@ -264,6 +265,19 @@ public class NumberEntryWidget implements ICompositeWidget {
         validate();
     }
 
+    public boolean isFocused() {
+        return this.textField.isFocused();
+    }
+
+    public void setFocused(boolean focused) {
+        this.focused = focused;
+        this.textField.setFocused(focused);
+    }
+
+    public boolean isMouseOverTextField(int mouseX, int mouseY) {
+        return this.textFieldBounds.contains(mouseX, mouseY);
+    }
+
     @Override
     public void setPosition(Point position) {
         bounds = new Rectangle(position.x(), position.y(), bounds.width, bounds.height);
@@ -303,7 +317,7 @@ public class NumberEntryWidget implements ICompositeWidget {
 
         this.currentScreenOrigin = Point.fromTopLeft(bounds);
         setTextFieldBounds(this.textFieldBounds);
-        this.textField.setFocused(true);
+        this.textField.setFocused(this.focused);
         if (this.previewFieldConfigured) {
             setPreviewFieldBounds(this.previewFieldBounds);
         }
@@ -688,7 +702,7 @@ public class NumberEntryWidget implements ICompositeWidget {
     public boolean onMouseDown(Point mousePos, int button) {
         if (button == 1 && this.textFieldBounds.contains(mousePos.x(), mousePos.y())) {
             this.textField.setText("");
-            this.textField.setFocused(true);
+            setFocused(true);
             return true;
         }
 
@@ -696,10 +710,12 @@ public class NumberEntryWidget implements ICompositeWidget {
             return false;
         }
 
-        return this.textField.mouseClicked(
+        boolean clicked = this.textField.mouseClicked(
             this.currentScreenOrigin.x() + mousePos.x(),
             this.currentScreenOrigin.y() + mousePos.y(),
             button);
+        this.focused = this.textField.isFocused();
+        return clicked;
     }
 
     @Override

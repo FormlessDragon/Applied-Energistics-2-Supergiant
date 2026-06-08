@@ -110,6 +110,11 @@ public class ColorApplicatorItem extends AEBasePoweredItem implements IBasicCell
         return applicator;
     }
 
+    @Override
+    public String getItemStackDisplayName(ItemStack stack) {
+        return getRestrictedDisplayName(stack, super.getItemStackDisplayName(stack));
+    }
+
     private static String capitalize(String input) {
         if (input == null || input.isEmpty()) {
             return input;

@@ -21,6 +21,7 @@ package ae2.core.network.clientbound;
 import ae2.api.storage.ISubGuiHost;
 import ae2.api.storage.ITerminalHost;
 import ae2.client.gui.PreviousExternalGui;
+import ae2.client.gui.implementations.GuiCellRestriction;
 import ae2.client.gui.implementations.GuiOutputSides;
 import ae2.client.gui.implementations.GuiPriority;
 import ae2.client.gui.implementations.GuiWirelessMagnet;
@@ -31,6 +32,7 @@ import ae2.client.gui.me.crafting.GuiSetStockAmount;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.container.AEBaseContainer;
 import ae2.container.GuiIds;
+import ae2.container.implementations.ContainerCellRestriction;
 import ae2.container.implementations.ContainerCraftAmount;
 import ae2.container.implementations.ContainerCraftConfirm;
 import ae2.container.implementations.ContainerCraftingStatus;
@@ -47,6 +49,7 @@ import ae2.helpers.IPriorityHost;
 import ae2.helpers.InterfaceLogicHost;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.text.TextComponents;
+import ae2.tile.misc.TileCellWorkbench;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import net.minecraft.client.Minecraft;
@@ -110,6 +113,9 @@ public class OpenGuiPacket extends ClientboundPacket {
         }
         if (guiKey == GuiIds.GuiKey.WIRELESS_MAGNET) {
             return WirelessTerminalGuiHost.class;
+        }
+        if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
+            return TileCellWorkbench.class;
         }
         return null;
     }
@@ -255,6 +261,9 @@ public class OpenGuiPacket extends ClientboundPacket {
         if (this.guiKey == GuiIds.GuiKey.WIRELESS_MAGNET) {
             return new ContainerWirelessMagnet(inventory, (WirelessTerminalGuiHost<?>) host);
         }
+        if (this.guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
+            return new ContainerCellRestriction(inventory, (TileCellWorkbench) host);
+        }
         return null;
     }
 
@@ -288,6 +297,10 @@ public class OpenGuiPacket extends ClientboundPacket {
         if (this.guiKey == GuiIds.GuiKey.WIRELESS_MAGNET) {
             return new GuiWirelessMagnet((ContainerWirelessMagnet) container, inventory,
                 this.guiTitle != null ? this.guiTitle : container.getGuiTitle());
+        }
+        if (this.guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
+            return new GuiCellRestriction((ContainerCellRestriction) container, inventory,
+                GuiStyleManager.loadStyleDoc("/screens/cell_restriction.json"));
         }
         return null;
     }

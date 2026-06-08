@@ -109,6 +109,11 @@ public class MatterCannonItem extends AEBasePoweredItem implements IBasicCellIte
     }
 
     @Override
+    public String getItemStackDisplayName(ItemStack stack) {
+        return getRestrictedDisplayName(stack, super.getItemStackDisplayName(stack));
+    }
+
+    @Override
     public double getChargeRate(ItemStack stack) {
         return 800d + 800d * Upgrades.getEnergyCardMultiplier(getUpgrades(stack));
     }

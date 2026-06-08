@@ -79,6 +79,11 @@ public class BasicStorageCell extends AEBaseItem implements IBasicCellItem {
     }
 
     @Override
+    public String getItemStackDisplayName(ItemStack stack) {
+        return getRestrictedDisplayName(stack, super.getItemStackDisplayName(stack));
+    }
+
+    @Override
     public AEKeyType getKeyType() {
         return this.keyType;
     }

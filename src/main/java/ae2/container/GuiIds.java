@@ -95,6 +95,7 @@ public final class GuiIds {
         THRESHOLD_LEVEL_EMITTER,
         CONFIG_MODIFIER,
         PATTERN_MODIFIER,
+        CELL_RESTRICTION,
         RENAMER;
 
         public static @NotNull GuiKey fromId(int guiId) {

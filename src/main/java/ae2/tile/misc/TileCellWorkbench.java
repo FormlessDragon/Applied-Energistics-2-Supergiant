@@ -21,18 +21,24 @@ import ae2.api.config.CopyMode;
 import ae2.api.config.Settings;
 import ae2.api.inventories.ISegmentedInventory;
 import ae2.api.stacks.GenericStack;
+import ae2.api.storage.ISubGuiHost;
 import ae2.api.storage.cells.ICellWorkbenchItem;
 import ae2.api.upgrades.IUpgradeInventory;
 import ae2.api.upgrades.IUpgradeableObject;
 import ae2.api.upgrades.UpgradeInventories;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigurableObject;
+import ae2.container.GuiIds;
+import ae2.container.ISubGui;
+import ae2.core.definitions.AEBlocks;
+import ae2.core.gui.GuiOpener;
 import ae2.helpers.externalstorage.GenericStackInv;
 import ae2.tile.AEBaseTile;
 import ae2.util.ConfigInventory;
 import ae2.util.ConfigManager;
 import ae2.util.inv.AppEngInternalInventory;
 import ae2.util.inv.InternalInventoryHost;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
@@ -41,7 +47,7 @@ import javax.annotation.Nullable;
 import java.util.List;
 
 public class TileCellWorkbench extends AEBaseTile
-    implements IUpgradeableObject, IConfigurableObject, InternalInventoryHost {
+    implements IUpgradeableObject, IConfigurableObject, InternalInventoryHost, ISubGuiHost {
 
     private final AppEngInternalInventory cell = new AppEngInternalInventory(this, 1);
     private final ConfigManager manager = new ConfigManager(this::saveChanges);
@@ -256,6 +262,15 @@ public class TileCellWorkbench extends AEBaseTile
         return this.cacheUpgrades;
     }
 
+    @Override
+    public void returnToMainContainer(EntityPlayer player, ISubGui subGui) {
+        GuiOpener.openGui(player, GuiIds.GuiKey.CELL_WORKBENCH, this, true);
+    }
+
+    @Override
+    public ItemStack getMainContainerIcon() {
+        return AEBlocks.CELL_WORKBENCH.stack();
+    }
 
 
 

@@ -54,6 +54,12 @@ public class BasicCellInventory implements StorageCell {
     private final IBasicCellItem cellType;
     private final ISaveProvider saveProvider;
     private final AEKey2LongMap cellItems = new AEKey2LongMap.OpenHashMap();
+    private final long totalBytes;
+    private final int bytesPerType;
+    private final long totalItemTypes;
+    private final int amountPerByte;
+    private final long amountLimit;
+    private final long maxItemsPerType;
     private long storedItemCount;
     private long storedItems;
     private boolean persisted = true;
@@ -64,6 +70,20 @@ public class BasicCellInventory implements StorageCell {
         this.cellType = cellType;
         this.saveProvider = saveProvider;
         loadCellItems();
+        var restriction = cellType.getCellRestrictionOrNull(itemStack);
+        this.bytesPerType = cellType.getBytesPerType(itemStack);
+        this.amountPerByte = cellType.getKeyType().getAmountPerByte();
+        if (restriction != null) {
+            this.totalBytes = IBasicCellItem.getAllocatedBytesForRestriction(restriction.amount(), restriction.types(),
+                this.amountPerByte, getBytesPerType());
+            this.totalItemTypes = restriction.types();
+            this.amountLimit = restriction.amount();
+        } else {
+            this.totalBytes = cellType.getBytes(itemStack);
+            this.totalItemTypes = cellType.getTotalTypes(itemStack);
+            this.amountLimit = -1;
+        }
+        this.maxItemsPerType = calculateMaxItemsPerType();
     }
 
     public static boolean isCell(ItemStack stack) {
@@ -157,16 +177,18 @@ public class BasicCellInventory implements StorageCell {
         }
 
         long currentAmount = cellItems.getLong(what);
-        long remainingItemCount = getRemainingItemCount();
+        long remainingItemCount = getRemainingItemCountByBytes();
         if (currentAmount <= 0) {
             if (!canHoldNewItem()) {
                 return 0;
             }
-            remainingItemCount -= (long) getBytesPerType() * what.getAmountPerByte();
+            remainingItemCount -= (long) getBytesPerType() * this.amountPerByte;
             if (remainingItemCount <= 0) {
                 return 0;
             }
         }
+        remainingItemCount = clampByAmountLimit(remainingItemCount);
+        remainingItemCount = Math.clamp(this.maxItemsPerType - currentAmount, 0, remainingItemCount);
 
         long inserted = Math.min(amount, remainingItemCount);
         if (mode == Actionable.MODULATE && inserted > 0) {
@@ -300,16 +322,35 @@ public class BasicCellInventory implements StorageCell {
         return getStoredItemTypes() < getTotalItemTypes() && getRemainingItemCount() > 0;
     }
 
+    private long calculateMaxItemsPerType() {
+        if (!cellType.getUpgrades(itemStack).isInstalled(AEItems.EQUAL_DISTRIBUTION_CARD.item())) {
+            return Long.MAX_VALUE;
+        }
+
+        long maxTypes = getTotalItemTypes();
+        var config = cellType.getConfigInventory(itemStack);
+        if (!cellType.isPartitionFuzzy(itemStack) && !cellType.isPartitionInverted(itemStack) && !config.isEmpty()) {
+            maxTypes = Math.min(maxTypes, config.keySet().size());
+        }
+        if (maxTypes <= 0) {
+            return 0;
+        }
+
+        long typeBytes = getBytesPerType() * maxTypes;
+        long storageForAmounts = Math.max(getTotalBytes() - typeBytes, 0);
+        return (storageForAmounts * this.amountPerByte + maxTypes - 1) / maxTypes;
+    }
+
     public long getTotalBytes() {
-        return cellType.getBytes(itemStack);
+        return this.totalBytes;
     }
 
     public int getBytesPerType() {
-        return cellType.getBytesPerType(itemStack);
+        return this.bytesPerType;
     }
 
     public long getTotalItemTypes() {
-        return cellType.getTotalTypes(itemStack);
+        return this.totalItemTypes;
     }
 
     public long getStoredItemCount() {
@@ -325,21 +366,34 @@ public class BasicCellInventory implements StorageCell {
     }
 
     public long getUsedBytes() {
-        var bytesForItemCount = (getStoredItemCount() + getUnusedItemCount()) / cellType.getKeyType().getAmountPerByte();
+        var bytesForItemCount = (getStoredItemCount() + getUnusedItemCount()) / this.amountPerByte;
         return getStoredItemTypes() * getBytesPerType() + bytesForItemCount;
     }
 
     public long getRemainingItemCount() {
-        final long remaining = getFreeBytes() * cellType.getKeyType().getAmountPerByte() + getUnusedItemCount();
+        return clampByAmountLimit(getRemainingItemCountByBytes());
+    }
+
+    private long getRemainingItemCountByBytes() {
+        final long remaining = getFreeBytes() * this.amountPerByte + getUnusedItemCount();
 // Technically not exactly evenly distributed, but close enough!
         return Math.max(remaining, 0);
     }
 
+    private long clampByAmountLimit(long remainingByBytes) {
+        if (this.amountLimit < 0) {
+            return remainingByBytes;
+        }
+        long remainingByLimit = this.amountLimit - getStoredItemCount();
+        var b = Math.min(remainingByBytes, remainingByLimit);
+        return Math.max(b, 0);
+    }
+
     public int getUnusedItemCount() {
-        final int div = (int) (getStoredItemCount() % cellType.getKeyType().getAmountPerByte());
+        final int div = (int) (getStoredItemCount() % this.amountPerByte);
         if (div == 0) {
             return 0;
         }
-        return cellType.getKeyType().getAmountPerByte() - div;
+        return this.amountPerByte - div;
     }
 }

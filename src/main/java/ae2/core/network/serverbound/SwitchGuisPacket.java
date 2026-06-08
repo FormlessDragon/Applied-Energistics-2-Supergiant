@@ -5,6 +5,7 @@ import ae2.api.storage.ITerminalHost;
 import ae2.container.AEBaseContainer;
 import ae2.container.GuiIds;
 import ae2.container.ISubGui;
+import ae2.container.implementations.ContainerCellRestriction;
 import ae2.container.implementations.ContainerCraftAmount;
 import ae2.container.implementations.ContainerCraftConfirm;
 import ae2.container.implementations.ContainerCraftingStatus;
@@ -23,6 +24,7 @@ import ae2.helpers.InterfaceLogicHost;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.parts.AEBasePart;
 import ae2.tile.AEBaseTile;
+import ae2.tile.misc.TileCellWorkbench;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import net.minecraft.entity.player.EntityPlayer;
@@ -175,6 +177,9 @@ public class SwitchGuisPacket extends ServerboundPacket {
         if (guiKey == GuiIds.GuiKey.WIRELESS_MAGNET) {
             return WirelessTerminalGuiHost.class;
         }
+        if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
+            return TileCellWorkbench.class;
+        }
         return null;
     }
 
@@ -200,6 +205,9 @@ public class SwitchGuisPacket extends ServerboundPacket {
         }
         if (guiKey == GuiIds.GuiKey.WIRELESS_MAGNET) {
             return new ContainerWirelessMagnet(inventory, (WirelessTerminalGuiHost<?>) host);
+        }
+        if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
+            return new ContainerCellRestriction(inventory, (TileCellWorkbench) host);
         }
         return null;
     }

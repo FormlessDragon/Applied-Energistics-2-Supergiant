@@ -57,6 +57,11 @@ public class PortableCellItem extends AbstractPortableCell implements IBasicCell
     }
 
     @Override
+    public String getItemStackDisplayName(ItemStack stack) {
+        return getRestrictedDisplayName(stack, super.getItemStackDisplayName(stack));
+    }
+
+    @Override
     public int getBytes(ItemStack cellItem) {
         return this.tier.bytes() / 2;
     }

@@ -1,0 +1,69 @@
+{
+  "$schema": "schema.json",
+  "includes": ["common/common.json"],
+  "background": {
+    "texture": "guis/cell_restriction.png",
+    "srcRect": [0, 0, 176, 160]
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2.CellRestriction"
+      },
+      "position": {
+        "left": 10,
+        "top": 8
+      }
+    },
+    "amount_label": {
+      "text": {
+        "translate": "gui.ae2.CellRestrictionResourceTotal"
+      },
+      "position": {
+        "left": 12,
+        "top": 32
+      }
+    },
+    "type_label": {
+      "text": {
+        "translate": "gui.ae2.Types"
+      },
+      "position": {
+        "left": 126,
+        "top": 32
+      }
+    }
+  },
+  "widgets": {
+    "back": {
+      "left": 152,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "amountInput": {
+      "left": 12,
+      "top": 43,
+      "width": 108,
+      "height": 12
+    },
+    "typesInput": {
+      "left": 126,
+      "top": 43,
+      "width": 38,
+      "height": 12
+    },
+    "set": {
+      "left": 12,
+      "top": 132,
+      "width": 48,
+      "height": 20
+    },
+    "release": {
+      "left": 66,
+      "top": 132,
+      "width": 98,
+      "height": 20
+    }
+  }
+}

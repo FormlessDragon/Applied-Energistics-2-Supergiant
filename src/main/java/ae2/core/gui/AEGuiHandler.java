@@ -7,6 +7,7 @@ import ae2.api.storage.ITerminalHost;
 import ae2.client.gui.implementations.GuiAdvancedIOBus;
 import ae2.client.gui.implementations.GuiAnnihilationPlane;
 import ae2.client.gui.implementations.GuiCaner;
+import ae2.client.gui.implementations.GuiCellRestriction;
 import ae2.client.gui.implementations.GuiCellWorkbench;
 import ae2.client.gui.implementations.GuiCondenser;
 import ae2.client.gui.implementations.GuiConfigModifier;
@@ -24,6 +25,7 @@ import ae2.client.gui.implementations.GuiMEChest;
 import ae2.client.gui.implementations.GuiModFilterBus;
 import ae2.client.gui.implementations.GuiModStorageBus;
 import ae2.client.gui.implementations.GuiMolecularAssembler;
+import ae2.client.gui.implementations.GuiNetworkAnalyser;
 import ae2.client.gui.implementations.GuiODFilterBus;
 import ae2.client.gui.implementations.GuiODStorageBus;
 import ae2.client.gui.implementations.GuiPatternModifier;
@@ -42,6 +44,7 @@ import ae2.client.gui.implementations.GuiStorageBus;
 import ae2.client.gui.implementations.GuiStorageLevelEmitter;
 import ae2.client.gui.implementations.GuiThresholdExportBus;
 import ae2.client.gui.implementations.GuiThresholdLevelEmitter;
+import ae2.client.gui.implementations.GuiTickAnalyser;
 import ae2.client.gui.implementations.GuiVibrationChamber;
 import ae2.client.gui.implementations.GuiVoidCell;
 import ae2.client.gui.implementations.GuiWirelessAccessPoint;
@@ -61,6 +64,7 @@ import ae2.container.GuiIds;
 import ae2.container.implementations.ContainerAdvancedIOBus;
 import ae2.container.implementations.ContainerAnnihilationPlane;
 import ae2.container.implementations.ContainerCaner;
+import ae2.container.implementations.ContainerCellRestriction;
 import ae2.container.implementations.ContainerCellWorkbench;
 import ae2.container.implementations.ContainerCondenser;
 import ae2.container.implementations.ContainerConfigModifier;
@@ -80,6 +84,7 @@ import ae2.container.implementations.ContainerMEChest;
 import ae2.container.implementations.ContainerModFilterBus;
 import ae2.container.implementations.ContainerModStorageBus;
 import ae2.container.implementations.ContainerMolecularAssembler;
+import ae2.container.implementations.ContainerNetworkAnalyser;
 import ae2.container.implementations.ContainerNetworkStatus;
 import ae2.container.implementations.ContainerNetworkTool;
 import ae2.container.implementations.ContainerODFilterBus;
@@ -100,6 +105,7 @@ import ae2.container.implementations.ContainerStorageBus;
 import ae2.container.implementations.ContainerStorageLevelEmitter;
 import ae2.container.implementations.ContainerThresholdExportBus;
 import ae2.container.implementations.ContainerThresholdLevelEmitter;
+import ae2.container.implementations.ContainerTickAnalyser;
 import ae2.container.implementations.ContainerVibrationChamber;
 import ae2.container.implementations.ContainerVoidCell;
 import ae2.container.implementations.ContainerWirelessAccessPoint;
@@ -109,10 +115,6 @@ import ae2.container.me.items.ContainerCraftingTerm;
 import ae2.container.me.items.ContainerPatternEncodingTerm;
 import ae2.container.me.items.ContainerWirelessCraftingTerm;
 import ae2.container.networking.ContainerControllerStatus;
-import ae2.client.gui.implementations.GuiNetworkAnalyser;
-import ae2.client.gui.implementations.GuiTickAnalyser;
-import ae2.container.implementations.ContainerNetworkAnalyser;
-import ae2.container.implementations.ContainerTickAnalyser;
 import ae2.core.gui.locator.GuiHostLocator;
 import ae2.core.gui.locator.GuiHostLocators;
 import ae2.core.gui.locator.ItemGuiHostLocator;
@@ -330,6 +332,12 @@ public class AEGuiHandler implements IGuiHandler {
             case CELL_WORKBENCH -> {
                 if (te instanceof TileCellWorkbench) {
                     return initTileContainer(new ContainerCellWorkbench(player.inventory, (TileCellWorkbench) te), te,
+                        ID);
+                }
+            }
+            case CELL_RESTRICTION -> {
+                if (te instanceof TileCellWorkbench) {
+                    return initTileContainer(new ContainerCellRestriction(player.inventory, (TileCellWorkbench) te), te,
                         ID);
                 }
             }
@@ -674,6 +682,14 @@ public class AEGuiHandler implements IGuiHandler {
                     return new GuiCellWorkbench(container, player.inventory,
                         customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/cell_workbench.json"));
+                }
+            }
+            case CELL_RESTRICTION -> {
+                if (te instanceof TileCellWorkbench) {
+                    ContainerCellRestriction container = initTileContainer(new ContainerCellRestriction(player.inventory,
+                        (TileCellWorkbench) te), te, ID);
+                    return new GuiCellRestriction(container, player.inventory,
+                        GuiStyleManager.loadStyleDoc("/screens/cell_restriction.json"));
                 }
             }
             case CONDENSER -> {
