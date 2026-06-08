@@ -51,7 +51,7 @@ public class StorageService implements IStorageService, IGridServiceProvider {
     private final SetMultimap<AEKey, StackWatcher<IStorageWatcherNode>> interests = HashMultimap.create();
     private final InterestManager<StackWatcher<IStorageWatcherNode>> interestManager = new InterestManager<>(this.interests);
     private final NetworkStorage storage = new NetworkStorage();
-    private final KeyCounter cachedAvailableStacks = new KeyCounter();
+    private final KeyCounter cachedAvailableStacks = KeyCounter.saturating();
     private final AEKey2LongMap cachedAvailableAmounts = new AEKey2LongMap.OpenHashMap();
     private final Reference2ObjectMap<IGridNode, StackWatcher<IStorageWatcherNode>> watchers =
         new Reference2ObjectOpenHashMap<>();

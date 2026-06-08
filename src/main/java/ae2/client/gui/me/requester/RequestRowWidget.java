@@ -158,17 +158,40 @@ public final class RequestRowWidget {
         this.statusDisplay.renderWidget();
     }
 
-    public void drawPreview() {
+    public void drawPreview(int guiLeft, int guiTop) {
         if (!this.visible) {
             return;
         }
-        this.amountField.renderPreview();
-        this.batchField.renderPreview();
+        this.amountField.renderPreview(guiLeft, guiTop);
+        this.batchField.renderPreview(guiLeft, guiTop);
     }
 
     public boolean mouseClicked(int mouseX, int mouseY, int button) {
-        return this.visible && (this.amountField.mouseClicked(mouseX, mouseY, button)
-            || this.batchField.mouseClicked(mouseX, mouseY, button));
+        if (!this.visible) {
+            return false;
+        }
+
+        if (this.amountField.isMouseOver(mouseX, mouseY)) {
+            this.batchField.setFocused(false);
+            return this.amountField.mouseClicked(mouseX, mouseY, button);
+        }
+
+        if (this.batchField.isMouseOver(mouseX, mouseY)) {
+            this.amountField.setFocused(false);
+            return this.batchField.mouseClicked(mouseX, mouseY, button);
+        }
+
+        return false;
+    }
+
+    public boolean isMouseOverInput(int mouseX, int mouseY) {
+        return this.visible && (this.amountField.isMouseOver(mouseX, mouseY)
+            || this.batchField.isMouseOver(mouseX, mouseY));
+    }
+
+    public void clearFocus() {
+        this.amountField.setFocused(false);
+        this.batchField.setFocused(false);
     }
 
     public boolean keyTyped(char typedChar, int keyCode) {

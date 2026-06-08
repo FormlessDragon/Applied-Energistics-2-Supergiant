@@ -8,6 +8,7 @@ import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.me.common.StackSizeRenderer;
 import ae2.client.gui.style.Blitter;
 import ae2.client.gui.style.GuiStyle;
+import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.container.me.common.AbstractContainerRequester;
 import ae2.container.slot.RequestSlot;
@@ -21,6 +22,7 @@ import ae2.tile.crafting.requester.Request;
 import ae2.tile.crafting.requester.RequestList;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -211,7 +213,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
         }
 
         for (RequestRowWidget row : this.requestWidgets) {
-            row.drawPreview();
+            row.drawPreview(offsetX, offsetY);
         }
     }
 
@@ -256,11 +258,27 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        RequestRowWidget clickedInputRow = null;
         for (RequestRowWidget row : this.requestWidgets) {
-            if (row.mouseClicked(mouseX, mouseY, mouseButton)) {
+            if (row.isMouseOverInput(mouseX, mouseY)) {
+                clickedInputRow = row;
+                break;
+            }
+        }
+
+        for (RequestRowWidget row : this.requestWidgets) {
+            if (row != clickedInputRow) {
+                row.clearFocus();
+            }
+        }
+
+        if (clickedInputRow != null) {
+            clearRegisteredTextFieldFocus();
+            if (clickedInputRow.mouseClicked(mouseX, mouseY, mouseButton)) {
                 return;
             }
         }
+
         super.mouseClicked(mouseX, mouseY, mouseButton);
     }
 
@@ -374,6 +392,18 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
             row.removeButtons(this.buttonList);
         }
         this.requestWidgets.clear();
+    }
+
+    private void clearRegisteredTextFieldFocus() {
+        for (GuiTextField textField : this.widgets.getTextFields()) {
+            textField.setFocused(false);
+        }
+
+        if (this instanceof ITextFieldGui textFieldGui) {
+            for (GuiTextField textField : textFieldGui.getTextFields()) {
+                textField.setFocused(false);
+            }
+        }
     }
 
     private void updateRequestSlot(int row, @Nullable Request request, boolean visible) {

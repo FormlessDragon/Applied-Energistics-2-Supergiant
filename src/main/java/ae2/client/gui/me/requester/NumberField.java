@@ -89,14 +89,14 @@ public class NumberField extends ConfirmableTextField {
         font.drawString(unitSymbol, getX() + WIDTH - font.getStringWidth(unitSymbol), getY(), 0x54_5454);
     }
 
-    void renderPreview() {
+    void renderPreview(int guiLeft, int guiTop) {
         if (!isFocused()) {
             this.previewField.setVisible(false);
             return;
         }
 
         this.previewField.setVisible(true);
-        this.previewField.move(getX() - TEXT_FIELD_PADDING, getY() - TEXT_FIELD_PADDING + HEIGHT);
+        this.previewField.move(getX() - guiLeft - TEXT_FIELD_PADDING, getY() - guiTop - TEXT_FIELD_PADDING + HEIGHT);
         this.previewField.resize(PREVIEW_WIDTH, HEIGHT);
         this.previewField.setText(getCachedPreviewValue());
         this.previewField.setCursorPositionEnd();

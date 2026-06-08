@@ -29,6 +29,7 @@ import ae2.api.storage.cells.ICellWorkbenchItem;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.ActionButton;
+import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.ToggleButton;
 import ae2.container.implementations.ContainerCellWorkbench;
@@ -47,6 +48,8 @@ import java.util.List;
 public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
     private final ToggleButton copyMode;
     private final SettingToggleButton<FuzzyMode> fuzzyMode;
+    private final PageButton previousPageButton;
+    private final PageButton nextPageButton;
 
     public GuiCellWorkbench(ContainerCellWorkbench container, InventoryPlayer playerInventory, ITextComponent title,
                             GuiStyle style) {
@@ -58,6 +61,10 @@ public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
         this.addToLeftToolbar(new ActionButton(ActionItems.CLOSE, act -> container.clear()));
         this.copyMode = this.addToLeftToolbar(new ToggleButton(Icon.COPY_MODE_ON, Icon.COPY_MODE_OFF,
             GuiText.CopyMode.text(), GuiText.CopyModeDesc.text(), act -> container.nextWorkBenchCopyMode()));
+        this.previousPageButton = new PageButton(Icon.ARROW_LEFT, () -> container.setPage(container.getCurrentPage() - 1));
+        this.nextPageButton = new PageButton(Icon.ARROW_RIGHT, () -> container.setPage(container.getCurrentPage() + 1));
+        this.widgets.add("previousPage", this.previousPageButton);
+        this.widgets.add("nextPage", this.nextPageButton);
     }
 
     private static void addIncompatibleWithCellTooltip(List<String> lines) {
@@ -72,6 +79,9 @@ public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
         this.copyMode.setState(this.container.getCopyMode() == CopyMode.CLEAR_ON_REMOVE);
         this.fuzzyMode.set(this.container.getFuzzyMode());
         this.fuzzyMode.setVisibility(container.getUpgrades().isInstalled(AEItems.FUZZY_CARD.item()));
+        this.previousPageButton.setVisibility(this.container.getPageCount() > 1 && this.container.getCurrentPage() > 0);
+        this.nextPageButton.setVisibility(this.container.getPageCount() > 1
+            && this.container.getCurrentPage() + 1 < this.container.getPageCount());
     }
 
     private void toggleFuzzyMode(SettingToggleButton<FuzzyMode> button, boolean backwards) {
@@ -125,6 +135,23 @@ public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
         }
 
         return lines;
+    }
+
+    private static class PageButton extends IconButton {
+        private final Icon icon;
+
+        PageButton(Icon icon, Runnable onPress) {
+            super(onPress);
+            this.icon = icon;
+            this.setMessage((icon == Icon.ARROW_LEFT
+                ? GuiText.InterfacePagePrevious
+                : GuiText.InterfacePageNext).text());
+        }
+
+        @Override
+        protected Icon getIcon() {
+            return this.icon;
+        }
     }
 
 }

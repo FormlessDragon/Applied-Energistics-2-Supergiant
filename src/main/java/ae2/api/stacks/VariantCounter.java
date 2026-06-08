@@ -19,6 +19,11 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
      * Enable to skip and remove keys that are mapped to zero.
      */
     private boolean dropZeros;
+    private final boolean saturating;
+
+    protected VariantCounter(boolean saturating) {
+        this.saturating = saturating;
+    }
 
     public boolean isDropZeros() {
         return dropZeros;
@@ -33,7 +38,24 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     }
 
     public void add(AEKey key, long amount) {
-        this.getRecords().addTo(key, amount);
+        var records = getRecords();
+        if (saturating) {
+            long newAmount;
+            long left = records.getLong(key);
+            long result = left + amount;
+            if (((left ^ result) & (amount ^ result)) < 0) {
+                newAmount = result < 0 ? Long.MAX_VALUE : Long.MIN_VALUE;
+            } else {
+                newAmount = result;
+            }
+            if (dropZeros && newAmount == 0) {
+                records.removeLong(key);
+            } else {
+                records.put(key, newAmount);
+            }
+        } else {
+            records.addTo(key, amount);
+        }
     }
 
     public void set(AEKey key, long amount) {
@@ -117,7 +139,7 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         getRecords().clear();
     }
 
-    public abstract VariantCounter copy();
+    public abstract VariantCounter copy(boolean saturating);
 
     public void invert() {
         for (var entry : getRecords().object2LongEntrySet()) {
@@ -142,6 +164,10 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     static class UnorderedVariantMap extends VariantCounter {
         private final AEKey2LongMap records = new AEKey2LongMap.OpenHashMap();
 
+        UnorderedVariantMap(boolean saturating) {
+            super(saturating);
+        }
+
         /**
          * For keys whose primary key does not support fuzzy range lookups, we simply return all records, which amounts
          * to ignoring NBT.
@@ -157,8 +183,8 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         }
 
         @Override
-        public VariantCounter copy() {
-            var result = new UnorderedVariantMap();
+        public VariantCounter copy(boolean saturating) {
+            var result = new UnorderedVariantMap(saturating);
             result.records.putAll(records);
             return result;
         }
@@ -170,6 +196,10 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
      */
     static class FuzzyVariantMap extends VariantCounter {
         private final AEKey2LongMap.AVLTreeMap records = FuzzySearch.createMap2Long();
+
+        FuzzyVariantMap(boolean saturating) {
+            super(saturating);
+        }
 
         @Override
         public Collection<Object2LongMap.Entry<AEKey>> findFuzzy(AEKey key, FuzzyMode fuzzy) {
@@ -183,8 +213,8 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         }
 
         @Override
-        public VariantCounter copy() {
-            var result = new FuzzyVariantMap();
+        public VariantCounter copy(boolean saturating) {
+            var result = new FuzzyVariantMap(saturating);
             result.records.putAll(records);
             return result;
         }

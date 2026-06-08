@@ -181,6 +181,13 @@ public class NetworkStorage implements MEStorage {
     }
 
     @Override
+    public KeyCounter getAvailableStacks() {
+        var result = KeyCounter.saturating();
+        getAvailableStacks(result);
+        return result;
+    }
+
+    @Override
     public ITextComponent getDescription() {
         return GuiText.MENetworkStorage.text();
     }

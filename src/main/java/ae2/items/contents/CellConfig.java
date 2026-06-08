@@ -39,8 +39,7 @@ public final class CellConfig {
     }
 
     public static ConfigInventory create(Set<AEKeyType> supportedTypes, ItemStack stack, int size) {
-        Preconditions.checkArgument(size >= 1 && size <= 63,
-            "Config inventory must have between 1 and 63 slots inclusive.");
+        Preconditions.checkArgument(size >= 1, "Config inventory must have at least one slot.");
         var holder = new Holder(stack);
         holder.inv = ConfigInventory.configTypes(size)
                                     .supportedTypes(supportedTypes)

@@ -50,9 +50,7 @@ public class TileCellWorkbench extends AEBaseTile
     @Nullable
     private ConfigInventory cacheConfig;
     private boolean locked;
-    private final ConfigInventory config = ConfigInventory.configTypes(63)
-                                                          .changeListener(this::configChanged)
-                                                          .build();
+    private ConfigInventory config = createConfigInventory(63);
 
     public TileCellWorkbench() {
         this.manager.registerSetting(Settings.COPY_MODE, CopyMode.CLEAR_ON_REMOVE);
@@ -72,6 +70,12 @@ public class TileCellWorkbench extends AEBaseTile
         }
     }
 
+    private ConfigInventory createConfigInventory(int size) {
+        return ConfigInventory.configTypes(Math.max(0, size))
+                              .changeListener(this::configChanged)
+                              .build();
+    }
+
     @Nullable
     public ICellWorkbenchItem getCell() {
         ItemStack stack = this.cell.getStackInSlot(0);
@@ -81,6 +85,7 @@ public class TileCellWorkbench extends AEBaseTile
     }
 
     public GenericStackInv getConfig() {
+        ensureConfigSizeForCurrentCell();
         return this.config;
     }
 
@@ -96,8 +101,9 @@ public class TileCellWorkbench extends AEBaseTile
     public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
         this.cell.readFromNBT(data, "cell");
-        this.config.readFromChildTag(data, "config");
         this.manager.readFromNBT(data);
+        ensureConfigSizeForCurrentCell();
+        this.config.readFromChildTag(data, "config");
     }
 
     @Nullable
@@ -127,6 +133,7 @@ public class TileCellWorkbench extends AEBaseTile
                 this.cacheConfig = null;
 
                 ConfigInventory configInventory = this.getCellConfigInventory();
+                this.resizeConfig(configInventory != null ? configInventory.size() : 63);
                 if (configInventory != null) {
                     if (!configInventory.isEmpty()) {
                         copy(configInventory, this.config);
@@ -158,6 +165,28 @@ public class TileCellWorkbench extends AEBaseTile
             }
         } finally {
             this.locked = false;
+        }
+    }
+
+    private void ensureConfigSizeForCurrentCell() {
+        ConfigInventory configInventory = this.getCellConfigInventory();
+        resizeConfig(configInventory != null ? configInventory.size() : 63);
+    }
+
+    private void resizeConfig(int size) {
+        size = Math.max(0, size);
+        if (this.config.size() == size) {
+            return;
+        }
+
+        ConfigInventory oldConfig = this.config;
+        this.config = createConfigInventory(size);
+        boolean wasLocked = this.locked;
+        this.locked = true;
+        try {
+            copy(oldConfig, this.config);
+        } finally {
+            this.locked = wasLocked;
         }
     }
 

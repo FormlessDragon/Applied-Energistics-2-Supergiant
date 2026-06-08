@@ -20,6 +20,20 @@
       "grid": "BREAK_AFTER_9COLS"
     }
   },
+  "widgets": {
+    "previousPage": {
+      "left": 116,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "nextPage": {
+      "left": 134,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    }
+  },
   "text": {
     "dialog_title": {
       "text": {

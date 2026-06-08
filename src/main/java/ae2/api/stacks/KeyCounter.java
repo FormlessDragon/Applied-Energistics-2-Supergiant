@@ -44,6 +44,22 @@ import java.util.Set;
 public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     // First map contains a mapping from AEKey#primaryKey
     private final Reference2ObjectMap<Object, VariantCounter> lists = new Reference2ObjectOpenHashMap<>();
+    private final boolean saturating;
+
+    public KeyCounter() {
+        this(false);
+    }
+
+    private KeyCounter(boolean saturating) {
+        this.saturating = saturating;
+    }
+
+    /**
+     * Creates a counter that clamps additions to the signed long range.
+     */
+    public static KeyCounter saturating() {
+        return new KeyCounter(true);
+    }
 
     public Collection<Object2LongMap.Entry<AEKey>> findFuzzy(AEKey key, FuzzyMode fuzzy) {
         Objects.requireNonNull(key, "key");
@@ -71,7 +87,7 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         for (var entry : other.lists.entrySet()) {
             var ourSubIndex = lists.get(entry.getKey());
             if (ourSubIndex == null) {
-                lists.put(entry.getKey(), entry.getValue().copy());
+                lists.put(entry.getKey(), entry.getValue().copy(saturating));
             } else {
                 ourSubIndex.addAll(entry.getValue());
             }
@@ -82,7 +98,7 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         for (var entry : other.lists.entrySet()) {
             var ourSubIndex = lists.get(entry.getKey());
             if (ourSubIndex == null) {
-                var copied = entry.getValue().copy();
+                var copied = entry.getValue().copy(saturating);
                 copied.invert();
                 lists.put(entry.getKey(), copied);
             } else {
@@ -165,9 +181,10 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     private VariantCounter getSubIndex(AEKey key) {
         // We check before the call to computeIfAbsent, otherwise we'd need a capturing lambda.
         if (key.getFuzzySearchMaxValue() > 0) {
-            return lists.computeIfAbsent(key.getPrimaryKey(), ignored -> new VariantCounter.FuzzyVariantMap());
+            return lists.computeIfAbsent(key.getPrimaryKey(), ignored -> new VariantCounter.FuzzyVariantMap(saturating));
         } else {
-            return lists.computeIfAbsent(key.getPrimaryKey(), ignored -> new VariantCounter.UnorderedVariantMap());
+            return lists.computeIfAbsent(key.getPrimaryKey(),
+                ignored -> new VariantCounter.UnorderedVariantMap(saturating));
         }
     }
 

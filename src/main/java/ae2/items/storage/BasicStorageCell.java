@@ -110,7 +110,7 @@ public class BasicStorageCell extends AEBaseItem implements IBasicCellItem {
 
     @Override
     public ConfigInventory getConfigInventory(ItemStack is) {
-        return CellConfig.create(Set.of(keyType), is);
+        return CellConfig.create(Set.of(keyType), is, this.totalTypes);
     }
 
     @Override

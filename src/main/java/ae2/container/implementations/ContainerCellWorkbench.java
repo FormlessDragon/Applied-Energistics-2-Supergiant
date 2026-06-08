@@ -49,13 +49,24 @@ import java.util.Map;
 import java.util.Objects;
 
 public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkbench> implements ae2.container.slot.IPartitionSlotHost {
+    private static final int CONFIG_SLOTS_PER_PAGE = 63;
+
     public static final String ACTION_NEXT_COPYMODE = "nextCopyMode";
     public static final String ACTION_PARTITION = "partition";
     public static final String ACTION_CLEAR = "clear";
     public static final String ACTION_SET_FUZZY_MODE = "setFuzzyMode";
+    public static final String ACTION_SET_PAGE = "setPage";
 
     @GuiSync(2)
     public CopyMode copyMode = CopyMode.CLEAR_ON_REMOVE;
+    @GuiSync(3)
+    public int currentPage;
+    @GuiSync(4)
+    public int pageCount = 1;
+    @GuiSync(7)
+    public int configSlotCount = CONFIG_SLOTS_PER_PAGE;
+
+    private CellWorkbenchPageInventory configPageInventory;
 
     public ContainerCellWorkbench(InventoryPlayer ip, TileCellWorkbench host) {
         super(ip, host);
@@ -64,6 +75,7 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
         registerClientAction(ACTION_PARTITION, this::partition);
         registerClientAction(ACTION_CLEAR, this::clear);
         registerClientAction(ACTION_SET_FUZZY_MODE, FuzzyMode.class, this::setCellFuzzyMode);
+        registerClientAction(ACTION_SET_PAGE, Integer.class, this::setPage);
     }
 
     @Override
@@ -75,9 +87,9 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
 
     @Override
     protected void setupConfig() {
-        ae2.util.ConfigGuiInventory inv = getConfigInventory().createGuiWrapper();
+        this.configPageInventory = new CellWorkbenchPageInventory(getHost(), CONFIG_SLOTS_PER_PAGE);
         for (int slot = 0; slot < 63; slot++) {
-            this.addSlot(new CellPartitionSlot(inv, this, slot), SlotSemantics.CONFIG);
+            this.addSlot(new CellPartitionSlot(this.configPageInventory, this, slot), SlotSemantics.CONFIG);
         }
     }
 
@@ -123,17 +135,37 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
 
     @Override
     public boolean isPartitionSlotEnabled(int idx) {
+        int actualSlot = getFirstSlotOnPage(this.currentPage) + idx;
         ICellWorkbenchItem cwi = getHost().getCell();
         if (cwi != null && getCopyMode() == CopyMode.CLEAR_ON_REMOVE) {
-            return idx < cwi.getConfigInventory(getWorkbenchItem()).size();
+            return actualSlot < cwi.getConfigInventory(getWorkbenchItem()).size();
         }
-        return getCopyMode() == CopyMode.KEEP_ON_REMOVE;
+        return getCopyMode() == CopyMode.KEEP_ON_REMOVE && actualSlot < getConfigInventory().size();
     }
 
     @Override
     public void onServerDataSync(ShortSet updatedFields) {
         super.onServerDataSync(updatedFields);
         getHost().getConfigManager().putSetting(Settings.COPY_MODE, getCopyMode());
+        updateConfigPageInventory();
+    }
+
+    @Override
+    public void onClientDataSync(ShortSet updatedFields) {
+        super.onClientDataSync(updatedFields);
+        updateConfigPageInventory();
+    }
+
+    @Override
+    public void broadcastChanges() {
+        if (isServerSide()) {
+            this.configSlotCount = getConfigInventory().size();
+            this.pageCount = getPageCount(this.configSlotCount);
+            this.currentPage = Math.clamp(this.currentPage, 0, this.pageCount - 1);
+        }
+
+        updateConfigPageInventory();
+        super.broadcastChanges();
     }
 
     public void clear() {
@@ -159,6 +191,27 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
         this.broadcastChanges();
     }
 
+    public void setPage(int page) {
+        if (isClientSide()) {
+            sendClientAction(ACTION_SET_PAGE, page);
+            return;
+        }
+
+        this.configSlotCount = getConfigInventory().size();
+        this.pageCount = getPageCount(this.configSlotCount);
+        this.currentPage = Math.clamp(page, 0, this.pageCount - 1);
+        updateConfigPageInventory();
+        this.detectAndSendChanges();
+    }
+
+    public int getCurrentPage() {
+        return this.currentPage;
+    }
+
+    public int getPageCount() {
+        return this.pageCount;
+    }
+
     public ItemStack getWorkbenchItem() {
         ae2.api.inventories.InternalInventory cells = Objects.requireNonNull(getHost().getSubInventory(ISegmentedInventory.CELLS));
         return cells.getStackInSlot(0);
@@ -170,6 +223,20 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
 
     private GenericStackInv getConfigInventory() {
         return Objects.requireNonNull(this.getHost().getConfig());
+    }
+
+    private void updateConfigPageInventory() {
+        if (this.configPageInventory != null) {
+            this.configPageInventory.setPage(this.currentPage);
+        }
+    }
+
+    private static int getPageCount(int slots) {
+        return Math.max(1, (Math.max(0, slots) + CONFIG_SLOTS_PER_PAGE - 1) / CONFIG_SLOTS_PER_PAGE);
+    }
+
+    private static int getFirstSlotOnPage(int page) {
+        return Math.max(0, page) * CONFIG_SLOTS_PER_PAGE;
     }
 
     private FuzzyMode getWorkbenchFuzzyMode() {
