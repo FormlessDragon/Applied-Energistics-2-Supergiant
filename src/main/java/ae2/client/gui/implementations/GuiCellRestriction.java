@@ -116,29 +116,30 @@ public class GuiCellRestriction extends AEBaseGui<ContainerCellRestriction> {
     public void drawFG(int offsetX, int offsetY, int mouseX, int mouseY) {
         super.drawFG(offsetX, offsetY, mouseX, mouseY);
 
-        drawInfo(GuiText.CellRestrictionMaxByte, this.container.maxBytes * this.container.amountPerByte, 62);
-        drawInfo(GuiText.CellRestrictionTotalByte, this.container.maxBytes, 72);
-        drawInfo(GuiText.CellRestrictionAmountPerByte, 82);
-        drawInfo(GuiText.CellRestrictionTypePerByte, 92);
+        drawInfo(GuiText.CellRestrictionMaxAmount, this.container.maxBytes * this.container.amountPerByte, 62);
+        drawInfo(GuiText.CellRestrictionMaxType, this.container.maxTypes, 72);
+        drawInfo(GuiText.CellRestrictionMaxByte, this.container.maxBytes, 82);
+        drawInfo(GuiText.CellRestrictionAmountPerByte, this.container.amountPerByte, 92);
+        drawInfo(GuiText.CellRestrictionTypePerByte, this.container.typePerByte, 102);
 
         if (this.cachedValidInput) {
-            drawInfo(GuiText.CellRestrictionAllocatedByte, this.cachedAllocatedBytes, 102);
+            drawInfo(GuiText.CellRestrictionAllocatedByte, this.cachedAllocatedBytes, 112);
         } else {
-            drawInfo(GuiText.CellRestrictionAllocatedByte, 102);
+            drawInfo(GuiText.CellRestrictionAllocatedByte, 112);
         }
         if (this.cachedValidInput) {
-            drawInfo(GuiText.CellRestrictionFreeByte, this.container.maxBytes - this.cachedAllocatedBytes, 112);
+            drawInfo(GuiText.CellRestrictionFreeByte, this.container.maxBytes - this.cachedAllocatedBytes, 122);
         } else {
-            drawInfo(GuiText.CellRestrictionFreeByte, 112);
+            drawInfo(GuiText.CellRestrictionFreeByte, 122);
         }
     }
 
     private void drawInfo(GuiText label, long value, int y) {
-        this.fontRenderer.drawString(label.text(value).getFormattedText(), 12, y, 0x404040);
+        this.fontRenderer.drawString(label.getLocal(value), 12, y, 0x404040);
     }
 
     private void drawInfo(GuiText label, int y) {
-        this.fontRenderer.drawString(label.text("error").getFormattedText(), 12, y, 0x404040);
+        this.fontRenderer.drawString(label.getLocal("error"), 12, y, 0x404040);
     }
 
     private void setRestriction() {
@@ -207,17 +208,18 @@ public class GuiCellRestriction extends AEBaseGui<ContainerCellRestriction> {
             return OptionalLong.empty();
         }
 
-        return MathExpressionParser.parse(text.trim(), this.decimalFormat)
-                                   .flatMap(this::toLong)
-                                   .map(OptionalLong::of)
-                                   .orElseGet(OptionalLong::empty);
+        var d = MathExpressionParser.parse(text.trim(), this.decimalFormat);
+        if (d.isPresent()) {
+            return toLong(d.get());
+        }
+        return OptionalLong.empty();
     }
 
-    private java.util.Optional<Long> toLong(BigDecimal value) {
+    private OptionalLong toLong(BigDecimal value) {
         try {
-            return java.util.Optional.of(value.setScale(0, RoundingMode.UNNECESSARY).longValueExact());
+            return OptionalLong.of(value.setScale(0, RoundingMode.UNNECESSARY).longValueExact());
         } catch (ArithmeticException ignored) {
-            return java.util.Optional.empty();
+            return OptionalLong.empty();
         }
     }
 
