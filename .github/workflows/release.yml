@@ -3,7 +3,7 @@ name: Releases
 on:
   push:
     tags:
-      - "*"
+      - "v*"
 
 jobs:
   build:
@@ -11,11 +11,11 @@ jobs:
     permissions:
       contents: write
     env:
-      RELEASE_VERSION: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ github.ref_name }}
       MAVEN_PUBLISHING_URL: https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/
       CENTRAL_NAMESPACE: ${{ vars.CENTRAL_NAMESPACE }}
       MAVEN_GROUP: ${{ vars.MAVEN_GROUP }}
-      MAVEN_ARTIFACT_ID: ${{ vars.MAVEN_ARTIFACT_ID || 'ae2' }}
+      MAVEN_ARTIFACT_ID: ${{ vars.MAVEN_ARTIFACT_ID }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -31,6 +31,12 @@ jobs:
         name: Set up Gradle
       - name: Add permission
         run: chmod +x ./gradlew
+      - name: Set release version
+        run: |
+          RELEASE_VERSION="${RELEASE_TAG#v}"
+          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> "$GITHUB_ENV"
+          echo "Release tag: ${RELEASE_TAG}"
+          echo "Release version: ${RELEASE_VERSION}"
       - name: Execute Gradle build
         run: ./gradlew build -x spotlessCheck -Pmod_version="${RELEASE_VERSION}"
 
@@ -72,9 +78,7 @@ jobs:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
 
-      - uses: ncipollo/release-action@v1.20.0
-        with:
-          tag: ${{ env.RELEASE_VERSION }}
-          name: ${{ env.RELEASE_VERSION }}
-          artifacts: "build/libs/*"
-          generateReleaseNotes: true
+      - name: Create GitHub release
+        run: gh release create "$RELEASE_TAG" build/libs/* --title "$RELEASE_TAG" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

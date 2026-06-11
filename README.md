@@ -19,6 +19,18 @@ The upstream repository remains the original AE2 project and the primary referen
 * [API.md](API.md): API notes for this branch
 * [Upstream repository](https://github.com/AppliedEnergistics/Applied-Energistics-2)
 
+## Maven
+
+```groovy
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation "io.github.formlessdragon:AppliedEnergistics2-Supergiant:${mod_version}:dev"
+}
+```
+
 ## Integrated
 
 * [Lapis256/AE2ToggleableViewCell](https://github.com/Lapis256/AE2ToggleableViewCell/tree/1.21.1): integrated the toggleable view cell feature with partial code reuse under the MIT License.
