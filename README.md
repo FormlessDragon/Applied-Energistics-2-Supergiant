@@ -29,6 +29,15 @@ The upstream repository remains the original AE2 project and the primary referen
 * [pedroksl/AdvancedAE](https://github.com/pedroksl/AdvancedAE): ported selected AdvancedAE parts, recipes, GUIs, and behavior into the `ae2` namespace under the LGPL-3.0 License;
 * [AlmostReliable/merequester](https://github.com/AlmostReliable/merequester): integrated ME Requester under LGPL-3.0 license.
 
+## Native Additions
+
+* Advanced Memory Card: in-network P2P management with filtering, binding, unbinding, renaming, and world highlights.
+* Multi-input P2P support, including the Pattern Provider P2P Tunnel for round-robin pattern dispatch through P2P
+  outputs.
+* Crafting and pattern-provider upgrades: Parallel Card, merged dispatch, batch target handling, automatic blank-pattern
+  refill, and improved pattern encoding controls.
+* New native tools, storage options, terminal interactions, and more.
+
 ## License
 
 * Applied Energistics 2 API
