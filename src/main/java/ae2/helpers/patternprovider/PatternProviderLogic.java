@@ -66,6 +66,7 @@ import ae2.helpers.InterfaceLogicHost;
 import ae2.helpers.patternprovider.PatternProviderMergeHelper.ExternalTarget;
 import ae2.helpers.patternprovider.PatternProviderMergeHelper.TargetMatch;
 import ae2.me.helpers.MachineSource;
+import ae2.parts.p2p.PatternProviderP2PTunnelPart;
 import ae2.util.inv.AppEngInternalInventory;
 import ae2.util.inv.InternalInventoryHost;
 import ae2.util.inv.PlayerInternalInventory;
@@ -469,14 +470,15 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             return 0;
         }
 
-        for (MachinePushTarget machineTarget : targetSet.machineTargets) {
+        for (int i = 0; i < targetSet.machineTargets.size(); i++) {
+            MachinePushTarget machineTarget = targetSet.machineTargets.get(i);
             int definitionMultiplier = machineTarget.batchTarget.getMaxPatternPushMultiplier(basePatternDetails,
                 buildPatternInputHolder(basePatternDetails), maxMultiplier, machineTarget.ejectionDirection);
             if (definitionMultiplier <= 0) {
                 continue;
             }
             int multiplier = Math.min(definitionMultiplier, maxMultiplier);
-            this.pendingMergePush = new MachineMergePush(basePatternDetails, machineTarget, multiplier);
+            this.pendingMergePush = new MachineMergePush(basePatternDetails, targetSet.machineTargets, i, multiplier);
             return multiplier;
         }
 
@@ -1023,6 +1025,91 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         return this.returnInv;
     }
 
+    public int getMaxPatternPushMultiplierThroughP2P(PatternProviderP2PTunnelPart inputTunnel,
+                                                     IPatternDetails patternDetails,
+                                                     KeyCounter[] inputs,
+                                                     int maxMultiplier) {
+        var basePatternDetails = PseudoPatternDetails.unwrap(patternDetails);
+        if (maxMultiplier <= 0 || !canMergePatternPushBasic(basePatternDetails)) {
+            return 0;
+        }
+
+        for (PatternProviderP2PTunnelPart outputTunnel : inputTunnel.getOutputsInAttemptOrder()) {
+            PatternProviderP2PTunnelPart.RemoteMachineTarget machineTarget = outputTunnel.findRemoteMachineTarget();
+            if (machineTarget != null) {
+                int multiplier = machineTarget.batchTarget().getMaxPatternPushMultiplier(basePatternDetails, inputs,
+                    maxMultiplier, machineTarget.ejectionDirection());
+                if (multiplier > 0) {
+                    inputTunnel.planOutputForPattern(basePatternDetails, outputTunnel);
+                    return Math.min(multiplier, maxMultiplier);
+                }
+                continue;
+            }
+
+            PatternProviderTarget externalTarget = outputTunnel.findRemoteExternalTarget(this.actionSource);
+            if (externalTarget == null || !basePatternDetails.supportsPushInputsToExternalInventory()
+                || isTargetBlocked(externalTarget, basePatternDetails)) {
+                continue;
+            }
+
+            int multiplier = PatternProviderMergeHelper.findMaxExternalMultiplier(externalTarget, inputs,
+                maxMultiplier, getInsertionMode());
+            if (multiplier > 0) {
+                inputTunnel.planOutputForPattern(basePatternDetails, outputTunnel);
+                return multiplier;
+            }
+        }
+
+        return 0;
+    }
+
+    public boolean pushPatternThroughP2P(PatternProviderP2PTunnelPart inputTunnel,
+                                         IPatternDetails patternDetails,
+                                         KeyCounter[] inputHolder,
+                                         int multiplier) {
+        var basePatternDetails = PseudoPatternDetails.unwrap(patternDetails);
+        PatternProviderP2PTunnelPart plannedOutput = inputTunnel.consumePlannedOutput(basePatternDetails);
+        for (PatternProviderP2PTunnelPart outputTunnel : inputTunnel.getOutputsInAttemptOrder(plannedOutput)) {
+            PatternProviderP2PTunnelPart.RemoteMachineTarget machineTarget = outputTunnel.findRemoteMachineTarget();
+            if (machineTarget != null) {
+                int acceptedMultiplier = machineTarget.batchTarget().getMaxPatternPushMultiplier(basePatternDetails,
+                    inputHolder, multiplier, machineTarget.ejectionDirection());
+                if (acceptedMultiplier < multiplier) {
+                    continue;
+                }
+                if (machineTarget.machine().pushPattern(basePatternDetails, inputHolder, multiplier,
+                    machineTarget.ejectionDirection())) {
+                    inputTunnel.onRemotePushSucceeded(outputTunnel);
+                    return true;
+                }
+                continue;
+            }
+
+            PatternProviderTarget externalTarget = outputTunnel.findRemoteExternalTarget(this.actionSource);
+            if (externalTarget == null || isTargetBlocked(externalTarget, basePatternDetails)
+                || !basePatternDetails.supportsPushInputsToExternalInventory()
+                || !PatternProviderMergeHelper.acceptsAllFully(externalTarget, inputHolder, 1, getInsertionMode())
+                || inputTunnel.getSide() == null) {
+                continue;
+            }
+
+            basePatternDetails.pushInputsToExternalInventory(inputHolder, (what, amount) -> {
+                if (amount > 0) {
+                    long inserted = externalTarget.insert(what, amount, Actionable.MODULATE, getInsertionMode());
+                    if (inserted < amount) {
+                        addToSendList(what, amount - inserted, inputTunnel.getSide());
+                    }
+                }
+            });
+            inputTunnel.onRemotePushSucceeded(outputTunnel);
+            this.saveChanges();
+            this.sendStacksOut();
+            return true;
+        }
+
+        return false;
+    }
+
     public void exportSettings(NBTTagCompound output) {
         NBTTagCompound settings = new NBTTagCompound();
         for (Entry<String, String> entry : this.configManager.exportSettings().entrySet()) {
@@ -1287,12 +1374,15 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
     private final class MachineMergePush implements PendingMergePush {
         private final IPatternDetails patternDetails;
-        private final MachinePushTarget target;
+        private final ObjectList<MachinePushTarget> targets;
+        private final int matchedTargetIndex;
         private final int multiplier;
 
-        private MachineMergePush(IPatternDetails patternDetails, MachinePushTarget target, int multiplier) {
+        private MachineMergePush(IPatternDetails patternDetails, ObjectList<MachinePushTarget> targets,
+                                 int matchedTargetIndex, int multiplier) {
             this.patternDetails = patternDetails;
-            this.target = target;
+            this.targets = new ObjectArrayList<>(targets);
+            this.matchedTargetIndex = matchedTargetIndex;
             this.multiplier = multiplier;
         }
 
@@ -1308,13 +1398,30 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
         @Override
         public boolean push(KeyCounter[] inputHolder, int multiplier) {
-            int acceptedMultiplier = this.target.batchTarget.getMaxPatternPushMultiplier(this.patternDetails, inputHolder,
-                multiplier, this.target.ejectionDirection);
-            if (acceptedMultiplier < multiplier) {
-                return false;
+            for (int i = this.matchedTargetIndex; i < this.targets.size(); i++) {
+                if (tryPushToTarget(this.targets.get(i), inputHolder, multiplier)) {
+                    return true;
+                }
             }
-            if (this.target.machine.pushPattern(this.patternDetails, inputHolder, multiplier,
-                this.target.ejectionDirection)) {
+
+            for (int i = 0; i < this.matchedTargetIndex; i++) {
+                if (tryPushToTarget(this.targets.get(i), inputHolder, multiplier)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private boolean tryPushToTarget(MachinePushTarget target, KeyCounter[] inputHolder, int multiplier) {
+            if (!(target.machine instanceof PatternProviderP2PTunnelPart)) {
+                int acceptedMultiplier = target.batchTarget.getMaxPatternPushMultiplier(this.patternDetails,
+                    inputHolder, multiplier, target.ejectionDirection);
+                if (acceptedMultiplier < multiplier) {
+                    return false;
+                }
+            }
+            if (target.machine.pushPattern(this.patternDetails, inputHolder, multiplier, target.ejectionDirection)) {
                 onPushPatternSuccess(this.patternDetails);
                 return true;
             }

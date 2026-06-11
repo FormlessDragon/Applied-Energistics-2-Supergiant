@@ -13,6 +13,7 @@ import ae2.parts.networking.EnergyAcceptorPart;
 import ae2.parts.p2p.FEP2PTunnelPart;
 import ae2.parts.p2p.FluidP2PTunnelPart;
 import ae2.parts.p2p.ItemP2PTunnelPart;
+import ae2.parts.p2p.PatternProviderP2PTunnelPart;
 import ae2.tile.networking.TileCableBus;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.MinecraftForge;
@@ -61,6 +62,18 @@ public final class InitCapabilityProviders {
         partEvent.register(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY,
             (part, side) -> ignoreSide(side, part.getExposedApi()),
             FluidP2PTunnelPart.class);
+        partEvent.register(AECapabilities.CRAFTING_MACHINE,
+            (part, side) -> ignoreSide(side, part.getCraftingMachineApi()),
+            PatternProviderP2PTunnelPart.class);
+        partEvent.register(AECapabilities.PATTERN_PROVIDER_BATCH_TARGET,
+            (part, side) -> ignoreSide(side, part.getCraftingMachineApi()),
+            PatternProviderP2PTunnelPart.class);
+        partEvent.register(AECapabilities.ME_STORAGE,
+            (part, side) -> ignoreSide(side, part.getInputStorageApi()),
+            PatternProviderP2PTunnelPart.class);
+        partEvent.register(AECapabilities.GENERIC_INTERNAL_INV,
+            (part, side) -> ignoreSide(side, part.getReturnInventoryApi()),
+            PatternProviderP2PTunnelPart.class);
         MinecraftForge.EVENT_BUS.post(partEvent);
         partEvent.registerGenericInternalInventoryAdapters();
         RegisterPartCapabilitiesEventInternal.register(partEvent);

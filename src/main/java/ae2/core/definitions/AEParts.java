@@ -65,6 +65,7 @@ import ae2.parts.p2p.IC2P2PTunnelPart;
 import ae2.parts.p2p.ItemP2PTunnelPart;
 import ae2.parts.p2p.LightP2PTunnelPart;
 import ae2.parts.p2p.MEP2PTunnelPart;
+import ae2.parts.p2p.PatternProviderP2PTunnelPart;
 import ae2.parts.p2p.RedstoneP2PTunnelPart;
 import ae2.parts.reporting.ConversionMonitorPart;
 import ae2.parts.reporting.CraftingTerminalPart;
@@ -203,6 +204,9 @@ public final class AEParts {
         AEPartIds.IC2_P2P_TUNNEL, IC2P2PTunnelPart.class, IC2P2PTunnelPart::new);
     public static final ItemDefinition<PartItem<LightP2PTunnelPart>> LIGHT_P2P_TUNNEL = createPart(
         AEPartIds.LIGHT_P2P_TUNNEL, LightP2PTunnelPart.class, LightP2PTunnelPart::new);
+    public static final ItemDefinition<PartItem<PatternProviderP2PTunnelPart>> PATTERN_PROVIDER_P2P_TUNNEL = createPart(
+        AEPartIds.PATTERN_PROVIDER_P2P_TUNNEL, PatternProviderP2PTunnelPart.class,
+        PatternProviderP2PTunnelPart::new);
 
     private static final ItemDefinition<?>[] PARTS = {
         STORAGE_BUS,
@@ -247,7 +251,8 @@ public final class AEParts {
         FLUID_P2P_TUNNEL,
         FE_P2P_TUNNEL,
         IC2_P2P_TUNNEL,
-        LIGHT_P2P_TUNNEL
+        LIGHT_P2P_TUNNEL,
+        PATTERN_PROVIDER_P2P_TUNNEL
     };
 
     private AEParts() {

@@ -23,6 +23,7 @@ import ae2.api.behaviors.ExternalStorageStrategy;
 import ae2.api.config.Actionable;
 import ae2.api.config.PatternProviderInsertionMode;
 import ae2.api.networking.security.IActionSource;
+import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKeyType;
 import ae2.api.storage.MEStorage;
@@ -31,11 +32,14 @@ import ae2.parts.automation.StackWorldBehaviors;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
+import net.minecraftforge.items.CapabilityItemHandler;
+import net.minecraftforge.items.IItemHandler;
 
 import org.jetbrains.annotations.Nullable;
 import java.util.Map;
@@ -59,12 +63,23 @@ public interface PatternProviderTarget {
             return wrapMeStorage(storage, src);
         }
 
+        Reference2ObjectMap<AEKeyType, PatternProviderTarget> externalTargets = new Reference2ObjectOpenHashMap<>();
+        if (blockEntity != null && blockEntity.hasCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY, side)) {
+            IItemHandler itemHandler = blockEntity.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY, side);
+            if (itemHandler != null) {
+                externalTargets.put(AEKeyType.items(), wrapItemHandler(itemHandler));
+            }
+        }
+
         Map<AEKeyType, ExternalStorageStrategy> strategies = StackWorldBehaviors.createExternalStorageStrategies(
             (WorldServer) level,
             pos,
             side);
         Reference2ObjectMap<AEKeyType, MEStorage> externalStorages = new Reference2ObjectOpenHashMap<>(strategies.size());
         for (Entry<AEKeyType, ExternalStorageStrategy> entry : strategies.entrySet()) {
+            if (externalTargets.containsKey(entry.getKey())) {
+                continue;
+            }
             MEStorage wrapper = entry.getValue().createWrapper(false, () -> {
             });
             if (wrapper != null) {
@@ -73,10 +88,131 @@ public interface PatternProviderTarget {
         }
 
         if (!externalStorages.isEmpty()) {
-            return wrapMeStorage(new CompositeStorage(externalStorages), src);
+            PatternProviderTarget storageTarget = wrapMeStorage(new CompositeStorage(externalStorages), src);
+            for (Entry<AEKeyType, MEStorage> entry : externalStorages.entrySet()) {
+                externalTargets.put(entry.getKey(), storageTarget);
+            }
+        }
+
+        if (!externalTargets.isEmpty()) {
+            return wrapTargets(externalTargets);
         }
 
         return null;
+    }
+
+    static PatternProviderTarget wrapTargets(Reference2ObjectMap<AEKeyType, PatternProviderTarget> targets) {
+        return new PatternProviderTarget() {
+            @Override
+            public long insert(AEKey what, long amount, Actionable type) {
+                return insert(what, amount, type, PatternProviderInsertionMode.DEFAULT);
+            }
+
+            @Override
+            public long insert(AEKey what, long amount, Actionable type, PatternProviderInsertionMode insertionMode) {
+                PatternProviderTarget target = targets.get(what.getType());
+                return target == null ? 0 : target.insert(what, amount, type, insertionMode);
+            }
+
+            @Override
+            public boolean containsPatternInput(Set<AEKey> patternInputs) {
+                for (PatternProviderTarget target : targets.values()) {
+                    if (target.containsPatternInput(patternInputs)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public boolean containsAnyStack() {
+                for (PatternProviderTarget target : targets.values()) {
+                    if (target.containsAnyStack()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public boolean hasEmptySlots() {
+                for (PatternProviderTarget target : targets.values()) {
+                    if (target.hasEmptySlots()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
+    }
+
+    static PatternProviderTarget wrapItemHandler(IItemHandler handler) {
+        return new PatternProviderTarget() {
+            @Override
+            public long insert(AEKey what, long amount, Actionable type) {
+                return insert(what, amount, type, PatternProviderInsertionMode.DEFAULT);
+            }
+
+            @Override
+            public long insert(AEKey what, long amount, Actionable type, PatternProviderInsertionMode insertionMode) {
+                if (!(what instanceof AEItemKey itemKey)) {
+                    return 0;
+                }
+
+                if (type == Actionable.SIMULATE) {
+                    int requestAmount = (int) Math.min(amount, Integer.MAX_VALUE);
+                    ItemStack input = itemKey.toStack(requestAmount);
+                    ItemStack remaining = PatternProviderTargetCache.insertIntoItemHandler(handler, input, true,
+                        insertionMode);
+                    return requestAmount - remaining.getCount();
+                }
+
+                long remainingAmount = amount;
+                while (remainingAmount > 0) {
+                    int requestAmount = (int) Math.min(remainingAmount, Integer.MAX_VALUE);
+                    ItemStack input = itemKey.toStack(requestAmount);
+                    ItemStack remaining = PatternProviderTargetCache.insertIntoItemHandler(handler, input, false,
+                        insertionMode);
+                    long inserted = requestAmount - remaining.getCount();
+                    if (inserted <= 0) {
+                        break;
+                    }
+                    remainingAmount -= inserted;
+                }
+                return amount - remainingAmount;
+            }
+
+            @Override
+            public boolean containsPatternInput(Set<AEKey> patternInputs) {
+                for (int slot = 0; slot < handler.getSlots(); slot++) {
+                    AEItemKey what = AEItemKey.of(handler.getStackInSlot(slot));
+                    if (what != null && patternInputs.contains(what.dropSecondary())) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public boolean containsAnyStack() {
+                for (int slot = 0; slot < handler.getSlots(); slot++) {
+                    if (!handler.getStackInSlot(slot).isEmpty()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public boolean hasEmptySlots() {
+                for (int slot = 0; slot < handler.getSlots(); slot++) {
+                    if (handler.getStackInSlot(slot).isEmpty()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
     }
 
     static PatternProviderTarget wrapMeStorage(MEStorage storage, IActionSource src) {

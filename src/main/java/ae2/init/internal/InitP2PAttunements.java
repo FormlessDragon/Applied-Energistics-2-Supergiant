@@ -43,6 +43,7 @@ public final class InitP2PAttunements {
         P2PTunnelAttunement.registerAttunementTag(AEPartIds.ITEM_P2P_TUNNEL, true);
         P2PTunnelAttunement.registerAttunementTag(AEPartIds.IC2_P2P_TUNNEL, true);
         P2PTunnelAttunement.registerAttunementTag(AEPartIds.LIGHT_P2P_TUNNEL);
+        P2PTunnelAttunement.registerAttunementTag(AEPartIds.PATTERN_PROVIDER_P2P_TUNNEL, true);
         registerTagAttunementBridges();
         Integrations.ic2().registerP2PAttunements();
 
@@ -109,6 +110,10 @@ public final class InitP2PAttunements {
         String lightTunnelTag = P2PTunnelAttunement.getAttunementTag(AEPartIds.LIGHT_P2P_TUNNEL);
         registerOre(lightTunnelTag, new ResourceLocation("minecraft", "torch"));
         registerOre(lightTunnelTag, new ResourceLocation("minecraft", "glowstone"));
+
+        String patternProviderTunnelTag = P2PTunnelAttunement.getAttunementTag(AEPartIds.PATTERN_PROVIDER_P2P_TUNNEL);
+        registerOre(patternProviderTunnelTag, AEBlockIds.PATTERN_PROVIDER);
+        registerOre(patternProviderTunnelTag, AEPartIds.PATTERN_PROVIDER);
     }
 
     private static void registerOre(String oreName, ResourceLocation itemId) {

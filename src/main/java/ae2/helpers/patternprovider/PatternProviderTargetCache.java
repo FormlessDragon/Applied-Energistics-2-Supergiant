@@ -29,7 +29,6 @@ import ae2.api.stacks.AEKeyType;
 import ae2.api.storage.MEStorage;
 import ae2.me.storage.CompositeStorage;
 import ae2.parts.automation.StackWorldBehaviors;
-import com.google.common.primitives.Ints;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
@@ -197,10 +196,25 @@ class PatternProviderTargetCache {
                     return 0;
                 }
 
-                ItemStack input = itemKey.toStack(Ints.saturatedCast(amount));
-                ItemStack remaining = insertIntoItemHandler(handler, input, type == Actionable.SIMULATE,
-                    insertionMode);
-                return amount - remaining.getCount();
+                if (type == Actionable.SIMULATE) {
+                    int requestAmount = (int) Math.min(amount, Integer.MAX_VALUE);
+                    ItemStack input = itemKey.toStack(requestAmount);
+                    ItemStack remaining = insertIntoItemHandler(handler, input, true, insertionMode);
+                    return requestAmount - remaining.getCount();
+                }
+
+                long remainingAmount = amount;
+                while (remainingAmount > 0) {
+                    int requestAmount = (int) Math.min(remainingAmount, Integer.MAX_VALUE);
+                    ItemStack input = itemKey.toStack(requestAmount);
+                    ItemStack remaining = insertIntoItemHandler(handler, input, false, insertionMode);
+                    long inserted = requestAmount - remaining.getCount();
+                    if (inserted <= 0) {
+                        break;
+                    }
+                    remainingAmount -= inserted;
+                }
+                return amount - remainingAmount;
             }
 
             @Override
