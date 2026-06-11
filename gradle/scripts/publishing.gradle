@@ -1,10 +1,31 @@
 apply from: 'gradle/scripts/helpers.gradle'
 
 setDefaultProperty('publish_to_maven', true, false)
+setDefaultProperty('maven_group', false, propertyString('root_package'))
+setDefaultProperty('maven_artifact_id', false, propertyString('mod_id'))
+setDefaultProperty('maven_developer_id', false, 'Circulate233')
+setDefaultProperty('maven_developer_name', false, 'Circulate233')
+setDefaultProperty('maven_license_name', false, propertyString('mod_license'))
+setDefaultProperty('maven_license_url', false, 'https://www.gnu.org/licenses/lgpl-3.0.txt')
+setDefaultProperty('maven_scm_url', false, propertyString('mod_url'))
 
 if (propertyBool('publish_to_maven')) {
     assertProperty('maven_name')
     assertProperty('maven_url')
+    assertProperty('maven_group')
+    assertProperty('maven_artifact_id')
+    assertProperty('maven_developer_id')
+    assertProperty('maven_developer_name')
+    assertProperty('maven_license_name')
+    assertProperty('maven_license_url')
+    assertProperty('maven_scm_url')
+    assertProperty('signingInMemoryKey')
+    assertProperty('signingInMemoryKeyPassword')
+
+    def publishMainJarTask = propertyBool('enable_shadow') ? 'remapShadowJar' : 'remapJar'
+    def scmUrl = propertyString('maven_scm_url')
+    def scmConnectionUrl = scmUrl.endsWith('.git') ? scmUrl : "${scmUrl}.git"
+
     publishing {
         repositories {
             maven {
@@ -15,17 +36,44 @@ if (propertyBool('publish_to_maven')) {
         }
         publications {
             mavenJava(MavenPublication) {
-                from components.java // Publish with standard artifacts
-                setGroupId(propertyString('root_package'))// Publish with root package as maven group
-                setArtifactId(propertyString('mod_id')) // Publish artifacts with mod id as the artifact id
+                from components.java
+                artifact(tasks.named(publishMainJarTask)) {
+                    classifier = null
+                }
+                setGroupId(propertyString('maven_group'))
+                setArtifactId(propertyString('maven_artifact_id'))
 
-                // Custom artifact:
-                // If you want to publish a different artifact to the one outputted when building normally
-                // Create a different gradle task (Jar task), in extra.gradle
-                // Remove the 'from components.java' line above
-                // Add this line (change the task name):
-                // artifacts task_name
+                pom {
+                    name = propertyString('mod_name')
+                    description = propertyString('mod_description')
+                    url = propertyString('mod_url')
+                    licenses {
+                        license {
+                            name = propertyString('maven_license_name')
+                            url = propertyString('maven_license_url')
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = propertyString('maven_developer_id')
+                            name = propertyString('maven_developer_name')
+                        }
+                    }
+                    scm {
+                        url = scmUrl
+                        connection = "scm:git:${scmConnectionUrl}"
+                        developerConnection = "scm:git:${scmConnectionUrl}"
+                    }
+                }
             }
         }
+    }
+
+    signing {
+        useInMemoryPgpKeys(
+                propertyString('signingInMemoryKey'),
+                propertyString('signingInMemoryKeyPassword')
+        )
+        sign publishing.publications.mavenJava
     }
 }
