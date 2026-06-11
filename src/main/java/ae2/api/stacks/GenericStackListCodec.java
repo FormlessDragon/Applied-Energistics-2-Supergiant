@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Objects;
 
 final class GenericStackListCodec {
+    private static final int MAX_STACK_LIST_ENTRIES = 1024;
+
     private GenericStackListCodec() {
     }
 
@@ -26,8 +28,9 @@ final class GenericStackListCodec {
     public static List<@Nullable GenericStack> decode(NBTTagList input) {
         Objects.requireNonNull(input, "input");
 
-        List<GenericStack> output = new ObjectArrayList<>(input.tagCount());
-        for (int i = 0; i < input.tagCount(); i++) {
+        int count = Math.min(input.tagCount(), MAX_STACK_LIST_ENTRIES);
+        List<GenericStack> output = new ObjectArrayList<>(count);
+        for (int i = 0; i < count; i++) {
             var tag = input.getCompoundTagAt(i);
             try {
                 output.add(GenericStack.readTag(tag));

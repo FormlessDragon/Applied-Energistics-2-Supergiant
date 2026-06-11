@@ -26,7 +26,8 @@ public final class SpinMapping {
     }
 
     public static EnumFacing getUpFromSpin(EnumFacing facing, int spin) {
-        return SPIN_DIRECTIONS[facing.ordinal()][spin];
+        var spinDirs = SPIN_DIRECTIONS[facing.ordinal()];
+        return spinDirs[Math.floorMod(spin, spinDirs.length)];
     }
 }
 

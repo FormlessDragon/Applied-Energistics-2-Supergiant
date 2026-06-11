@@ -7,9 +7,9 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.model.IModelState;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.function.Function;
@@ -24,8 +24,8 @@ public class WrappedGenericStackModel implements BasicUnbakedModel {
 
     @Nullable
     @Override
-    public IBakedModel bake(@Nonnull IModelState state, @Nonnull VertexFormat format,
-                            @Nonnull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
+    public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
+                            @NotNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         return new WrappedGenericStackBakedModel(format, state, bakedTextureGetter.apply(PARTICLE));
     }
 }

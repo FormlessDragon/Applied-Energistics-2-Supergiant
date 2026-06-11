@@ -26,6 +26,8 @@ import ae2.container.networking.INetworkStatusContainer;
 import ae2.container.networking.NetworkStatus;
 import ae2.core.network.clientbound.NetworkStatusPacket;
 import ae2.items.contents.NetworkToolGuiHost;
+import ae2.me.Grid;
+import ae2.server.Commands;
 import ae2.server.subcommands.GridsCommand;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.EnumFacing;
@@ -103,7 +105,7 @@ public class ContainerNetworkStatus extends AEBaseContainer implements INetworkS
             return;
         }
 
-        if (this.grid instanceof ae2.me.Grid meGrid) {
+        if (this.grid instanceof Grid meGrid) {
             var server = getPlayerInventory().player.getServer();
             if (server != null) {
                 String commandLine = GridsCommand.buildExportCommand(meGrid.getSerialNumber());
@@ -124,7 +126,7 @@ public class ContainerNetworkStatus extends AEBaseContainer implements INetworkS
     }
 
     private boolean computeCanExportGrid() {
-        if (!(this.grid instanceof ae2.me.Grid)) {
+        if (!(this.grid instanceof Grid)) {
             return false;
         }
 
@@ -134,7 +136,7 @@ public class ContainerNetworkStatus extends AEBaseContainer implements INetworkS
             return false;
         }
 
-        return player.canUseCommand(ae2.server.Commands.GRIDS.level,
-            ae2.server.Commands.GRIDS.getName());
+        return player.canUseCommand(Commands.GRIDS.level,
+            Commands.GRIDS.getName());
     }
 }

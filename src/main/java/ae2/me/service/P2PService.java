@@ -32,11 +32,10 @@ import ae2.parts.p2p.MEP2PTunnelPart;
 import ae2.parts.p2p.P2PTunnelPart;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
-import it.unimi.dsi.fastutil.shorts.Short2ObjectMap;
-import it.unimi.dsi.fastutil.shorts.Short2ObjectOpenHashMap;
 import net.minecraft.nbt.NBTTagCompound;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collection;
 import java.util.Random;
 import java.util.stream.Stream;
 
@@ -53,7 +52,7 @@ public class P2PService implements IGridService, IGridServiceProvider {
     }
 
     private final IGrid myGrid;
-    private final Short2ObjectMap<P2PTunnelPart<?>> inputs = new Short2ObjectOpenHashMap<>();
+    private final Multimap<Short, P2PTunnelPart<?>> inputs = LinkedHashMultimap.create();
     private final Multimap<Short, P2PTunnelPart<?>> outputs = LinkedHashMultimap.create();
     private final Random frequencyGenerator;
 
@@ -85,7 +84,7 @@ public class P2PService implements IGridService, IGridServiceProvider {
             if (tunnel.isOutput()) {
                 this.outputs.remove(tunnel.getFrequency(), tunnel);
             } else {
-                this.inputs.remove(tunnel.getFrequency());
+                this.inputs.remove(tunnel.getFrequency(), tunnel);
             }
 
             this.updateTunnel(tunnel.getFrequency(), !tunnel.isOutput(), false);
@@ -104,11 +103,18 @@ public class P2PService implements IGridService, IGridServiceProvider {
             if (tunnel.isOutput()) {
                 this.outputs.put(tunnel.getFrequency(), tunnel);
             } else {
-                this.inputs.put(tunnel.getFrequency(), tunnel);
+                this.addInput(tunnel);
             }
 
             this.updateTunnel(tunnel.getFrequency(), !tunnel.isOutput(), false);
         }
+    }
+
+    private void addInput(P2PTunnelPart<?> tunnel) {
+        if (!tunnel.supportsMultipleInputs()) {
+            this.inputs.removeAll(tunnel.getFrequency());
+        }
+        this.inputs.put(tunnel.getFrequency(), tunnel);
     }
 
     private void updateTunnel(short freq, boolean updateOutputs, boolean configChange) {
@@ -121,8 +127,7 @@ public class P2PService implements IGridService, IGridServiceProvider {
             }
         }
         if (!updateOutputs) {
-            final P2PTunnelPart<?> in = this.inputs.get(freq);
-            if (in != null) {
+            for (P2PTunnelPart<?> in : this.inputs.get(freq)) {
                 if (configChange) {
                     in.onTunnelConfigChange();
                 }
@@ -137,7 +142,7 @@ public class P2PService implements IGridService, IGridServiceProvider {
         }
 
         if (this.inputs.containsValue(t)) {
-            this.inputs.remove(t.getFrequency());
+            this.inputs.remove(t.getFrequency(), t);
         }
 
         final short oldFrequency = t.getFrequency();
@@ -146,7 +151,7 @@ public class P2PService implements IGridService, IGridServiceProvider {
         if (t.isOutput()) {
             this.outputs.put(t.getFrequency(), t);
         } else {
-            this.inputs.put(t.getFrequency(), t);
+            this.addInput(t);
         }
 
         if (oldFrequency != newFrequency) {
@@ -175,8 +180,7 @@ public class P2PService implements IGridService, IGridServiceProvider {
 
     public <T extends P2PTunnelPart<T>> Stream<T> getOutputs(short freq, Class<T> c) {
         // Check that a matching input exists for the requested type
-        final P2PTunnelPart<?> input = this.inputs.get(freq);
-        if (!c.isInstance(input)) {
+        if (this.inputs.get(freq).stream().noneMatch(c::isInstance)) {
             return Stream.empty();
         }
 
@@ -187,6 +191,14 @@ public class P2PService implements IGridService, IGridServiceProvider {
     }
 
     public P2PTunnelPart<?> getInput(short freq) {
-        return this.inputs.get(freq);
+        Collection<P2PTunnelPart<?>> matchingInputs = this.inputs.get(freq);
+        return matchingInputs.isEmpty() ? null : matchingInputs.iterator().next();
+    }
+
+    public <T extends P2PTunnelPart<T>> Stream<T> getInputs(short freq, Class<T> c) {
+        return this.inputs.get(freq)
+                          .stream()
+                          .filter(c::isInstance)
+                          .map(c::cast);
     }
 }

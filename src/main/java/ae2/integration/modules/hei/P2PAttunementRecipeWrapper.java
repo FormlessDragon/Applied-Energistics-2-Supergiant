@@ -8,6 +8,7 @@ import mezz.jei.api.recipe.IRecipeWrapper;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraftforge.oredict.OreDictionary;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Collections;
@@ -37,9 +38,9 @@ class P2PAttunementRecipeWrapper implements IRecipeWrapper {
     }
 
     static P2PAttunementRecipeWrapper forTag(String oreName, Item output) {
-        List<ItemStack> inputs = net.minecraftforge.oredict.OreDictionary.getOres(oreName).stream()
-                                                                         .map(ItemStack::copy)
-                                                                         .toList();
+        List<ItemStack> inputs = OreDictionary.getOres(oreName).stream()
+                                              .map(ItemStack::copy)
+                                              .toList();
         return new P2PAttunementRecipeWrapper(inputs, output, List.of(
             ItemModText.P2P_TAG_ATTUNEMENT.getLocal()));
     }

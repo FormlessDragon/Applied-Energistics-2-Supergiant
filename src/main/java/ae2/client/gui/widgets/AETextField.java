@@ -73,7 +73,7 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
      * Displayed with a muted text color when the text box is unfocused and has no content.
      */
     @Nullable
-    private ITextComponent placeholder;
+    private String placeholder;
 
     /**
      * Uses the values to instantiate a padded version of a text field. Pays attention to the '_' caret.
@@ -251,7 +251,7 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
             super.drawTextBox();
 
             if (this.placeholder != null && !this.isFocused() && this.getText().isEmpty()) {
-                this.fontRenderer.drawString(this.placeholder.getFormattedText(), this.x, this.y,
+                this.fontRenderer.drawString(this.placeholder, this.x, this.y,
                     this.style.getColor(PaletteColor.TEXTFIELD_PLACEHOLDER).toARGB());
             }
         } finally {
@@ -323,6 +323,10 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
     }
 
     public void setPlaceholder(@Nullable ITextComponent placeholder) {
+        this.placeholder = placeholder == null ? null : placeholder.getFormattedText();
+    }
+
+    public void setPlaceholder(@Nullable String placeholder) {
         this.placeholder = placeholder;
     }
 

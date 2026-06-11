@@ -31,6 +31,7 @@ import ae2.items.parts.PartModels;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
@@ -66,34 +67,39 @@ public class LightP2PTunnelPart extends P2PTunnelPart<LightP2PTunnelPart> implem
         }
     }
 
-    @Override
-    public void writeToStream(PacketBuffer data) {
-        super.writeToStream(data);
-        data.writeInt(this.isOutput() ? this.lastValue : 0);
+    static void writeLightState(PacketBuffer data, boolean output, int lastValue, int opacity) {
+        data.writeBoolean(output);
+        data.writeInt(lastValue);
+        data.writeInt(opacity);
     }
 
-    @Override
-    public boolean readFromStream(PacketBuffer data) {
-        boolean changed = super.readFromStream(data);
-        final int oldValue = this.lastValue;
-
-        this.lastValue = data.readInt();
-
-        this.setOutput(this.lastValue > 0);
-        return changed || this.lastValue != oldValue;
+    static LightState readLightState(PacketBuffer data) {
+        return new LightState(data.readBoolean(), data.readInt(), data.readInt());
     }
 
     private boolean doWork() {
+        return this.pollInputLightAndPropagate(false);
+    }
+
+    private boolean pollInputLightAndPropagate(boolean forcePropagation) {
         if (this.isOutput()) {
             return false;
         }
 
         final TileEntity te = this.getTileEntity();
         final World level = te.getWorld();
-        final int newLevel = level.getLightFromNeighbors(te.getPos().offset(this.getSide()));
-
-        if (this.lastValue != newLevel && this.getMainNode().isActive()) {
+        EnumFacing side = this.getSide();
+        if (side == null) {
+            return false;
+        }
+        final int newLevel = level.getLightFromNeighbors(te.getPos().offset(side));
+        boolean changed = this.lastValue != newLevel;
+        if (changed) {
             this.lastValue = newLevel;
+            this.getHost().markForSave();
+        }
+
+        if ((changed || forcePropagation) && this.getMainNode().isActive()) {
             for (LightP2PTunnelPart out : this.getOutputs()) {
                 out.setLightLevel(this.lastValue);
             }
@@ -104,7 +110,8 @@ public class LightP2PTunnelPart extends P2PTunnelPart<LightP2PTunnelPart> implem
 
     @Override
     public void onNeighborChanged(IBlockAccess level, BlockPos pos, BlockPos neighbor) {
-        if (this.isOutput() && pos.offset(this.getSide()).equals(neighbor)) {
+        EnumFacing side = this.getSide();
+        if (this.isOutput() && side != null && pos.offset(side).equals(neighbor)) {
             this.opacity = -1;
             this.getHost().markForUpdate();
         } else {
@@ -121,9 +128,25 @@ public class LightP2PTunnelPart extends P2PTunnelPart<LightP2PTunnelPart> implem
         return 0;
     }
 
-    private void setLightLevel(int out) {
-        this.lastValue = out;
-        this.getHost().markForUpdate();
+    @Override
+    public void writeToStream(PacketBuffer data) {
+        super.writeToStream(data);
+        writeLightState(data, this.isOutput(), this.isOutput() ? this.lastValue : 0, this.opacity);
+    }
+
+    @Override
+    public boolean readFromStream(PacketBuffer data) {
+        boolean changed = super.readFromStream(data);
+        final int oldValue = this.lastValue;
+        final int oldOpacity = this.opacity;
+        final boolean oldOutput = this.isOutput();
+
+        LightState state = readLightState(data);
+        this.lastValue = state.lastValue();
+        this.opacity = state.opacity();
+
+        this.setOutput(state.output());
+        return changed || this.lastValue != oldValue || this.opacity != oldOpacity || this.isOutput() != oldOutput;
     }
 
     private int blockLight(int emit) {
@@ -131,7 +154,11 @@ public class LightP2PTunnelPart extends P2PTunnelPart<LightP2PTunnelPart> implem
             TileEntity be = getHost().getTileEntity();
             World level = be.getWorld();
             BlockPos pos = be.getPos();
-            this.opacity = level.getLightFromNeighbors(pos.offset(getSide()));
+            EnumFacing side = getSide();
+            if (side == null) {
+                return 0;
+            }
+            this.opacity = level.getLightFromNeighbors(pos.offset(side));
         }
 
         return Math.max(0, emit - this.opacity);
@@ -164,7 +191,7 @@ public class LightP2PTunnelPart extends P2PTunnelPart<LightP2PTunnelPart> implem
                 this.getHost().markForUpdate();
             }
         } else {
-            this.doWork();
+            this.pollInputLightAndPropagate(true);
         }
     }
 
@@ -181,6 +208,36 @@ public class LightP2PTunnelPart extends P2PTunnelPart<LightP2PTunnelPart> implem
     @Override
     public IPartModel getStaticModels() {
         return MODELS.getModel(this.isPowered(), this.isActive());
+    }
+
+    private void setLightLevel(int out) {
+        boolean changed = this.lastValue != out || this.opacity != -1;
+        this.lastValue = out;
+        this.opacity = -1;
+        if (changed) {
+            this.getHost().markForSave();
+            this.getHost().markForUpdate();
+            refreshOutputLight();
+        }
+    }
+
+    private void refreshOutputLight() {
+        TileEntity tile = getHost().getTileEntity();
+        if (tile == null || tile.getWorld() == null || tile.getWorld().isRemote) {
+            return;
+        }
+
+        World level = tile.getWorld();
+        BlockPos pos = tile.getPos();
+        level.checkLight(pos);
+
+        EnumFacing side = getSide();
+        if (side != null) {
+            level.checkLight(pos.offset(side));
+        }
+    }
+
+    record LightState(boolean output, int lastValue, int opacity) {
     }
 }
 

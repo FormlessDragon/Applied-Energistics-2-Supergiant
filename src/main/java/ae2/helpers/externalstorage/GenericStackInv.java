@@ -132,6 +132,11 @@ public class GenericStackInv implements MEStorage, GenericInternalInventory {
         }
     }
 
+    private static long saturatingAdd(long left, long right) {
+        long result = left + right;
+        return result < 0 ? Long.MAX_VALUE : result;
+    }
+
     @Override
     public long insert(int slot, AEKey what, long amount, Actionable mode) {
         Objects.requireNonNull(what, "what");
@@ -144,7 +149,7 @@ public class GenericStackInv implements MEStorage, GenericInternalInventory {
         var currentWhat = getKey(slot);
         var currentAmount = getAmount(slot);
         if (currentWhat == null || currentWhat.equals(what)) {
-            var newAmount = Math.min(currentAmount + amount, getMaxAmount(what));
+            var newAmount = Math.min(saturatingAdd(currentAmount, amount), getMaxAmount(what));
             if (newAmount > currentAmount) {
                 if (mode == Actionable.MODULATE) {
                     setStack(slot, new GenericStack(what, newAmount));
@@ -213,8 +218,8 @@ public class GenericStackInv implements MEStorage, GenericInternalInventory {
     }
 
     public void useRegisteredCapacities() {
-        for (var entry : GenericSlotCapacities.getMap().entrySet()) {
-            setCapacity(entry.getKey(), entry.getValue());
+        for (var entry : GenericSlotCapacities.getMap().reference2LongEntrySet()) {
+            setCapacity(entry.getKey(), entry.getLongValue());
         }
     }
 

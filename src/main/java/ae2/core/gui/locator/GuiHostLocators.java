@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketBuffer;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
@@ -16,13 +17,18 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 public final class GuiHostLocators {
+    private static final int MAX_LOCATOR_KEY_LENGTH = 256;
     private static final Map<String, Registration<?>> REGISTRY = new Object2ObjectOpenHashMap<>();
+    private static final Map<Class<? extends GuiHostLocator>, Registration<?>> REGISTRY_BY_CLASS =
+        new Object2ObjectOpenHashMap<>();
 
     static {
-        register(TileLocator.class, TileLocator::writeToPacket, TileLocator::readFromPacket);
-        register(PartLocator.class, PartLocator::writeToPacket, PartLocator::readFromPacket);
-        register(InventoryItemLocator.class, InventoryItemLocator::writeToPacket, InventoryItemLocator::readFromPacket);
-        register(BaublesItemLocator.class, BaublesItemLocator::writeToPacket, BaublesItemLocator::readFromPacket);
+        register("tile", TileLocator.class, TileLocator::writeToPacket, TileLocator::readFromPacket);
+        register("part", PartLocator.class, PartLocator::writeToPacket, PartLocator::readFromPacket);
+        register("inventory_item", InventoryItemLocator.class, InventoryItemLocator::writeToPacket,
+            InventoryItemLocator::readFromPacket);
+        register("baubles_item", BaublesItemLocator.class, BaublesItemLocator::writeToPacket,
+            BaublesItemLocator::readFromPacket);
     }
 
     private GuiHostLocators() {
@@ -31,36 +37,51 @@ public final class GuiHostLocators {
     public static synchronized <T extends GuiHostLocator> void register(Class<T> locatorClass,
                                                                         BiConsumer<T, PacketBuffer> packetWriter,
                                                                         Function<PacketBuffer, T> packetReader) {
-        String classKey = locatorClass.getName();
-        if (REGISTRY.containsKey(classKey)) {
-            throw new IllegalStateException("GuiHostLocator type " + classKey + " is already registered.");
-        }
-        REGISTRY.put(classKey, new Registration<>(packetWriter, packetReader));
+        register(locatorClass.getName(), locatorClass, packetWriter, packetReader);
     }
 
-    private static synchronized Registration<?> getRegistration(String classKey) {
-        var registration = REGISTRY.get(classKey);
+    public static synchronized <T extends GuiHostLocator> void register(String key, Class<T> locatorClass,
+                                                                        BiConsumer<T, PacketBuffer> packetWriter,
+                                                                        Function<PacketBuffer, T> packetReader) {
+        if (key.length() > MAX_LOCATOR_KEY_LENGTH) {
+            throw new IllegalArgumentException("GuiHostLocator key " + key + " is too long.");
+        }
+        if (REGISTRY.containsKey(key)) {
+            throw new IllegalStateException("GuiHostLocator key " + key + " is already registered.");
+        }
+        if (REGISTRY_BY_CLASS.containsKey(locatorClass)) {
+            throw new IllegalStateException("GuiHostLocator type " + locatorClass + " is already registered.");
+        }
+        var registration = new Registration<>(key, packetWriter, packetReader);
+        REGISTRY.put(key, registration);
+        REGISTRY_BY_CLASS.put(locatorClass, registration);
+    }
+
+    private static synchronized Registration<?> getRegistration(String locatorKey) {
+        var registration = REGISTRY.get(locatorKey);
         if (registration == null) {
-            throw new IllegalArgumentException("Unregistered container locator class: " + classKey);
+            throw new IllegalArgumentException("Unregistered container locator key: " + locatorKey);
         }
         return registration;
     }
 
     @SuppressWarnings("unchecked")
     public static <T extends GuiHostLocator> void writeToPacket(PacketBuffer buf, T locator) {
-        var classKey = locator.getClass().getName();
-        var registration = (Registration<T>) getRegistration(classKey);
-        buf.writeString(classKey);
+        var registration = (Registration<T>) REGISTRY_BY_CLASS.get(locator.getClass());
+        if (registration == null) {
+            throw new IllegalArgumentException("Unregistered container locator class: " + locator.getClass());
+        }
+        buf.writeString(registration.key);
         registration.writeToPacket.accept(locator, buf);
     }
 
     public static GuiHostLocator readFromPacket(PacketBuffer buf) {
-        var classKey = buf.readString(32767);
-        var registration = getRegistration(classKey);
+        var locatorKey = buf.readString(MAX_LOCATOR_KEY_LENGTH);
+        var registration = getRegistration(locatorKey);
         return registration.readFromPacket.apply(buf);
     }
 
-    public static GuiHostLocator forTile(net.minecraft.tileentity.TileEntity tileEntity) {
+    public static GuiHostLocator forTile(TileEntity tileEntity) {
         if (tileEntity.getWorld() == null) {
             throw new IllegalArgumentException("Cannot open a tile entity that is not in a world");
         }
@@ -121,6 +142,7 @@ public final class GuiHostLocators {
     }
 
     private record Registration<T extends GuiHostLocator>(
+        String key,
         BiConsumer<T, PacketBuffer> writeToPacket,
         Function<PacketBuffer, T> readFromPacket) {
     }

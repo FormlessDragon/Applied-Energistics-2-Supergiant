@@ -10,6 +10,7 @@ import ae2.api.storage.cells.IBasicCellItem;
 import ae2.api.upgrades.IUpgradeInventory;
 import ae2.api.upgrades.UpgradeInventories;
 import ae2.api.upgrades.Upgrades;
+import ae2.container.GuiIds;
 import ae2.core.AppEng;
 import ae2.items.contents.CellConfig;
 import ae2.items.storage.StorageTier;
@@ -30,7 +31,7 @@ public class PortableCellItem extends AbstractPortableCell implements IBasicCell
     private final AEKeyType keyType;
     private final int totalTypes;
 
-    public PortableCellItem(AEKeyType keyType, int totalTypes, ae2.container.GuiIds.GuiKey guiKey, StorageTier tier,
+    public PortableCellItem(AEKeyType keyType, int totalTypes, GuiIds.GuiKey guiKey, StorageTier tier,
                             double powerCapacity, int defaultColor) {
         super(guiKey, powerCapacity, defaultColor);
         this.setMaxStackSize(1);

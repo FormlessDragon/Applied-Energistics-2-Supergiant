@@ -22,6 +22,7 @@ import ae2.items.tools.powered.powersink.AEBasePoweredItem;
 import ae2.recipes.AERecipeTypes;
 import ae2.recipes.game.StorageCellUpgradeRecipe;
 import ae2.recipes.quartzcutting.QuartzCuttingRecipe;
+import ae2.tile.misc.TileCondenser;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import mezz.jei.api.IJeiRuntime;
 import mezz.jei.api.IModPlugin;
@@ -232,7 +233,7 @@ public class HeiPlugin implements IModPlugin {
         if (stack.isEmpty() || !(stack.getItem() instanceof StorageComponentItem storageComponent)) {
             return;
         }
-        if (storageComponent.getBytes(stack) * ae2.tile.misc.TileCondenser.BYTE_MULTIPLIER
+        if (storageComponent.getBytes(stack) * TileCondenser.BYTE_MULTIPLIER
             >= CondenserOutput.MATTER_BALLS.requiredPower) {
             viableComponents.add(stack);
         }

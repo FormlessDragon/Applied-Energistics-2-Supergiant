@@ -219,6 +219,15 @@ public final class Icon {
 
     public static final Icon ENABLED = registerBuiltin("enabled", 16, 16);
     public static final Icon DISABLED = registerBuiltin("disabled", 16, 16);
+    public static final Icon ADVANCED_MEMORY_CARD_BIND_OUTPUT = registerBuiltin("advanced_memory_card_bind_output", 16, 16);
+    public static final Icon ADVANCED_MEMORY_CARD_BIND_INPUT = registerBuiltin("advanced_memory_card_bind_input", 16, 16);
+    public static final Icon ADVANCED_MEMORY_CARD_COPY_OUTPUT = registerBuiltin("advanced_memory_card_copy_output", 16, 16);
+    public static final Icon ADVANCED_MEMORY_CARD_DELETE_BINDING = registerBuiltin("advanced_memory_card_delete_binding", 16, 16);
+    public static final Icon ADVANCED_MEMORY_CARD_REFRESH = registerBuiltin("advanced_memory_card_refresh", 16, 16);
+    public static final Icon ADVANCED_MEMORY_CARD_INPUT = registerBuiltin("advanced_memory_card_input", 16, 16);
+    public static final Icon ADVANCED_MEMORY_CARD_OUTPUT = registerBuiltin("advanced_memory_card_output", 16, 16);
+    public static final Icon ADVANCED_MEMORY_CARD_BOUND = registerBuiltin("advanced_memory_card_bound", 16, 16);
+    public static final Icon ADVANCED_MEMORY_CARD_UNBOUND = registerBuiltin("advanced_memory_card_unbound", 16, 16);
     public static final Icon PATTERN_PROVIDER_HIGHLIGHT = registerBuiltin("pattern_provider_highlight", 6, 11);
     public static final Icon PATTERN_PROVIDER_RENAME = registerBuiltin("pattern_provider_rename", 6, 11);
 

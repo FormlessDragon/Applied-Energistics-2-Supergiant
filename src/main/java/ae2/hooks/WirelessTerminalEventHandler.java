@@ -2,11 +2,13 @@ package ae2.hooks;
 
 import ae2.helpers.WirelessTerminalActions;
 import net.minecraft.entity.item.EntityItem;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemArrow;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.world.World;
 import net.minecraftforge.event.entity.living.LivingEntityUseItemEvent;
 import net.minecraftforge.event.entity.player.ArrowLooseEvent;
 import net.minecraftforge.event.entity.player.ArrowNockEvent;
@@ -22,6 +24,9 @@ public class WirelessTerminalEventHandler {
     private static final double MAGNET_RANGE = 8.0;
 
     private static void restockHeldItem(EntityPlayerMP player, EnumHand hand, ItemStack original) {
+        if (hand == null || original == null || original.isEmpty()) {
+            return;
+        }
         ItemStack item = original.copy();
         WirelessTerminalActions.restockStack(player, item, player.getHeldItem(hand),
             stack -> player.setHeldItem(hand, stack));
@@ -48,10 +53,16 @@ public class WirelessTerminalEventHandler {
         }
     }
 
+    private static boolean isServerPlayer(EntityPlayer player) {
+        World world = player != null ? player.world : null;
+        return world != null && !world.isRemote && player instanceof EntityPlayerMP;
+    }
+
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.player.world.isRemote
-            || !(event.player instanceof EntityPlayerMP player)) {
+        EntityPlayer playerEntity = event.player;
+        if (event.phase != TickEvent.Phase.END || !isServerPlayer(playerEntity)
+            || !(playerEntity instanceof EntityPlayerMP player)) {
             return;
         }
 
@@ -73,7 +84,9 @@ public class WirelessTerminalEventHandler {
 
     @SubscribeEvent
     public void onItemPickup(EntityItemPickupEvent event) {
-        if (event.getEntityPlayer().world.isRemote || !(event.getEntityPlayer() instanceof EntityPlayerMP player)) {
+        EntityPlayer playerEntity = event.getEntityPlayer();
+        if (!isServerPlayer(playerEntity) || !(playerEntity instanceof EntityPlayerMP player)
+            || event.getItem() == null) {
             return;
         }
         if (WirelessTerminalActions.tryPickupToME(player, event.getItem()) && event.getItem().isDead) {
@@ -83,7 +96,7 @@ public class WirelessTerminalEventHandler {
 
     @SubscribeEvent
     public void onItemUseFinish(LivingEntityUseItemEvent.Finish event) {
-        if (event.getEntityLiving().world.isRemote || !(event.getEntityLiving() instanceof EntityPlayerMP player)) {
+        if (!(event.getEntityLiving() instanceof EntityPlayerMP player) || !isServerPlayer(player)) {
             return;
         }
         ItemStack original = event.getItem().copy();
@@ -92,8 +105,10 @@ public class WirelessTerminalEventHandler {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-        if (event.isCanceled() || event.getWorld().isRemote
-            || !(event.getEntityPlayer() instanceof EntityPlayerMP player)) {
+        EntityPlayer playerEntity = event.getEntityPlayer();
+        World world = event.getWorld();
+        if (event.isCanceled() || world == null || world.isRemote || !isServerPlayer(playerEntity)
+            || !(playerEntity instanceof EntityPlayerMP player)) {
             return;
         }
         restockHeldItem(player, event.getHand(), event.getItemStack());
@@ -101,8 +116,10 @@ public class WirelessTerminalEventHandler {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onEntityInteract(PlayerInteractEvent.EntityInteractSpecific event) {
-        if (event.isCanceled() || event.getWorld().isRemote
-            || !(event.getEntityPlayer() instanceof EntityPlayerMP player)) {
+        EntityPlayer playerEntity = event.getEntityPlayer();
+        World world = event.getWorld();
+        if (event.isCanceled() || world == null || world.isRemote || !isServerPlayer(playerEntity)
+            || !(playerEntity instanceof EntityPlayerMP player)) {
             return;
         }
         restockHeldItem(player, event.getHand(), event.getItemStack());
@@ -110,8 +127,8 @@ public class WirelessTerminalEventHandler {
 
     @SubscribeEvent
     public void onArrowNock(ArrowNockEvent event) {
-        if (!event.hasAmmo() || event.getEntityPlayer().world.isRemote
-            || !(event.getEntityPlayer() instanceof EntityPlayerMP player)) {
+        EntityPlayer playerEntity = event.getEntityPlayer();
+        if (!event.hasAmmo() || !isServerPlayer(playerEntity) || !(playerEntity instanceof EntityPlayerMP player)) {
             return;
         }
         restockProjectile(player);
@@ -119,8 +136,8 @@ public class WirelessTerminalEventHandler {
 
     @SubscribeEvent
     public void onArrowLoose(ArrowLooseEvent event) {
-        if (!event.hasAmmo() || event.getEntityPlayer().world.isRemote
-            || !(event.getEntityPlayer() instanceof EntityPlayerMP player)) {
+        EntityPlayer playerEntity = event.getEntityPlayer();
+        if (!event.hasAmmo() || !isServerPlayer(playerEntity) || !(playerEntity instanceof EntityPlayerMP player)) {
             return;
         }
         restockProjectile(player);

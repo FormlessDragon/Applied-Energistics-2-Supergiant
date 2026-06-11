@@ -25,8 +25,8 @@ public class GuiODStorageBus extends GuiSpecialStorageBus<ContainerODStorageBus>
         this.black.setMaxStringLength(1024);
         this.white.setText(container.whiteExpression);
         this.black.setText(container.blackExpression);
-        this.white.setPlaceholder(GuiText.ODFilterWhiteTooltip.text());
-        this.black.setPlaceholder(GuiText.ODFilterBlackTooltip.text());
+        this.white.setPlaceholder(GuiText.ODFilterWhiteTooltip.getLocal());
+        this.black.setPlaceholder(GuiText.ODFilterBlackTooltip.getLocal());
     }
 
     @Override

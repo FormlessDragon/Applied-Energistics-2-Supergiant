@@ -20,7 +20,7 @@ package ae2.client.gui.me.common;
 
 import ae2.container.me.common.GridInventoryEntry;
 import net.minecraft.item.ItemStack;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class RepoSlot extends ClientReadOnlySlot {
 

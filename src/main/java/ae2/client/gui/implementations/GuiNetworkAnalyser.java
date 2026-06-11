@@ -61,7 +61,7 @@ public class GuiNetworkAnalyser extends AEBaseGui<ContainerNetworkAnalyser> {
         this.widgets.add("color_window", this.colorWindow);
 
         loadConfig(container.getConfig());
-        InitNetwork.sendToServer(new AnalyserGenericPacket("update"));
+        InitNetwork.sendToServer(new AnalyserGenericPacket(this.container.windowId, "update"));
     }
 
     public void loadConfig(NetworkAnalyserConfig config) {
@@ -146,6 +146,6 @@ public class GuiNetworkAnalyser extends AEBaseGui<ContainerNetworkAnalyser> {
             new Reference2ObjectOpenHashMap<>(this.colors));
         NetworkDataHandler.updateConfig(config);
         getContainer().saveConfig(config);
-        InitNetwork.sendToServer(new NetworkConfigSavePacket(config));
+        InitNetwork.sendToServer(new NetworkConfigSavePacket(getContainer().windowId, config));
     }
 }

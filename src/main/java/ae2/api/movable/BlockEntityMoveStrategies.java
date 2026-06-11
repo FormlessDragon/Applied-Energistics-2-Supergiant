@@ -56,6 +56,7 @@ public final class BlockEntityMoveStrategies {
     public synchronized static void add(IBlockEntityMoveStrategy strategy) {
         Objects.requireNonNull(strategy, "handler");
         strategies.add(strategy);
+        valid.clear();
     }
 
     /**

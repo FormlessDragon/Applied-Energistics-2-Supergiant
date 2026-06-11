@@ -20,6 +20,8 @@ package ae2.spatial;
 
 import ae2.client.render.SpatialSkyRender;
 import ae2.init.worldgen.InitBiomes;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
@@ -32,7 +34,7 @@ import net.minecraft.world.gen.IChunkGenerator;
 import net.minecraftforge.client.IRenderHandler;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 
@@ -40,8 +42,7 @@ public class WorldProviderSpatial extends WorldProvider {
 
     private static final IRenderHandler NO_CLOUD_RENDERER = new IRenderHandler() {
         @Override
-        public void render(float partialTicks, net.minecraft.client.multiplayer.WorldClient world,
-                           net.minecraft.client.Minecraft mc) {
+        public void render(float partialTicks, WorldClient world, Minecraft mc) {
         }
     };
 

@@ -10,6 +10,7 @@ import ae2.container.slot.AppEngSlot;
 import ae2.container.slot.OutputSlot;
 import ae2.tile.misc.TileCrystalAssembler;
 import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.inventory.Slot;
 
 public class ContainerCrystalAssembler extends UpgradeableContainer<TileCrystalAssembler> implements IProgressProvider {
     private final AppEngSlot tankSlot;
@@ -60,7 +61,7 @@ public class ContainerCrystalAssembler extends UpgradeableContainer<TileCrystalA
         return this.autoExport;
     }
 
-    public boolean isTankSlot(net.minecraft.inventory.Slot slot) {
+    public boolean isTankSlot(Slot slot) {
         return slot == this.tankSlot;
     }
 }

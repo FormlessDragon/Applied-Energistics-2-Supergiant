@@ -38,6 +38,7 @@ import net.minecraftforge.event.entity.player.PlayerDestroyItemEvent;
 
 public class ContainerQuartzKnife extends AEBaseContainer {
     private static final String NAME_PRESS_NAME_TAG = "name_press_name";
+    private static final int MAX_NAME_LENGTH = 32;
     private final InternalInventory input = new AppEngInternalInventory(null, 1, 1);
     private String currentName = "";
 
@@ -52,6 +53,9 @@ public class ContainerQuartzKnife extends AEBaseContainer {
     }
 
     public void setName(String value) {
+        if (value != null && value.length() > MAX_NAME_LENGTH) {
+            return;
+        }
         this.currentName = value;
         if (isClientSide()) {
             sendClientAction("setName", value);

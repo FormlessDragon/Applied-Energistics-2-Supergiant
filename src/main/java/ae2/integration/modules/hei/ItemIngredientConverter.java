@@ -18,6 +18,10 @@ public final class ItemIngredientConverter implements IngredientConverter<ItemSt
     @Nullable
     @Override
     public ItemStack getIngredientFromStack(GenericStack stack) {
+        if (stack == null) {
+            return null;
+        }
+
         if (stack.what() instanceof AEItemKey itemKey) {
             return itemKey.toStack(Math.max(1, Ints.saturatedCast(stack.amount())));
         }

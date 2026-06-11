@@ -1,0 +1,15 @@
+{
+  "type": "forge:ore_shapeless",
+  "ingredients": [
+    {
+      "item": "ae2:memory_card"
+    },
+    {
+      "item": "ae2:network_tool"
+    }
+  ],
+  "result": {
+    "item": "ae2:advanced_memory_card",
+    "count": 1
+  }
+}

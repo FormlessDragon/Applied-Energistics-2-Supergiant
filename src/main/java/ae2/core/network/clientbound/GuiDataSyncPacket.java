@@ -13,6 +13,8 @@ import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
  * This packet is used to synchronize container-fields from server to client.
  */
 public class GuiDataSyncPacket extends ClientboundPacket {
+    private static final int MAX_PAYLOAD_BYTES = 1024 * 1024;
+
     private int windowId;
     private byte[] payload;
 
@@ -28,8 +30,18 @@ public class GuiDataSyncPacket extends ClientboundPacket {
     protected void read(ByteBuf buf) {
         this.windowId = buf.readInt();
         int length = buf.readInt();
+        if (length < 0 || length > MAX_PAYLOAD_BYTES || length > buf.readableBytes()) {
+            this.payload = null;
+            buf.skipBytes(buf.readableBytes());
+            return;
+        }
+
         this.payload = new byte[length];
         buf.readBytes(this.payload);
+        if (buf.isReadable()) {
+            this.payload = null;
+            buf.skipBytes(buf.readableBytes());
+        }
     }
 
     @Override
@@ -41,9 +53,10 @@ public class GuiDataSyncPacket extends ClientboundPacket {
 
     @Override
     public void handleClient(Minecraft minecraft) {
-        if (minecraft.player != null && minecraft.player.openContainer instanceof AEBaseContainer container
+        if (this.payload != null && minecraft.player != null
+            && minecraft.player.openContainer instanceof AEBaseContainer container
             && container.windowId == windowId) {
-            container.receiveGuiData(payload);
+            container.receiveGuiData(this.payload);
         }
     }
 

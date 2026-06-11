@@ -6,7 +6,7 @@ import ae2.api.networking.IGrid;
 import ae2.api.stacks.AEItemKey;
 import net.minecraft.entity.player.EntityPlayer;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public interface PatternContainer {
     @Nullable

@@ -21,7 +21,7 @@ package ae2.client.render.model;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.util.EnumFacing;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 record AutoRotatingCacheKey(IBlockState blockState, EnumFacing forward, EnumFacing up, @Nullable EnumFacing side) {
 

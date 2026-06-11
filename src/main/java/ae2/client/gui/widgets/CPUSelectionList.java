@@ -20,6 +20,7 @@ package ae2.client.gui.widgets;
 
 import ae2.api.client.AEKeyRendering;
 import ae2.api.config.CpuSelectionMode;
+import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AmountFormat;
 import ae2.client.Point;
 import ae2.client.gui.ICompositeWidget;
@@ -36,6 +37,7 @@ import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.item.ItemStack;
@@ -101,10 +103,10 @@ public class CPUSelectionList implements ICompositeWidget {
         GlStateManager.popMatrix();
     }
 
-    private static void drawScaledKey(int x, int y, float scale, ae2.api.stacks.AEKey what) {
+    private static void drawScaledKey(int x, int y, AEKey what) {
         GlStateManager.pushMatrix();
         GlStateManager.translate(x, y, 0);
-        GlStateManager.scale(scale, scale, 1.0f);
+        GlStateManager.scale(SMALL_TEXT_SCALE, SMALL_TEXT_SCALE, 1.0f);
         AEKeyRendering.drawInGui(Minecraft.getMinecraft(), 0, 0, what);
         GlStateManager.popMatrix();
     }
@@ -268,11 +270,11 @@ public class CPUSelectionList implements ICompositeWidget {
                 Icon.S_CRAFT.getBlitter().dest(x + 2, y + 9).blit();
                 drawScaledString(currentJob.what().formatAmount(currentJob.amount(), AmountFormat.SLOT),
                     x + 14, y + 13, textColor.toARGB());
-                drawScaledKey(x + 55, y + 9, SMALL_TEXT_SCALE, currentJob.what());
+                drawScaledKey(x + 55, y + 9, currentJob.what());
 
                 int progress = (int) (cpu.progress() * (buttonBg.getSrcWidth() - 1));
                 if (progress > 0) {
-                    net.minecraft.client.gui.Gui.drawRect(
+                    Gui.drawRect(
                         x,
                         y + buttonBg.getSrcHeight() - 2,
                         x + progress,

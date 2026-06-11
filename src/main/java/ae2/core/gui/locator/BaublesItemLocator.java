@@ -4,13 +4,20 @@ import ae2.integration.modules.baubles.BaublesIntegration;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketBuffer;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public record BaublesItemLocator(int baubleSlot, @Nullable RayTraceResult hitResult) implements ItemGuiHostLocator {
+    private static final int INVALID_BAUBLE_SLOT = Integer.MIN_VALUE;
+
     public static BaublesItemLocator readFromPacket(PacketBuffer buf) {
-        return new BaublesItemLocator(buf.readInt(), readHitResult(buf));
+        int baubleSlot = buf.readInt();
+        DecodedHitResult decodedHitResult = readHitResult(buf);
+        return new BaublesItemLocator(decodedHitResult.valid() ? baubleSlot : INVALID_BAUBLE_SLOT,
+            decodedHitResult.hitResult());
     }
 
     private static void writeHitResult(PacketBuffer buf, @Nullable RayTraceResult hitResult) {
@@ -26,15 +33,18 @@ public record BaublesItemLocator(int baubleSlot, @Nullable RayTraceResult hitRes
         buf.writeDouble(hitResult.hitVec.z);
     }
 
-    @Nullable
-    private static RayTraceResult readHitResult(PacketBuffer buf) {
+    private static DecodedHitResult readHitResult(PacketBuffer buf) {
         if (!buf.readBoolean()) {
-            return null;
+            return new DecodedHitResult(null, true);
         }
         var blockPos = buf.readBlockPos();
-        var side = net.minecraft.util.EnumFacing.VALUES[buf.readByte()];
-        var hitVec = new net.minecraft.util.math.Vec3d(buf.readDouble(), buf.readDouble(), buf.readDouble());
-        return new RayTraceResult(hitVec, side, blockPos);
+        int sideIndex = buf.readByte();
+        var hitVec = new Vec3d(buf.readDouble(), buf.readDouble(), buf.readDouble());
+        if (sideIndex < 0 || sideIndex >= EnumFacing.VALUES.length) {
+            return new DecodedHitResult(null, false);
+        }
+        var side = EnumFacing.VALUES[sideIndex];
+        return new DecodedHitResult(new RayTraceResult(hitVec, side, blockPos), true);
     }
 
     @Override
@@ -62,5 +72,8 @@ public record BaublesItemLocator(int baubleSlot, @Nullable RayTraceResult hitRes
     @Nullable
     public RayTraceResult hitResult() {
         return hitResult;
+    }
+
+    private record DecodedHitResult(@Nullable RayTraceResult hitResult, boolean valid) {
     }
 }

@@ -20,6 +20,7 @@ package ae2.api.features;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
+import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
@@ -66,7 +67,23 @@ public final class P2PTunnelAttunementInternal {
     }
 
     public static Map<String, Item> getTagTunnels() {
-        return P2PTunnelAttunement.tagTunnels;
+        return Map.copyOf(P2PTunnelAttunement.tagTunnels);
+    }
+
+    public static List<Item> getManageableTunnels() {
+        return List.copyOf(P2PTunnelAttunement.manageableTunnels);
+    }
+
+    public static boolean supportsMultipleInputs(Item tunnelItem) {
+        return P2PTunnelAttunement.multipleInputTunnels.getOrDefault(tunnelItem, false);
+    }
+
+    public static boolean supportsMultipleInputs(ResourceLocation tunnelType) {
+        Item tunnelItem = Item.REGISTRY.getObject(tunnelType);
+        if (tunnelItem == null || tunnelItem == Items.AIR) {
+            return false;
+        }
+        return supportsMultipleInputs(tunnelItem);
     }
 
     public record AttunementInfo(Set<Capability<?>> apis) {

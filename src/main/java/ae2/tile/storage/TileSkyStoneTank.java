@@ -31,7 +31,7 @@ import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.fml.common.network.ByteBufUtils;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class TileSkyStoneTank extends AEBaseTile {
 
@@ -105,7 +105,7 @@ public class TileSkyStoneTank extends AEBaseTile {
     @Override
     public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY) {
-            return (T) this.tank;
+            return (T) this.getFluidHandler();
         }
         return super.getCapability(capability, facing);
     }

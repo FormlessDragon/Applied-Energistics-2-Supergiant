@@ -41,6 +41,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 
+import org.jetbrains.annotations.Nullable;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
@@ -112,9 +113,11 @@ public class MEP2PTunnelPart extends P2PTunnelPart<MEP2PTunnelPart> implements I
     }
 
     @Override
-    public void setPartHostInfo(EnumFacing side, IPartHost host, TileEntity blockEntity) {
+    public void setPartHostInfo(@Nullable EnumFacing side, IPartHost host, TileEntity blockEntity) {
         super.setPartHostInfo(side, host, blockEntity);
-        this.outerNode.setExposedOnSides(EnumSet.of(side));
+        if (side != null) {
+            this.outerNode.setExposedOnSides(EnumSet.of(side));
+        }
     }
 
     @Override

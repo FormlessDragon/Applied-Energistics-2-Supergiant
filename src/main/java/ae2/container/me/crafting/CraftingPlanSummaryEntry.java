@@ -23,6 +23,7 @@ import net.minecraft.network.PacketBuffer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Comparator;
+import java.util.Objects;
 
 public record CraftingPlanSummaryEntry(AEKey what, long missingAmount, long storedAmount,
                                        long craftAmount, long intermediateCraftAmount, long inventoryAmount,
@@ -35,11 +36,20 @@ public record CraftingPlanSummaryEntry(AEKey what, long missingAmount, long stor
 
     public static CraftingPlanSummaryEntry read(PacketBuffer buffer) {
         var what = AEKey.readKey(buffer);
+        if (what == null) {
+            throw new IllegalArgumentException("Crafting plan summary entry has an invalid key");
+        }
+
         long missingAmount = buffer.readVarLong();
         long storedAmount = buffer.readVarLong();
         long craftAmount = buffer.readVarLong();
         long intermediateCraftAmount = buffer.readVarLong();
         long inventoryAmount = buffer.readVarLong();
+        if (missingAmount < 0 || storedAmount < 0 || craftAmount < 0 || intermediateCraftAmount < 0
+            || inventoryAmount < 0) {
+            throw new IllegalArgumentException("Crafting plan summary entry contains negative amounts");
+        }
+
         boolean finalOutput = buffer.readBoolean();
         return new CraftingPlanSummaryEntry(what, missingAmount, storedAmount, craftAmount, intermediateCraftAmount,
             inventoryAmount, finalOutput);
@@ -51,6 +61,7 @@ public record CraftingPlanSummaryEntry(AEKey what, long missingAmount, long stor
     }
 
     public void write(PacketBuffer buffer) {
+        Objects.requireNonNull(this.what, "what");
         AEKey.writeKey(buffer, this.what);
         buffer.writeVarLong(this.missingAmount);
         buffer.writeVarLong(this.storedAmount);

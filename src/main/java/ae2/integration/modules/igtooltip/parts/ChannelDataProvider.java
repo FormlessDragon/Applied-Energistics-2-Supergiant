@@ -27,8 +27,10 @@ public final class ChannelDataProvider
     public void buildTooltip(IUsedChannelProvider object, TooltipContext context, TooltipBuilder tooltip) {
         var serverData = context.serverData();
         if (serverData.hasKey(TAG_ERROR, Constants.NBT.TAG_STRING)) {
-            var error = ChannelError.valueOf(serverData.getString(TAG_ERROR));
-            tooltip.addLine(error.text, TextFormatting.RED);
+            var error = ChannelError.fromName(serverData.getString(TAG_ERROR));
+            if (error != null) {
+                tooltip.addLine(error.text, TextFormatting.RED);
+            }
             return;
         }
 
@@ -78,6 +80,15 @@ public final class ChannelDataProvider
 
         ChannelError(LocalizationEnum text) {
             this.text = text;
+        }
+
+        static ChannelError fromName(String name) {
+            for (var error : values()) {
+                if (error.name().equals(name)) {
+                    return error;
+                }
+            }
+            return null;
         }
     }
 }

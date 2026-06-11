@@ -35,7 +35,6 @@ import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
 import ae2.container.guisync.ILinkStatusAwareContainer;
 import ae2.container.slot.RestrictedInputSlot;
-import ae2.core.AELog;
 import ae2.core.network.clientbound.ClearPatternAccessTerminalPacket;
 import ae2.core.network.clientbound.PatternAccessTerminalInfoPacket;
 import ae2.core.network.clientbound.PatternAccessTerminalPacket;
@@ -77,6 +76,7 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
     private static final String ACTION_OPEN_PROVIDER = "openProvider";
     private static final String ACTION_RENAME_GROUP = "renameGroup";
     private static final String ACTION_RENAME_PROVIDER = "renameProvider";
+    private static final int MAX_CUSTOM_NAME_LENGTH = 32;
     private static long inventorySerial = Long.MIN_VALUE;
 
     private final IPatternAccessTermContainerHost host;
@@ -140,14 +140,19 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
         renamePatternGroup(new RenamePatternGroupPayload(inventoryIds, name));
     }
 
-    public boolean canRenamePatternProvider(long inventoryId) {
-        ContainerTracker tracker = this.byId.get(inventoryId);
-        return tracker != null && tracker.container.canEditTerminalName();
+    private static boolean isValidCustomName(@Nullable String name) {
+        return name != null && name.length() <= MAX_CUSTOM_NAME_LENGTH;
     }
 
     private void renamePatternGroup(RenamePatternGroupPayload payload) {
         if (isClientSide()) {
             sendClientAction(ACTION_RENAME_GROUP, payload);
+            return;
+        }
+        if (payload == null || payload.inventoryIds() == null || !isValidCustomName(payload.name())) {
+            return;
+        }
+        if (payload.inventoryIds().length > this.byId.size()) {
             return;
         }
 
@@ -173,6 +178,9 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
     private void renamePatternProvider(RenamePatternProviderPayload payload) {
         if (isClientSide()) {
             sendClientAction(ACTION_RENAME_PROVIDER, payload);
+            return;
+        }
+        if (payload == null || !isValidCustomName(payload.name())) {
             return;
         }
 
@@ -320,7 +328,6 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
             return;
         }
         if (slot < 0 || slot >= inv.server.size()) {
-            AELog.warn("Client refers to invalid slot %d of inventory %s", slot, inv.container);
             return;
         }
 
@@ -426,62 +433,73 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
 
         boolean assemblerPattern = pattern instanceof IAssemblerPattern;
 
-        List<QuickMoveTarget> targets = new ObjectArrayList<>();
         if (assemblerPattern) {
+            ReferenceSet<ContainerTracker> usedContainers = new ReferenceOpenHashSet<>();
             for (ContainerTracker targetInventory : this.diList.values()) {
                 if (!isVisible(targetInventory.container)
                     || targetInventory.container.isAssemblerPatternContainer() != assemblerPattern) {
                     continue;
                 }
                 for (int slot = 0; slot < targetInventory.server.size(); slot++) {
-                    targets.add(new QuickMoveTarget(targetInventory, slot));
+                    if (movePatternToTarget(player, sourceSlot, sourcePattern, usedContainers, targetInventory, slot)) {
+                        return;
+                    }
+                    if (usedContainers.contains(targetInventory)) {
+                        break;
+                    }
                 }
             }
-        } else {
-            int targetCount = Math.min(allowedPatternContainerIds.size(), allowedPatternSlots.size());
-            for (int i = 0; i < targetCount; i++) {
-                ContainerTracker targetInventory = this.byId.get(allowedPatternContainerIds.getLong(i));
-                if (targetInventory != null && isVisible(targetInventory.container)
-                    && targetInventory.container.isAssemblerPatternContainer() == assemblerPattern) {
-                    targets.add(new QuickMoveTarget(targetInventory, (int) allowedPatternSlots.getLong(i)));
-                }
+            return;
+        }
+
+        List<QuickMoveTarget> targets = new ObjectArrayList<>();
+        int targetCount = Math.min(allowedPatternContainerIds.size(), allowedPatternSlots.size());
+        for (int i = 0; i < targetCount; i++) {
+            ContainerTracker targetInventory = this.byId.get(allowedPatternContainerIds.getLong(i));
+            if (targetInventory != null && isVisible(targetInventory.container)
+                && targetInventory.container.isAssemblerPatternContainer() == assemblerPattern) {
+                targets.add(new QuickMoveTarget(targetInventory, (int) allowedPatternSlots.getLong(i)));
             }
         }
 
-        if (!assemblerPattern && targets.stream().map(target -> target.container().group).distinct().count() != 1) {
+        if (targets.stream().map(target -> target.container().group).distinct().count() != 1) {
             return;
         }
 
         ReferenceSet<ContainerTracker> usedContainers = new ReferenceOpenHashSet<>();
         for (QuickMoveTarget target : targets) {
-            ContainerTracker container = target.container();
-            if (usedContainers.contains(container)) {
-                continue;
-            }
-            if (containsPattern(container, sourcePattern)) {
-                continue;
-            }
-
-            int slot = target.slot();
-            if (slot < 0 || slot >= container.server.size()) {
-                continue;
-            }
-
-            FilteredInternalInventory targetSlot = new FilteredInternalInventory(
-                container.server.getSlotInv(slot),
-                new PatternSlotFilter(container.container, player.world));
-            ItemStack movedPattern = sourceSlot.getStack().copy();
-            movedPattern.setCount(1);
-            if (!targetSlot.addItems(movedPattern).isEmpty()) {
-                continue;
-            }
-
-            sourceSlot.decrStackSize(1);
-            usedContainers.add(container);
-            if (sourceSlot.getStack().isEmpty()) {
+            if (movePatternToTarget(player, sourceSlot, sourcePattern, usedContainers, target.container(),
+                target.slot())) {
                 return;
             }
         }
+    }
+
+    private boolean movePatternToTarget(EntityPlayerMP player, Slot sourceSlot, AEItemKey sourcePattern,
+                                        ReferenceSet<ContainerTracker> usedContainers, ContainerTracker container,
+                                        int slot) {
+        if (usedContainers.contains(container)) {
+            return false;
+        }
+        if (containsPattern(container, sourcePattern)) {
+            return false;
+        }
+        if (slot < 0 || slot >= container.server.size()) {
+            return false;
+        }
+
+        FilteredInternalInventory targetSlot = new FilteredInternalInventory(
+            container.server.getSlotInv(slot),
+            new PatternSlotFilter(container.container, player.world));
+        ItemStack movedPattern = sourceSlot.getStack().copy();
+        movedPattern.setCount(1);
+        if (!targetSlot.addItems(movedPattern).isEmpty()) {
+            return false;
+        }
+
+        sourceSlot.decrStackSize(1);
+        usedContainers.add(container);
+        return sourceSlot.getStack().isEmpty();
     }
 
     private void sendIncrementalUpdate() {

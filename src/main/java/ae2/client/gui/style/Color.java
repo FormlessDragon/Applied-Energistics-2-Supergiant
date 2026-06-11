@@ -18,7 +18,7 @@
 
 package ae2.client.gui.style;
 
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -49,7 +49,7 @@ public record Color(int r, int g, int b, int a) {
     }
 
     @Override
-    public @NonNull String toString() {
+    public @NotNull String toString() {
         StringBuilder result = new StringBuilder(9);
         result.append('#');
         if (a <= 0xF) {

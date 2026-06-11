@@ -14,6 +14,7 @@ import net.minecraft.init.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemSkull;
 import net.minecraft.item.ItemStack;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
@@ -31,13 +32,13 @@ public class ItemPlacementStrategy implements PlacementStrategy {
     private final WorldServer level;
     private final BlockPos pos;
     private final EnumFacing side;
-    private final net.minecraft.tileentity.TileEntity host;
+    private final TileEntity host;
     @Nullable
     private final UUID ownerUuid;
     private boolean blocked = false;
 
     public ItemPlacementStrategy(WorldServer level, BlockPos pos, EnumFacing side,
-                                 net.minecraft.tileentity.TileEntity host, @Nullable UUID owningEntityPlayerId) {
+                                 TileEntity host, @Nullable UUID owningEntityPlayerId) {
         this.level = level;
         this.pos = pos;
         this.side = side;
@@ -45,7 +46,7 @@ public class ItemPlacementStrategy implements PlacementStrategy {
         this.ownerUuid = owningEntityPlayerId;
     }
 
-    private static void spawnItemEntity(World level, net.minecraft.tileentity.TileEntity te, EnumFacing side,
+    private static void spawnItemEntity(World level, TileEntity te, EnumFacing side,
                                         ItemStack is) {
         final double centerX = te.getPos().getX() + .5;
         final double centerY = te.getPos().getY();

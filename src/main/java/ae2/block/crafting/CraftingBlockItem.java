@@ -35,6 +35,14 @@ public class CraftingBlockItem extends AEBaseBlockItem {
         super(block);
     }
 
+    private static int safeMultiplyCount(int left, int right) {
+        long result = (long) left * right;
+        if (result <= 0) {
+            return 0;
+        }
+        return result > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) result;
+    }
+
     @Override
     public ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, EnumHand hand) {
         if (!InteractionUtil.isInAlternateUseMode(player)) {
@@ -51,7 +59,7 @@ public class CraftingBlockItem extends AEBaseBlockItem {
         player.setHeldItem(hand, ItemStack.EMPTY);
 
         ItemStack returnedUpgrade = removedUpgrade.copy();
-        returnedUpgrade.setCount(removedUpgrade.getCount() * itemCount);
+        returnedUpgrade.setCount(safeMultiplyCount(removedUpgrade.getCount(), itemCount));
         if (!player.inventory.addItemStackToInventory(returnedUpgrade)) {
             player.dropItem(returnedUpgrade, false);
         }

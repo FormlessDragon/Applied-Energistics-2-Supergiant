@@ -21,16 +21,11 @@ record CraftingRecipeTransferAnalysis(
 
     static CraftingRecipeTransferAnalysis analyze(ContainerCraftingTerm.MissingIngredientSlots missingSlots,
                                                   int ingredientCount) {
-        return of(missingSlots.missingSlots(), missingSlots.craftableSlots(), ingredientCount, 1);
-    }
-
-    static CraftingRecipeTransferAnalysis of(IntSet missingGuiSlots, IntSet craftableGuiSlots,
-                                             int ingredientCount) {
-        return of(missingGuiSlots, craftableGuiSlots, ingredientCount, 0);
+        return of(missingSlots.missingSlots(), missingSlots.craftableSlots(), ingredientCount);
     }
 
     private static CraftingRecipeTransferAnalysis of(IntSet missingSlots, IntSet craftableSlots,
-                                                     int ingredientCount, int guiSlotOffset) {
+                                                     int ingredientCount) {
         int unavailableCount = missingSlots.size() + craftableSlots.size();
 
         Outcome outcome;
@@ -46,14 +41,14 @@ record CraftingRecipeTransferAnalysis(
             outcome = Outcome.PARTIAL_UNCRAFTABLE;
         }
 
-        return new CraftingRecipeTransferAnalysis(outcome, toGuiSlots(missingSlots, guiSlotOffset),
-            toGuiSlots(craftableSlots, guiSlotOffset), ingredientCount);
+        return new CraftingRecipeTransferAnalysis(outcome, toGuiSlots(missingSlots),
+            toGuiSlots(craftableSlots), ingredientCount);
     }
 
-    private static IntSet toGuiSlots(IntSet slots, int offset) {
+    private static IntSet toGuiSlots(IntSet slots) {
         IntRBTreeSet result = new IntRBTreeSet();
         for (int slot : slots) {
-            result.add(slot + offset);
+            result.add(slot + 1);
         }
         return result;
     }

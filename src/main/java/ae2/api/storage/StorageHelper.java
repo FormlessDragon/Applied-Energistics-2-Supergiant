@@ -86,6 +86,12 @@ public final class StorageHelper {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(src, "src");
         Objects.requireNonNull(mode, "mode");
+        if (amount < 0) {
+            throw new IllegalArgumentException("Cannot pass a negative amount");
+        }
+        if (amount == 0) {
+            return 0;
+        }
 
         var retrieved = inv.extract(request, amount, Actionable.SIMULATE, src);
 
@@ -137,11 +143,17 @@ public final class StorageHelper {
      */
     public static long poweredInsert(IEnergySource energy, MEStorage inv, AEKey input, long amount,
                                      IActionSource src, Actionable mode) {
-        Objects.requireNonNull(energy);
-        Objects.requireNonNull(inv);
-        Objects.requireNonNull(input);
-        Objects.requireNonNull(src);
-        Objects.requireNonNull(mode);
+        Objects.requireNonNull(energy, "energy");
+        Objects.requireNonNull(inv, "inv");
+        Objects.requireNonNull(input, "input");
+        Objects.requireNonNull(src, "src");
+        Objects.requireNonNull(mode, "mode");
+        if (amount < 0) {
+            throw new IllegalArgumentException("Cannot pass a negative amount");
+        }
+        if (amount == 0) {
+            return 0;
+        }
 
         amount = inv.insert(input, amount, Actionable.SIMULATE, src);
         if (amount <= 0) {

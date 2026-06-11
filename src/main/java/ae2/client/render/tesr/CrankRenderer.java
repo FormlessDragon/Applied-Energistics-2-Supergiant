@@ -37,7 +37,7 @@ import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.model.ModelLoaderRegistry;
 import net.minecraftforge.common.model.TRSRTransformation;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
 
 public class CrankRenderer extends TileEntitySpecialRenderer<TileCrank> {
@@ -86,32 +86,38 @@ public class CrankRenderer extends TileEntitySpecialRenderer<TileCrank> {
         BufferBuilder buffer = tessellator.getBuffer();
 
         GlStateManager.pushMatrix();
-        GlStateManager.translate(x, y, z);
-        GlStateManager.translate(0.5F, 0.5F, 0.5F);
-        BlockOrientation orientation = BlockOrientation.get(crank);
-        BlockEntityRenderHelper.applyOrientation(orientation);
-        GlStateManager.translate(-0.5F, -0.5F, -0.5F);
+        try {
+            GlStateManager.translate(x, y, z);
+            GlStateManager.translate(0.5F, 0.5F, 0.5F);
+            BlockOrientation orientation = BlockOrientation.get(crank);
+            BlockEntityRenderHelper.applyOrientation(orientation);
+            GlStateManager.translate(-0.5F, -0.5F, -0.5F);
 
-        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.BLOCK);
-        buffer.setTranslation(-crank.getPos().getX(), -crank.getPos().getY(), -crank.getPos().getZ());
-        dispatcher.getBlockModelRenderer().renderModel(crank.getWorld(), base, blockState, crank.getPos(), buffer,
-            false);
-        buffer.setTranslation(0, 0, 0);
-        tessellator.draw();
+            buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.BLOCK);
+            buffer.setTranslation(-crank.getPos().getX(), -crank.getPos().getY(), -crank.getPos().getZ());
+            dispatcher.getBlockModelRenderer().renderModel(crank.getWorld(), base, blockState, crank.getPos(), buffer,
+                false);
+            buffer.setTranslation(0, 0, 0);
+            tessellator.draw();
 
-        GlStateManager.translate(0.5F, 0.5F, 0.5F);
-        GlStateManager.rotate(-crank.getVisibleRotation(), 0, 0, 1);
-        GlStateManager.translate(-0.5F, -0.5F, -0.5F);
+            GlStateManager.translate(0.5F, 0.5F, 0.5F);
+            GlStateManager.rotate(-crank.getVisibleRotation(), 0, 0, 1);
+            GlStateManager.translate(-0.5F, -0.5F, -0.5F);
 
-        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.BLOCK);
-        buffer.setTranslation(-crank.getPos().getX(), -crank.getPos().getY(), -crank.getPos().getZ());
-        dispatcher.getBlockModelRenderer().renderModel(crank.getWorld(), handle, blockState, crank.getPos(), buffer,
-            false);
-        buffer.setTranslation(0, 0, 0);
-        tessellator.draw();
-
-        GlStateManager.popMatrix();
-        RenderHelper.enableStandardItemLighting();
+            buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.BLOCK);
+            buffer.setTranslation(-crank.getPos().getX(), -crank.getPos().getY(), -crank.getPos().getZ());
+            dispatcher.getBlockModelRenderer().renderModel(crank.getWorld(), handle, blockState, crank.getPos(), buffer,
+                false);
+            buffer.setTranslation(0, 0, 0);
+            tessellator.draw();
+        } finally {
+            buffer.setTranslation(0, 0, 0);
+            GlStateManager.popMatrix();
+            GlStateManager.shadeModel(GL11.GL_FLAT);
+            GlStateManager.enableCull();
+            GlStateManager.disableBlend();
+            RenderHelper.enableStandardItemLighting();
+        }
     }
 
     private IBakedModel getBaseModel() {

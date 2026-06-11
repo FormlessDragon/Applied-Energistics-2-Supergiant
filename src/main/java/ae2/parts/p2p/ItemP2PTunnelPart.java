@@ -27,13 +27,14 @@ import net.minecraft.item.ItemStack;
 import net.minecraftforge.items.CapabilityItemHandler;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemHandlerHelper;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
 public class ItemP2PTunnelPart extends CapabilityP2PTunnelPart<ItemP2PTunnelPart, IItemHandler> {
 
-    private static final P2PModels MODELS = new P2PModels(AppEng.makeId("part/p2p/p2p_tunnel_items"));
+    private static final P2PModels MODELS = new P2PModels(AppEng.makeId("part/p2p/p2p_tunnel_items"),
+        AppEng.makeId("part/p2p_tunnel_item"));
     private static final IItemHandler NULL_ITEM_HANDLER = new NullItemHandler();
 
     public ItemP2PTunnelPart(IPartItem<?> partItem) {
@@ -61,17 +62,17 @@ public class ItemP2PTunnelPart extends CapabilityP2PTunnelPart<ItemP2PTunnelPart
         }
 
         @Override
-        public @NonNull ItemStack getStackInSlot(int slot) {
+        public @NotNull ItemStack getStackInSlot(int slot) {
             return ItemStack.EMPTY;
         }
 
         @Override
-        public @NonNull ItemStack insertItem(int slot, @NonNull ItemStack stack, boolean simulate) {
+        public @NotNull ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate) {
             return stack;
         }
 
         @Override
-        public @NonNull ItemStack extractItem(int slot, int amount, boolean simulate) {
+        public @NotNull ItemStack extractItem(int slot, int amount, boolean simulate) {
             return ItemStack.EMPTY;
         }
 
@@ -81,7 +82,7 @@ public class ItemP2PTunnelPart extends CapabilityP2PTunnelPart<ItemP2PTunnelPart
         }
 
         @Override
-        public boolean isItemValid(int slot, @NonNull ItemStack stack) {
+        public boolean isItemValid(int slot, @NotNull ItemStack stack) {
             return false;
         }
     }
@@ -94,12 +95,12 @@ public class ItemP2PTunnelPart extends CapabilityP2PTunnelPart<ItemP2PTunnelPart
         }
 
         @Override
-        public @NonNull ItemStack getStackInSlot(int slot) {
+        public @NotNull ItemStack getStackInSlot(int slot) {
             return ItemStack.EMPTY;
         }
 
         @Override
-        public @NonNull ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
+        public @NotNull ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
             int remainder = stack.getCount();
 
             final int outputTunnels = ItemP2PTunnelPart.this.getOutputs().size();
@@ -151,7 +152,7 @@ public class ItemP2PTunnelPart extends CapabilityP2PTunnelPart<ItemP2PTunnelPart
         }
 
         @Override
-        public @NonNull ItemStack extractItem(int slot, int amount, boolean simulate) {
+        public @NotNull ItemStack extractItem(int slot, int amount, boolean simulate) {
             return ItemStack.EMPTY;
         }
 
@@ -161,7 +162,7 @@ public class ItemP2PTunnelPart extends CapabilityP2PTunnelPart<ItemP2PTunnelPart
         }
 
         @Override
-        public boolean isItemValid(int slot, @NonNull ItemStack stack) {
+        public boolean isItemValid(int slot, @NotNull ItemStack stack) {
             return true;
         }
 
@@ -170,48 +171,83 @@ public class ItemP2PTunnelPart extends CapabilityP2PTunnelPart<ItemP2PTunnelPart
     private class OutputItemHandler implements IItemHandler {
         @Override
         public int getSlots() {
-            try (CapabilityGuard input = getInputCapability()) {
-                return input.get().getSlots();
+            int slots = 0;
+            for (ItemP2PTunnelPart input : getInputs()) {
+                try (CapabilityGuard capabilityGuard = input.getAdjacentCapability()) {
+                    slots = Math.max(slots, capabilityGuard.get().getSlots());
+                }
             }
+            return slots;
         }
 
         @Override
-        public @NonNull ItemStack getStackInSlot(int slot) {
-            try (CapabilityGuard input = getInputCapability()) {
-                return input.get().getStackInSlot(slot);
+        public @NotNull ItemStack getStackInSlot(int slot) {
+            for (ItemP2PTunnelPart input : getInputs()) {
+                try (CapabilityGuard capabilityGuard = input.getAdjacentCapability()) {
+                    IItemHandler handler = capabilityGuard.get();
+                    if (slot < handler.getSlots()) {
+                        ItemStack stack = handler.getStackInSlot(slot);
+                        if (!stack.isEmpty()) {
+                            return stack;
+                        }
+                    }
+                }
             }
+            return ItemStack.EMPTY;
         }
 
         @Override
-        public @NonNull ItemStack insertItem(int slot, @NonNull ItemStack stack, boolean simulate) {
+        public @NotNull ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate) {
             return stack;
         }
 
         @Override
-        public @NonNull ItemStack extractItem(int slot, int amount, boolean simulate) {
-            try (CapabilityGuard input = getInputCapability()) {
-                ItemStack result = input.get().extractItem(slot, amount, simulate);
+        public @NotNull ItemStack extractItem(int slot, int amount, boolean simulate) {
+            for (ItemP2PTunnelPart input : getInputs()) {
+                try (CapabilityGuard capabilityGuard = input.getAdjacentCapability()) {
+                    IItemHandler handler = capabilityGuard.get();
+                    if (slot >= handler.getSlots()) {
+                        continue;
+                    }
+                    ItemStack result = handler.extractItem(slot, amount, simulate);
+                    if (result.isEmpty()) {
+                        continue;
+                    }
 
-                if (!simulate) {
-                    deductTransportCost(result.getCount(), AEKeyType.items());
+                    if (!simulate) {
+                        deductTransportCost(result.getCount(), AEKeyType.items());
+                    }
+
+                    return result;
                 }
-
-                return result;
             }
+            return ItemStack.EMPTY;
         }
 
         @Override
         public int getSlotLimit(int slot) {
-            try (CapabilityGuard input = getInputCapability()) {
-                return input.get().getSlotLimit(slot);
+            for (ItemP2PTunnelPart input : getInputs()) {
+                try (CapabilityGuard capabilityGuard = input.getAdjacentCapability()) {
+                    IItemHandler handler = capabilityGuard.get();
+                    if (slot < handler.getSlots()) {
+                        return handler.getSlotLimit(slot);
+                    }
+                }
             }
+            return 0;
         }
 
         @Override
-        public boolean isItemValid(int slot, @NonNull ItemStack stack) {
-            try (CapabilityGuard input = getInputCapability()) {
-                return input.get().isItemValid(slot, stack);
+        public boolean isItemValid(int slot, @NotNull ItemStack stack) {
+            for (ItemP2PTunnelPart input : getInputs()) {
+                try (CapabilityGuard capabilityGuard = input.getAdjacentCapability()) {
+                    IItemHandler handler = capabilityGuard.get();
+                    if (slot < handler.getSlots() && handler.isItemValid(slot, stack)) {
+                        return true;
+                    }
+                }
             }
+            return false;
         }
     }
 }

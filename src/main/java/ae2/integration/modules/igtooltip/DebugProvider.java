@@ -7,6 +7,7 @@ import ae2.api.networking.IManagedGridNode;
 import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.orientation.BlockOrientation;
 import ae2.api.orientation.IOrientationStrategy;
+import ae2.api.orientation.RelativeSide;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.Side;
 import ae2.integration.modules.theoneprobe.TopText;
@@ -78,7 +79,7 @@ public final class DebugProvider {
         if (!strategy.getProperties().isEmpty()) {
             var orientation = BlockOrientation.get(strategy, blockState);
             tooltip.addLine(label(tooltip, TopText.debug_forward, TextFormatting.WHITE)
-                + localizeSide(tooltip, orientation.getSide(ae2.api.orientation.RelativeSide.FRONT))
+                + localizeSide(tooltip, orientation.getSide(RelativeSide.FRONT))
                 + " "
                 + label(tooltip, TopText.debug_spin, TextFormatting.WHITE)
                 + orientation.getSpin());

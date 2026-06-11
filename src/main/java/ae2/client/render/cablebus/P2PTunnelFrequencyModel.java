@@ -25,7 +25,7 @@ import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.model.IModel;
 import net.minecraftforge.common.model.IModelState;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -40,8 +40,8 @@ public class P2PTunnelFrequencyModel implements IModel {
     }
 
     @Override
-    public IBakedModel bake(@NonNull IModelState state, @NonNull VertexFormat format,
-                            @NonNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
+    public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
+                            @NotNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         try {
             TextureAtlasSprite texture = bakedTextureGetter.apply(TEXTURE);
             return new P2PTunnelFrequencyBakedModel(format, texture);

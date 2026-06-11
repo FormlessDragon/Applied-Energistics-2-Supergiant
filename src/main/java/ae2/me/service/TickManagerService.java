@@ -22,11 +22,22 @@ import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridServiceProvider;
 import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.networking.ticking.ITickManager;
-import ae2.api.networking.ticking.TickSnapshot;
 import ae2.api.networking.ticking.TickRateModulation;
+import ae2.api.networking.ticking.TickSnapshot;
+import ae2.api.networking.ticking.TickingRequest;
 import ae2.me.GridNode;
 import ae2.me.service.helpers.TickTracker;
 import ae2.me.ticker.RequestBox;
+import ae2.parts.networking.CablePart;
+import ae2.parts.p2p.P2PTunnelPart;
+import ae2.parts.storagebus.StorageBusPart;
+import ae2.tile.crafting.ICraftingCPUTileEntity;
+import ae2.tile.crafting.TileMolecularAssembler;
+import ae2.tile.crafting.TilePatternProvider;
+import ae2.tile.networking.TileCableBus;
+import ae2.tile.storage.TileDrive;
+import ae2.tile.storage.TileIOPort;
+import ae2.tile.storage.TileMEChest;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterators;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -163,25 +174,27 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
         }
     }
 
-    @Override
-    public void addNode(IGridNode gridNode, @Nullable NBTTagCompound savedData) {
-        IGridTickable tickable = gridNode.getService(IGridTickable.class);
-        if (tickable != null) {
-            ae2.api.networking.ticking.TickingRequest tr = tickable.getTickingRequest(gridNode);
-
-            Objects.requireNonNull(tr);
-
-            TickTracker tt = new TickTracker(tr, gridNode, tickable, this.currentTick);
-
-            this.alertable.put(gridNode, tt);
-
-            if (tr.isSleeping()) {
-                this.sleeping.put(gridNode, tt);
-            } else {
-                this.awake.put(gridNode, tt);
-                this.addToQueue(gridNode, tt);
-            }
+    private static TickSnapshot.Category classify(Object owner) {
+        if (owner instanceof StorageBusPart
+            || owner instanceof TileDrive
+            || owner instanceof TileMEChest
+            || owner instanceof TileIOPort) {
+            return TickSnapshot.Category.STORAGE;
         }
+
+        if (owner instanceof TileMolecularAssembler
+            || owner instanceof TilePatternProvider
+            || owner instanceof ICraftingCPUTileEntity) {
+            return TickSnapshot.Category.CRAFTING;
+        }
+
+        if (owner instanceof CablePart
+            || owner instanceof P2PTunnelPart
+            || owner instanceof TileCableBus) {
+            return TickSnapshot.Category.TICK;
+        }
+
+        return TickSnapshot.Category.MISC;
     }
 
     @Override
@@ -448,27 +461,25 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
         long lastTick) {
     }
 
-    private static TickSnapshot.Category classify(Object owner) {
-        if (owner instanceof ae2.parts.storagebus.StorageBusPart
-            || owner instanceof ae2.tile.storage.TileDrive
-            || owner instanceof ae2.tile.storage.TileMEChest
-            || owner instanceof ae2.tile.storage.TileIOPort) {
-            return TickSnapshot.Category.STORAGE;
-        }
+    @Override
+    public void addNode(IGridNode gridNode, @Nullable NBTTagCompound savedData) {
+        IGridTickable tickable = gridNode.getService(IGridTickable.class);
+        if (tickable != null) {
+            TickingRequest tr = tickable.getTickingRequest(gridNode);
 
-        if (owner instanceof ae2.tile.crafting.TileMolecularAssembler
-            || owner instanceof ae2.tile.crafting.TilePatternProvider
-            || owner instanceof ae2.tile.crafting.ICraftingCPUTileEntity) {
-            return TickSnapshot.Category.CRAFTING;
-        }
+            Objects.requireNonNull(tr);
 
-        if (owner instanceof ae2.parts.networking.CablePart
-            || owner instanceof ae2.parts.p2p.P2PTunnelPart
-            || owner instanceof ae2.tile.networking.TileCableBus) {
-            return TickSnapshot.Category.TICK;
-        }
+            TickTracker tt = new TickTracker(tr, gridNode, tickable, this.currentTick);
 
-        return TickSnapshot.Category.MISC;
+            this.alertable.put(gridNode, tt);
+
+            if (tr.isSleeping()) {
+                this.sleeping.put(gridNode, tt);
+            } else {
+                this.awake.put(gridNode, tt);
+                this.addToQueue(gridNode, tt);
+            }
+        }
     }
 
     private static int getQueueKey(@Nullable World world) {

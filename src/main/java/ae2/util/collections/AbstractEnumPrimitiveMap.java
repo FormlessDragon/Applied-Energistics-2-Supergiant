@@ -34,16 +34,16 @@ abstract class AbstractEnumPrimitiveMap<E extends Enum<E>> {
     @SuppressWarnings("unchecked")
     protected final E requireKey(Object key) {
         if (!isCompatibleKey(key)) {
-            throw new ClassCastException("Expected key of type " + this.enumClass.getName() + " but got "
-                + (key == null ? "null" : key.getClass().getName()));
+            throw new ClassCastException("Expected key of type " + this.enumClass.getSimpleName() + " but got "
+                + (key == null ? "null" : key.getClass().getSimpleName()));
         }
         return (E) key;
     }
 
     private void verifyKeyType(E key) {
         if (key.getDeclaringClass() != this.enumClass) {
-            throw new ClassCastException("Expected key of type " + this.enumClass.getName() + " but got "
-                + key.getClass().getName());
+            throw new ClassCastException("Expected key of type " + this.enumClass.getSimpleName() + " but got "
+                + key.getClass().getSimpleName());
         }
     }
 }

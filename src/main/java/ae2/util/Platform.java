@@ -46,7 +46,7 @@ import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.Loader;
 import net.minecraftforge.fml.common.ModContainer;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.text.DecimalFormat;
 import java.util.List;
 import java.util.UUID;
@@ -156,7 +156,7 @@ public final class Platform {
         return level.getTileEntity(pos);
     }
 
-    public static boolean hasPermissions(DimensionalBlockPos dc, net.minecraft.entity.player.EntityPlayer player) {
+    public static boolean hasPermissions(DimensionalBlockPos dc, EntityPlayer player) {
         if (!dc.isInWorld(player.world)) {
             return false;
         }
@@ -205,7 +205,7 @@ public final class Platform {
         return EnumFacing.getFacingFromVector(newForward.getX(), newForward.getY(), newForward.getZ());
     }
 
-    public static void spawnDrops(World level, BlockPos pos, List<net.minecraft.item.ItemStack> drops) {
+    public static void spawnDrops(World level, BlockPos pos, List<ItemStack> drops) {
         if (level == null || level.isRemote) {
             return;
         }
@@ -245,7 +245,7 @@ public final class Platform {
             || InventoryBogoSortModule.isLoaded();
     }
 
-    public static void sendImmediateTileEntityUpdate(net.minecraft.entity.player.EntityPlayer player, BlockPos pos) {
+    public static void sendImmediateTileEntityUpdate(EntityPlayer player, BlockPos pos) {
         if (!(player instanceof EntityPlayerMP serverPlayer)) {
             return;
         }

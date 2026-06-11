@@ -5,15 +5,18 @@ import ae2.api.config.Actionable;
 import ae2.api.config.RedstoneMode;
 import ae2.api.config.Settings;
 import ae2.api.networking.IGrid;
+import ae2.api.networking.crafting.ICraftingService;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
 import ae2.api.stacks.AEKey;
 import ae2.api.storage.StorageHelper;
+import ae2.container.GuiIds;
 import ae2.core.AppEng;
 import ae2.core.definitions.AEItems;
 import ae2.items.parts.PartModels;
 import ae2.parts.PartModel;
 import ae2.parts.automation.ExportBusPart;
+import ae2.parts.automation.StackWorldBehaviors;
 import ae2.util.ConfigInventory;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
@@ -40,7 +43,7 @@ public class PreciseExportBusPart extends ExportBusPart {
     public ConfigInventory getConfig() {
         if (this.stackConfig == null) {
             this.stackConfig = ConfigInventory.configStacks(63)
-                                              .supportedTypes(ae2.parts.automation.StackWorldBehaviors.withExportStrategy())
+                                              .supportedTypes(StackWorldBehaviors.withExportStrategy())
                                               .changeListener(this::onStackConfigChanged)
                                               .allowOverstacking(true)
                                               .build();
@@ -107,7 +110,7 @@ public class PreciseExportBusPart extends ExportBusPart {
         return context.hasDoneWork();
     }
 
-    protected void attemptCrafting(StackTransferContext context, ae2.api.networking.crafting.ICraftingService cg,
+    protected void attemptCrafting(StackTransferContext context, ICraftingService cg,
                                    int slotToExport, AEKey what, long targetAmount) {
         long amount = getExportStrategy().push(what, targetAmount, Actionable.SIMULATE);
         if (amount == targetAmount) {
@@ -131,8 +134,8 @@ public class PreciseExportBusPart extends ExportBusPart {
     }
 
     @Override
-    protected ae2.container.GuiIds.GuiKey getGuiKey() {
-        return ae2.container.GuiIds.GuiKey.PRECISE_EXPORT_BUS;
+    protected GuiIds.GuiKey getGuiKey() {
+        return GuiIds.GuiKey.PRECISE_EXPORT_BUS;
     }
 
     @Override

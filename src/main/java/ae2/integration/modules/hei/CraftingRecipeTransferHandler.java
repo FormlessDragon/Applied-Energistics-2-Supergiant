@@ -8,12 +8,14 @@ import ae2.container.me.items.ContainerCraftingTerm;
 import ae2.core.localization.ItemModText;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.integration.modules.itemlists.CraftingHelper;
+import ae2.util.EmptyArrays;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import mezz.jei.api.gui.IGuiIngredient;
 import mezz.jei.api.gui.IRecipeLayout;
 import mezz.jei.api.ingredients.VanillaTypes;
+import mezz.jei.api.recipe.IRecipeCategory;
 import mezz.jei.api.recipe.VanillaRecipeCategoryUid;
 import mezz.jei.api.recipe.transfer.IRecipeTransferError;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandler;
@@ -22,9 +24,9 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.Ingredient;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -67,7 +69,7 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
 
     private static @Nullable ExtractedPseudoRecipe extractTemporaryPseudoRecipe(ContainerCraftingTerm container,
                                                                                 IRecipeLayout recipeLayout) {
-        boolean craftingLayout = VanillaRecipeCategoryUid.CRAFTING.equals(recipeLayout.getRecipeCategory().getUid());
+        boolean craftingLayout = isCraftingLayout(recipeLayout);
         List<GenericStack> recipeInputs = selectFirstGenericStackPerSlot(
             GenericIngredientHelper.getIngredients(recipeLayout, true, craftingLayout,
                 craftingLayout ? CRAFTING_GRID_SIZE : AEProcessingPattern.MAX_INPUT_SLOTS),
@@ -111,7 +113,7 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
         IClientRepo clientRepo = container.getClientRepo();
         if (clientRepo != null && container.getLinkStatus().connected()) {
             for (GridInventoryEntry entry : clientRepo.getAllEntries()) {
-                if (entry.what() != null && entry.storedAmount() > 0) {
+                if (entry != null && entry.what() != null && entry.storedAmount() > 0) {
                     available.add(entry.what(), entry.storedAmount());
                 }
             }
@@ -127,6 +129,9 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
 
         List<GenericStack> missing = new ObjectArrayList<>(recipeInputs.size());
         for (GenericStack input : recipeInputs) {
+            if (!isValidStack(input)) {
+                continue;
+            }
             long remaining = input.amount();
             long fromAvailable = Math.min(remaining, available.get(input.what()));
             if (fromAvailable > 0) {
@@ -144,15 +149,18 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
     }
 
     private static void addAvailableStack(KeyCounter available, @Nullable GenericStack stack) {
-        if (stack != null && stack.amount() > 0) {
+        if (isValidStack(stack)) {
             available.add(stack.what(), stack.amount());
         }
     }
 
     private static void addOrMerge(List<GenericStack> stacks, GenericStack stack) {
+        if (!isValidStack(stack)) {
+            return;
+        }
         for (int i = 0; i < stacks.size(); i++) {
             GenericStack existing = stacks.get(i);
-            if (existing.what().equals(stack.what())) {
+            if (isValidStack(existing) && existing.what().equals(stack.what())) {
                 stacks.set(i, GenericStack.sum(existing, stack));
                 return;
             }
@@ -165,10 +173,30 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
         return containerClass;
     }
 
+    private static boolean isCraftingLayout(IRecipeLayout recipeLayout) {
+        IRecipeCategory<?> category = recipeLayout.getRecipeCategory();
+        return category != null && VanillaRecipeCategoryUid.CRAFTING.equals(category.getUid());
+    }
+
+    private static boolean isValidStack(@Nullable GenericStack stack) {
+        return stack != null && stack.what() != null && stack.amount() > 0;
+    }
+
+    private record ExtractedRecipe(Int2ObjectMap<Ingredient> ingredients, List<List<ItemStack>> templates,
+                                   boolean tooLarge) {
+    }
+
+    private record ExtractedPseudoRecipe(List<GenericStack> inputs, List<GenericStack> outputs) {
+    }
+
     @Override
-    public IRecipeTransferError transferRecipe(@Nonnull T container,
-                                               @Nonnull IRecipeLayout recipeLayout,
-                                               @Nonnull EntityPlayer player, boolean maxTransfer, boolean doTransfer) {
+    public IRecipeTransferError transferRecipe(@NotNull T container,
+                                               @NotNull IRecipeLayout recipeLayout,
+                                               @NotNull EntityPlayer player, boolean maxTransfer, boolean doTransfer) {
+        if (recipeLayout == null) {
+            return this.handlerHelper.createInternalError();
+        }
+
         ExtractedRecipe extractedRecipe = extractRecipe(recipeLayout);
         ExtractedPseudoRecipe pseudoRecipe = GuiScreen.isCtrlKeyDown()
             ? extractTemporaryPseudoRecipe(container, recipeLayout)
@@ -212,10 +240,19 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
 
     @SuppressWarnings("unchecked")
     private @Nullable ExtractedRecipe extractRecipe(IRecipeLayout recipeLayout) {
-        var guiIngredients = recipeLayout.getIngredientsGroup(VanillaTypes.ITEM).getGuiIngredients();
+        var ingredientGroup = recipeLayout.getIngredientsGroup(VanillaTypes.ITEM);
+        if (ingredientGroup == null) {
+            return null;
+        }
+
+        var guiIngredients = ingredientGroup.getGuiIngredients();
+        if (guiIngredients == null || guiIngredients.isEmpty()) {
+            return null;
+        }
+
         Int2ObjectMap<Ingredient> ingredients = new Int2ObjectOpenHashMap<>();
         List<List<ItemStack>> templates = createEmptyTemplates();
-        boolean craftingLayout = VanillaRecipeCategoryUid.CRAFTING.equals(recipeLayout.getRecipeCategory().getUid());
+        boolean craftingLayout = isCraftingLayout(recipeLayout);
         boolean tooLarge = false;
         int nextProcessingSlot = 0;
 
@@ -242,7 +279,11 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
                 if (entry instanceof Int2ObjectMap.Entry<IGuiIngredient<ItemStack>> e) {
                     guiSlot = e.getIntKey();
                 } else {
-                    guiSlot = entry.getKey();
+                    Integer guiSlotKey = entry.getKey();
+                    if (guiSlotKey == null) {
+                        continue;
+                    }
+                    guiSlot = guiSlotKey;
                 }
                 gridSlot = guiSlot - 1;
                 if (guiSlot == RECIPE_OUTPUT_SLOT || gridSlot < 0) {
@@ -274,18 +315,11 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
                 continue;
             }
 
-            ItemStack[] matchingStacks = stacks.toArray(new ItemStack[0]);
+            ItemStack[] matchingStacks = stacks.toArray(EmptyArrays.EMPTY_ITEM_STACK_ARRAY);
             ingredients.put(gridSlot, Ingredient.fromStacks(matchingStacks));
             templates.set(gridSlot, stacks);
         }
 
         return ingredients.isEmpty() && !tooLarge ? null : new ExtractedRecipe(ingredients, templates, tooLarge);
-    }
-
-    private record ExtractedRecipe(Int2ObjectMap<Ingredient> ingredients, List<List<ItemStack>> templates,
-                                   boolean tooLarge) {
-    }
-
-    private record ExtractedPseudoRecipe(List<GenericStack> inputs, List<GenericStack> outputs) {
     }
 }

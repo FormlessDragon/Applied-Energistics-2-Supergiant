@@ -37,35 +37,35 @@ public class Position {
     @Nullable
     private Integer bottom;
 
-    public @org.jspecify.annotations.Nullable Integer getLeft() {
+    public @Nullable Integer getLeft() {
         return left;
     }
 
-    public void setLeft(@org.jspecify.annotations.Nullable Integer left) {
+    public void setLeft(@Nullable Integer left) {
         this.left = left;
     }
 
-    public @org.jspecify.annotations.Nullable Integer getTop() {
+    public @Nullable Integer getTop() {
         return top;
     }
 
-    public void setTop(@org.jspecify.annotations.Nullable Integer top) {
+    public void setTop(@Nullable Integer top) {
         this.top = top;
     }
 
-    public @org.jspecify.annotations.Nullable Integer getRight() {
+    public @Nullable Integer getRight() {
         return right;
     }
 
-    public void setRight(@org.jspecify.annotations.Nullable Integer right) {
+    public void setRight(@Nullable Integer right) {
         this.right = right;
     }
 
-    public @org.jspecify.annotations.Nullable Integer getBottom() {
+    public @Nullable Integer getBottom() {
         return bottom;
     }
 
-    public void setBottom(@org.jspecify.annotations.Nullable Integer bottom) {
+    public void setBottom(@Nullable Integer bottom) {
         this.bottom = bottom;
     }
 

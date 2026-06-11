@@ -18,7 +18,6 @@
 
 package ae2.api.orientation;
 
-import ae2.block.orientation.SpinMapping;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
@@ -88,12 +87,6 @@ public enum BlockOrientation {
             ? TRSRTransformation.identity()
             : new TRSRTransformation(null, this.quaternion, null, null);
         this.spin = spin;
-        EnumFacing front = EnumFacing.values()[ordinal() / 4];
-        EnumFacing top = SpinMapping.getUpFromSpin(front, spin);
-        EnumFacing bottom = top.getOpposite();
-        EnumFacing right = fromVector(cross(front, top));
-        EnumFacing left = right.getOpposite();
-        EnumFacing back = front.getOpposite();
     }
 
     public static BlockOrientation get(EnumFacing facing) {
@@ -115,6 +108,10 @@ public enum BlockOrientation {
     }
 
     public static BlockOrientation get(EnumFacing facing, int spin) {
+        if (facing == null || spin < 0 || spin > 3) {
+            return get(EnumFacing.NORTH);
+        }
+
         return values()[facing.ordinal() * 4 + spin];
     }
 
@@ -132,24 +129,6 @@ public enum BlockOrientation {
         var facing = strategy.getFacing(state);
         var spin = strategy.getSpin(state);
         return get(facing, spin);
-    }
-
-    private static EnumFacing fromVector(int[] vector) {
-        return EnumFacing.getFacingFromVector(vector[0], vector[1], vector[2]);
-    }
-
-    private static int[] cross(EnumFacing a, EnumFacing b) {
-        int ax = a.getXOffset();
-        int ay = a.getYOffset();
-        int az = a.getZOffset();
-        int bx = b.getXOffset();
-        int by = b.getYOffset();
-        int bz = b.getZOffset();
-        return new int[]{
-            ay * bz - az * by,
-            az * bx - ax * bz,
-            ax * by - ay * bx
-        };
     }
 
     private static EnumFacing rotateAround(EnumFacing side, EnumFacing.Axis axis, boolean positive) {

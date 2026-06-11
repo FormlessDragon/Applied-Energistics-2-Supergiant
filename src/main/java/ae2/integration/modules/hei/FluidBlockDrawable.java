@@ -1,5 +1,6 @@
 package ae2.integration.modules.hei;
 
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockFluidRenderer;
 import net.minecraft.client.renderer.BufferBuilder;
@@ -16,9 +17,8 @@ import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.WorldType;
 import net.minecraft.world.biome.Biome;
 import net.minecraftforge.fluids.Fluid;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
-
-import javax.annotation.Nullable;
 
 final class FluidBlockDrawable {
     private static final int SIZE = 16;
@@ -71,7 +71,7 @@ final class FluidBlockDrawable {
         }
     }
 
-    private record FluidBlockAccess(net.minecraft.block.state.IBlockState fluidState) implements IBlockAccess {
+    private record FluidBlockAccess(IBlockState fluidState) implements IBlockAccess {
         @Nullable
         @Override
         public TileEntity getTileEntity(BlockPos pos) {
@@ -84,7 +84,7 @@ final class FluidBlockDrawable {
         }
 
         @Override
-        public net.minecraft.block.state.IBlockState getBlockState(BlockPos pos) {
+        public IBlockState getBlockState(BlockPos pos) {
             return BlockPos.ORIGIN.equals(pos) ? fluidState : Blocks.AIR.getDefaultState();
         }
 

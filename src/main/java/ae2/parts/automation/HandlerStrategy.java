@@ -13,7 +13,7 @@ import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemHandlerHelper;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public abstract class HandlerStrategy<C, S> {
     public static final HandlerStrategy<IItemHandler, ItemStack> ITEMS = new HandlerStrategy<>(AEKeyType.items()) {
@@ -39,7 +39,7 @@ public abstract class HandlerStrategy<C, S> {
             return 0;
         }
 
-        @org.jetbrains.annotations.Nullable
+        @Nullable
         @Override
         public ItemStack getStack(AEKey what, long amount) {
             if (what instanceof AEItemKey itemKey) {

@@ -1,5 +1,6 @@
 package ae2.core.gui;
 
+import ae2.api.parts.IPartHost;
 import ae2.container.GuiIds;
 import ae2.core.AppEngBase;
 import ae2.core.gui.locator.BaublesItemLocator;
@@ -7,8 +8,10 @@ import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.parts.AEBasePart;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
@@ -22,7 +25,7 @@ public final class GuiOpener {
     }
 
     public static void openGui(EntityPlayer player, GuiIds.GuiKey bridge, TileEntity tile, boolean returnedFromSubScreen) {
-        net.minecraft.util.math.BlockPos pos = tile.getPos();
+        BlockPos pos = tile.getPos();
         player.openGui(AppEngBase.instance(), GuiIds.getGuiId(bridge, returnedFromSubScreen), tile.getWorld(),
             pos.getX(), pos.getY(), pos.getZ());
     }
@@ -34,9 +37,20 @@ public final class GuiOpener {
     public static void openPartGui(EntityPlayer player, GuiIds.GuiKey key, AEBasePart part,
                                    boolean returnedFromSubScreen) {
         BlockPos pos = part.getHost().getLocation().getPos();
-        int side = Objects.requireNonNull(part.getSide(), "Part GUI requires a sided part").ordinal();
+        int side = encodePartSide(Objects.requireNonNull(part.getSide(), "Part GUI requires a sided part"));
         player.openGui(AppEngBase.instance(), GuiIds.getGuiId(key, returnedFromSubScreen), player.world, pos.getX(),
             (side << 8) | (pos.getY() & 255), pos.getZ());
+    }
+
+    public static void openPartGui(EntityPlayer player, GuiIds.GuiKey key, IPartHost host, @Nullable EnumFacing side) {
+        openPartGui(player, key, host, side, false);
+    }
+
+    public static void openPartGui(EntityPlayer player, GuiIds.GuiKey key, IPartHost host, @Nullable EnumFacing side,
+                                   boolean returnedFromSubScreen) {
+        BlockPos pos = host.getLocation().getPos();
+        player.openGui(AppEngBase.instance(), GuiIds.getGuiId(key, returnedFromSubScreen), player.world, pos.getX(),
+            (encodePartSide(side) << 8) | (pos.getY() & 255), pos.getZ());
     }
 
     public static boolean openItemGui(EntityPlayer player, GuiIds.GuiKey key, ItemGuiHostLocator locator) {
@@ -62,7 +76,7 @@ public final class GuiOpener {
             return true;
         }
 
-        if (key == GuiIds.GuiKey.PATTERN_MODIFIER) {
+        if (key == GuiIds.GuiKey.PATTERN_MODIFIER || key == GuiIds.GuiKey.ADVANCED_MEMORY_CARD) {
             RayTraceResult hitResult = locator.hitResult();
             if (hitResult != null && hitResult.getBlockPos() != null) {
                 BlockPos pos = hitResult.getBlockPos();
@@ -79,6 +93,10 @@ public final class GuiOpener {
 
     private static int encodeBaublesPatternModifierLocator(BaublesItemLocator locator) {
         return -1 - locator.baubleSlot();
+    }
+
+    private static int encodePartSide(@Nullable EnumFacing side) {
+        return side == null ? EnumFacing.VALUES.length : side.ordinal();
     }
 
     public static void openItemGui(EntityPlayer player, GuiIds.GuiKey key, int slot, BlockPos pos,

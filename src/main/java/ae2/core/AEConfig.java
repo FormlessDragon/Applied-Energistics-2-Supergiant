@@ -18,6 +18,7 @@
 
 package ae2.core;
 
+import ae2.api.behaviors.GenericSlotCapacities;
 import ae2.api.config.CondenserOutput;
 import ae2.api.config.CraftingPlanSortMode;
 import ae2.api.config.PowerUnit;
@@ -25,8 +26,10 @@ import ae2.api.config.SortDir;
 import ae2.api.config.TerminalStyle;
 import ae2.api.networking.pathing.ChannelMode;
 import ae2.api.stacks.AEFluidKey;
+import ae2.api.stacks.AEKeyType;
 import ae2.core.settings.TickRates;
 import ae2.me.service.TickManagerService;
+import ae2.util.EmptyArrays;
 import net.minecraftforge.common.config.Config;
 import net.minecraftforge.common.config.ConfigManager;
 import net.minecraftforge.fml.client.event.ConfigChangedEvent;
@@ -118,6 +121,8 @@ public class AEConfig {
 
         ConfigManager.sync(Tags.MOD_ID, Config.Type.INSTANCE);
         this.applyRuntimeValues();
+        GenericSlotCapacities.modifyValue(AEKeyType.items(), getInterfaceItemSlotCapacity());
+        GenericSlotCapacities.modifyValue(AEKeyType.fluids(), getInterfaceFluidSlotCapacity());
     }
 
     private void applyRuntimeValues() {
@@ -464,7 +469,7 @@ public class AEConfig {
     }
 
     public void setPatternImportPriorityOrder(String[] order) {
-        String[] nextOrder = order == null ? new String[0] : order.clone();
+        String[] nextOrder = order == null ? EmptyArrays.EMPTY_STRING_ARRAY : order.clone();
         if (!Arrays.equals(nextOrder, CLIENT.patternImportPriorityOrder)) {
             CLIENT.patternImportPriorityOrder = nextOrder;
             this.save();
@@ -770,7 +775,7 @@ public class AEConfig {
 
         @Config.Name("patternImportPriorityOrder")
         @Config.Comment("Client-side order used when selecting HEI/JEI ingredient variants for the pattern encoding terminal.")
-        public String[] patternImportPriorityOrder = new String[0];
+        public String[] patternImportPriorityOrder = EmptyArrays.EMPTY_STRING_ARRAY;
     }
 
     public static final class Terminals {

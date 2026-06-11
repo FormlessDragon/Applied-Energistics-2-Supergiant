@@ -6,7 +6,7 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public final class RegisterPartCapabilitiesEventInternal {
     private static final ObjectOpenHashSet<Class<? extends TileEntity>> HOST_TYPES = new ObjectOpenHashSet<>();

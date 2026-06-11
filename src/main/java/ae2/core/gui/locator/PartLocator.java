@@ -12,17 +12,27 @@ public final class PartLocator implements GuiHostLocator {
     private final BlockPos pos;
     @Nullable
     private final EnumFacing side;
+    private final boolean valid;
 
     public PartLocator(BlockPos pos, @Nullable EnumFacing side) {
+        this(pos, side, true);
+    }
+
+    private PartLocator(BlockPos pos, @Nullable EnumFacing side, boolean valid) {
         this.pos = pos;
         this.side = side;
+        this.valid = valid;
     }
 
     public static PartLocator readFromPacket(PacketBuffer buf) {
         var pos = buf.readBlockPos();
         EnumFacing side = null;
         if (buf.readBoolean()) {
-            side = EnumFacing.VALUES[buf.readByte()];
+            int sideIndex = buf.readByte();
+            if (sideIndex < 0 || sideIndex >= EnumFacing.VALUES.length) {
+                return new PartLocator(pos, null, false);
+            }
+            side = EnumFacing.VALUES[sideIndex];
         }
         return new PartLocator(pos, side);
     }
@@ -30,11 +40,15 @@ public final class PartLocator implements GuiHostLocator {
     @Override
     @Nullable
     public <T> T locate(EntityPlayer player, Class<T> hostInterface) {
+        if (!valid) {
+            return null;
+        }
+
         var part = PartHelper.getPart(player.world, pos, side);
         if (hostInterface.isInstance(part)) {
             return hostInterface.cast(part);
         } else if (part != null) {
-            AELog.warn("Part at %s does not implement host interface %s", part, hostInterface);
+            AELog.debug("Part at %s does not implement host interface %s", part, hostInterface);
         }
 
         return null;

@@ -20,7 +20,7 @@ public class GuiModStorageBus extends GuiSpecialStorageBus<ContainerModStorageBu
         this.modExpression.setResponder(container::setModExpression);
         this.modExpression.setMaxStringLength(512);
         this.modExpression.setText(container.modExpression);
-        this.modExpression.setPlaceholder(GuiText.ModFilterTooltip.text());
+        this.modExpression.setPlaceholder(GuiText.ModFilterTooltip.getLocal());
     }
 
     @Override

@@ -54,13 +54,13 @@ public class SelectedPart {
         this.side = null;
     }
 
-    public SelectedPart(IPart part, @org.jspecify.annotations.Nullable EnumFacing side) {
+    public SelectedPart(IPart part, @Nullable EnumFacing side) {
         this.part = part;
         this.facade = null;
         this.side = side;
     }
 
-    public SelectedPart(IFacadePart facade, @org.jspecify.annotations.Nullable EnumFacing side) {
+    public SelectedPart(IFacadePart facade, @Nullable EnumFacing side) {
         this.part = null;
         this.facade = facade;
         this.side = side;

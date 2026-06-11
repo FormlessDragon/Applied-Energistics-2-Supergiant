@@ -2,10 +2,12 @@ package ae2.parts.automation.special;
 
 import ae2.api.config.Settings;
 import ae2.api.networking.IGrid;
+import ae2.api.networking.storage.IStorageService;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
+import ae2.container.GuiIds;
 import ae2.core.AppEng;
 import ae2.items.parts.PartModels;
 import ae2.parts.PartModel;
@@ -33,9 +35,10 @@ public class ThresholdExportBusPart extends PreciseExportBusPart implements Thre
     @Override
     public void readFromNBT(NBTTagCompound extra) {
         super.readFromNBT(extra);
-        int ordinal = extra.getByte("thresholdMode");
-        if (ordinal >= 0 && ordinal < ThresholdMode.values().length) {
-            this.mode = ThresholdMode.values()[ordinal];
+        int modeIndex = extra.getByte("thresholdMode");
+        var modes = ThresholdMode.values();
+        if (modeIndex >= 0 && modeIndex < modes.length) {
+            this.mode = modes[modeIndex];
         }
     }
 
@@ -73,12 +76,12 @@ public class ThresholdExportBusPart extends PreciseExportBusPart implements Thre
         return context.hasDoneWork();
     }
 
-    private boolean passesThreshold(GenericStack stack, ae2.api.networking.storage.IStorageService storageService) {
+    private boolean passesThreshold(GenericStack stack, IStorageService storageService) {
         long stored = storageService.getCachedInventory().get(stack.what());
         return (this.mode == ThresholdMode.GREATER) == (stored > stack.amount());
     }
 
-    private long getMaxOutput(GenericStack stack, ae2.api.networking.storage.IStorageService storageService) {
+    private long getMaxOutput(GenericStack stack, IStorageService storageService) {
         if (this.mode == ThresholdMode.GREATER) {
             return storageService.getCachedInventory().get(stack.what()) - stack.amount();
         }
@@ -100,8 +103,8 @@ public class ThresholdExportBusPart extends PreciseExportBusPart implements Thre
     }
 
     @Override
-    protected ae2.container.GuiIds.GuiKey getGuiKey() {
-        return ae2.container.GuiIds.GuiKey.THRESHOLD_EXPORT_BUS;
+    protected GuiIds.GuiKey getGuiKey() {
+        return GuiIds.GuiKey.THRESHOLD_EXPORT_BUS;
     }
 
     @Override

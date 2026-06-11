@@ -3,10 +3,13 @@ package ae2.block.misc;
 import ae2.api.orientation.IOrientationStrategy;
 import ae2.api.orientation.OrientationStrategies;
 import ae2.block.AEBaseBlock;
+import ae2.core.definitions.AEBlocks;
 import ae2.core.definitions.AEItems;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockDirectional;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.BlockRenderLayer;
@@ -100,7 +103,7 @@ public class CertusQuartzClusterBlock extends AEBaseBlock {
     }
 
     @Override
-    public void neighborChanged(IBlockState state, World world, BlockPos pos, net.minecraft.block.Block blockIn,
+    public void neighborChanged(IBlockState state, World world, BlockPos pos, Block blockIn,
                                 BlockPos fromPos) {
         EnumFacing facing = state.getValue(BlockDirectional.FACING);
         if (!canStay(world, pos, facing)) {
@@ -110,7 +113,7 @@ public class CertusQuartzClusterBlock extends AEBaseBlock {
     }
 
     @Override
-    public boolean canSilkHarvest(World world, BlockPos pos, IBlockState state, net.minecraft.entity.player.EntityPlayer player) {
+    public boolean canSilkHarvest(World world, BlockPos pos, IBlockState state, EntityPlayer player) {
         return true;
     }
 
@@ -121,19 +124,19 @@ public class CertusQuartzClusterBlock extends AEBaseBlock {
 
     @Override
     public Item getItemDropped(IBlockState state, Random rand, int fortune) {
-        return this == ae2.core.definitions.AEBlocks.QUARTZ_CLUSTER.block()
+        return this == AEBlocks.QUARTZ_CLUSTER.block()
             ? AEItems.CERTUS_QUARTZ_CRYSTAL.item()
             : AEItems.CERTUS_QUARTZ_DUST.item();
     }
 
     @Override
     public int quantityDropped(Random random) {
-        return this == ae2.core.definitions.AEBlocks.QUARTZ_CLUSTER.block() ? 4 : 1;
+        return this == AEBlocks.QUARTZ_CLUSTER.block() ? 4 : 1;
     }
 
     @Override
     public int quantityDroppedWithBonus(int fortune, Random random) {
-        if (this != ae2.core.definitions.AEBlocks.QUARTZ_CLUSTER.block()) {
+        if (this != AEBlocks.QUARTZ_CLUSTER.block()) {
             return 1;
         }
         return 4 + (fortune > 0 ? random.nextInt(fortune + 1) : 0);

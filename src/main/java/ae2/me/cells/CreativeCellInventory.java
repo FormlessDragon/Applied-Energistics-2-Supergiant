@@ -42,11 +42,17 @@ public class CreativeCellInventory implements StorageCell {
 
     @Override
     public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
+        if (what == null || amount <= 0) {
+            return 0;
+        }
         return configured.contains(what) ? amount : 0;
     }
 
     @Override
     public long extract(AEKey what, long amount, Actionable mode, IActionSource source) {
+        if (what == null || amount <= 0) {
+            return 0;
+        }
         return configured.contains(what) ? amount : 0;
     }
 

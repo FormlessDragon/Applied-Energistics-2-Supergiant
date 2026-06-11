@@ -1,6 +1,7 @@
 package ae2.api.implementations.items;
 
 import ae2.api.util.AEColor;
+import net.minecraft.item.EnumDyeColor;
 import net.minecraft.nbt.NBTTagCompound;
 
 /**
@@ -43,8 +44,22 @@ public record MemoryCardColors(
         if (index >= colors.length) {
             return AEColor.TRANSPARENT;
         }
-        int ordinal = colors[index];
-        return ordinal >= 0 && ordinal < AEColor.values().length ? AEColor.values()[ordinal] : AEColor.TRANSPARENT;
+        return getColor(colors[index]);
+    }
+
+    private static AEColor getColor(int legacyId) {
+        if (legacyId < 0 || legacyId > 15) {
+            return AEColor.TRANSPARENT;
+        }
+        return AEColor.fromDye(EnumDyeColor.byMetadata(legacyId));
+    }
+
+    private static int toTagColorId(AEColor color) {
+        return color.dye == null ? -1 : color.dye.getMetadata();
+    }
+
+    public static MemoryCardColors repeatedPairs(AEColor first, AEColor second, AEColor third, AEColor fourth) {
+        return new MemoryCardColors(first, first, second, second, third, third, fourth, fourth);
     }
 
     public AEColor get(int x, int y) {
@@ -64,8 +79,9 @@ public record MemoryCardColors(
 
     public int[] toArray() {
         return new int[]{
-            this.top1.ordinal(), this.top2.ordinal(), this.top3.ordinal(), this.top4.ordinal(),
-            this.bottom1.ordinal(), this.bottom2.ordinal(), this.bottom3.ordinal(), this.bottom4.ordinal()
+            toTagColorId(this.top1), toTagColorId(this.top2), toTagColorId(this.top3), toTagColorId(this.top4),
+            toTagColorId(this.bottom1), toTagColorId(this.bottom2), toTagColorId(this.bottom3),
+            toTagColorId(this.bottom4)
         };
     }
 }

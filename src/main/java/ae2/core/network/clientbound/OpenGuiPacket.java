@@ -65,18 +65,22 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.WeakHashMap;
 
+import static ae2.util.EmptyArrays.EMPTY_BYTE_ARRAY;
+
 public class OpenGuiPacket extends ClientboundPacket {
+    private static final int MAX_INITIAL_DATA_BYTES = 5;
     private static final Map<GuiScreen, Boolean> SERVER_GUI_SWITCH_SOURCES = new WeakHashMap<>();
-    private GuiIds.GuiKey guiKey;
+    private GuiIds.@Nullable GuiKey guiKey;
     private GuiHostLocator locator;
     private boolean returnedFromSubScreen;
     private boolean externalGuiReturn;
     private int windowId;
     @Nullable
     private ITextComponent guiTitle;
-    private byte[] initialData = new byte[0];
+    private byte[] initialData = EMPTY_BYTE_ARRAY;
 
     public OpenGuiPacket() {
     }
@@ -84,7 +88,7 @@ public class OpenGuiPacket extends ClientboundPacket {
     public OpenGuiPacket(GuiIds.GuiKey guiKey, GuiHostLocator locator,
                          boolean returnedFromSubScreen, @Nullable ITextComponent guiTitle, byte[] initialData,
                          int windowId, boolean externalGuiReturn) {
-        this.guiKey = guiKey;
+        this.guiKey = Objects.requireNonNull(guiKey);
         this.locator = locator;
         this.returnedFromSubScreen = returnedFromSubScreen;
         this.guiTitle = guiTitle;
@@ -151,14 +155,19 @@ public class OpenGuiPacket extends ClientboundPacket {
         this.externalGuiReturn = packetBuffer.readBoolean();
         this.windowId = packetBuffer.readVarInt();
         this.guiTitle = TextComponents.readFromPacket(packetBuffer);
-        this.initialData = new byte[packetBuffer.readVarInt()];
+        int initialDataLength = packetBuffer.readVarInt();
+        if (initialDataLength < 0 || initialDataLength > MAX_INITIAL_DATA_BYTES
+            || initialDataLength > packetBuffer.readableBytes()) {
+            throw new IllegalArgumentException("Invalid initial GUI data length: " + initialDataLength);
+        }
+        this.initialData = new byte[initialDataLength];
         packetBuffer.readBytes(this.initialData);
     }
 
     @Override
     protected void write(ByteBuf buf) {
         PacketBuffer packetBuffer = new PacketBuffer(buf);
-        packetBuffer.writeVarInt(this.guiKey.getGuiId());
+        packetBuffer.writeVarInt(Objects.requireNonNull(this.guiKey).getGuiId());
         GuiHostLocators.writeToPacket(packetBuffer, this.locator);
         packetBuffer.writeBoolean(this.returnedFromSubScreen);
         packetBuffer.writeBoolean(this.externalGuiReturn);
@@ -236,33 +245,33 @@ public class OpenGuiPacket extends ClientboundPacket {
     @SideOnly(Side.CLIENT)
     @Nullable
     private AEBaseContainer createContainer(InventoryPlayer inventory, Object host) {
-        if (this.guiKey == GuiIds.GuiKey.CRAFT_AMOUNT) {
-            return new ContainerCraftAmount(inventory, (ISubGuiHost) host);
+        if (this.guiKey == GuiIds.GuiKey.CRAFT_AMOUNT && host instanceof ISubGuiHost subGuiHost) {
+            return new ContainerCraftAmount(inventory, subGuiHost);
         }
-        if (this.guiKey == GuiIds.GuiKey.CRAFT_CONFIRM) {
-            return new ContainerCraftConfirm(inventory, (ISubGuiHost) host);
+        if (this.guiKey == GuiIds.GuiKey.CRAFT_CONFIRM && host instanceof ISubGuiHost subGuiHost) {
+            return new ContainerCraftConfirm(inventory, subGuiHost);
         }
-        if (this.guiKey == GuiIds.GuiKey.CRAFTING_STATUS) {
-            return new ContainerCraftingStatus(inventory, (ITerminalHost) host);
+        if (this.guiKey == GuiIds.GuiKey.CRAFTING_STATUS && host instanceof ITerminalHost terminalHost) {
+            return new ContainerCraftingStatus(inventory, terminalHost);
         }
-        if (this.guiKey == GuiIds.GuiKey.OUTPUT_SIDES) {
-            return new ContainerOutputSides(inventory, (IOutputSideConfigHost) host);
+        if (this.guiKey == GuiIds.GuiKey.OUTPUT_SIDES && host instanceof IOutputSideConfigHost outputSideConfigHost) {
+            return new ContainerOutputSides(inventory, outputSideConfigHost);
         }
-        if (this.guiKey == GuiIds.GuiKey.SET_STOCK_AMOUNT) {
-            return new ContainerSetStockAmount(inventory, (InterfaceLogicHost) host);
+        if (this.guiKey == GuiIds.GuiKey.SET_STOCK_AMOUNT && host instanceof InterfaceLogicHost interfaceLogicHost) {
+            return new ContainerSetStockAmount(inventory, interfaceLogicHost);
         }
-        if (this.guiKey == GuiIds.GuiKey.PRIORITY) {
-            ContainerPriority priorityContainer = new ContainerPriority(inventory, (IPriorityHost) host);
+        if (this.guiKey == GuiIds.GuiKey.PRIORITY && host instanceof IPriorityHost priorityHost) {
+            ContainerPriority priorityContainer = new ContainerPriority(inventory, priorityHost);
             if (this.initialData.length > 0) {
                 priorityContainer.setInitialPriority(new PacketBuffer(Unpooled.wrappedBuffer(this.initialData)).readVarInt());
             }
             return priorityContainer;
         }
-        if (this.guiKey == GuiIds.GuiKey.WIRELESS_MAGNET) {
-            return new ContainerWirelessMagnet(inventory, (WirelessTerminalGuiHost<?>) host);
+        if (this.guiKey == GuiIds.GuiKey.WIRELESS_MAGNET && host instanceof WirelessTerminalGuiHost<?> wirelessTerminalGuiHost) {
+            return new ContainerWirelessMagnet(inventory, wirelessTerminalGuiHost);
         }
-        if (this.guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
-            return new ContainerCellRestriction(inventory, (TileCellWorkbench) host);
+        if (this.guiKey == GuiIds.GuiKey.CELL_RESTRICTION && host instanceof TileCellWorkbench cellWorkbench) {
+            return new ContainerCellRestriction(inventory, cellWorkbench);
         }
         return null;
     }

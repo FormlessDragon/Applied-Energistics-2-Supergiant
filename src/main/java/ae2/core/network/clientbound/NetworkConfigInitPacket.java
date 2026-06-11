@@ -1,7 +1,7 @@
 package ae2.core.network.clientbound;
 
-import ae2.core.network.ClientboundPacket;
 import ae2.client.gui.implementations.GuiNetworkAnalyser;
+import ae2.core.network.ClientboundPacket;
 import ae2.items.tools.NetworkAnalyserConfig;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
@@ -21,6 +21,9 @@ public class NetworkConfigInitPacket extends ClientboundPacket {
     @Override
     protected void read(ByteBuf buf) {
         config = NetworkAnalyserConfig.read(buf);
+        if (config == null) {
+            config = NetworkAnalyserConfig.DEFAULT;
+        }
     }
 
     @Override

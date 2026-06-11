@@ -31,47 +31,81 @@ public record NetworkAnalyserConfig(AnalyserMode mode, float nodeSize, Map<Enum<
     }
 
     public static NetworkAnalyserConfig read(ByteBuf buf) {
-        AnalyserMode mode = AnalyserMode.byIndex(buf.readByte());
+        if (buf.readableBytes() < 6) {
+            return null;
+        }
+        int modeIndex = buf.readByte();
+        AnalyserMode mode = getEnumByIndex(AnalyserMode.values(), modeIndex);
+        if (mode == null) {
+            return null;
+        }
         float nodeSize = buf.readFloat();
+        if (!Float.isFinite(nodeSize) || nodeSize < 0.1f || nodeSize > 0.9f) {
+            return null;
+        }
         var colors = new Reference2ObjectOpenHashMap<Enum<?>, ColorData>();
         int size = buf.readUnsignedByte();
+        if (size > DEFAULT_COLORS.size()) {
+            return null;
+        }
         for (int i = 0; i < size; i++) {
-            FlagType type = FlagType.byIndex(buf.readByte());
+            if (buf.readableBytes() < 6) {
+                return null;
+            }
+            FlagType type = getEnumByIndex(FlagType.values(), buf.readByte());
             int ordinal = buf.readByte();
+            if (type == null) {
+                return null;
+            }
             ColorData color = ColorData.read(buf);
             switch (type) {
-                case LINK -> colors.put(LinkFlag.byIndex(ordinal), color);
-                case NODE -> colors.put(NodeFlag.byIndex(ordinal), color);
+                case LINK -> {
+                    LinkFlag flag = getEnumByIndex(LinkFlag.values(), ordinal);
+                    if (flag == null) {
+                        return null;
+                    }
+                    if (!DEFAULT_COLORS.containsKey(flag) || colors.containsKey(flag)) {
+                        return null;
+                    }
+                    colors.put(flag, color);
+                }
+                case NODE -> {
+                    NodeFlag flag = getEnumByIndex(NodeFlag.values(), ordinal);
+                    if (flag == null) {
+                        return null;
+                    }
+                    if (!DEFAULT_COLORS.containsKey(flag) || colors.containsKey(flag)) {
+                        return null;
+                    }
+                    colors.put(flag, color);
+                }
             }
         }
         return new NetworkAnalyserConfig(mode, nodeSize, colors);
     }
 
-    public void write(ByteBuf buf) {
-        buf.writeByte(mode.ordinal());
-        buf.writeFloat(nodeSize);
-        buf.writeByte(colors.size());
-        for (var entry : colors.entrySet()) {
-            Enum<?> type = entry.getKey();
-            if (type instanceof LinkFlag) {
-                buf.writeByte(FlagType.LINK.ordinal());
-            } else {
-                buf.writeByte(FlagType.NODE.ordinal());
-            }
-            buf.writeByte(type.ordinal());
-            entry.getValue().write(buf);
-        }
+    private static <T extends Enum<T>> T getEnumByIndex(T[] values, int index) {
+        return index >= 0 && index < values.length ? values[index] : null;
     }
 
     public static NetworkAnalyserConfig fromTag(NBTTagCompound tag) {
         if (tag == null) {
             return DEFAULT;
         }
-        AnalyserMode mode = tag.hasKey(TAG_MODE) ? AnalyserMode.byIndex(tag.getInteger(TAG_MODE)) : DEFAULT.mode;
+        AnalyserMode mode = DEFAULT.mode;
+        if (tag.hasKey(TAG_MODE, 99)) {
+            AnalyserMode tagMode = getEnumByIndex(AnalyserMode.values(), tag.getInteger(TAG_MODE));
+            if (tagMode != null) {
+                mode = tagMode;
+            }
+        }
         float nodeSize = tag.hasKey(TAG_NODE_SIZE) ? tag.getFloat(TAG_NODE_SIZE) : DEFAULT.nodeSize;
+        if (!Float.isFinite(nodeSize)) {
+            nodeSize = DEFAULT.nodeSize;
+        }
         var colors = new Reference2ObjectOpenHashMap<Enum<?>, ColorData>();
         colors.putAll(DEFAULT_COLORS);
-        if (tag.hasKey(TAG_COLORS)) {
+        if (tag.hasKey(TAG_COLORS, 10)) {
             NBTTagCompound colorTag = tag.getCompoundTag(TAG_COLORS);
             readColor(colorTag, colors, LinkFlag.NORMAL, "link_normal");
             readColor(colorTag, colors, LinkFlag.DENSE, "link_dense");
@@ -81,6 +115,13 @@ public record NetworkAnalyserConfig(AnalyserMode mode, float nodeSize, Map<Enum<
             readColor(colorTag, colors, NodeFlag.MISSING, "node_missing");
         }
         return new NetworkAnalyserConfig(mode, Math.clamp(nodeSize, 0.1f, 0.9f), colors);
+    }
+
+    private static void readColor(NBTTagCompound tag, Reference2ObjectMap<Enum<?>, ColorData> colors, Enum<?> key,
+                                  String name) {
+        if (tag.hasKey(name, 10)) {
+            colors.put(key, ColorData.fromTag(tag.getCompoundTag(name), colors.get(key)));
+        }
     }
 
     public NBTTagCompound toTag() {
@@ -98,10 +139,22 @@ public record NetworkAnalyserConfig(AnalyserMode mode, float nodeSize, Map<Enum<
         return tag;
     }
 
-    private static void readColor(NBTTagCompound tag, Reference2ObjectMap<Enum<?>, ColorData> colors, Enum<?> key,
-                                  String name) {
-        if (tag.hasKey(name)) {
-            colors.put(key, ColorData.fromTag(tag.getCompoundTag(name), colors.get(key)));
+    public void write(ByteBuf buf) {
+        buf.writeByte(mode.ordinal());
+        buf.writeFloat(nodeSize);
+        buf.writeByte(DEFAULT_COLORS.size());
+        for (Enum<?> type : DEFAULT_COLORS.keySet()) {
+            if (type instanceof LinkFlag) {
+                buf.writeByte(FlagType.LINK.ordinal());
+            } else {
+                buf.writeByte(FlagType.NODE.ordinal());
+            }
+            buf.writeByte(type.ordinal());
+            ColorData color = colors.get(type);
+            if (color == null) {
+                color = DEFAULT_COLORS.get(type);
+            }
+            color.write(buf);
         }
     }
 

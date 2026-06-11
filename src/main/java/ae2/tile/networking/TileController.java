@@ -18,6 +18,7 @@
 
 package ae2.tile.networking;
 
+import ae2.api.config.Actionable;
 import ae2.api.networking.GridFlags;
 import ae2.api.networking.GridHelper;
 import ae2.api.networking.IGridNodeListener;
@@ -33,6 +34,7 @@ import ae2.core.gui.GuiOpener;
 import ae2.tile.grid.AENetworkedPoweredTile;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumFacing;
 
@@ -141,7 +143,7 @@ public class TileController extends AENetworkedPoweredTile {
     }
 
     @Override
-    protected double funnelPowerIntoStorage(double power, ae2.api.config.Actionable mode) {
+    protected double funnelPowerIntoStorage(double power, Actionable mode) {
         var grid = getMainNode().getGrid();
         if (grid != null) {
             return grid.getEnergyService().injectPower(power, mode);
@@ -167,7 +169,7 @@ public class TileController extends AENetworkedPoweredTile {
         return AEBlocks.CONTROLLER.stack(1);
     }
 
-    public void openGui(net.minecraft.entity.player.EntityPlayer player) {
+    public void openGui(EntityPlayer player) {
         GuiOpener.openGui(player, GuiIds.GuiKey.CONTROLLER_STATUS, this);
     }
 }

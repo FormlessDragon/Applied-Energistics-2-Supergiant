@@ -8,7 +8,7 @@ import ae2.server.subcommands.GridsCommand;
 import ae2.server.subcommands.SpatialStorageCommand;
 import ae2.server.subcommands.TestMeteoritesCommand;
 import ae2.server.subcommands.TickMonitoring;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
 

@@ -3,7 +3,7 @@ package ae2.recipes.handlers;
 import ae2.recipes.AERecipeTypes;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.Ingredient;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class ChargerRecipe {
     private final Ingredient ingredient;

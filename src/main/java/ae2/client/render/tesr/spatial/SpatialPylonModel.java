@@ -29,7 +29,7 @@ import net.minecraftforge.client.model.IModel;
 import net.minecraftforge.common.model.IModelState;
 import net.minecraftforge.common.model.TRSRTransformation;
 
-import javax.annotation.Nonnull;
+import org.jetbrains.annotations.NotNull;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -58,8 +58,8 @@ public class SpatialPylonModel implements IModel {
     }
 
     @Override
-    public IBakedModel bake(@Nonnull IModelState state, @Nonnull VertexFormat format,
-                            @Nonnull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
+    public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
+                            @NotNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         Map<SpatialPylonTextureType, TextureAtlasSprite> textures = new EnumMap<>(
             SpatialPylonTextureType.class);
 

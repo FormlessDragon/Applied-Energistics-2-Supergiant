@@ -110,7 +110,10 @@ public abstract class AbstractLevelEmitterPart extends UpgradeablePart {
             var te = this.getHost().getTileEntity();
             this.prevState = isOn;
             Platform.notifyBlocksOfNeighbors(te.getWorld(), te.getPos());
-            Platform.notifyBlocksOfNeighbors(te.getWorld(), te.getPos().offset(this.getSide()));
+            var side = this.getSide();
+            if (side != null) {
+                Platform.notifyBlocksOfNeighbors(te.getWorld(), te.getPos().offset(side));
+            }
         }
     }
 
@@ -141,6 +144,9 @@ public abstract class AbstractLevelEmitterPart extends UpgradeablePart {
     public final void animateTick(World level, BlockPos pos, Random r) {
         if (this.isLevelEmitterOn()) {
             final EnumFacing d = this.getSide();
+            if (d == null) {
+                return;
+            }
 
             final double d0 = d.getXOffset() * 0.45F + (r.nextFloat() - 0.5F) * 0.2D;
             final double d1 = d.getYOffset() * 0.45F + (r.nextFloat() - 0.5F) * 0.2D;

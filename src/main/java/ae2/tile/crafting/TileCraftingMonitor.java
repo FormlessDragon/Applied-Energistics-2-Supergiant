@@ -35,14 +35,9 @@ public class TileCraftingMonitor extends TileCraftingUnit implements IColorableB
     private GenericStack display;
     private AEColor paintedColor = AEColor.TRANSPARENT;
 
-    @Override
-    protected boolean readFromStream(ByteBuf data) {
-        final boolean changed = super.readFromStream(data);
-        var packetBuffer = new PacketBuffer(data);
-        final AEColor oldPaintedColor = this.paintedColor;
-        this.paintedColor = AEColor.values()[packetBuffer.readByte()];
-        this.display = GenericStack.readBuffer(packetBuffer);
-        return oldPaintedColor != this.paintedColor || changed;
+    private static AEColor readColor(int colorIndex) {
+        AEColor[] colors = AEColor.values();
+        return colorIndex >= 0 && colorIndex < colors.length ? colors[colorIndex] : AEColor.TRANSPARENT;
     }
 
     @Override
@@ -54,10 +49,20 @@ public class TileCraftingMonitor extends TileCraftingUnit implements IColorableB
     }
 
     @Override
+    protected boolean readFromStream(ByteBuf data) {
+        final boolean changed = super.readFromStream(data);
+        var packetBuffer = new PacketBuffer(data);
+        final AEColor oldPaintedColor = this.paintedColor;
+        this.paintedColor = readColor(packetBuffer.readByte());
+        this.display = GenericStack.readBuffer(packetBuffer);
+        return oldPaintedColor != this.paintedColor || changed;
+    }
+
+    @Override
     public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
         if (data.hasKey("paintedColor")) {
-            this.paintedColor = AEColor.values()[data.getByte("paintedColor")];
+            this.paintedColor = readColor(data.getByte("paintedColor"));
         }
     }
 

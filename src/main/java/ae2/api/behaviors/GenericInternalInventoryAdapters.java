@@ -4,7 +4,6 @@ import ae2.api.AECapabilities;
 import ae2.util.CowMap;
 import net.minecraftforge.common.capabilities.Capability;
 
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
@@ -14,7 +13,6 @@ import java.util.function.Function;
 /**
  * Allows addons to expose AE2's generic internal inventories through Forge capabilities.
  */
-@ApiStatus.Experimental
 public final class GenericInternalInventoryAdapters {
     private static final CowMap<Capability<?>, Function<GenericInternalInventory, ?>> adapters = CowMap
         .identityHashMap();

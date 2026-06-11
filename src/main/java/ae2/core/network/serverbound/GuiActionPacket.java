@@ -8,6 +8,10 @@ import net.minecraft.network.PacketBuffer;
 import org.jetbrains.annotations.Nullable;
 
 public class GuiActionPacket extends ServerboundPacket {
+    public static final int MAX_ACTION_NAME_LENGTH = 128;
+    public static final int MAX_JSON_PAYLOAD_LENGTH = 16384;
+
+    private int windowId;
     private String actionName;
     @Nullable
     private String jsonPayload;
@@ -15,7 +19,8 @@ public class GuiActionPacket extends ServerboundPacket {
     public GuiActionPacket() {
     }
 
-    public GuiActionPacket(String actionName, @Nullable String jsonPayload) {
+    public GuiActionPacket(int windowId, String actionName, @Nullable String jsonPayload) {
+        this.windowId = windowId;
         this.actionName = actionName;
         this.jsonPayload = jsonPayload;
     }
@@ -23,17 +28,22 @@ public class GuiActionPacket extends ServerboundPacket {
     @Override
     protected void read(ByteBuf buf) {
         var packetBuffer = new PacketBuffer(buf);
-        this.actionName = packetBuffer.readString(32767);
+        this.windowId = packetBuffer.readInt();
+        this.actionName = packetBuffer.readString(MAX_ACTION_NAME_LENGTH);
         if (packetBuffer.readBoolean()) {
-            this.jsonPayload = packetBuffer.readString(32767);
+            this.jsonPayload = packetBuffer.readString(MAX_JSON_PAYLOAD_LENGTH);
         } else {
             this.jsonPayload = null;
+        }
+        if (buf.isReadable()) {
+            throw new IllegalArgumentException("Trailing GUI action packet payload bytes: " + buf.readableBytes());
         }
     }
 
     @Override
     protected void write(ByteBuf buf) {
         var packetBuffer = new PacketBuffer(buf);
+        packetBuffer.writeInt(this.windowId);
         packetBuffer.writeString(this.actionName);
         packetBuffer.writeBoolean(this.jsonPayload != null);
         if (this.jsonPayload != null) {
@@ -44,6 +54,9 @@ public class GuiActionPacket extends ServerboundPacket {
     @Override
     public void handleServer(EntityPlayerMP player) {
         if (player.openContainer instanceof AEBaseContainer container) {
+            if (container.windowId != this.windowId) {
+                return;
+            }
             container.receiveClientAction(this.actionName, this.jsonPayload);
         }
     }

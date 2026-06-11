@@ -55,11 +55,11 @@ public class KeyTypeSelectionButton extends IconButton {
         Set<AEKeyType> newSelection = getNextSelection(container.getClientKeyTypeSelection());
 
         for (var keyType : newSelection) {
-            container.selectKeyType(keyType, true);
+            container.selectKeyType(container.windowId, keyType, true);
         }
         for (var keyType : container.getClientKeyTypeSelection().enabledSet()) {
             if (!newSelection.contains(keyType)) {
-                container.selectKeyType(keyType, false);
+                container.selectKeyType(container.windowId, keyType, false);
             }
         }
     }

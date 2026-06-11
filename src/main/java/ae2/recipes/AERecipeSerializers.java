@@ -9,9 +9,12 @@ import ae2.recipes.handlers.CrystalAssemblerRecipeSerializer;
 import ae2.recipes.handlers.CrystalFixerRecipeSerializer;
 import ae2.recipes.handlers.InscriberRecipeSerializer;
 import ae2.recipes.mattercannon.MatterCannonAmmoSerializer;
+import ae2.recipes.serializers.JsonRecipeUtils;
 import ae2.recipes.transform.TransformRecipeSerializer;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import net.minecraft.util.JsonUtils;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.crafting.JsonContext;
 
@@ -41,16 +44,24 @@ public final class AERecipeSerializers {
     }
 
     public static void register(JsonObject json, JsonContext ctx) {
-        if (!ae2.recipes.serializers.JsonRecipeUtils.shouldLoad(json)) {
+        if (!JsonRecipeUtils.shouldLoad(json)) {
             return;
         }
 
-        String type = ctx.appendModId(json.get("type").getAsString());
-        IAERecipeFactory factory = FACTORIES.get(new ResourceLocation(type));
+        String type = ctx.appendModId(JsonUtils.getString(json, "type"));
+        IAERecipeFactory factory = FACTORIES.get(readType(type));
         if (factory == null) {
             return;
         }
 
         factory.register(json, ctx);
+    }
+
+    private static ResourceLocation readType(String type) {
+        try {
+            return new ResourceLocation(type);
+        } catch (RuntimeException e) {
+            throw new JsonSyntaxException("Invalid AE2 recipe type: " + type, e);
+        }
     }
 }

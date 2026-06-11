@@ -40,6 +40,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagLong;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
+import net.minecraftforge.common.util.Constants;
 
 import java.util.Date;
 import java.util.EnumSet;
@@ -72,10 +73,14 @@ public class TileQuantumBridge extends AENetworkedInvTile
     }
 
     public static boolean isValidEntangledSingularity(ItemStack stack) {
-        return !stack.isEmpty()
-            && stack.getItem() == AEItems.QUANTUM_ENTANGLED_SINGULARITY.item()
-            && stack.hasTagCompound()
-            && stack.getTagCompound().hasKey(ENTANGLED_SINGULARITY_ID, 99);
+        if (stack.isEmpty()
+            || stack.getItem() != AEItems.QUANTUM_ENTANGLED_SINGULARITY.item()
+            || !stack.hasTagCompound()) {
+            return false;
+        }
+
+        NBTTagCompound tag = stack.getTagCompound();
+        return tag != null && tag.hasKey(ENTANGLED_SINGULARITY_ID, Constants.NBT.TAG_LONG);
     }
 
     public static void assignFrequency(ItemStack stack) {
@@ -250,9 +255,12 @@ public class TileQuantumBridge extends AENetworkedInvTile
     public long getQEFrequency() {
         final ItemStack stack = this.internalInventory.getStackInSlot(0);
         if (isValidEntangledSingularity(stack)) {
-            NBTBase frequencyTag = stack.getTagCompound().getTag(ENTANGLED_SINGULARITY_ID);
-            if (frequencyTag instanceof NBTTagLong) {
-                return ((NBTTagLong) frequencyTag).getLong();
+            NBTTagCompound tag = stack.getTagCompound();
+            if (tag != null) {
+                NBTBase frequencyTag = tag.getTag(ENTANGLED_SINGULARITY_ID);
+                if (frequencyTag instanceof NBTTagLong) {
+                    return ((NBTTagLong) frequencyTag).getLong();
+                }
             }
         }
 

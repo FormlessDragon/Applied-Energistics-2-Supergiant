@@ -16,6 +16,7 @@ import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.command.WrongUsageException;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
@@ -25,6 +26,7 @@ import net.minecraft.world.Teleporter;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.DimensionManager;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -78,8 +80,8 @@ public class SpatialStorageCommand implements ISubCommand {
         for (SpatialStoragePlot plot : SpatialStoragePlotManager.INSTANCE.getPlots()) {
             BlockPos origin = plot.getOrigin();
             BlockPos size = plot.getSize();
-            if (playerPos.getX() >= origin.getX() && playerPos.getX() <= origin.getX() + size.getX()
-                && playerPos.getZ() >= origin.getZ() && playerPos.getZ() <= origin.getZ() + size.getZ()) {
+            if (playerPos.getX() >= origin.getX() && playerPos.getX() < origin.getX() + size.getX()
+                && playerPos.getZ() >= origin.getZ() && playerPos.getZ() < origin.getZ() + size.getZ()) {
                 return plot;
             }
         }
@@ -89,7 +91,11 @@ public class SpatialStorageCommand implements ISubCommand {
 
     private static int parsePlotId(String input) throws CommandException {
         try {
-            return Integer.parseInt(input);
+            int plotId = Integer.parseInt(input);
+            if (plotId < 1) {
+                throw new NumberFormatException("Plot id must be positive");
+            }
+            return plotId;
         } catch (NumberFormatException e) {
             throw new CommandException("commands.ae2.spatial.invalid_plot_id", input);
         }
@@ -121,9 +127,9 @@ public class SpatialStorageCommand implements ISubCommand {
         return PlayerMessages.UnknownAE2Player.text(ownerId);
     }
 
-    private static java.time.Instant getLastTransitionTimestamp(SpatialStoragePlot plot) {
+    private static Instant getLastTransitionTimestamp(SpatialStoragePlot plot) {
         TransitionInfo transition = plot.getLastTransition();
-        return transition != null ? transition.timestamp() : java.time.Instant.MIN;
+        return transition != null ? transition.timestamp() : Instant.MIN;
     }
 
     private static boolean acceptsPlotId(String action) {
@@ -158,16 +164,19 @@ public class SpatialStorageCommand implements ISubCommand {
         }
 
         if (args.length == 1) {
-            listPlots(srv, sender);
+            listPlots(sender);
             return;
         }
 
-        String action = args[1].toLowerCase();
+        String action = args[1].toLowerCase(Locale.ROOT);
         switch (action) {
             case "info" -> {
                 if (args.length == 2) {
                     showPlotInfo(sender, getCurrentPlot(sender));
                     return;
+                }
+                if (args.length != 3) {
+                    throw new WrongUsageException("commands.ae2.spatial");
                 }
                 showPlotInfo(sender, getPlot(parsePlotId(args[2])));
                 return;
@@ -184,6 +193,9 @@ public class SpatialStorageCommand implements ISubCommand {
                     teleportBack(srv, sender, getCurrentPlot(sender));
                     return;
                 }
+                if (args.length != 3) {
+                    throw new WrongUsageException("commands.ae2.spatial");
+                }
                 teleportBack(srv, sender, getPlot(parsePlotId(args[2])));
                 return;
             }
@@ -199,7 +211,7 @@ public class SpatialStorageCommand implements ISubCommand {
         throw new WrongUsageException("commands.ae2.spatial");
     }
 
-    private void listPlots(MinecraftServer server, ICommandSender sender) {
+    private void listPlots(ICommandSender sender) {
         ObjectList<SpatialStoragePlot> plots = new ObjectArrayList<>(SpatialStoragePlotManager.INSTANCE.getPlots());
         if (plots.isEmpty()) {
             sender.sendMessage(PlayerMessages.NoSpatialIOPlots.text());
@@ -292,19 +304,19 @@ public class SpatialStorageCommand implements ISubCommand {
         }
 
         @Override
-        public void placeInPortal(net.minecraft.entity.Entity entity, float rotationYaw) {
+        public void placeInPortal(Entity entity, float rotationYaw) {
             entity.setLocationAndAngles(this.pos.getX() + 0.5, this.pos.getY(), this.pos.getZ() + 0.5,
                 entity.rotationYaw, entity.rotationPitch);
         }
 
         @Override
-        public boolean placeInExistingPortal(net.minecraft.entity.Entity entity, float rotationYaw) {
+        public boolean placeInExistingPortal(Entity entity, float rotationYaw) {
             this.placeInPortal(entity, rotationYaw);
             return true;
         }
 
         @Override
-        public boolean makePortal(net.minecraft.entity.Entity entity) {
+        public boolean makePortal(Entity entity) {
             return true;
         }
 

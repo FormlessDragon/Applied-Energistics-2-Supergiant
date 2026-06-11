@@ -40,14 +40,23 @@ public class MEPackageItem extends AEBaseItem {
     }
 
     private static boolean restoreBlock(World world, BlockPos pos, NBTTagCompound tag) {
-        Block block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(tag.getString(BLOCK_ID_TAG)));
-        if (block == null || !world.mayPlace(block, pos, false, EnumFacing.UP, null)) {
+        if (!tag.hasKey(BLOCK_ID_TAG, 8) || !tag.hasKey(STATE_TAG, 10) || !tag.hasKey(DATA_TAG, 10)) {
+            return false;
+        }
+
+        ResourceLocation blockId = getResourceLocation(tag.getString(BLOCK_ID_TAG));
+        Block block = blockId == null ? null : ForgeRegistries.BLOCKS.getValue(blockId);
+        if (block == null || !MEPackingTapeItem.BLOCK_WHITELIST.contains(blockId)
+            || !world.mayPlace(block, pos, false, EnumFacing.UP, null)) {
+            return false;
+        }
+        IBlockState state = NBTUtil.readBlockState(tag.getCompoundTag(STATE_TAG));
+        if (state.getBlock() != block) {
             return false;
         }
         if (world.isRemote) {
             return true;
         }
-        IBlockState state = NBTUtil.readBlockState(tag.getCompoundTag(STATE_TAG));
         if (!world.setBlockState(pos, state, 3)) {
             return false;
         }
@@ -127,8 +136,13 @@ public class MEPackageItem extends AEBaseItem {
             return EnumActionResult.PASS;
         }
         if (tag.getBoolean(IS_PART_TAG)) {
-            Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(tag.getString(ID_TAG)));
-            if (!(item instanceof IPartItem<?>)) {
+            if (!tag.hasKey(ID_TAG, 8) || !tag.hasKey(DATA_TAG, 10)) {
+                return EnumActionResult.FAIL;
+            }
+
+            ResourceLocation itemId = getResourceLocation(tag.getString(ID_TAG));
+            Item item = itemId == null ? null : ForgeRegistries.ITEMS.getValue(itemId);
+            if (!(item instanceof IPartItem<?>) || !MEPackingTapeItem.PART_WHITELIST.contains(itemId)) {
                 return EnumActionResult.FAIL;
             }
             ItemStack partStack = new ItemStack(item);

@@ -1,5 +1,6 @@
 package ae2.client.gui.me.crafting;
 
+import ae2.client.Point;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.Blitter;
@@ -68,7 +69,7 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
         widgets.add("missingOnly", missingOnly);
         this.back = new CraftingTreeButton(Icon.BACK,
             GuiText.CraftingTreeBack.text(),
-            () -> InitNetwork.sendToServer(new SwitchCraftingTreePacket()));
+            () -> InitNetwork.sendToServer(new SwitchCraftingTreePacket(this.container.windowId)));
         widgets.add("back", back);
     }
 
@@ -218,7 +219,7 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
     }
 
     private void layoutWidgets() {
-        this.tree.setPosition(new ae2.client.Point(7, 25));
+        this.tree.setPosition(new Point(7, 25));
         this.tree.setSize(background.internalWidth(), background.internalHeight());
         moveButton(screenshot, xSize - 86);
         moveButton(missingOnly, xSize - 58);

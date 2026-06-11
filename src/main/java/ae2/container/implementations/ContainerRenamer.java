@@ -1,33 +1,23 @@
 package ae2.container.implementations;
 
+import ae2.api.util.ICustomName;
 import ae2.container.AEBaseContainer;
 import ae2.container.guisync.GuiSync;
-import ae2.parts.AEBasePart;
-import ae2.tile.AEBaseTile;
-import ae2.tile.crafting.ICraftingCPUTileEntity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
 
 public class ContainerRenamer extends AEBaseContainer {
 
     private static final String ACTION_SET_NAME = "setName";
-    private final Object renamableHost;
+    private static final int MAX_CUSTOM_NAME_LENGTH = 32;
+    private final ICustomName renamableHost;
     @GuiSync(1)
     private String initialName;
     @GuiSync(2)
     private boolean initialNameReady;
     private String pendingName;
 
-    public ContainerRenamer(InventoryPlayer playerInventory, AEBaseTile host) {
-        super(playerInventory, host);
-        this.renamableHost = host;
-        this.initialName = getName(host.getCustomName());
-        this.pendingName = this.initialName;
-        this.initialNameReady = isServerSide();
-        registerClientAction(ACTION_SET_NAME, String.class, this::setName);
-    }
-
-    public ContainerRenamer(InventoryPlayer playerInventory, AEBasePart host) {
+    public ContainerRenamer(InventoryPlayer playerInventory, ICustomName host) {
         super(playerInventory, host);
         this.renamableHost = host;
         this.initialName = getName(host.getCustomName());
@@ -49,6 +39,9 @@ public class ContainerRenamer extends AEBaseContainer {
     }
 
     public void setName(String name) {
+        if (name != null && name.length() > MAX_CUSTOM_NAME_LENGTH) {
+            return;
+        }
         this.pendingName = name;
         if (isClientSide()) {
             sendClientAction(ACTION_SET_NAME, name);
@@ -66,21 +59,10 @@ public class ContainerRenamer extends AEBaseContainer {
     }
 
     private void applyName(String name) {
-        this.initialName = name;
-        if (this.renamableHost instanceof AEBaseTile tile) {
-            if (tile instanceof ICraftingCPUTileEntity craftingCpu) {
-                craftingCpu.setName(name);
-            } else {
-                tile.setCustomName(name);
-            }
-            tile.saveChanges();
-            tile.markForUpdate();
-        } else if (this.renamableHost instanceof AEBasePart part) {
-            part.setCustomName(name);
-            if (part.getHost() != null) {
-                part.getHost().markForSave();
-                part.getHost().markForUpdate();
-            }
+        if (name != null && name.length() > MAX_CUSTOM_NAME_LENGTH) {
+            return;
         }
+        this.initialName = name;
+        this.renamableHost.setCustomNameFromRenamer(name);
     }
 }

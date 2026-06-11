@@ -26,7 +26,7 @@ package ae2.api.inventories;
 import ae2.api.stacks.GenericStack;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.items.IItemHandlerModifiable;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 class InternalInventoryItemHandler implements IItemHandlerModifiable {
     private final InternalInventory inventory;
@@ -41,22 +41,22 @@ class InternalInventoryItemHandler implements IItemHandlerModifiable {
     }
 
     @Override
-    public @NonNull ItemStack getStackInSlot(int slot) {
+    public @NotNull ItemStack getStackInSlot(int slot) {
         return inventory.getStackInSlot(slot);
     }
 
     @Override
-    public void setStackInSlot(int slot, @NonNull ItemStack stack) {
+    public void setStackInSlot(int slot, @NotNull ItemStack stack) {
         inventory.setItemDirect(slot, stack);
     }
 
     @Override
-    public @NonNull ItemStack insertItem(int slot, @NonNull ItemStack stack, boolean simulate) {
+    public @NotNull ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate) {
         return inventory.insertItem(slot, stack, simulate);
     }
 
     @Override
-    public @NonNull ItemStack extractItem(int slot, int amount, boolean simulate) {
+    public @NotNull ItemStack extractItem(int slot, int amount, boolean simulate) {
         // Do not allow extraction of wrapped stacks because they're an internal detail
         if (GenericStack.isWrapped(inventory.getStackInSlot(slot))) {
             return ItemStack.EMPTY;
@@ -71,7 +71,7 @@ class InternalInventoryItemHandler implements IItemHandlerModifiable {
     }
 
     @Override
-    public boolean isItemValid(int slot, @NonNull ItemStack stack) {
+    public boolean isItemValid(int slot, @NotNull ItemStack stack) {
         return inventory.isItemValid(slot, stack);
     }
 }

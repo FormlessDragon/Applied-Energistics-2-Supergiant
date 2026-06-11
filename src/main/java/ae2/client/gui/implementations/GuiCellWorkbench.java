@@ -44,7 +44,6 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextFormatting;
 
 import java.util.List;
@@ -62,8 +61,8 @@ public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
 
         this.fuzzyMode = addToLeftToolbar(
             new SettingToggleButton<>(Settings.FUZZY_MODE, FuzzyMode.IGNORE_ALL, this::toggleFuzzyMode));
-        this.addToLeftToolbar(new ActionButton(ActionItems.COG, act -> container.partition()));
-        this.addToLeftToolbar(new ActionButton(ActionItems.CLOSE, act -> container.clear()));
+        this.addToLeftToolbar(new ActionButton(ActionItems.COG, container::partition));
+        this.addToLeftToolbar(new ActionButton(ActionItems.CLOSE, container::clear));
         this.cellRestrictionButton = this.addToLeftToolbar(new CellRestrictionButton(this::openCellRestriction));
         this.copyMode = this.addToLeftToolbar(new ToggleButton(Icon.COPY_MODE_ON, Icon.COPY_MODE_OFF,
             GuiText.CopyMode.text(), GuiText.CopyModeDesc.text(), act -> container.nextWorkBenchCopyMode()));
@@ -74,9 +73,7 @@ public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
     }
 
     private static void addIncompatibleWithCellTooltip(List<String> lines) {
-        lines.add(GuiText.IncompatibleWithCell.text()
-                                              .setStyle(new Style().setColor(TextFormatting.RED))
-                                              .getFormattedText());
+        lines.add(TextFormatting.RED + GuiText.IncompatibleWithCell.getLocal());
     }
 
     @Override

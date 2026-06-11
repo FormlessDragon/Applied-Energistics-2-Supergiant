@@ -84,7 +84,7 @@ public abstract class GeometryHelper {
             return false;
         }
 
-        int i = face.getAxis().ordinal();
+        int i = axisIndex(face.getAxis());
         final float val = quad.posByIndex(0, i);
         return epsilonEquals(val, quad.posByIndex(1, i)) && epsilonEquals(val, quad.posByIndex(2, i))
             && epsilonEquals(val, quad.posByIndex(3, i));
@@ -102,7 +102,7 @@ public abstract class GeometryHelper {
         if (lightFace == null)
             return false;
 
-        final float x = quad.posByIndex(0, lightFace.getAxis().ordinal());
+        final float x = quad.posByIndex(0, axisIndex(lightFace.getAxis()));
         return lightFace.getAxisDirection() == AxisDirection.POSITIVE ? x >= EPS_MAX : x <= EPS_MIN;
     }
 
@@ -246,5 +246,13 @@ public abstract class GeometryHelper {
 
     private static boolean epsilonEquals(float a, float b) {
         return Math.abs(a - b) < EPSILON;
+    }
+
+    private static int axisIndex(Axis axis) {
+        return switch (axis) {
+            case X -> 0;
+            case Y -> 1;
+            case Z -> 2;
+        };
     }
 }

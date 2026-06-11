@@ -3,186 +3,214 @@ package ae2.server.services.compass;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.clientbound.ClearCompassCachePacket;
-import ae2.tile.misc.TileMysteriousCube;
+import ae2.util.MeteoriteCompassSearch;
+import ae2.worldgen.meteorite.MeteoritesWorldData;
+import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
-import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.Objects;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 public final class ServerCompassService {
-    private static final int MAX_RANGE = 174;
-    private static final int CHUNK_SIZE = 16;
-    private static final LoadingCache<Query, Optional<BlockPos>> CLOSEST_METEORITE_CACHE = CacheBuilder.newBuilder()
-                                                                                                       .maximumSize(100)
-                                                                                                       .expireAfterWrite(5, TimeUnit.SECONDS)
-                                                                                                       .build(new CacheLoader<>() {
-                                                                                                           @Override
-                                                                                                           public @NonNull Optional<BlockPos> load(@NonNull Query query) {
-                                                                                                               return Optional.ofNullable(findClosestMeteoritePos(query.level, query.chunk));
-                                                                                                           }
-                                                                                                       });
+    private static final int LOADED_CHUNK_INDEX_RADIUS = 8;
+    private static final Cache<ChunkIndexQuery, Boolean> CHUNK_INDEX_ATTEMPT_CACHE = CacheBuilder.newBuilder()
+                                                                                                 .maximumSize(4096)
+                                                                                                 .expireAfterWrite(5,
+                                                                                                     TimeUnit.SECONDS)
+                                                                                                 .build();
+    private static final LoadingCache<RegionQuery, ObjectList<BlockPos>> METEORITE_TARGET_CACHE =
+        CacheBuilder.newBuilder()
+                    .maximumSize(512)
+                    .expireAfterWrite(5, TimeUnit.SECONDS)
+                    .build(new CacheLoader<>() {
+                        @Override
+                        public @NotNull ObjectList<BlockPos> load(@NotNull RegionQuery query) {
+                            return findMeteoriteTargets(query.level, query.regionX, query.regionZ);
+                        }
+                    });
 
-    public static Optional<BlockPos> getClosestMeteorite(WorldServer level, ChunkPos chunkPos) {
-        return CLOSEST_METEORITE_CACHE.getUnchecked(new Query(level, chunkPos));
+    public static Optional<BlockPos> getClosestMeteorite(WorldServer level, int regionX, int regionZ, BlockPos origin,
+                                                         boolean indexLoadedChunks) {
+        if (indexLoadedChunks) {
+            ensureLoadedChunksIndexed(level, regionX, regionZ, origin);
+        }
+        return findClosest(METEORITE_TARGET_CACHE.getUnchecked(new RegionQuery(level, regionX, regionZ)), origin);
     }
 
-    @Nullable
-    private static BlockPos findClosestMeteoritePos(WorldServer level, ChunkPos originChunkPos) {
-        var chunkPos = findClosestMeteoriteChunk(level, originChunkPos);
-        if (chunkPos == null) {
-            return null;
-        }
-        var chunk = level.getChunkProvider().getLoadedChunk(chunkPos.x, chunkPos.z);
-        if (chunk == null) {
-            return getChunkCenter(chunkPos);
-        }
-
-        var sourcePos = getChunkCenter(originChunkPos);
-        var closestDistanceSq = Double.MAX_VALUE;
-        BlockPos chosenPos = getChunkCenter(chunkPos);
-        for (TileEntity blockEntity : chunk.getTileEntityMap().values()) {
-            if (!(blockEntity instanceof TileMysteriousCube)) {
-                continue;
-            }
-
-            BlockPos meteoritePos = blockEntity.getPos();
-            var distSq = sourcePos.distanceSq(meteoritePos);
-            if (distSq < closestDistanceSq) {
-                chosenPos = meteoritePos;
-                closestDistanceSq = distSq;
-            }
-        }
-        return chosenPos;
+    public static void clearCache() {
+        CHUNK_INDEX_ATTEMPT_CACHE.invalidateAll();
+        CHUNK_INDEX_ATTEMPT_CACHE.cleanUp();
+        METEORITE_TARGET_CACHE.invalidateAll();
+        METEORITE_TARGET_CACHE.cleanUp();
     }
 
-    @Nullable
-    private static ChunkPos findClosestMeteoriteChunk(WorldServer level, ChunkPos chunkPos) {
-        var cx = chunkPos.x;
-        var cz = chunkPos.z;
-
-        if (hasCompassTarget(level, cx, cz)) {
-            return chunkPos;
-        }
-
-        for (int offset = 1; offset < MAX_RANGE; offset++) {
-            final int minX = cx - offset;
-            final int minZ = cz - offset;
-            final int maxX = cx + offset;
-            final int maxZ = cz + offset;
-
-            int closest = Integer.MAX_VALUE;
-            int chosenX = cx;
-            int chosenZ = cz;
-
-            for (int z = minZ; z <= maxZ; z++) {
-                if (hasCompassTarget(level, minX, z)) {
-                    final int closeness = dist(cx, cz, minX, z);
-                    if (closeness < closest) {
-                        closest = closeness;
-                        chosenX = minX;
-                        chosenZ = z;
-                    }
-                }
-                if (hasCompassTarget(level, maxX, z)) {
-                    final int closeness = dist(cx, cz, maxX, z);
-                    if (closeness < closest) {
-                        closest = closeness;
-                        chosenX = maxX;
-                        chosenZ = z;
-                    }
-                }
-            }
-
-            for (int x = minX + 1; x < maxX; x++) {
-                if (hasCompassTarget(level, x, minZ)) {
-                    final int closeness = dist(cx, cz, x, minZ);
-                    if (closeness < closest) {
-                        closest = closeness;
-                        chosenX = x;
-                        chosenZ = minZ;
-                    }
-                }
-                if (hasCompassTarget(level, x, maxZ)) {
-                    final int closeness = dist(cx, cz, x, maxZ);
-                    if (closeness < closest) {
-                        closest = closeness;
-                        chosenX = x;
-                        chosenZ = maxZ;
-                    }
-                }
-            }
-
-            if (closest < Integer.MAX_VALUE) {
-                return new ChunkPos(chosenX, chosenZ);
-            }
-        }
-
-        return null;
+    public static void clearCache(WorldServer level) {
+        CHUNK_INDEX_ATTEMPT_CACHE.asMap().keySet().removeIf(query -> query.level == level);
+        CHUNK_INDEX_ATTEMPT_CACHE.cleanUp();
+        METEORITE_TARGET_CACHE.asMap().keySet().removeIf(query -> query.level == level);
+        METEORITE_TARGET_CACHE.cleanUp();
     }
 
-    public static void updateArea(WorldServer level, Chunk chunk) {
-        var compassRegion = CompassRegion.get(level, chunk.getPos());
-        ExtendedBlockStorage[] sections = chunk.getBlockStorageArray();
-        for (var i = 0; i < sections.length; i++) {
-            updateArea(compassRegion, chunk, i);
-        }
-    }
-
-    public static void notifyBlockChange(WorldServer level, BlockPos pos) {
-        Chunk chunk = level.getChunk(pos.getX() >> 4, pos.getZ() >> 4);
-        var compassRegion = CompassRegion.get(level, chunk.getPos());
-        updateArea(compassRegion, chunk, pos.getY() >> 4);
-        CLOSEST_METEORITE_CACHE.invalidateAll();
+    public static void clearCacheAndNotifyClients(WorldServer level) {
+        clearCache(level);
         notifyClients(level);
     }
 
-    private static void updateArea(CompassRegion compassRegion, Chunk chunk, int sectionIndex) {
+    private static ObjectList<BlockPos> findMeteoriteTargets(WorldServer level, int regionX, int regionZ) {
+        return ObjectLists.unmodifiable(MeteoritesWorldData.get(level).getMeteoriteTargetsInCompassRegion(regionX,
+            regionZ, pos -> shouldUseGeneratedMeteoriteTarget(level, pos)));
+    }
+
+    private static Optional<BlockPos> findClosest(ObjectList<BlockPos> candidates, BlockPos origin) {
+        long closestDistance = Long.MAX_VALUE;
+        BlockPos closest = null;
+        for (BlockPos pos : candidates) {
+            long dx = (long) pos.getX() - origin.getX();
+            long dz = (long) pos.getZ() - origin.getZ();
+            long distance = dx * dx + dz * dz;
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closest = pos;
+            }
+        }
+        return Optional.ofNullable(closest);
+    }
+
+    private static boolean shouldUseGeneratedMeteoriteTarget(WorldServer level, BlockPos pos) {
+        int chunkX = pos.getX() >> 4;
+        int chunkZ = pos.getZ() >> 4;
+        Chunk chunk = level.getChunkProvider().getLoadedChunk(chunkX, chunkZ);
+        if (chunk != null) {
+            return chunk.getBlockState(pos).getBlock() == AEBlocks.MYSTERIOUS_CUBE.block();
+        }
+
+        CompassRegion compassRegion = CompassRegion.get(level, new ChunkPos(chunkX, chunkZ));
+        int sectionIndex = pos.getY() >> 4;
+        return !compassRegion.isChunkChecked(chunkX, chunkZ)
+            || compassRegion.hasCompassTarget(chunkX, chunkZ, sectionIndex);
+    }
+
+    private static void ensureLoadedChunksIndexed(WorldServer level, int regionX, int regionZ, BlockPos origin) {
+        int minChunkX = MeteoriteCompassSearch.getRegionMinChunk(regionX);
+        int maxChunkX = MeteoriteCompassSearch.getRegionMaxChunk(regionX);
+        int minChunkZ = MeteoriteCompassSearch.getRegionMinChunk(regionZ);
+        int maxChunkZ = MeteoriteCompassSearch.getRegionMaxChunk(regionZ);
+        int originChunkX = origin.getX() >> 4;
+        int originChunkZ = origin.getZ() >> 4;
+        indexLoadedChunks(level,
+            Math.max(minChunkX, originChunkX - LOADED_CHUNK_INDEX_RADIUS),
+            Math.min(maxChunkX, originChunkX + LOADED_CHUNK_INDEX_RADIUS),
+            Math.max(minChunkZ, originChunkZ - LOADED_CHUNK_INDEX_RADIUS),
+            Math.min(maxChunkZ, originChunkZ + LOADED_CHUNK_INDEX_RADIUS));
+    }
+
+    private static void indexLoadedChunks(WorldServer level, int minChunkX, int maxChunkX, int minChunkZ,
+                                          int maxChunkZ) {
+        boolean changed = false;
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                Chunk chunk = level.getChunkProvider().getLoadedChunk(chunkX, chunkZ);
+                if (chunk == null) {
+                    continue;
+                }
+
+                var query = new ChunkIndexQuery(level, chunkX, chunkZ);
+                if (CHUNK_INDEX_ATTEMPT_CACHE.getIfPresent(query) != null) {
+                    continue;
+                }
+                CHUNK_INDEX_ATTEMPT_CACHE.put(query, Boolean.TRUE);
+
+                MeteoritesWorldData meteorites = MeteoritesWorldData.get(level);
+                CompassRegion compassRegion = CompassRegion.get(level, new ChunkPos(chunkX, chunkZ));
+                if (compassRegion.isChunkChecked(chunkX, chunkZ)
+                    && !meteorites.hasCompassTargetsInChunk(chunkX, chunkZ)) {
+                    continue;
+                }
+
+                changed |= updateAreaWithoutNotifying(level, chunk);
+            }
+        }
+        if (changed) {
+            clearCacheAndNotifyClients(level);
+        }
+    }
+
+    public static void updateArea(WorldServer level, Chunk chunk) {
+        boolean changed = updateAreaWithoutNotifying(level, chunk);
+        if (changed) {
+            clearCacheAndNotifyClients(level);
+        }
+    }
+
+    private static boolean updateAreaWithoutNotifying(WorldServer level, Chunk chunk) {
+        boolean changed = false;
+        var compassRegion = CompassRegion.get(level, chunk.getPos());
+        ExtendedBlockStorage[] sections = chunk.getBlockStorageArray();
+        for (var i = 0; i < sections.length; i++) {
+            changed |= updateArea(level, compassRegion, chunk, i);
+        }
+        changed |= compassRegion.markChunkChecked(chunk.x, chunk.z);
+        return changed;
+    }
+
+    public static void notifyBlockChange(WorldServer level, BlockPos pos) {
+        Chunk chunk = level.getChunkProvider().getLoadedChunk(pos.getX() >> 4, pos.getZ() >> 4);
+        if (chunk == null) {
+            return;
+        }
+
+        var compassRegion = CompassRegion.get(level, chunk.getPos());
+        int sectionIndex = pos.getY() >> 4;
+        if (sectionIndex < 0 || sectionIndex >= chunk.getBlockStorageArray().length) {
+            return;
+        }
+
+        boolean changed = updateArea(level, compassRegion, chunk, sectionIndex);
+        changed |= compassRegion.markChunkChecked(chunk.x, chunk.z);
+        if (changed) {
+            clearCacheAndNotifyClients(level);
+        }
+    }
+
+    private static boolean updateArea(WorldServer level, CompassRegion compassRegion, Chunk chunk, int sectionIndex) {
         int cx = chunk.x;
         int cz = chunk.z;
         var section = chunk.getBlockStorageArray()[sectionIndex];
         if (section == null || section.isEmpty()) {
-            compassRegion.setHasCompassTarget(cx, cz, sectionIndex, false);
-            return;
+            boolean changed = compassRegion.setHasCompassTarget(cx, cz, sectionIndex, false);
+            changed |= MeteoritesWorldData.get(level)
+                                          .syncCompassTargetsInSection(cx, cz, sectionIndex, Collections.emptyList());
+            return changed;
         }
 
         var desiredBlock = AEBlocks.MYSTERIOUS_CUBE.block();
+        ObjectList<BlockPos> targets = new ObjectArrayList<>();
         for (int localX = 0; localX < 16; localX++) {
             for (int localY = 0; localY < 16; localY++) {
                 for (int localZ = 0; localZ < 16; localZ++) {
                     if (section.get(localX, localY, localZ).getBlock() == desiredBlock) {
-                        compassRegion.setHasCompassTarget(cx, cz, sectionIndex, true);
-                        return;
+                        targets.add(new BlockPos((cx << 4) + localX, (sectionIndex << 4) + localY,
+                            (cz << 4) + localZ));
                     }
                 }
             }
         }
-        compassRegion.setHasCompassTarget(cx, cz, sectionIndex, false);
-    }
-
-    private static boolean hasCompassTarget(WorldServer level, int chunkX, int chunkZ) {
-        return CompassRegion.get(level, new ChunkPos(chunkX, chunkZ)).hasCompassTarget(chunkX, chunkZ);
-    }
-
-    private static BlockPos getChunkCenter(ChunkPos chunkPos) {
-        return new BlockPos(chunkPos.getXStart() + 8, 0, chunkPos.getZStart() + 8);
-    }
-
-    private static int dist(int ax, int az, int bx, int bz) {
-        final int up = (bz - az) * CHUNK_SIZE;
-        final int side = (bx - ax) * CHUNK_SIZE;
-        return up * up + side * side;
+        boolean changed = compassRegion.setHasCompassTarget(cx, cz, sectionIndex, !targets.isEmpty());
+        changed |= MeteoritesWorldData.get(level).syncCompassTargetsInSection(cx, cz, sectionIndex, targets);
+        return changed;
     }
 
     private static void notifyClients(WorldServer level) {
@@ -194,22 +222,47 @@ public final class ServerCompassService {
         }
     }
 
-    private record Query(WorldServer level, ChunkPos chunk) {
+    private record RegionQuery(WorldServer level, int regionX, int regionZ) {
 
         @Override
         public boolean equals(Object obj) {
             if (this == obj) {
                 return true;
             }
-            if (!(obj instanceof Query(WorldServer level1, ChunkPos chunk1))) {
+            if (!(obj instanceof RegionQuery(WorldServer level1, int regionX1, int regionZ1))) {
                 return false;
             }
-            return this.level == level1 && Objects.equals(this.chunk, chunk1);
+            return this.level == level1 && this.regionX == regionX1 && this.regionZ == regionZ1;
         }
 
         @Override
         public int hashCode() {
-            return 31 * System.identityHashCode(this.level) + this.chunk.hashCode();
+            int result = System.identityHashCode(this.level);
+            result = 31 * result + this.regionX;
+            result = 31 * result + this.regionZ;
+            return result;
+        }
+    }
+
+    private record ChunkIndexQuery(WorldServer level, int chunkX, int chunkZ) {
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof ChunkIndexQuery(WorldServer level1, int chunkX1, int chunkZ1))) {
+                return false;
+            }
+            return this.level == level1 && this.chunkX == chunkX1 && this.chunkZ == chunkZ1;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = System.identityHashCode(this.level);
+            result = 31 * result + this.chunkX;
+            result = 31 * result + this.chunkZ;
+            return result;
         }
     }
 }

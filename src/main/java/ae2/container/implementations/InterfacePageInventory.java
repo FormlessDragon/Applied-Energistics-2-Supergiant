@@ -34,6 +34,9 @@ final class InterfacePageInventory extends BaseInternalInventory {
 
     @Override
     public int getSlotLimit(int slot) {
+        if (!isValidTranslatedSlot(slot)) {
+            return 0;
+        }
         return this.delegate.getSlotLimit(translateSlot(slot));
     }
 
@@ -59,6 +62,9 @@ final class InterfacePageInventory extends BaseInternalInventory {
 
     @Override
     public InternalInventory getSlotInv(int slotIndex) {
+        if (!isValidTranslatedSlot(slotIndex)) {
+            return this;
+        }
         return this.delegate.getSlotInv(translateSlot(slotIndex));
     }
 

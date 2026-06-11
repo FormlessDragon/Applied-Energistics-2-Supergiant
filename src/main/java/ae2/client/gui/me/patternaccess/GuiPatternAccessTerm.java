@@ -175,15 +175,15 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
         this.scrollbar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
         this.groupSearchField = this.widgets.addTextField("search");
-        this.groupSearchField.setPlaceholder(GuiText.SearchPlaceholder.text());
+        this.groupSearchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.groupSearchField.setTooltipMessage(Collections.singletonList(
             GuiText.PatternAccessTerminalProviderSearchTooltip.text()));
         this.inputSearchField = this.widgets.addTextField("inputSearch");
-        this.inputSearchField.setPlaceholder(GuiText.SearchPlaceholder.text());
+        this.inputSearchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.inputSearchField.setTooltipMessage(Collections.singletonList(
             GuiText.PatternAccessTerminalSearchTooltipInput.text()));
         this.outputSearchField = this.widgets.addTextField("outputSearch");
-        this.outputSearchField.setPlaceholder(GuiText.SearchPlaceholder.text());
+        this.outputSearchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.outputSearchField.setTooltipMessage(Collections.singletonList(
             GuiText.PatternAccessTerminalSearchTooltipOutput.text()));
         this.patternModifierPanel = new PatternModifierPanelWidget(this, new PatternAccessPanelHost());
@@ -252,6 +252,15 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     private static void highlightProviderAndClose(PatternProviderInfo info) {
         highlightProvider(info);
         Minecraft.getMinecraft().displayGuiScreen(null);
+    }
+
+    private static void applySlotUpdates(AppEngInternalInventory inventory, Int2ObjectMap<ItemStack> slots) {
+        for (Int2ObjectMap.Entry<ItemStack> entry : slots.int2ObjectEntrySet()) {
+            int slot = entry.getIntKey();
+            if (slot >= 0 && slot < inventory.size()) {
+                inventory.setItemDirect(slot, entry.getValue());
+            }
+        }
     }
 
     private void addWirelessUniversalTerminalButton() {
@@ -783,14 +792,15 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
     public void postFullUpdate(long inventoryId, long sortBy, boolean canEditTerminalName, PatternContainerGroup group,
                                int inventorySize, Int2ObjectMap<ItemStack> slots) {
+        if (group == null) {
+            return;
+        }
         PatternContainerEntry patternContainer = new PatternContainerEntry(inventoryId, inventorySize, sortBy,
             canEditTerminalName, group);
         this.byId.put(inventoryId, patternContainer);
 
         AppEngInternalInventory inventory = patternContainer.getInventory();
-        for (Int2ObjectMap.Entry<ItemStack> entry : slots.int2ObjectEntrySet()) {
-            inventory.setItemDirect(entry.getIntKey(), entry.getValue());
-        }
+        applySlotUpdates(inventory, slots);
 
         this.patternSearchText.clear();
         refreshList();
@@ -804,9 +814,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         }
 
         AppEngInternalInventory inventory = patternContainer.getInventory();
-        for (Int2ObjectMap.Entry<ItemStack> entry : slots.int2ObjectEntrySet()) {
-            inventory.setItemDirect(entry.getIntKey(), entry.getValue());
-        }
+        applySlotUpdates(inventory, slots);
 
         this.patternSearchText.clear();
         refreshList();

@@ -28,6 +28,8 @@ import java.util.List;
 
 public record CraftingStatus(boolean fullStatus, long elapsedTime, long remainingItemCount, long startItemCount,
                              List<CraftingStatusEntry> entries, boolean suspended) {
+    private static final int MAX_ENTRY_COUNT = 4096;
+    private static final int MIN_ENTRY_BYTES = 5;
 
     public static final CraftingStatus EMPTY = new CraftingStatus(true, 0, 0, 0, Collections.emptyList(), false);
 
@@ -46,7 +48,15 @@ public record CraftingStatus(boolean fullStatus, long elapsedTime, long remainin
         long elapsedTime = buffer.readVarLong();
         long remainingItemCount = buffer.readVarLong();
         long startItemCount = buffer.readVarLong();
+        if (elapsedTime < 0 || remainingItemCount < 0 || startItemCount < 0) {
+            throw new IllegalArgumentException("Crafting status contains negative amounts");
+        }
+
         int size = buffer.readInt();
+        if (size < 0 || size > MAX_ENTRY_COUNT || size > buffer.readableBytes() / MIN_ENTRY_BYTES) {
+            throw new IllegalArgumentException("Invalid crafting status entry count: " + size);
+        }
+
         var entries = ImmutableList.<CraftingStatusEntry>builderWithExpectedSize(size);
         for (int i = 0; i < size; i++) {
             entries.add(CraftingStatusEntry.read(buffer));

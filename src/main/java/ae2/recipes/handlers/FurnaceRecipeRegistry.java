@@ -6,6 +6,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonSyntaxException;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.Ingredient;
 import net.minecraft.util.JsonUtils;
@@ -78,6 +79,9 @@ public final class FurnaceRecipeRegistry {
         Ingredient ingredient = JsonRecipeUtils.readIngredient(json, "ingredient", ctx);
         ItemStack output = JsonRecipeUtils.readItemStack(json, "result", ctx);
         float experience = JsonUtils.getFloat(json, "experience", 0.0F);
+        if (!Float.isFinite(experience) || experience < 0) {
+            throw new JsonSyntaxException("experience must be finite and non-negative");
+        }
 
         for (ItemStack input : ingredient.getMatchingStacks()) {
             if (!input.isEmpty()) {

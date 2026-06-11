@@ -40,7 +40,8 @@ public record GenericStack(AEKey what, long amount) {
             return null;
         }
 
-        return new GenericStack(what, buffer.readVarLong());
+        long amount = buffer.readVarLong();
+        return new GenericStack(what, amount);
     }
 
     public static void writeBuffer(@Nullable GenericStack stack, PacketBuffer buffer) {
@@ -153,13 +154,9 @@ public record GenericStack(AEKey what, long amount) {
         return stack.getItem() instanceof WrappedGenericStack;
     }
 
-    public static @org.jspecify.annotations.Nullable GenericStack unwrapItemStack(ItemStack stack) {
+    public static @Nullable GenericStack unwrapItemStack(ItemStack stack) {
         if (!stack.isEmpty() && stack.getItem() instanceof WrappedGenericStack item) {
-            AEKey what = item.unwrapWhat(stack);
-            if (what != null) {
-                long amount = item.unwrapAmount(stack);
-                return new GenericStack(what, amount);
-            }
+            return item.unwrap(stack);
         }
 
         return null;
@@ -169,6 +166,14 @@ public record GenericStack(AEKey what, long amount) {
         if (!left.what.equals(right.what)) {
             throw new IllegalArgumentException("Cannot sum generic stacks of " + left.what + " and " + right.what);
         }
-        return new GenericStack(left.what, left.amount + right.amount);
+        return new GenericStack(left.what, saturatingAdd(left.amount, right.amount));
+    }
+
+    private static long saturatingAdd(long left, long right) {
+        long result = left + right;
+        if (((left ^ result) & (right ^ result)) < 0) {
+            return result < 0 ? Long.MAX_VALUE : Long.MIN_VALUE;
+        }
+        return result;
     }
 }

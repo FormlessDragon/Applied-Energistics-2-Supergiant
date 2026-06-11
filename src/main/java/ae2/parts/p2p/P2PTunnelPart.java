@@ -22,6 +22,7 @@ import ae2.api.config.Actionable;
 import ae2.api.config.PowerMultiplier;
 import ae2.api.config.PowerUnit;
 import ae2.api.features.P2PTunnelAttunement;
+import ae2.api.features.P2PTunnelAttunementInternal;
 import ae2.api.implementations.items.IMemoryCard;
 import ae2.api.implementations.items.MemoryCardColors;
 import ae2.api.implementations.items.MemoryCardMessages;
@@ -35,6 +36,7 @@ import ae2.api.util.AEColor;
 import ae2.client.render.cablebus.P2PTunnelFrequencyModelData;
 import ae2.core.AEConfig;
 import ae2.items.tools.MemoryCardItem;
+import ae2.items.tools.quartz.QuartzCuttingKnifeItem;
 import ae2.me.service.P2PService;
 import ae2.parts.AEBasePart;
 import ae2.util.InteractionUtil;
@@ -51,7 +53,7 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.Vec3d;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
@@ -93,6 +95,18 @@ public abstract class P2PTunnelPart<T extends P2PTunnelPart<T>> extends AEBasePa
 
     public List<T> getOutputs() {
         return getOutputStream().collect(Collectors.<T>toList());
+    }
+
+    public List<T> getInputs() {
+        if (this.getFrequency() == 0 || getMainNode().getGrid() == null) {
+            return List.of();
+        }
+        return P2PService.get(getMainNode().getGrid()).getInputs(this.getFrequency(), getTunnelClass())
+                         .collect(Collectors.<T>toList());
+    }
+
+    public boolean supportsMultipleInputs() {
+        return P2PTunnelAttunementInternal.supportsMultipleInputs(this.getPartItem().asItem());
     }
 
     public Stream<T> getOutputStream() {
@@ -153,7 +167,16 @@ public abstract class P2PTunnelPart<T extends P2PTunnelPart<T>> extends AEBasePa
     }
 
     @Override
+    public void setCustomNameFromRenamer(@Nullable String customName) {
+        P2PTunnelMemoryActions.renameFrequency(this, customName);
+    }
+
+    @Override
     public boolean onUseItemOn(ItemStack heldItem, EntityPlayer player, EnumHand hand, Vec3d pos) {
+        if (heldItem.getItem() instanceof QuartzCuttingKnifeItem) {
+            return super.onUseItemOn(heldItem, player, hand, pos);
+        }
+
         ItemStack newType = P2PTunnelAttunement.getTunnelPartByTriggerItem(heldItem);
         if (!newType.isEmpty() && newType.getItem() != getPartItem().asItem() && newType.getItem() instanceof IPartItem<?> partItem) {
             boolean oldOutput = isOutput();
@@ -170,7 +193,7 @@ public abstract class P2PTunnelPart<T extends P2PTunnelPart<T>> extends AEBasePa
             return true;
         }
 
-        if (isClientSide() || hand == EnumHand.OFF_HAND) {
+        if (isClientSide()) {
             return false;
         }
 
@@ -219,8 +242,8 @@ public abstract class P2PTunnelPart<T extends P2PTunnelPart<T>> extends AEBasePa
                         newPart = this.getHost().replacePart(partItem, this.getSide(), player, hand);
                     }
 
-                    if (newPart instanceof P2PTunnelPart) {
-                        newPart.importSettings(SettingsFrom.MEMORY_CARD, cardTag, player);
+                    if (newPart instanceof P2PTunnelPart<?> tunnel) {
+                        tunnel.importP2PSettings(SettingsFrom.MEMORY_CARD, cardTag, player, hand == EnumHand.OFF_HAND);
                     }
 
                     memoryCard.notifyUser(player, MemoryCardMessages.SETTINGS_LOADED);
@@ -237,13 +260,20 @@ public abstract class P2PTunnelPart<T extends P2PTunnelPart<T>> extends AEBasePa
 
     @Override
     public void importSettings(SettingsFrom mode, NBTTagCompound input, @Nullable EntityPlayer player) {
+        importP2PSettings(mode, input, player, false);
+    }
+
+    private void importP2PSettings(SettingsFrom mode, NBTTagCompound input, @Nullable EntityPlayer player,
+                                   boolean bindAsInput) {
         super.importSettings(mode, input, player);
 
         NBTBase frequencyBase = input.getTag(EXPORTED_P2P_FREQUENCY_TAG);
         NBTTagShort frequencyTag = frequencyBase instanceof NBTTagShort ? (NBTTagShort) frequencyBase : null;
         if (frequencyTag != null) {
             short frequency = frequencyTag.getShort();
-            if (frequency != this.freq) {
+            if (bindAsInput) {
+                P2PTunnelMemoryActions.bindInputFromCard(this, frequency);
+            } else if (frequency != this.freq) {
                 setOutput(true);
                 if (getMainNode().getGrid() != null) {
                     P2PService.get(getMainNode().getGrid()).updateFreq(this, frequency);
@@ -269,8 +299,7 @@ public abstract class P2PTunnelPart<T extends P2PTunnelPart<T>> extends AEBasePa
                 output.setShort(EXPORTED_P2P_FREQUENCY_TAG, freq);
                 AEColor[] colors = Platform.p2p().toColors(freq);
                 MemoryCardItem.setMemoryCardColors(output,
-                    new MemoryCardColors(colors[0], colors[0], colors[1], colors[1],
-                        colors[2], colors[2], colors[3], colors[3]));
+                    MemoryCardColors.repeatedPairs(colors[0], colors[1], colors[2], colors[3]));
             }
         }
     }

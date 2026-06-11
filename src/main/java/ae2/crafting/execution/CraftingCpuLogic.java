@@ -44,6 +44,7 @@ import ae2.hooks.ticking.TickHandler;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
 import ae2.me.service.CraftingService;
 import com.google.common.base.Preconditions;
+import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
@@ -111,7 +112,9 @@ public class CraftingCpuLogic {
             for (var input : task.getKey().getInputs()) {
                 for (var possibleInput : input.possibleInputs()) {
                     if (what.matches(possibleInput)) {
-                        demand += possibleInput.amount() * input.getMultiplier() * task.getValue().value;
+                        demand = LongMath.saturatedAdd(demand,
+                            LongMath.saturatedMultiply(possibleInput.amount(),
+                                LongMath.saturatedMultiply(input.getMultiplier(), task.getValue().value)));
                         break;
                     }
                 }
@@ -284,8 +287,7 @@ public class CraftingCpuLogic {
                                          Map.Entry<IPatternDetails, ExecutingCraftingJob.TaskProgress> task,
                                          int remainingPatternBudget, boolean mergePush) {
         if (!mergePush) {
-            return tryPushPattern(job, provider, details, finalOutputPseudoPattern, energyService, level, task, 1,
-                false);
+            return tryPushPattern(job, provider, details, finalOutputPseudoPattern, energyService, level, task, 1);
         }
 
         int maxMultiplier = (int) Math.min(task.getValue().value, remainingPatternBudget);
@@ -308,13 +310,13 @@ public class CraftingCpuLogic {
         }
 
         return tryPushPattern(job, provider, details, finalOutputPseudoPattern, energyService, level, task,
-            maxMultiplier, true);
+            maxMultiplier);
     }
 
     private int tryPushPattern(ExecutingCraftingJob job, ICraftingProvider provider, IPatternDetails details,
                                boolean finalOutputPseudoPattern, IEnergyService energyService, World level,
                                Map.Entry<IPatternDetails, ExecutingCraftingJob.TaskProgress> task,
-                               int multiplier, boolean mergePush) {
+                               int multiplier) {
         if (multiplier <= 0) {
             return 0;
         }
@@ -700,7 +702,8 @@ public class CraftingCpuLogic {
             for (var t : job.tasks.entrySet()) {
                 for (var output : t.getKey().getOutputs()) {
                     if (template.matches(output)) {
-                        count += output.amount() * t.getValue().value;
+                        count = LongMath.saturatedAdd(count,
+                            LongMath.saturatedMultiply(output.amount(), t.getValue().value));
                     }
                 }
             }
@@ -730,7 +733,7 @@ public class CraftingCpuLogic {
             out.addAll(job.pseudoInventory.list);
             for (var t : job.tasks.entrySet()) {
                 for (var output : t.getKey().getOutputs()) {
-                    out.add(output.what(), output.amount() * t.getValue().value);
+                    out.add(output.what(), LongMath.saturatedMultiply(output.amount(), t.getValue().value));
                 }
             }
         }

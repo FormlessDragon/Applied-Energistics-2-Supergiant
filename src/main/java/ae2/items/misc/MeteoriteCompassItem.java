@@ -1,6 +1,7 @@
 package ae2.items.misc;
 
 import ae2.client.render.model.MeteoriteCompassBakedModel;
+import ae2.core.definitions.AEItems;
 import ae2.core.localization.GuiText;
 import ae2.items.AEBaseItem;
 import net.minecraft.client.util.ITooltipFlag;
@@ -43,7 +44,7 @@ public class MeteoriteCompassItem extends AEBaseItem {
     }
 
     public static ItemStack createBeaconCompass() {
-        return createBeaconCompass(new ItemStack(ae2.core.definitions.AEItems.METEORITE_COMPASS.item()));
+        return createBeaconCompass(new ItemStack(AEItems.METEORITE_COMPASS.item()));
     }
 
     @Override

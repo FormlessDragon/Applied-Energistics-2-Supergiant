@@ -18,16 +18,19 @@
 
 package ae2.client.render.model;
 
+import ae2.api.implementations.items.MemoryCardColors;
 import ae2.core.AppEng;
+import ae2.items.tools.MemoryCardItem;
 import net.minecraft.client.renderer.block.model.IBakedModel;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.vertex.VertexFormat;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.model.IModel;
 import net.minecraftforge.client.model.ModelLoaderRegistry;
 import net.minecraftforge.common.model.IModelState;
 import net.minecraftforge.common.model.TRSRTransformation;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -41,10 +44,26 @@ public class MemoryCardModel implements IModel {
 
     public static final ResourceLocation MODEL_BASE = AppEng.makeId("item/memory_card_base");
     private static final ResourceLocation TEXTURE = AppEng.makeId("item/memory_card_hash");
+    private final ResourceLocation baseModelId;
+    private final Function<ItemStack, MemoryCardColors> colorProvider;
+
+    public MemoryCardModel() {
+        this(MODEL_BASE);
+    }
+
+    public MemoryCardModel(ResourceLocation baseModelId) {
+        this(baseModelId, MemoryCardItem::getMemoryCardColors);
+    }
+
+    public MemoryCardModel(ResourceLocation baseModelId,
+                           Function<ItemStack, MemoryCardColors> colorProvider) {
+        this.baseModelId = baseModelId;
+        this.colorProvider = colorProvider;
+    }
 
     @Override
     public Collection<ResourceLocation> getDependencies() {
-        return Collections.singletonList(MODEL_BASE);
+        return Collections.singletonList(this.baseModelId);
     }
 
     @Override
@@ -53,17 +72,17 @@ public class MemoryCardModel implements IModel {
     }
 
     @Override
-    public IBakedModel bake(@NonNull IModelState state, @NonNull VertexFormat format,
+    public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
                             Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         TextureAtlasSprite texture = bakedTextureGetter.apply(TEXTURE);
         IBakedModel baseModel = this.getBaseModel(state, format, bakedTextureGetter);
-        return new MemoryCardBakedModel(format, baseModel, texture);
+        return new MemoryCardBakedModel(format, baseModel, texture, this.colorProvider);
     }
 
     private IBakedModel getBaseModel(IModelState state, VertexFormat format,
                                      Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         try {
-            return ModelLoaderRegistry.getModel(MODEL_BASE).bake(state, format, bakedTextureGetter);
+            return ModelLoaderRegistry.getModel(this.baseModelId).bake(state, format, bakedTextureGetter);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

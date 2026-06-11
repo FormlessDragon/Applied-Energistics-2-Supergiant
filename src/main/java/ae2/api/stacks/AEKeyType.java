@@ -59,8 +59,7 @@ public abstract class AEKeyType {
 
     @Nullable
     public static AEKeyType fromRawId(int id) {
-        Preconditions.checkArgument(id >= 0 && id <= Byte.MAX_VALUE, "id out of range: %d", id);
-        return AEKeyTypesInternal.byId(id);
+        return id >= 0 && id <= Byte.MAX_VALUE ? AEKeyTypesInternal.byId(id) : null;
     }
 
     public static AEKeyType fluids() {

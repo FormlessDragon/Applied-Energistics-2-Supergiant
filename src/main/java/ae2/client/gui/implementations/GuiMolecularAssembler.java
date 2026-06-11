@@ -16,7 +16,7 @@ import ae2.container.implementations.ContainerMolecularAssembler;
 import ae2.container.slot.AppEngSlot;
 import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
-import ae2.core.network.bidirectional.ConfigValuePacket;
+import ae2.core.network.serverbound.ConfigValueServerPacket;
 import ae2.helpers.patternprovider.PatternProviderCapacity;
 import ae2.util.EnumCycler;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -33,6 +33,7 @@ public class GuiMolecularAssembler extends AEBaseGui<ContainerMolecularAssembler
     private final PageButton nextPageButton;
     private final ToggleButton showInPatternAccessTerminalButton;
     private final PatternModifierPanelWidget patternModifierPanel;
+    private int lastProgress = Integer.MIN_VALUE;
 
     public GuiMolecularAssembler(ContainerMolecularAssembler container, InventoryPlayer playerInventory, ITextComponent title,
                                  GuiStyle style) {
@@ -66,12 +67,19 @@ public class GuiMolecularAssembler extends AEBaseGui<ContainerMolecularAssembler
     protected void updateBeforeRender() {
         super.updateBeforeRender();
         this.repositionPatternPageSlots();
-        this.progressBar.setFullMsg(new TextComponentString(this.container.getCurrentProgress() + "%"));
+        updateProgressTooltip(this.container.getCurrentProgress());
         this.showInPatternAccessTerminalButton.setState(this.container.getShowInAccessTerminal() == YesNo.YES);
         this.previousPageButton.setVisibility(this.container.getPageCount() > 1 && this.container.getCurrentPage() > 0);
         this.nextPageButton.setVisibility(this.container.getPageCount() > 1
             && this.container.getCurrentPage() + 1 < this.container.getPageCount());
         this.patternModifierPanel.update();
+    }
+
+    private void updateProgressTooltip(int progress) {
+        if (progress != this.lastProgress) {
+            this.lastProgress = progress;
+            this.progressBar.setFullMsg(new TextComponentString(progress + "%"));
+        }
     }
 
     @Override
@@ -98,7 +106,8 @@ public class GuiMolecularAssembler extends AEBaseGui<ContainerMolecularAssembler
     }
 
     private void selectPatternProviderMode(boolean ignored) {
-        InitNetwork.CHANNEL.sendToServer(new ConfigValuePacket(
+        InitNetwork.sendToServer(new ConfigValueServerPacket(
+            this.container.windowId,
             Settings.PATTERN_ACCESS_TERMINAL,
             EnumCycler.rotateEnum(
                 this.container.getShowInAccessTerminal(),

@@ -30,6 +30,7 @@ import ae2.client.gui.widgets.Scrollbar;
 import ae2.container.AEBaseContainer;
 import ae2.container.networking.INetworkStatusContainer;
 import ae2.container.networking.MachineGroup;
+import ae2.container.networking.NetworkStatus;
 import ae2.core.AEConfig;
 import ae2.core.localization.GuiText;
 import ae2.util.Platform;
@@ -61,6 +62,11 @@ public class GuiNetworkStatus<T extends AEBaseContainer & INetworkStatusContaine
     private List<ITextComponent> hoveredMachineTooltip;
     private int hoveredMachineTooltipMouseX;
     private int hoveredMachineTooltipMouseY;
+    @Nullable
+    private NetworkStatus cachedStatusForText;
+    @Nullable
+    private NetworkStatus cachedStatusForMachines;
+    private List<MachineGroup> cachedSortedMachines = List.of();
 
     public GuiNetworkStatus(T container, InventoryPlayer playerInventory, GuiStyle style) {
         super(container, playerInventory, style);
@@ -74,19 +80,7 @@ public class GuiNetworkStatus<T extends AEBaseContainer & INetworkStatusContaine
         super.updateBeforeRender();
 
         var status = container.getStatus();
-        setTextContent(TEXT_ID_DIALOG_TITLE, GuiText.NetworkDetails.text(status.getChannelsUsed()));
-        setTextContent("stored_power", GuiText.StoredPower.text(
-            formatPowerStatus(status.isInfiniteStoredPower(), status.getStoredPower(), false)));
-        setTextContent("max_power", GuiText.MaxPower.text(
-            formatPowerStatus(status.isInfiniteMaxStoredPower(), status.getMaxStoredPower(), false)));
-        setTextContent("power_input_rate",
-            GuiText.PowerInputRate.text(
-                formatPowerStatus(status.isInfiniteAveragePowerInjection(), status.getAveragePowerInjection(), true)));
-        setTextContent("power_usage_rate",
-            GuiText.PowerUsageRate.text(
-                formatPowerStatus(status.isInfiniteAveragePowerUsage(), status.getAveragePowerUsage(), true)));
-        setTextContent("channel_power_rate",
-            GuiText.ChannelEnergyDrain.text(Platform.formatPower(status.getChannelPower(), true)));
+        updateStatusCaches(status);
 
         int overflowRows = (status.getGroupedMachines().size() + COLUMNS - 1) / COLUMNS - ROWS;
         scrollbar.setRange(0, Math.max(0, overflowRows), 1);
@@ -107,8 +101,7 @@ public class GuiNetworkStatus<T extends AEBaseContainer & INetworkStatusContaine
         int viewEnd = viewStart + COLUMNS * ROWS;
 
         List<ITextComponent> tooltip = null;
-        List<MachineGroup> machines = new ObjectArrayList<>(container.getStatus().getGroupedMachines());
-        machines.sort(MachineGroup.COMPARATOR);
+        List<MachineGroup> machines = this.cachedSortedMachines;
 
         for (int i = viewStart; i < Math.min(viewEnd, machines.size()); i++) {
             MachineGroup entry = machines.get(i);
@@ -156,6 +149,30 @@ public class GuiNetworkStatus<T extends AEBaseContainer & INetworkStatusContaine
             hoveredMachineTooltip = tooltip;
             hoveredMachineTooltipMouseX = mouseX;
             hoveredMachineTooltipMouseY = mouseY;
+        }
+    }
+
+    private void updateStatusCaches(NetworkStatus status) {
+        if (status != this.cachedStatusForText) {
+            this.cachedStatusForText = status;
+            setTextContent(TEXT_ID_DIALOG_TITLE, GuiText.NetworkDetails.text(status.getChannelsUsed()));
+            setTextContent("stored_power", GuiText.StoredPower.text(
+                formatPowerStatus(status.isInfiniteStoredPower(), status.getStoredPower(), false)));
+            setTextContent("max_power", GuiText.MaxPower.text(
+                formatPowerStatus(status.isInfiniteMaxStoredPower(), status.getMaxStoredPower(), false)));
+            setTextContent("power_input_rate", GuiText.PowerInputRate.text(
+                formatPowerStatus(status.isInfiniteAveragePowerInjection(), status.getAveragePowerInjection(), true)));
+            setTextContent("power_usage_rate", GuiText.PowerUsageRate.text(
+                formatPowerStatus(status.isInfiniteAveragePowerUsage(), status.getAveragePowerUsage(), true)));
+            setTextContent("channel_power_rate",
+                GuiText.ChannelEnergyDrain.text(Platform.formatPower(status.getChannelPower(), true)));
+        }
+
+        if (status != this.cachedStatusForMachines) {
+            this.cachedStatusForMachines = status;
+            ObjectArrayList<MachineGroup> machines = new ObjectArrayList<>(status.getGroupedMachines());
+            machines.sort(MachineGroup.COMPARATOR);
+            this.cachedSortedMachines = machines;
         }
     }
 

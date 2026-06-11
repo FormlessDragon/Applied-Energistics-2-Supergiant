@@ -2,6 +2,7 @@ package ae2.core.network.serverbound;
 
 import ae2.container.AEBaseContainer;
 import ae2.container.me.common.IMEInteractionHandler;
+import ae2.core.network.NetworkPacketHelper;
 import ae2.core.network.ServerboundPacket;
 import ae2.helpers.InventoryAction;
 import io.netty.buffer.ByteBuf;
@@ -31,7 +32,11 @@ public class MEInteractionPacket extends ServerboundPacket {
         var packetBuffer = new PacketBuffer(buf);
         this.windowId = packetBuffer.readInt();
         this.serial = packetBuffer.readVarLong();
-        this.action = packetBuffer.readEnumValue(InventoryAction.class);
+        this.action = NetworkPacketHelper.readEnumOrNull(packetBuffer, InventoryAction.class);
+        if (packetBuffer.isReadable()) {
+            throw new IllegalArgumentException("Trailing ME interaction packet payload bytes: "
+                + packetBuffer.readableBytes());
+        }
     }
 
     @Override
@@ -44,15 +49,22 @@ public class MEInteractionPacket extends ServerboundPacket {
 
     @Override
     public void handleServer(EntityPlayerMP player) {
-        if (player.openContainer.windowId != this.windowId) {
+        if (this.action == null) {
             return;
         }
-        if (player.openContainer instanceof IMEInteractionHandler handler) {
-            Container openContainer = player.openContainer;
-            handler.handleInteraction(this.serial, this.action);
-            if (player.openContainer == openContainer && openContainer instanceof AEBaseContainer container) {
-                container.syncInventoryActionState(player);
-            }
+        if (!(player.openContainer instanceof AEBaseContainer container)) {
+            return;
+        }
+        if (container.windowId != this.windowId) {
+            return;
+        }
+        if (!(container instanceof IMEInteractionHandler handler)) {
+            return;
+        }
+        Container openContainer = player.openContainer;
+        handler.handleInteraction(this.serial, this.action);
+        if (player.openContainer == openContainer) {
+            container.syncInventoryActionState(player);
         }
     }
 }

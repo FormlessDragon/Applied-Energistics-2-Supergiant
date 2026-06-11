@@ -10,10 +10,12 @@ import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import net.minecraft.network.PacketBuffer;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +23,7 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
                                 List<PatternContainerGroup> machines,
                                 Map<PatternContainerGroup, List<CraftingSupplierLocation>> machineLocations) implements Comparable<LiteCraftTreeProc> {
 
+    @SuppressWarnings("unused")
     public LiteCraftTreeProc(List<LiteCraftTreeNode> inputs, List<PatternContainerGroup> machines) {
         this(inputs, machines, Map.of());
     }
@@ -33,25 +36,18 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
     @Nullable
     public static LiteCraftTreeProc of(final CraftingTreeProcess process, final CraftingTreeNode parent,
                                        final long parentAmount) {
-        return of(process, parent, parentAmount, null, null);
+        return of(process, null, null, false);
     }
 
     @Nullable
+    @SuppressWarnings("unused")
     static LiteCraftTreeProc of(final CraftingTreeProcess process, final CraftingTreeNode parent,
                                 final long parentAmount, final MissingAllocator missingAllocator) {
-        return of(process, parent, parentAmount, missingAllocator, null);
+        return of(process, missingAllocator, null, false);
     }
 
     @Nullable
-    static LiteCraftTreeProc of(final CraftingTreeProcess process, final CraftingTreeNode parent,
-                                final long parentAmount, final MissingAllocator missingAllocator,
-                                final LiteCraftTreeNode.PatternTimesAllocator patternTimesAllocator) {
-        return of(process, parent, parentAmount, missingAllocator, patternTimesAllocator, false);
-    }
-
-    @Nullable
-    static LiteCraftTreeProc of(final CraftingTreeProcess process, final CraftingTreeNode parent,
-                                final long parentAmount, final MissingAllocator missingAllocator,
+    static LiteCraftTreeProc of(final CraftingTreeProcess process, final MissingAllocator missingAllocator,
                                 final LiteCraftTreeNode.PatternTimesAllocator patternTimesAllocator,
                                 boolean recursiveDisplayNode) {
         long processTimes = patternTimesAllocator == null
@@ -84,17 +80,28 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
         return inputs.isEmpty() ? null : proc;
     }
 
+    @SuppressWarnings("unused")
     public static LiteCraftTreeProc fromBuffer(final ByteBuf buf, final CraftingTreeStackRegistry stackSet) {
-        int size = buf.readByte();
+        return fromBuffer(buf, stackSet, new CraftingTreeStackRegistry.DecodeLimits(), 0);
+    }
+
+    static LiteCraftTreeProc fromBuffer(final ByteBuf buf, final CraftingTreeStackRegistry stackSet,
+                                        final CraftingTreeStackRegistry.DecodeLimits limits, final int depth) {
+        limits.addProcess();
+
+        int size = buf.readUnsignedByte();
+        limits.checkProcessChildCount(size);
         int machineCount = buf.readUnsignedByte();
+        limits.checkMachineCount(machineCount);
         List<PatternContainerGroup> machines = new ArrayList<>(machineCount);
         Map<PatternContainerGroup, List<CraftingSupplierLocation>> machineLocations =
-            new java.util.LinkedHashMap<>(machineCount);
+            new LinkedHashMap<>(machineCount);
         var packetBuffer = new PacketBuffer(buf);
         for (int i = 0; i < machineCount; i++) {
             PatternContainerGroup machine = PatternContainerGroup.readFromPacket(packetBuffer);
             machines.add(machine);
             int locationCount = packetBuffer.readVarInt();
+            limits.addMachineLocations(locationCount);
             List<CraftingSupplierLocation> locations = new ArrayList<>(locationCount);
             for (int locationIndex = 0; locationIndex < locationCount; locationIndex++) {
                 locations.add(CraftingSupplierLocation.read(packetBuffer));
@@ -106,7 +113,7 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
         List<LiteCraftTreeNode> inputs = new ArrayList<>();
         LiteCraftTreeProc proc = new LiteCraftTreeProc(inputs, machines, machineLocations);
         for (int i = 0; i < size; i++) {
-            inputs.add(LiteCraftTreeNode.fromBuffer(buf, stackSet, proc));
+            inputs.add(LiteCraftTreeNode.fromBuffer(buf, stackSet, proc, limits, depth));
         }
         return proc;
     }
@@ -197,7 +204,7 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
     }
 
     @Override
-    public int compareTo(@Nonnull final LiteCraftTreeProc o) {
+    public int compareTo(@NotNull final LiteCraftTreeProc o) {
         return Integer.compare(diveToDeep(this, 0, new LiteCraftTreeNode.DepthRecorder()), diveToDeep(o, 0, new LiteCraftTreeNode.DepthRecorder()));
     }
 

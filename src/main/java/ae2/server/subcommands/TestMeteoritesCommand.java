@@ -57,7 +57,10 @@ public class TestMeteoritesCommand implements ISubCommand {
         sender.sendMessage(message.text(args));
     }
 
-    private static int parseCoordinate(String input) throws CommandException {
+    private static int parseCoordinate(String input, int current) throws CommandException {
+        if ("~".equals(input)) {
+            return current;
+        }
         try {
             return Integer.parseInt(input);
         } catch (NumberFormatException e) {
@@ -119,13 +122,17 @@ public class TestMeteoritesCommand implements ISubCommand {
             world = srv.getWorld(0);
         }
 
+        if (world == null) {
+            throw new CommandException("commands.ae2.test_meteorites");
+        }
+
         if (origin == null) {
             origin = world.getSpawnPoint();
         }
 
         if (args.length == 3) {
-            int blockX = parseCoordinate(args[1]);
-            int blockZ = parseCoordinate(args[2]);
+            int blockX = parseCoordinate(args[1], origin.getX());
+            int blockZ = parseCoordinate(args[2], origin.getZ());
             origin = new BlockPos(blockX, origin.getY(), blockZ);
         }
 

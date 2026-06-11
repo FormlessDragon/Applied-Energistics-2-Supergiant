@@ -6,8 +6,8 @@ import ae2.api.integrations.igtooltip.TooltipBuilder;
 import ae2.api.integrations.igtooltip.TooltipContext;
 import ae2.api.integrations.igtooltip.providers.BodyProvider;
 import ae2.api.integrations.igtooltip.providers.ServerDataProvider;
-import ae2.integration.modules.igtooltip.TooltipProviders;
 import ae2.integration.modules.igtooltip.NetworkDebugProvider;
+import ae2.integration.modules.igtooltip.TooltipProviders;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import mcp.mobius.waila.api.IWailaConfigHandler;
@@ -23,7 +23,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Comparator;
 import java.util.List;
@@ -76,7 +76,7 @@ public final class WailaBlockEntityInfoProvider implements IWailaDataProvider {
     }
 
     @Override
-    public @NonNull List<String> getWailaBody(ItemStack itemStack, List<String> currentToolTip,
+    public @NotNull List<String> getWailaBody(ItemStack itemStack, List<String> currentToolTip,
                                               IWailaDataAccessor accessor, IWailaConfigHandler config) {
         var blockEntity = accessor.getTileEntity();
         if (blockEntity == null) {
@@ -99,8 +99,12 @@ public final class WailaBlockEntityInfoProvider implements IWailaDataProvider {
     }
 
     @Override
-    public @NonNull NBTTagCompound getNBTData(EntityPlayerMP player, TileEntity te, NBTTagCompound tag,
+    public @NotNull NBTTagCompound getNBTData(EntityPlayerMP player, TileEntity te, NBTTagCompound tag,
                                               World world, BlockPos pos) {
+        if (tag == null) {
+            tag = new NBTTagCompound();
+        }
+
         if (te != null) {
             for (ServerDataCollector dataCollector : dataCollectors) {
                 dataCollector.collect(te, player, tag);

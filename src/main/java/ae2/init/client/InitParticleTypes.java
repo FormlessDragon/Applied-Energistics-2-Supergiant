@@ -19,6 +19,7 @@
 package ae2.init.client;
 
 import ae2.client.render.effects.ParticleTypes;
+import ae2.core.AppEng;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.util.ResourceLocation;
 
@@ -43,7 +44,7 @@ public final class InitParticleTypes {
     }
 
     private static ResourceLocation id(String name) {
-        return ae2.core.AppEng.makeId(name);
+        return AppEng.makeId(name);
     }
 }
 

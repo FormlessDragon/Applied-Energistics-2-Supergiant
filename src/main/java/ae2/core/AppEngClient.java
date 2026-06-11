@@ -26,11 +26,14 @@ import ae2.client.commands.ClientCommands;
 import ae2.client.gui.StackTooltipRenderer;
 import ae2.client.gui.me.common.PendingCraftingJobs;
 import ae2.client.gui.me.common.PinnedKeys;
+import ae2.client.render.NetworkRender;
+import ae2.client.render.ProfileRender;
 import ae2.client.render.crafting.CraftingMonitorTESR;
 import ae2.client.render.effects.EnergyParticleData;
 import ae2.client.render.effects.LightningArcParticleData;
 import ae2.client.render.effects.ParticleTypes;
 import ae2.client.render.model.UVLModelLoader;
+import ae2.client.render.overlay.AdvancedMemoryCardHighlightHandler;
 import ae2.client.render.overlay.CraftingSupplierHighlightHandler;
 import ae2.client.render.overlay.MeteoriteCompassBeaconRenderer;
 import ae2.client.render.overlay.OverlayManager;
@@ -50,6 +53,7 @@ import ae2.core.network.serverbound.UpdateHoldingCtrlPacket;
 import ae2.entity.TinyTNTPrimedEntity;
 import ae2.entity.TinyTNTPrimedRenderer;
 import ae2.helpers.IMouseWheelItem;
+import ae2.hooks.CompassManager;
 import ae2.hooks.RenderBlockOutlineHook;
 import ae2.hooks.WirelessTerminalPickBlockHook;
 import ae2.hooks.WirelessUniversalTerminalClientHandler;
@@ -61,8 +65,6 @@ import ae2.init.client.InitItemModelsProperties;
 import ae2.init.client.InitParticleTypes;
 import ae2.init.client.InitStackRenderHandlers;
 import ae2.integration.Integrations;
-import ae2.client.render.NetworkRender;
-import ae2.client.render.ProfileRender;
 import ae2.tile.crafting.TileCraftingMonitor;
 import ae2.tile.crafting.TileMolecularAssembler;
 import ae2.tile.misc.TileCharger;
@@ -77,12 +79,14 @@ import ae2.tile.storage.TileSkyChest;
 import ae2.tile.storage.TileSkyStoneTank;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraftforge.client.event.MouseEvent;
 import net.minecraftforge.client.event.TextureStitchEvent;
 import net.minecraftforge.client.model.ModelLoaderRegistry;
 import net.minecraftforge.common.ForgeModContainer;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.client.FMLClientHandler;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.client.registry.RenderingRegistry;
@@ -148,6 +152,7 @@ public final class AppEngClient extends AppEngServer {
         MinecraftForge.EVENT_BUS.register(new MeteoriteCompassBeaconRenderer());
         MinecraftForge.EVENT_BUS.register(OverlayManager.getInstance());
         MinecraftForge.EVENT_BUS.register(CraftingSupplierHighlightHandler.INSTANCE);
+        MinecraftForge.EVENT_BUS.register(AdvancedMemoryCardHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(StackTooltipRenderer.INSTANCE);
         MinecraftForge.EVENT_BUS.register(NetworkRender.INSTANCE);
         MinecraftForge.EVENT_BUS.register(ProfileRender.INSTANCE);
@@ -217,6 +222,14 @@ public final class AppEngClient extends AppEngServer {
     @SubscribeEvent
     public void clientDisconnected(FMLNetworkEvent.ClientDisconnectionFromServerEvent event) {
         clearClientSessionState();
+    }
+
+    @SubscribeEvent
+    public void clientWorldUnload(WorldEvent.Unload event) {
+        World level = event.getWorld();
+        if (level != null && level.isRemote) {
+            CompassManager.INSTANCE.clear();
+        }
     }
 
     @SubscribeEvent
@@ -296,15 +309,16 @@ public final class AppEngClient extends AppEngServer {
         int viewDistance = (Math.max(2, mc.gameSettings.renderDistanceChunks) + 1) * 16;
         double viewDistanceSq = (double) viewDistance * viewDistance;
 
-        for (TileCableBus tileEntity : mc.world.loadedTileEntityList.stream()
-                                                                    .filter(TileCableBus.class::isInstance)
-                                                                    .map(TileCableBus.class::cast)
-                                                                    .toList()) {
+        for (var loadedTileEntity : mc.world.loadedTileEntityList) {
+            if (!(loadedTileEntity instanceof TileCableBus tileEntity)) {
+                continue;
+            }
+
             if (tileEntity.isInvalid()) {
                 continue;
             }
 
-            net.minecraft.util.math.BlockPos pos = tileEntity.getPos();
+            BlockPos pos = tileEntity.getPos();
             if (!mc.world.isBlockLoaded(pos) || mc.player.getDistanceSqToCenter(pos) > viewDistanceSq) {
                 continue;
             }
@@ -361,11 +375,13 @@ public final class AppEngClient extends AppEngServer {
     private void clearClientSessionState() {
         this.prevCableRenderMode = CableRenderMode.STANDARD;
         this.prevPartPlacementOppositeDown = false;
-        net.minecraft.entity.player.EntityPlayer player = Minecraft.getMinecraft().player;
+        var player = Minecraft.getMinecraft().player;
         if (player != null) {
             PlayerState.setHoldingCtrl(player, false);
         }
         ExportedGridContent.clearActiveExports();
+        CompassManager.INSTANCE.clear();
+        AdvancedMemoryCardHighlightHandler.INSTANCE.clear();
         PendingCraftingJobs.clearPendingJobs();
         PinnedKeys.clearPinnedKeys();
     }

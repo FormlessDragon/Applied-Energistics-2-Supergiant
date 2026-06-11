@@ -31,6 +31,7 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 
 public abstract class AbstractReportingPart extends AEBasePart implements IMonitorPart {
@@ -56,7 +57,7 @@ public abstract class AbstractReportingPart extends AEBasePart implements IMonit
     }
 
     @Override
-    public void onNeighborChanged(net.minecraft.world.IBlockAccess level, BlockPos pos, BlockPos neighbor) {
+    public void onNeighborChanged(IBlockAccess level, BlockPos pos, BlockPos neighbor) {
         EnumFacing side = this.getSide();
         if (side != null && pos.offset(side).equals(neighbor)) {
             this.opacity = -1;

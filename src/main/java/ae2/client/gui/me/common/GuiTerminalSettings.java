@@ -272,6 +272,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         WirelessTerminals.setMagnetMode(stack, terminal,
             WirelessTerminalMagnetMode.from(this.magnetCheckbox.isSelected(), this.pickupToMECheckbox.isSelected()));
         InitNetwork.sendToServer(new WirelessTerminalSettingsPacket(
+            this.container.windowId,
             this.pickBlockCheckbox.isSelected(),
             this.craftIfMissingCheckbox.isSelected(),
             this.restockCheckbox.isSelected(),
@@ -367,7 +368,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         if (this.container instanceof ContainerMEStorage meStorage) {
             meStorage.setRecursiveIngredientReserveAmount(amount);
         }
-        InitNetwork.sendToServer(new SetRecursiveIngredientReserveAmountPacket(amount));
+        InitNetwork.sendToServer(new SetRecursiveIngredientReserveAmountPacket(this.container.windowId, amount));
         validateRecursiveReserveField();
     }
 

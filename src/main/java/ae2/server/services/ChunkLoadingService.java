@@ -32,8 +32,10 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.ForgeChunkManager;
 import net.minecraftforge.common.ForgeChunkManager.Ticket;
+import net.minecraftforge.common.util.Constants;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
+
 import java.util.List;
 
 public class ChunkLoadingService implements ForgeChunkManager.LoadingCallback {
@@ -73,6 +75,13 @@ public class ChunkLoadingService implements ForgeChunkManager.LoadingCallback {
                 continue;
             }
 
+            if (!modData.hasKey(TAG_OWNER_X, Constants.NBT.TAG_INT)
+                || !modData.hasKey(TAG_OWNER_Y, Constants.NBT.TAG_INT)
+                || !modData.hasKey(TAG_OWNER_Z, Constants.NBT.TAG_INT)) {
+                ForgeChunkManager.releaseTicket(ticket);
+                continue;
+            }
+
             BlockPos ownerPos = new BlockPos(modData.getInteger(TAG_OWNER_X), modData.getInteger(TAG_OWNER_Y),
                 modData.getInteger(TAG_OWNER_Z));
             TileEntity tileEntity = serverLevel.getTileEntity(ownerPos);
@@ -86,7 +95,6 @@ public class ChunkLoadingService implements ForgeChunkManager.LoadingCallback {
                                    .put(ownerPos, ticket);
 
             for (ChunkPos chunkPos : ticket.getChunkList()) {
-                //noinspection deprecation
                 anchor.registerChunk(chunkPos);
             }
         }
@@ -129,16 +137,23 @@ public class ChunkLoadingService implements ForgeChunkManager.LoadingCallback {
     }
 
     private @Nullable Ticket getOrCreateTicket(WorldServer level, BlockPos owner) {
-        Object2ObjectMap<BlockPos, Ticket> tickets = this.ticketsByDimension.computeIfAbsent(level.provider.getDimension(),
-            ignored -> new Object2ObjectOpenHashMap<>());
-        Ticket existing = tickets.get(owner);
-        if (existing != null) {
-            return existing;
+        int dimension = level.provider.getDimension();
+        Object2ObjectMap<BlockPos, Ticket> tickets = this.ticketsByDimension.get(dimension);
+        if (tickets != null) {
+            Ticket existing = tickets.get(owner);
+            if (existing != null) {
+                return existing;
+            }
         }
 
         Ticket ticket = ForgeChunkManager.requestTicket(AppEngBase.instance(), level, ForgeChunkManager.Type.NORMAL);
         if (ticket == null) {
             return null;
+        }
+
+        if (tickets == null) {
+            tickets = new Object2ObjectOpenHashMap<>();
+            this.ticketsByDimension.put(dimension, tickets);
         }
 
         NBTTagCompound modData = ticket.getModData();

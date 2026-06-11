@@ -24,6 +24,7 @@ import ae2.api.ids.AEItemIds;
 import ae2.api.stacks.AEKeyType;
 import ae2.api.upgrades.Upgrades;
 import ae2.api.util.AEColor;
+import ae2.container.GuiIds;
 import ae2.core.AEConfig;
 import ae2.core.DebugCreativeTab;
 import ae2.core.FacadeCreativeTab;
@@ -50,12 +51,15 @@ import ae2.items.storage.SpatialStorageCellItem;
 import ae2.items.storage.StorageTier;
 import ae2.items.storage.ViewCellItem;
 import ae2.items.storage.VoidCellItem;
+import ae2.items.tools.AdvancedMemoryCardItem;
 import ae2.items.tools.ConfigModifierItem;
 import ae2.items.tools.MEPackageItem;
 import ae2.items.tools.MEPackingTapeItem;
 import ae2.items.tools.MemoryCardItem;
+import ae2.items.tools.NetworkAnalyserItem;
 import ae2.items.tools.NetworkToolItem;
 import ae2.items.tools.PatternModifierItem;
+import ae2.items.tools.TickAnalyserItem;
 import ae2.items.tools.fluix.FluixAxeItem;
 import ae2.items.tools.fluix.FluixHoeItem;
 import ae2.items.tools.fluix.FluixPickaxeItem;
@@ -80,8 +84,6 @@ import ae2.items.tools.quartz.QuartzSpadeItem;
 import ae2.items.tools.quartz.QuartzSwordItem;
 import ae2.items.tools.quartz.QuartzToolType;
 import ae2.items.tools.quartz.QuartzWrenchItem;
-import ae2.items.tools.NetworkAnalyserItem;
-import ae2.items.tools.TickAnalyserItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.util.ResourceLocation;
@@ -314,43 +316,43 @@ public final class AEItems {
         AEItemIds.METEORITE_COMPASS, new MeteoriteCompassItem());
     public static final ItemDefinition<PortableCellItem> PORTABLE_ITEM_CELL1K = new ItemDefinition<>(
         AEItemIds.PORTABLE_ITEM_CELL1K,
-        new PortableCellItem(AEKeyType.items(), 54, ae2.container.GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_1K,
+        new PortableCellItem(AEKeyType.items(), 54, GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_1K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_ITEM_CELL4K = new ItemDefinition<>(
         AEItemIds.PORTABLE_ITEM_CELL4K,
-        new PortableCellItem(AEKeyType.items(), 45, ae2.container.GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_4K,
+        new PortableCellItem(AEKeyType.items(), 45, GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_4K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_ITEM_CELL16K = new ItemDefinition<>(
         AEItemIds.PORTABLE_ITEM_CELL16K,
-        new PortableCellItem(AEKeyType.items(), 36, ae2.container.GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_16K,
+        new PortableCellItem(AEKeyType.items(), 36, GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_16K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_ITEM_CELL64K = new ItemDefinition<>(
         AEItemIds.PORTABLE_ITEM_CELL64K,
-        new PortableCellItem(AEKeyType.items(), 27, ae2.container.GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_64K,
+        new PortableCellItem(AEKeyType.items(), 27, GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_64K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_ITEM_CELL256K = new ItemDefinition<>(
         AEItemIds.PORTABLE_ITEM_CELL256K,
-        new PortableCellItem(AEKeyType.items(), 18, ae2.container.GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_256K,
+        new PortableCellItem(AEKeyType.items(), 18, GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_256K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_FLUID_CELL1K = new ItemDefinition<>(
         AEItemIds.PORTABLE_FLUID_CELL1K,
-        new PortableCellItem(AEKeyType.fluids(), 18, ae2.container.GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_1K,
+        new PortableCellItem(AEKeyType.fluids(), 18, GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_1K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_FLUID_CELL4K = new ItemDefinition<>(
         AEItemIds.PORTABLE_FLUID_CELL4K,
-        new PortableCellItem(AEKeyType.fluids(), 18, ae2.container.GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_4K,
+        new PortableCellItem(AEKeyType.fluids(), 18, GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_4K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_FLUID_CELL16K = new ItemDefinition<>(
         AEItemIds.PORTABLE_FLUID_CELL16K,
-        new PortableCellItem(AEKeyType.fluids(), 18, ae2.container.GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_16K,
+        new PortableCellItem(AEKeyType.fluids(), 18, GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_16K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_FLUID_CELL64K = new ItemDefinition<>(
         AEItemIds.PORTABLE_FLUID_CELL64K,
-        new PortableCellItem(AEKeyType.fluids(), 18, ae2.container.GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_64K,
+        new PortableCellItem(AEKeyType.fluids(), 18, GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_64K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_FLUID_CELL256K = new ItemDefinition<>(
         AEItemIds.PORTABLE_FLUID_CELL256K,
-        new PortableCellItem(AEKeyType.fluids(), 18, ae2.container.GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_256K,
+        new PortableCellItem(AEKeyType.fluids(), 18, GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_256K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<WirelessTerminalItem> WIRELESS_TERMINAL = new ItemDefinition<>(
         AEItemIds.WIRELESS_TERMINAL, new WirelessTerminalItem(getWirelessTerminalBattery()));
@@ -390,6 +392,8 @@ public final class AEItems {
         AEItemIds.PATTERN_MODIFIER, new PatternModifierItem());
     public static final ItemDefinition<MemoryCardItem> MEMORY_CARD = new ItemDefinition<>(AEItemIds.MEMORY_CARD,
         new MemoryCardItem());
+    public static final ItemDefinition<AdvancedMemoryCardItem> ADVANCED_MEMORY_CARD = new ItemDefinition<>(
+        AEItemIds.ADVANCED_MEMORY_CARD, new AdvancedMemoryCardItem());
     public static final ItemDefinition<DebugCardItem> DEBUG_CARD = new ItemDefinition<>(AEItemIds.DEBUG_CARD,
         new DebugCardItem(), DebugCreativeTab.INSTANCE);
     public static final ItemDefinition<EraserItem> DEBUG_ERASER = new ItemDefinition<>(AEItemIds.DEBUG_ERASER,
@@ -539,6 +543,7 @@ public final class AEItems {
         CONFIG_MODIFIER,
         PATTERN_MODIFIER,
         MEMORY_CARD,
+        ADVANCED_MEMORY_CARD,
         DEBUG_CARD,
         DEBUG_ERASER,
         DEBUG_METEORITE_PLACER,

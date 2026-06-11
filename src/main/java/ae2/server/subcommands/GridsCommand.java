@@ -12,11 +12,14 @@ import ae2.me.service.StatisticsService;
 import ae2.parts.AEBasePart;
 import ae2.parts.p2p.MEP2PTunnelPart;
 import ae2.server.ISubCommand;
+import ae2.util.EmptyArrays;
 import ae2.util.Platform;
 import com.google.common.base.Preconditions;
 import com.google.gson.stream.JsonWriter;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
@@ -42,9 +45,9 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.world.ChunkDataEvent;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.relauncher.ReflectionHelper;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -96,14 +99,16 @@ public class GridsCommand implements ISubCommand {
             var iterator = openSet.iterator();
             Grid grid = iterator.next();
             iterator.remove();
-            for (IGridNode node : grid.getNodes()) {
+            for (IGridNode node : new ObjectArrayList<>(grid.getNodes())) {
                 Object owner = node.getOwner();
                 if (owner instanceof AEBasePart basePart) {
                     visitGridInFrontOfPart(basePart, reachableGrids, openSet);
                 } else if (owner instanceof PatternProviderLogicHost patternProvider) {
                     TileEntity tile = patternProvider.getTileEntity();
-                    for (EnumFacing targetSide : patternProvider.getTargets()) {
-                        visitGridAt(tile, tile.getPos().offset(targetSide), reachableGrids, openSet);
+                    if (tile != null) {
+                        for (EnumFacing targetSide : patternProvider.getTargets()) {
+                            visitGridAt(tile, tile.getPos().offset(targetSide), reachableGrids, openSet);
+                        }
                     }
                 } else if (owner instanceof MEP2PTunnelPart meTunnel) {
                     Object tunnelGrid = meTunnel.getMainNode().getGrid();
@@ -148,7 +153,7 @@ public class GridsCommand implements ISubCommand {
     private static void exportGrids(EntityPlayerMP player, int serialNumber, Collection<Grid> grids) throws CommandException {
         if (player != null) {
             InitNetwork.sendToClient(player,
-                new ExportedGridContent(serialNumber, ExportedGridContent.ContentType.FIRST_CHUNK, new byte[0]));
+                new ExportedGridContent(serialNumber, ExportedGridContent.ContentType.FIRST_CHUNK, EmptyArrays.EMPTY_BYTE_ARRAY));
             try (SendToPlayerStream output = new SendToPlayerStream(player, serialNumber)) {
                 exportGrids(grids, output);
                 output.complete();
@@ -173,12 +178,13 @@ public class GridsCommand implements ISubCommand {
 
     private static void exportGrids(Collection<Grid> grids, OutputStream output) throws CommandException {
         try (ZipOutputStream zip = new ZipOutputStream(new NonClosingOutputStream(output))) {
+            ObjectList<Grid> gridSnapshot = new ObjectArrayList<>(grids);
             Object2ObjectMap<WorldServer, ObjectSet<ChunkPos>> chunksByLevel = new Object2ObjectOpenHashMap<>();
-            for (Grid grid : grids) {
+            for (Grid grid : gridSnapshot) {
                 var statisticsService = grid.getService(StatisticsService.class);
-                for (var entry : statisticsService.getChunks().entrySet()) {
+                for (var entry : new ObjectArrayList<>(statisticsService.getChunks().entrySet())) {
                     chunksByLevel.computeIfAbsent(entry.getKey(), ignored -> new ObjectOpenHashSet<>())
-                                 .addAll(entry.getValue().elementSet());
+                                 .addAll(new ObjectArrayList<>(entry.getValue().elementSet()));
                 }
 
                 zip.putNextEntry(new ZipEntry("grid_" + grid.getSerialNumber() + ".json"));
@@ -288,7 +294,7 @@ public class GridsCommand implements ISubCommand {
         int serialNumber = 0;
         Collection<Grid> grids;
         if (args.length == 2) {
-            grids = TickHandler.instance().getGridList();
+            grids = new ObjectArrayList<>(TickHandler.instance().getGridList());
         } else if (args.length == 3) {
             serialNumber = parseSerial(args[2]);
             grids = collectReachableGrids(findGrid(serialNumber));
@@ -331,7 +337,7 @@ public class GridsCommand implements ISubCommand {
         }
 
         @Override
-        public void write(@Nonnull byte[] b, int off, int len) {
+        public void write(byte @NotNull [] b, int off, int len) {
             Preconditions.checkState(!this.closed, "stream already closed");
             int remaining = len;
             int offset = off;
@@ -386,12 +392,12 @@ public class GridsCommand implements ISubCommand {
         }
 
         @Override
-        public void write(@Nonnull byte[] b) throws IOException {
+        public void write(byte @NotNull [] b) throws IOException {
             this.delegate.write(b);
         }
 
         @Override
-        public void write(@Nonnull byte[] b, int off, int len) throws IOException {
+        public void write(byte @NotNull [] b, int off, int len) throws IOException {
             this.delegate.write(b, off, len);
         }
 

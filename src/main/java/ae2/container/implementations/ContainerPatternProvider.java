@@ -32,7 +32,7 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -98,29 +98,15 @@ public class ContainerPatternProvider extends AEBaseContainer
         this.updatePatternSlotState();
     }
 
-    protected boolean canInteractiveDistance(@NonNull EntityPlayer player, @NonNull TileEntity tileEntityHost) {
-        return remote ? tileEntityHost.hasWorld() && tileEntityHost.getWorld().isBlockLoaded(tileEntityHost.getPos()) : super.canInteractiveDistance(player, tileEntityHost);
+    private static int clampPage(int page, int pageCount) {
+        if (pageCount <= 0) {
+            return 0;
+        }
+        return Math.clamp(page, 0, pageCount - 1);
     }
 
-    @Override
-    public void broadcastChanges() {
-        if (isServerSide()) {
-            this.blockingMode = this.logic.getConfigManager().getSetting(Settings.BLOCKING_MODE);
-            this.blockingType = this.logic.getConfigManager().getSetting(Settings.PATTERN_PROVIDER_BLOCKING_TYPE);
-            this.insertionMode = this.logic.getConfigManager().getSetting(Settings.PATTERN_PROVIDER_INSERTION_MODE);
-            this.outputSideMode = this.logic.getConfigManager().getSetting(Settings.PATTERN_PROVIDER_OUTPUT_SIDE_MODE);
-            this.showInAccessTerminal = this.logic.getConfigManager().getSetting(Settings.PATTERN_ACCESS_TERMINAL);
-            this.lockCraftingMode = this.logic.getConfigManager().getSetting(Settings.LOCK_CRAFTING_MODE);
-            this.craftingLockedReason = this.logic.getCraftingLockedReason();
-            this.unlockStack = this.logic.getUnlockStack();
-            this.activePatternSlots = this.logic.getActivePatternSlots();
-            this.pageCount = this.logic.getPatternPageCount();
-            this.currentPage = Math.min(this.currentPage, this.pageCount - 1);
-            this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
-        }
-
-        this.updatePatternSlotState();
-        super.broadcastChanges();
+    protected boolean canInteractiveDistance(@NotNull EntityPlayer player, @NotNull TileEntity tileEntityHost) {
+        return remote ? tileEntityHost.hasWorld() && tileEntityHost.getWorld().isBlockLoaded(tileEntityHost.getPos()) : super.canInteractiveDistance(player, tileEntityHost);
     }
 
     @Override
@@ -231,12 +217,33 @@ public class ContainerPatternProvider extends AEBaseContainer
         lockPlayerInventorySlot(slot);
     }
 
+    @Override
+    public void broadcastChanges() {
+        if (isServerSide()) {
+            this.blockingMode = this.logic.getConfigManager().getSetting(Settings.BLOCKING_MODE);
+            this.blockingType = this.logic.getConfigManager().getSetting(Settings.PATTERN_PROVIDER_BLOCKING_TYPE);
+            this.insertionMode = this.logic.getConfigManager().getSetting(Settings.PATTERN_PROVIDER_INSERTION_MODE);
+            this.outputSideMode = this.logic.getConfigManager().getSetting(Settings.PATTERN_PROVIDER_OUTPUT_SIDE_MODE);
+            this.showInAccessTerminal = this.logic.getConfigManager().getSetting(Settings.PATTERN_ACCESS_TERMINAL);
+            this.lockCraftingMode = this.logic.getConfigManager().getSetting(Settings.LOCK_CRAFTING_MODE);
+            this.craftingLockedReason = this.logic.getCraftingLockedReason();
+            this.unlockStack = this.logic.getUnlockStack();
+            this.activePatternSlots = this.logic.getActivePatternSlots();
+            this.pageCount = this.logic.getPatternPageCount();
+            this.currentPage = clampPage(this.currentPage, this.pageCount);
+            this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
+        }
+
+        this.updatePatternSlotState();
+        super.broadcastChanges();
+    }
+
     public void setPage(int page) {
         if (isClientSide()) {
             sendClientAction(ACTION_SET_PAGE, page);
             return;
         }
-        this.currentPage = Math.clamp(page, 0, this.logic.getPatternPageCount() - 1);
+        this.currentPage = clampPage(page, this.logic.getPatternPageCount());
         this.updatePatternSlotState();
         this.detectAndSendChanges();
     }

@@ -20,6 +20,7 @@ package ae2.client.render;
 
 import ae2.client.render.cablebus.FacadeBuilder;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -28,7 +29,7 @@ import net.minecraft.client.renderer.block.model.ItemOverrideList;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumFacing;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.Collections;
 import java.util.List;
 
@@ -50,7 +51,7 @@ public class FacadeBakedItemModel extends DelegateBakedModel {
             return Collections.emptyList();
         }
         if (this.quads == null) {
-            it.unimi.dsi.fastutil.objects.ObjectList<BakedQuad> result = new ObjectArrayList<>();
+            ObjectList<BakedQuad> result = new ObjectArrayList<>();
             result.addAll(this.facadeBuilder.buildFacadeItemQuads(this.textureStack, EnumFacing.NORTH));
             result.addAll(this.getBaseModel().getQuads(state, side, rand));
             this.quads = ObjectLists.unmodifiable(result);

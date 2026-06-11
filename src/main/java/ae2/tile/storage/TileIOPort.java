@@ -33,6 +33,7 @@ import ae2.api.networking.energy.IEnergyService;
 import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.networking.ticking.TickRateModulation;
 import ae2.api.networking.ticking.TickingRequest;
+import ae2.api.orientation.RelativeSide;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.MEStorage;
@@ -64,8 +65,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.util.List;
 
 public class TileIOPort extends AENetworkedInvTile implements IUpgradeableObject, IConfigurableObject, IGridTickable {
@@ -198,7 +199,7 @@ public class TileIOPort extends AENetworkedInvTile implements IUpgradeableObject
 
     @Override
     protected InternalInventory getExposedInventoryForSide(EnumFacing side) {
-        EnumFacing up = this.getOrientation().getSide(ae2.api.orientation.RelativeSide.TOP);
+        EnumFacing up = this.getOrientation().getSide(RelativeSide.TOP);
         if (side == up || side == up.getOpposite()) {
             return this.inputCellsExt;
         }

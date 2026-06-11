@@ -21,6 +21,7 @@ package ae2.spatial;
 import ae2.api.movable.BlockEntityMoveStrategies;
 import ae2.api.movable.IBlockEntityMoveStrategy;
 import ae2.core.AELog;
+import ae2.core.definitions.AEBlocks;
 import ae2.server.services.compass.ServerCompassService;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
@@ -34,7 +35,7 @@ import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.gen.structure.StructureBoundingBox;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 public class CachedPlane {
@@ -260,7 +261,7 @@ public class CachedPlane {
 
         private static IBlockState getMatrixFrame() {
             if (matrixFrame == null) {
-                matrixFrame = ae2.core.definitions.AEBlocks.MATRIX_FRAME.block().getDefaultState();
+                matrixFrame = AEBlocks.MATRIX_FRAME.block().getDefaultState();
             }
             return matrixFrame;
         }

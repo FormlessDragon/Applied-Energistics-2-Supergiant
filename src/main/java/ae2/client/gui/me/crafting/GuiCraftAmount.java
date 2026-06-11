@@ -24,8 +24,8 @@ import ae2.client.gui.implementations.AESubGui;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.GuiNumberEntryButtonSettings;
-import ae2.client.gui.widgets.NumberEntryWidget;
 import ae2.client.gui.widgets.NumberEntryButtonConfigButton;
+import ae2.client.gui.widgets.NumberEntryWidget;
 import ae2.container.implementations.ContainerCraftAmount;
 import ae2.core.localization.GuiText;
 import net.minecraft.client.gui.GuiScreen;
@@ -37,15 +37,18 @@ import net.minecraft.util.text.ITextComponent;
  */
 public class GuiCraftAmount extends AEBaseGui<ContainerCraftAmount> {
 
+    private final ITextComponent nextText = GuiText.Next.text();
+    private final ITextComponent startText = GuiText.Start.text();
     private final AE2Button next;
     private final NumberEntryWidget amountToCraft;
     private boolean amountInitialized;
+    private boolean shiftDown;
 
     public GuiCraftAmount(ContainerCraftAmount container, InventoryPlayer playerInventory, ITextComponent title,
                           GuiStyle style) {
         super(container, playerInventory, style);
 
-        this.next = widgets.addButton("next", GuiText.Next.text(), this::confirm);
+        this.next = widgets.addButton("next", this.nextText, this::confirm);
 
         AESubGui.addBackButton(container, "back", widgets,
             container.hasExternalGuiReturn() ? GuiText.ReturnToPreviousGui.text() : null);
@@ -53,7 +56,7 @@ public class GuiCraftAmount extends AEBaseGui<ContainerCraftAmount> {
 
         this.amountToCraft = widgets.addNumberEntryWidget("amountToCraft", NumberEntryType.UNITLESS);
         this.amountToCraft.setMinValue(1);
-        this.amountToCraft.setMaxValue(Integer.MAX_VALUE);
+        this.amountToCraft.setMaxValue(ContainerCraftAmount.MAX_AUTO_CRAFT_AMOUNT);
         this.amountToCraft.setLongValue(1);
         this.amountToCraft.setTextFieldStyle(style.getWidget("amountToCraftInput"));
         this.amountToCraft.setPreviewFieldStyle(style.getWidget("amountToCraftPreview"));
@@ -74,7 +77,11 @@ public class GuiCraftAmount extends AEBaseGui<ContainerCraftAmount> {
             }
         }
 
-        this.next.setMessage(GuiScreen.isShiftKeyDown() ? GuiText.Start.text() : GuiText.Next.text());
+        boolean newShiftDown = GuiScreen.isShiftKeyDown();
+        if (this.shiftDown != newShiftDown) {
+            this.shiftDown = newShiftDown;
+            this.next.setMessage(newShiftDown ? this.startText : this.nextText);
+        }
         this.next.enabled = this.amountToCraft.getIntValue().orElse(0) > 0;
     }
 

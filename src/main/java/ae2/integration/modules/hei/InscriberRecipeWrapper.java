@@ -5,6 +5,7 @@ import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.ingredients.VanillaTypes;
 import mezz.jei.api.recipe.IRecipeWrapper;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.crafting.Ingredient;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -17,8 +18,8 @@ class InscriberRecipeWrapper implements IRecipeWrapper {
         this.recipe = recipe;
     }
 
-    private static List<ItemStack> getStacks(net.minecraft.item.crafting.Ingredient ingredient) {
-        if (ingredient == null || ingredient == net.minecraft.item.crafting.Ingredient.EMPTY) {
+    private static List<ItemStack> getStacks(Ingredient ingredient) {
+        if (ingredient == null || ingredient == Ingredient.EMPTY) {
             return Collections.singletonList(ItemStack.EMPTY);
         }
         ItemStack[] stacks = ingredient.getMatchingStacks();

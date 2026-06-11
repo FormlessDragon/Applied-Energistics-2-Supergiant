@@ -13,9 +13,7 @@ import ae2.api.parts.IPartModel;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.container.GuiIds;
-import ae2.core.definitions.AEItems;
 import ae2.util.ConfigInventory;
-import ae2.util.prioritylist.DefaultPriorityList;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.WorldServer;
 import org.jetbrains.annotations.NotNull;
@@ -62,11 +60,20 @@ public class StockExportBusPart extends ExportBusPart {
         getMainNode().ifPresent((grid, node) -> grid.getTickManager().alertDevice(node));
     }
 
-    protected StorageReader getStorageReader() {
+    StorageReader getStorageReader() {
         if (storageReader == null) {
             var self = this.getHost().getTileEntity();
-            var fromPos = self.getPos().offset(this.getSide());
-            var fromSide = getSide().getOpposite();
+            var side = getSide();
+            if (side == null) {
+                return what -> {
+                    if (what == null) {
+                        return 0;
+                    }
+                    return 0;
+                };
+            }
+            var fromPos = self.getPos().offset(side);
+            var fromSide = side.getOpposite();
             storageReader = new ExternalStorageReader((WorldServer) getLevel(), fromPos, fromSide);
         }
         return storageReader;
@@ -138,8 +145,7 @@ public class StockExportBusPart extends ExportBusPart {
     @Override
     @NotNull
     protected StackTransferContext createTransferContext(IStorageService storageService, IEnergyService energyService) {
-        return new StackTransferContextImpl(storageService, energyService, this.source, getOperationsPerTick(),
-            DefaultPriorityList.INSTANCE);
+        return super.createTransferContext(storageService, energyService);
     }
 
     protected long getCurrentStock(AEKey what) {
@@ -153,7 +159,7 @@ public class StockExportBusPart extends ExportBusPart {
 
     @Override
     protected boolean isCraftingEnabled() {
-        return isUpgradedWith(AEItems.CRAFTING_CARD);
+        return super.isCraftingEnabled();
     }
 
     @Override

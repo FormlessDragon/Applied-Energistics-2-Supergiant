@@ -48,12 +48,14 @@ public class CompositeStorage implements MEStorage, ITickingMonitor {
         this.cache = new InventoryCache();
     }
 
+    @SuppressWarnings("unused")
     public CompositeStorage() {
         this(new Object2ObjectOpenHashMap<>());
     }
 
     public void setStorages(Map<AEKeyType, MEStorage> storages) {
         this.storages = Objects.requireNonNull(storages);
+        this.forceCacheRebuild = true;
     }
 
     @Override
@@ -128,8 +130,8 @@ public class CompositeStorage implements MEStorage, ITickingMonitor {
     }
 
     private class InventoryCache {
-        private KeyCounter frontBuffer = new KeyCounter();
-        private KeyCounter backBuffer = new KeyCounter();
+        private KeyCounter frontBuffer = KeyCounter.saturating();
+        private KeyCounter backBuffer = KeyCounter.saturating();
 
         public boolean update() {
 // Flip back & front buffer and start building a new list
@@ -148,11 +150,15 @@ public class CompositeStorage implements MEStorage, ITickingMonitor {
                 var old = backBuffer.get(entry.getKey());
                 if (old == 0 || old != entry.getLongValue()) {
                     changed = true;
+                    break;
                 }
             }
-            for (var oldEntry : backBuffer) {
-                if (frontBuffer.get(oldEntry.getKey()) == 0) {
-                    changed = true;
+            if (!changed) {
+                for (var oldEntry : backBuffer) {
+                    if (frontBuffer.get(oldEntry.getKey()) == 0) {
+                        changed = true;
+                        break;
+                    }
                 }
             }
 

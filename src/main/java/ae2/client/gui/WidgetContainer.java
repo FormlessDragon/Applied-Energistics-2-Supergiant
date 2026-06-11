@@ -21,6 +21,7 @@ package ae2.client.gui;
 import ae2.client.Point;
 import ae2.client.gui.style.Blitter;
 import ae2.client.gui.style.GuiStyle;
+import ae2.client.gui.style.TooltipArea;
 import ae2.client.gui.style.WidgetStyle;
 import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.AECheckbox;
@@ -275,7 +276,7 @@ public class WidgetContainer {
 
         tooltips.clear();
         if (this.style != null) {
-            for (Map.Entry<String, ae2.client.gui.style.TooltipArea> entry : this.style.getTooltips().entrySet()) {
+            for (Map.Entry<String, TooltipArea> entry : this.style.getTooltips().entrySet()) {
                 Point pos = entry.getValue().resolve(relativeBounds);
                 Rectangle area = new Rectangle(
                     pos.x(), pos.y(),

@@ -20,6 +20,7 @@ package ae2.spatial;
 
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.math.BlockPos;
+import net.minecraftforge.common.util.Constants.NBT;
 
 import java.time.Instant;
 
@@ -40,6 +41,14 @@ public record TransitionInfo(String worldId, int dimensionId, BlockPos min, Bloc
     }
 
     public static TransitionInfo fromTag(NBTTagCompound tag) {
+        if (!tag.hasKey(TAG_WORLD_ID, NBT.TAG_STRING)
+            || !tag.hasKey(TAG_DIMENSION_ID, NBT.TAG_INT)
+            || !tag.hasKey(TAG_TIMESTAMP, NBT.TAG_LONG)
+            || !hasPosTag(tag, TAG_MIN, "min_x", "min_y", "min_z")
+            || !hasPosTag(tag, TAG_MAX, "max_x", "max_y", "max_z")) {
+            return null;
+        }
+
         BlockPos min = readPos(tag, TAG_MIN, "min_x", "min_y", "min_z");
         BlockPos max = readPos(tag, TAG_MAX, "max_x", "max_y", "max_z");
         return new TransitionInfo(
@@ -59,11 +68,23 @@ public record TransitionInfo(String worldId, int dimensionId, BlockPos min, Bloc
     }
 
     private static BlockPos readPos(NBTTagCompound tag, String key, String legacyX, String legacyY, String legacyZ) {
-        if (tag.hasKey(key, 10)) {
+        if (tag.hasKey(key, NBT.TAG_COMPOUND)) {
             NBTTagCompound posTag = tag.getCompoundTag(key);
             return new BlockPos(posTag.getInteger("x"), posTag.getInteger("y"), posTag.getInteger("z"));
         }
         return new BlockPos(tag.getInteger(legacyX), tag.getInteger(legacyY), tag.getInteger(legacyZ));
+    }
+
+    private static boolean hasPosTag(NBTTagCompound tag, String key, String legacyX, String legacyY, String legacyZ) {
+        if (tag.hasKey(key, NBT.TAG_COMPOUND)) {
+            NBTTagCompound posTag = tag.getCompoundTag(key);
+            return posTag.hasKey("x", NBT.TAG_INT)
+                && posTag.hasKey("y", NBT.TAG_INT)
+                && posTag.hasKey("z", NBT.TAG_INT);
+        }
+        return tag.hasKey(legacyX, NBT.TAG_INT)
+            && tag.hasKey(legacyY, NBT.TAG_INT)
+            && tag.hasKey(legacyZ, NBT.TAG_INT);
     }
 
     public NBTTagCompound toTag() {

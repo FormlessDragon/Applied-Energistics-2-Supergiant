@@ -35,6 +35,9 @@ import java.util.List;
 import java.util.Map;
 
 public class NetworkStatus {
+    private static final int MAX_MACHINE_GROUPS = 4096;
+    private static final int MIN_MACHINE_GROUP_BYTES = 18;
+
     private double averagePowerInjection;
     private double averagePowerUsage;
     private double storedPower;
@@ -118,6 +121,10 @@ public class NetworkStatus {
         status.channelsUsed = data.readVarInt();
 
         int count = data.readVarInt();
+        if (count < 0 || count > MAX_MACHINE_GROUPS || count > data.readableBytes() / MIN_MACHINE_GROUP_BYTES) {
+            throw new IllegalArgumentException("Invalid network status machine group count: " + count);
+        }
+
         ObjectList<MachineGroup> machines = new ObjectArrayList<>(count);
         for (int i = 0; i < count; i++) {
             machines.add(MachineGroup.read(data));

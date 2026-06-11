@@ -29,6 +29,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraftforge.common.util.Constants;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -36,6 +37,8 @@ import java.util.List;
 
 public class TilePaint extends AEBaseTile {
     private static final int LIGHT_PER_DOT = 12;
+    private static final int MAX_DOTS = 21;
+    private static final int BYTES_PER_DOT = 2;
 
     private int isLit = 0;
     private List<Splotch> dots = null;
@@ -53,7 +56,7 @@ public class TilePaint extends AEBaseTile {
     @Override
     public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
-        if (data.hasKey("dots")) {
+        if (data.hasKey("dots", Constants.NBT.TAG_BYTE_ARRAY)) {
             this.readBuffer(Unpooled.copiedBuffer(data.getByteArray("dots")));
         }
     }
@@ -84,15 +87,28 @@ public class TilePaint extends AEBaseTile {
     }
 
     private void readBuffer(ByteBuf in) {
-        final byte howMany = in.readByte();
+        if (!in.isReadable()) {
+            this.isLit = 0;
+            this.dots = null;
+            return;
+        }
+
+        final int howMany = in.readUnsignedByte();
         if (howMany == 0) {
             this.isLit = 0;
             this.dots = null;
             return;
         }
 
-        this.dots = new ObjectArrayList<>(howMany);
-        for (int x = 0; x < howMany; x++) {
+        final int readableDots = Math.min(Math.min(howMany, MAX_DOTS), in.readableBytes() / BYTES_PER_DOT);
+        if (readableDots == 0) {
+            this.isLit = 0;
+            this.dots = null;
+            return;
+        }
+
+        this.dots = new ObjectArrayList<>(readableDots);
+        for (int x = 0; x < readableDots; x++) {
             this.dots.add(new Splotch(in));
         }
         updateLight();
@@ -147,7 +163,7 @@ public class TilePaint extends AEBaseTile {
                 this.dots = new ObjectArrayList<>();
             }
 
-            if (this.dots.size() > 20) {
+            if (this.dots.size() >= MAX_DOTS) {
                 this.dots.removeFirst();
             }
 

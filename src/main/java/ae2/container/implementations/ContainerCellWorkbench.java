@@ -21,9 +21,11 @@ import ae2.api.config.CopyMode;
 import ae2.api.config.FuzzyMode;
 import ae2.api.config.Settings;
 import ae2.api.inventories.ISegmentedInventory;
+import ae2.api.inventories.InternalInventory;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.StorageCells;
+import ae2.api.storage.cells.IBasicCellItem;
 import ae2.api.storage.cells.ICellWorkbenchItem;
 import ae2.api.storage.cells.StorageCell;
 import ae2.api.upgrades.IUpgradeInventory;
@@ -31,6 +33,7 @@ import ae2.api.util.IConfigManager;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
 import ae2.container.slot.CellPartitionSlot;
+import ae2.container.slot.IPartitionSlotHost;
 import ae2.container.slot.OptionalRestrictedInputSlot;
 import ae2.container.slot.RestrictedInputSlot;
 import ae2.helpers.externalstorage.GenericStackInv;
@@ -48,7 +51,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 
-public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkbench> implements ae2.container.slot.IPartitionSlotHost {
+public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkbench> implements IPartitionSlotHost {
     private static final int CONFIG_SLOTS_PER_PAGE = 63;
 
     public static final String ACTION_NEXT_COPYMODE = "nextCopyMode";
@@ -78,11 +81,11 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
         registerClientAction(ACTION_SET_PAGE, Integer.class, this::setPage);
     }
 
-    @Override
-    protected void setupInventorySlots() {
-        ae2.api.inventories.InternalInventory cell = this.getHost().getSubInventory(ISegmentedInventory.CELLS);
-        this.addSlot(new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.WORKBENCH_CELL, cell, 0),
-            SlotSemantics.STORAGE_CELL);
+    private static int clampPage(int page, int pageCount) {
+        if (pageCount <= 0) {
+            return 0;
+        }
+        return Math.clamp(page, 0, pageCount - 1);
     }
 
     @Override
@@ -157,15 +160,10 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
     }
 
     @Override
-    public void broadcastChanges() {
-        if (isServerSide()) {
-            this.configSlotCount = getConfigInventory().size();
-            this.pageCount = getPageCount(this.configSlotCount);
-            this.currentPage = Math.clamp(this.currentPage, 0, this.pageCount - 1);
-        }
-
-        updateConfigPageInventory();
-        super.broadcastChanges();
+    protected void setupInventorySlots() {
+        InternalInventory cell = this.getHost().getSubInventory(ISegmentedInventory.CELLS);
+        this.addSlot(new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.WORKBENCH_CELL, cell, 0),
+            SlotSemantics.STORAGE_CELL);
     }
 
     public void clear() {
@@ -191,6 +189,18 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
         this.broadcastChanges();
     }
 
+    @Override
+    public void broadcastChanges() {
+        if (isServerSide()) {
+            this.configSlotCount = getConfigInventory().size();
+            this.pageCount = getPageCount(this.configSlotCount);
+            this.currentPage = clampPage(this.currentPage, this.pageCount);
+        }
+
+        updateConfigPageInventory();
+        super.broadcastChanges();
+    }
+
     public void setPage(int page) {
         if (isClientSide()) {
             sendClientAction(ACTION_SET_PAGE, page);
@@ -199,7 +209,7 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
 
         this.configSlotCount = getConfigInventory().size();
         this.pageCount = getPageCount(this.configSlotCount);
-        this.currentPage = Math.clamp(page, 0, this.pageCount - 1);
+        this.currentPage = clampPage(page, this.pageCount);
         updateConfigPageInventory();
         this.detectAndSendChanges();
     }
@@ -213,8 +223,15 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
     }
 
     public ItemStack getWorkbenchItem() {
-        ae2.api.inventories.InternalInventory cells = Objects.requireNonNull(getHost().getSubInventory(ISegmentedInventory.CELLS));
+        InternalInventory cells = Objects.requireNonNull(getHost().getSubInventory(ISegmentedInventory.CELLS));
         return cells.getStackInSlot(0);
+    }
+
+    public boolean canRestrictCell() {
+        ItemStack stack = getWorkbenchItem();
+        return !stack.isEmpty()
+            && stack.getItem() instanceof IBasicCellItem basicCellItem
+            && basicCellItem.isStorageCell(stack);
     }
 
     public CopyMode getCopyMode() {

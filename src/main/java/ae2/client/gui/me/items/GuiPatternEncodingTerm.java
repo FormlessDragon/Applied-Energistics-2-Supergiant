@@ -214,11 +214,11 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
             var itemTooltip = new ObjectArrayList<>(getItemToolTip(slot.getStack()));
             GenericStack unwrapped = GenericStack.fromItemStack(slot.getStack());
             if (unwrapped != null) {
-                itemTooltip.add(Tooltips.getAmountTooltip(ButtonToolTips.Amount, unwrapped).getFormattedText());
+                itemTooltip.add(Tooltips.getAmountTooltipLocal(ButtonToolTips.Amount, unwrapped));
             }
-            itemTooltip.add(Tooltips.getSetAmountTooltip().getFormattedText());
+            itemTooltip.add(Tooltips.getSetAmountTooltipLocal());
             if (this.container.isProcessingPatternItemSlot(slot)) {
-                itemTooltip.add(Tooltips.getRenameTooltip().getFormattedText());
+                itemTooltip.add(Tooltips.getRenameTooltipLocal());
             }
             drawItemTooltipWithImages(mouseX, mouseY, slot.getStack(), itemTooltip);
             return;

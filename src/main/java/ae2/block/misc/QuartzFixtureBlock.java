@@ -7,6 +7,7 @@ import ae2.block.AEBaseBlock;
 import ae2.client.EffectType;
 import ae2.core.AEConfig;
 import ae2.core.AppEngBase;
+import ae2.util.EmptyArrays;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockDirectional;
@@ -80,7 +81,7 @@ public class QuartzFixtureBlock extends AEBaseBlock {
             ordered.add(axisFacing.facing.getOpposite());
         }
 
-        return ordered.toArray(new EnumFacing[0]);
+        return ordered.toArray(EmptyArrays.EMPTY_FACING_ARRAY);
     }
 
     @Override

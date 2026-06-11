@@ -1,6 +1,7 @@
 package ae2.recipes.serializers;
 
 import ae2.api.ids.AEItemIds;
+import ae2.util.EmptyArrays;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -25,6 +26,7 @@ public final class JsonRecipeUtils {
     private static final ResourceLocation KNIFE_TAG = new ResourceLocation("ae2", "knife");
     private static final ResourceLocation ALL_CERTUS_QUARTZ_TAG = new ResourceLocation("ae2", "all_certus_quartz");
     private static final ResourceLocation ENDER_PEARLS_TAG = new ResourceLocation("c", "ender_pearls");
+    private static final int MAX_JSON_ARRAY_ENTRIES = 1024;
 
     private JsonRecipeUtils() {
     }
@@ -39,11 +41,22 @@ public final class JsonRecipeUtils {
 
     public static List<ItemStack> readItemStacks(JsonObject json, String key, JsonContext ctx) {
         JsonArray array = JsonUtils.getJsonArray(json, key);
+        validateArraySize(array, key);
         List<ItemStack> result = new ObjectArrayList<>(array.size());
         for (JsonElement element : array) {
-            result.add(readItemStack(element.getAsJsonObject(), ctx));
+            result.add(readItemStack(readObject(element, key + " entry"), ctx));
         }
         return result;
+    }
+
+    public static JsonObject readObject(JsonElement json, String description) {
+        if (json == null || json.isJsonNull()) {
+            throw new JsonSyntaxException("Expected " + description + " to be an object");
+        }
+        if (!json.isJsonObject()) {
+            throw new JsonSyntaxException("Expected " + description + " to be an object, got " + json);
+        }
+        return json.getAsJsonObject();
     }
 
     public static Ingredient readIngredient(JsonObject json, String key, JsonContext ctx) {
@@ -52,6 +65,7 @@ public final class JsonRecipeUtils {
 
     public static List<Ingredient> readIngredients(JsonObject json, String key, JsonContext ctx) {
         JsonArray array = JsonUtils.getJsonArray(json, key);
+        validateArraySize(array, key);
         List<Ingredient> result = new ObjectArrayList<>(array.size());
         for (JsonElement element : array) {
             result.add(readIngredient(element, ctx));
@@ -121,6 +135,7 @@ public final class JsonRecipeUtils {
         }
 
         if (json.isJsonArray()) {
+            validateArraySize(json.getAsJsonArray(), "ingredient alternatives");
             List<ItemStack> alternatives = new ObjectArrayList<>();
             addAlternativeStacks(alternatives, json.getAsJsonArray(), ctx);
             return createIngredient(alternatives, "ingredient alternatives");
@@ -150,14 +165,21 @@ public final class JsonRecipeUtils {
         if (alternatives.isEmpty()) {
             throw new JsonSyntaxException("Could not resolve any matches for " + description);
         }
-        return Ingredient.fromStacks(alternatives.toArray(new ItemStack[0]));
+        return Ingredient.fromStacks(alternatives.toArray(EmptyArrays.EMPTY_ITEM_STACK_ARRAY));
     }
 
     private static void addAlternativeStacks(List<ItemStack> alternatives, JsonArray array, JsonContext ctx) {
+        validateArraySize(array, "ingredient alternatives");
         Set<String> seen = new ObjectLinkedOpenHashSet<>();
         for (JsonElement element : array) {
             Ingredient ingredient = readIngredient(element, ctx);
             addMatchingStacks(alternatives, seen, ingredient);
+        }
+    }
+
+    private static void validateArraySize(JsonArray array, String description) {
+        if (array.size() > MAX_JSON_ARRAY_ENTRIES) {
+            throw new JsonSyntaxException(description + " has too many entries: " + array.size());
         }
     }
 
@@ -285,10 +307,14 @@ public final class JsonRecipeUtils {
     }
 
     private static ResourceLocation parseId(String id) {
-        int separator = id.indexOf(':');
-        if (separator > 0) {
-            return new ResourceLocation(id.substring(0, separator), id.substring(separator + 1));
+        try {
+            int separator = id.indexOf(':');
+            if (separator > 0) {
+                return new ResourceLocation(id.substring(0, separator), id.substring(separator + 1));
+            }
+            return new ResourceLocation(id);
+        } catch (RuntimeException e) {
+            throw new JsonSyntaxException("Invalid resource id: " + id, e);
         }
-        return new ResourceLocation(id);
     }
 }

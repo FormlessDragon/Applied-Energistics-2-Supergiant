@@ -24,6 +24,7 @@ import ae2.api.implementations.items.MemoryCardMessages;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.upgrades.IUpgradeInventory;
 import ae2.api.upgrades.IUpgradeableObject;
+import ae2.api.util.AEColor;
 import ae2.api.util.IConfigurableObject;
 import ae2.block.AEBaseTileBlock;
 import ae2.core.localization.InGameTooltip;
@@ -67,7 +68,7 @@ import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -263,7 +264,10 @@ public class MemoryCardItem extends AEBaseItem implements IMemoryCard {
                 upgrades.setItemDirect(i, ItemStack.EMPTY);
             }
             for (int i = 0; i < desiredUpgrades.tagCount(); i++) {
-                upgrades.addItems(new ItemStack(desiredUpgrades.getCompoundTagAt(i)));
+                ItemStack desired = readStack(desiredUpgrades.getCompoundTagAt(i));
+                if (!desired.isEmpty()) {
+                    upgrades.addItems(desired);
+                }
             }
             return;
         }
@@ -278,7 +282,7 @@ public class MemoryCardItem extends AEBaseItem implements IMemoryCard {
         Reference2IntOpenHashMap<Item> desiredCounts = new Reference2IntOpenHashMap<>();
         desiredCounts.defaultReturnValue(0);
         for (int i = 0; i < desiredUpgrades.tagCount(); i++) {
-            ItemStack desired = new ItemStack(desiredUpgrades.getCompoundTagAt(i));
+            ItemStack desired = readStack(desiredUpgrades.getCompoundTagAt(i));
             if (!desired.isEmpty()) {
                 desiredCounts.addTo(desired.getItem(), desired.getCount());
             }
@@ -339,6 +343,14 @@ public class MemoryCardItem extends AEBaseItem implements IMemoryCard {
         }
     }
 
+    private static ItemStack readStack(NBTTagCompound tag) {
+        try {
+            return new ItemStack(tag);
+        } catch (RuntimeException ignored) {
+            return ItemStack.EMPTY;
+        }
+    }
+
     public static void clearCard(ItemStack card) {
         NBTTagCompound tag = card.getTagCompound();
         if (tag == null) {
@@ -360,7 +372,17 @@ public class MemoryCardItem extends AEBaseItem implements IMemoryCard {
 
     public static MemoryCardColors getMemoryCardColors(ItemStack stack) {
         NBTTagCompound tag = stack.getTagCompound();
-        return tag == null ? MemoryCardColors.DEFAULT : MemoryCardColors.fromTag(tag, MEMORY_CARD_COLORS);
+        if (tag == null) {
+            return MemoryCardColors.DEFAULT;
+        }
+
+        NBTBase frequencyBase = tag.getTag(EXPORTED_P2P_FREQUENCY);
+        if (frequencyBase instanceof NBTTagShort frequencyTag && frequencyTag.getShort() != 0) {
+            AEColor[] colors = Platform.p2p().toColors(frequencyTag.getShort());
+            return MemoryCardColors.repeatedPairs(colors[0], colors[1], colors[2], colors[3]);
+        }
+
+        return MemoryCardColors.fromTag(tag, MEMORY_CARD_COLORS);
     }
 
     public static int getTintColor(ItemStack stack, int tintIndex) {
@@ -378,6 +400,7 @@ public class MemoryCardItem extends AEBaseItem implements IMemoryCard {
     @Override
     protected void addCheckedInformation(ItemStack stack, World world, List<String> lines, ITooltipFlag advancedTooltips) {
         super.addCheckedInformation(stack, world, lines, advancedTooltips);
+        lines.add(InGameTooltip.MemoryCardOffhandP2PInput.getLocal());
 
         NBTTagCompound tag = stack.getTagCompound();
         if (tag == null) {

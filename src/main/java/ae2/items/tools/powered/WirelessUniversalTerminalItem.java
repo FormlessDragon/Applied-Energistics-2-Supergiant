@@ -18,10 +18,12 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.nbt.NBTTagString;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.NonNullList;
+import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.NotNull;
@@ -60,7 +62,7 @@ public class WirelessUniversalTerminalItem extends WirelessTerminalItem {
 
     @Override
     public WirelessTerminalGuiHost<?> getGuiHost(EntityPlayer player, ItemGuiHostLocator locator,
-                                                 @Nullable net.minecraft.util.math.RayTraceResult hitResult) {
+                                                 @Nullable RayTraceResult hitResult) {
         ItemStack stack = locator.locateItem(player);
         WirelessTerminalItem terminal = getCurrentTerminal(stack);
         if (terminal == null) {
@@ -178,7 +180,7 @@ public class WirelessUniversalTerminalItem extends WirelessTerminalItem {
     private void writeInstalledTerminalIds(NBTTagCompound tag, Set<String> ids) {
         NBTTagList list = new NBTTagList();
         for (String id : ids) {
-            list.appendTag(new net.minecraft.nbt.NBTTagString(id));
+            list.appendTag(new NBTTagString(id));
         }
         tag.setTag(WirelessTerminals.TAG_INSTALLED_TERMINALS, list);
     }
@@ -229,8 +231,8 @@ public class WirelessUniversalTerminalItem extends WirelessTerminalItem {
                                          ITooltipFlag advancedTooltips) {
         WirelessTerminalItem current = getCurrentTerminal(stack);
         if (current != null) {
-            lines.add(GuiText.WirelessTerminalCurrent.text(current.getWirelessTerminalDefinition().displayName())
-                                                     .getFormattedText());
+            lines.add(GuiText.WirelessTerminalCurrent.getLocal(
+                current.getWirelessTerminalDefinition().displayName().getFormattedText()));
         }
         for (String id : getInstalledTerminalIds(stack)) {
             WirelessTerminalDefinition definition = WirelessTerminalRegistry.definitionOfId(id);

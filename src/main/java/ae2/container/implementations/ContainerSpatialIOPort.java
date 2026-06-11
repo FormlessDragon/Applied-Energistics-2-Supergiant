@@ -18,6 +18,10 @@
 
 package ae2.container.implementations;
 
+import ae2.api.networking.IGrid;
+import ae2.api.networking.IGridNode;
+import ae2.api.networking.energy.IEnergyService;
+import ae2.api.networking.spatial.ISpatialService;
 import ae2.container.AEBaseContainer;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
@@ -25,6 +29,7 @@ import ae2.container.slot.OutputSlot;
 import ae2.container.slot.RestrictedInputSlot;
 import ae2.tile.spatial.TileSpatialIOPort;
 import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.util.math.BlockPos;
 
 public class ContainerSpatialIOPort extends AEBaseContainer {
 
@@ -60,19 +65,19 @@ public class ContainerSpatialIOPort extends AEBaseContainer {
         if (this.isServerSide()) {
             this.delay++;
             TileSpatialIOPort port = (TileSpatialIOPort) this.getTileEntity();
-            ae2.api.networking.IGridNode gridNode = port != null ? port.getGridNode() : null;
-            ae2.api.networking.IGrid grid = gridNode != null ? gridNode.grid() : null;
+            IGridNode gridNode = port != null ? port.getGridNode() : null;
+            IGrid grid = gridNode != null ? gridNode.grid() : null;
             if (this.delay > 15 && grid != null) {
                 this.delay = 0;
-                ae2.api.networking.energy.IEnergyService energy = grid.getEnergyService();
-                ae2.api.networking.spatial.ISpatialService spatial = grid.getSpatialService();
+                IEnergyService energy = grid.getEnergyService();
+                ISpatialService spatial = grid.getSpatialService();
                 this.currentPower = (long) (100.0 * energy.getStoredPower());
                 this.maxPower = (long) (100.0 * energy.getMaxStoredPower());
                 this.requiredPower = (long) (100.0 * spatial.requiredPower());
                 this.efficiency = (long) (100.0f * spatial.currentEfficiency());
 
-                net.minecraft.util.math.BlockPos min = spatial.getMin();
-                net.minecraft.util.math.BlockPos max = spatial.getMax();
+                BlockPos min = spatial.getMin();
+                BlockPos max = spatial.getMax();
                 if (min != null && max != null && spatial.isValidRegion()) {
                     this.xSize = max.getX() - min.getX() - 1;
                     this.ySize = max.getY() - min.getY() - 1;

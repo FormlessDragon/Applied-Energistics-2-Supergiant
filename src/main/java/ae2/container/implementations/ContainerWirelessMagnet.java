@@ -3,13 +3,16 @@ package ae2.container.implementations;
 import ae2.api.config.IncludeExclude;
 import ae2.container.AEBaseContainer;
 import ae2.container.ISubGui;
+import ae2.container.SlotSemantic;
 import ae2.container.SlotSemantics;
 import ae2.container.slot.FakeSlot;
+import ae2.core.definitions.AEItems;
 import ae2.core.gui.locator.GuiHostLocator;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.helpers.WirelessTerminalMagnetHost;
 import ae2.util.ConfigInventory;
 import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.item.ItemStack;
 
 public class ContainerWirelessMagnet extends AEBaseContainer implements ISubGui {
     private static final String ACTION_TOGGLE_PICKUP_MODE = "togglePickupMode";
@@ -37,7 +40,7 @@ public class ContainerWirelessMagnet extends AEBaseContainer implements ISubGui 
         registerClientAction(ACTION_SWAP, this::swapConfigs);
     }
 
-    private void addConfigSlots(ConfigInventory config, ae2.container.SlotSemantic semantic) {
+    private void addConfigSlots(ConfigInventory config, SlotSemantic semantic) {
         var inv = config.createGuiWrapper();
         for (int y = 0; y < 3; y++) {
             for (int x = 0; x < 9; x++) {
@@ -65,9 +68,19 @@ public class ContainerWirelessMagnet extends AEBaseContainer implements ISubGui 
         return this.magnetHost.getInsertMode();
     }
 
+    @Override
+    public void setFilter(int slotIndex, ItemStack item, boolean preferEmptying) {
+        if (isServerSide() && !hasMagnetCard()) {
+            return;
+        }
+        super.setFilter(slotIndex, item, preferEmptying);
+    }
+
     public void togglePickupMode() {
         if (isClientSide()) {
             sendClientAction(ACTION_TOGGLE_PICKUP_MODE);
+        } else if (!hasMagnetCard()) {
+            return;
         }
         this.magnetHost.togglePickupMode();
     }
@@ -75,6 +88,8 @@ public class ContainerWirelessMagnet extends AEBaseContainer implements ISubGui 
     public void toggleInsertMode() {
         if (isClientSide()) {
             sendClientAction(ACTION_TOGGLE_INSERT_MODE);
+        } else if (!hasMagnetCard()) {
+            return;
         }
         this.magnetHost.toggleInsertMode();
     }
@@ -82,6 +97,8 @@ public class ContainerWirelessMagnet extends AEBaseContainer implements ISubGui 
     public void copyInsertToPickup() {
         if (isClientSide()) {
             sendClientAction(ACTION_COPY_UP);
+        } else if (!hasMagnetCard()) {
+            return;
         }
         this.magnetHost.copyInsertToPickup();
     }
@@ -89,6 +106,8 @@ public class ContainerWirelessMagnet extends AEBaseContainer implements ISubGui 
     public void copyPickupToInsert() {
         if (isClientSide()) {
             sendClientAction(ACTION_COPY_DOWN);
+        } else if (!hasMagnetCard()) {
+            return;
         }
         this.magnetHost.copyPickupToInsert();
     }
@@ -96,7 +115,13 @@ public class ContainerWirelessMagnet extends AEBaseContainer implements ISubGui 
     public void swapConfigs() {
         if (isClientSide()) {
             sendClientAction(ACTION_SWAP);
+        } else if (!hasMagnetCard()) {
+            return;
         }
         this.magnetHost.swapConfigs();
+    }
+
+    private boolean hasMagnetCard() {
+        return this.host.getUpgrades().isInstalled(AEItems.MAGNET_CARD.item());
     }
 }

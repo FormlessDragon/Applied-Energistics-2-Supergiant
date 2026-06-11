@@ -1,5 +1,6 @@
 package ae2.core.network.serverbound;
 
+import ae2.api.crafting.PatternDetailsHelper;
 import ae2.container.me.common.AbstractContainerRequester;
 import ae2.core.network.ServerboundPacket;
 import io.netty.buffer.ByteBuf;
@@ -77,8 +78,13 @@ public class RequesterUpdatePacket extends ServerboundPacket {
                 this.amount = packetBuffer.readVarLong();
                 this.batchSize = packetBuffer.readVarLong();
             }
+            if (packetBuffer.isReadable()) {
+                throw new IllegalArgumentException("Trailing requester update payload bytes: "
+                    + packetBuffer.readableBytes());
+            }
         } catch (RuntimeException e) {
             this.updateType = UpdateType.INVALID;
+            invalidateMalformed(buf, e);
         }
     }
 
@@ -90,24 +96,36 @@ public class RequesterUpdatePacket extends ServerboundPacket {
         return this.updateType == UpdateType.NUMBERS;
     }
 
+    private boolean hasValidNumbers() {
+        return this.amount >= 0
+            && this.amount <= PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT
+            && this.batchSize >= 1
+            && this.batchSize <= PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT;
+    }
+
     @Override
     public void handleServer(EntityPlayerMP player) {
         if (this.updateType == UpdateType.INVALID) {
             return;
         }
 
-        if (player.openContainer.windowId != this.windowId) {
+        if (!(player.openContainer instanceof AbstractContainerRequester container)) {
             return;
         }
 
-        if (player.openContainer instanceof AbstractContainerRequester container) {
-            if (this.updateType == UpdateType.STATE) {
-                container.updateRequesterState(this.requesterId, this.requestIndex, this.enabled, this.forceStart);
-            } else {
-                container.updateRequesterNumbers(this.requesterId, this.requestIndex, this.amount, this.batchSize);
-            }
-            container.syncInventoryActionState(player);
+        if (container.windowId != this.windowId) {
+            return;
         }
+
+        if (this.updateType == UpdateType.STATE) {
+            container.updateRequesterState(this.requesterId, this.requestIndex, this.enabled, this.forceStart);
+        } else {
+            if (!hasValidNumbers()) {
+                return;
+            }
+            container.updateRequesterNumbers(this.requesterId, this.requestIndex, this.amount, this.batchSize);
+        }
+        container.syncInventoryActionState(player);
     }
 
     int getWindowId() {

@@ -21,6 +21,7 @@ import ae2.client.render.effects.EnergyParticleData;
 import ae2.client.render.effects.ParticleTypes;
 import ae2.core.AppEngBase;
 import ae2.core.network.ClientboundPacket;
+import ae2.core.network.NetworkPacketHelper;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.PacketBuffer;
@@ -51,7 +52,10 @@ public class ItemTransitionEffectPacket extends ClientboundPacket {
         this.x = stream.readFloat();
         this.y = stream.readFloat();
         this.z = stream.readFloat();
-        this.direction = stream.readEnumValue(EnumFacing.class);
+        this.direction = NetworkPacketHelper.readEnumOrNull(stream, EnumFacing.class);
+        if (this.direction == null) {
+            this.direction = EnumFacing.UP;
+        }
     }
 
     @Override

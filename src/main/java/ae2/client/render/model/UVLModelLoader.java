@@ -62,10 +62,10 @@ import net.minecraftforge.common.model.IModelState;
 import net.minecraftforge.common.model.ITransformation;
 import net.minecraftforge.fml.relauncher.ReflectionHelper;
 import org.apache.commons.io.IOUtils;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.util.vector.Vector3f;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -147,7 +147,7 @@ public enum UVLModelLoader implements ICustomModelLoader {
     }
 
     @Override
-    public void onResourceManagerReload(@NonNull IResourceManager resourceManager) {
+    public void onResourceManagerReload(@NotNull IResourceManager resourceManager) {
         this.resourceManager = resourceManager;
     }
 
@@ -169,7 +169,7 @@ public enum UVLModelLoader implements ICustomModelLoader {
     }
 
     @Override
-    public IModel loadModel(@NonNull ResourceLocation modelLocation) {
+    public IModel loadModel(@NotNull ResourceLocation modelLocation) {
         return new UVLModelWrapper(modelLocation);
     }
 
@@ -234,8 +234,8 @@ public enum UVLModelLoader implements ICustomModelLoader {
         }
 
         @Override
-        public IBakedModel bake(@NonNull IModelState state, @NonNull VertexFormat format,
-                                @NonNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
+        public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
+                                @NotNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
             setFaceBakery(UVLModelLoader.this.getLoader(), new FaceBakeryOverride());
             IBakedModel model = this.parent.bake(state, format, bakedTextureGetter);
             setFaceBakery(UVLModelLoader.this.getLoader(), new FaceBakery());
@@ -302,7 +302,7 @@ public enum UVLModelLoader implements ICustomModelLoader {
                 UnpackedBakedQuad.Builder builder = new UnpackedBakedQuad.Builder(newFormat);
                 final VertexLighterFlat transformer = new VertexLighterFlat(Minecraft.getMinecraft().getBlockColors()) {
                     @Override
-                    protected void updateLightmap(float @NonNull [] normal, float[] lightmap, float x, float y, float z) {
+                    protected void updateLightmap(float @NotNull [] normal, float[] lightmap, float x, float y, float z) {
                         lightmap[0] = brightness.rightFloat();
                         lightmap[1] = brightness.leftFloat();
                     }

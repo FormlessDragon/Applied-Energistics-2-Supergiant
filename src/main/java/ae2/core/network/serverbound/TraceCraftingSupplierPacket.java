@@ -23,6 +23,10 @@ public class TraceCraftingSupplierPacket extends ServerboundPacket {
         var data = new PacketBuffer(buf);
         this.windowId = data.readInt();
         this.serial = data.readVarLong();
+        if (data.isReadable()) {
+            throw new IllegalArgumentException("Trailing crafting supplier trace packet payload bytes: "
+                + data.readableBytes());
+        }
     }
 
     @Override
@@ -34,11 +38,12 @@ public class TraceCraftingSupplierPacket extends ServerboundPacket {
 
     @Override
     public void handleServer(EntityPlayerMP player) {
-        if (player.openContainer.windowId != this.windowId) {
+        if (!(player.openContainer instanceof ContainerCraftingCPU container)) {
             return;
         }
-        if (player.openContainer instanceof ContainerCraftingCPU container) {
-            container.traceSupplierForSerial(this.serial);
+        if (container.windowId != this.windowId) {
+            return;
         }
+        container.traceSupplierForSerial(this.serial);
     }
 }

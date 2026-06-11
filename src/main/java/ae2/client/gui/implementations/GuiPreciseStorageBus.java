@@ -81,9 +81,9 @@ public class GuiPreciseStorageBus extends GuiSpecialStorageBus<ContainerStorageB
             var itemTooltip = new ObjectArrayList<>(getItemToolTip(slot.getStack()));
             GenericStack unwrapped = GenericStack.fromItemStack(slot.getStack());
             if (unwrapped != null) {
-                itemTooltip.add(Tooltips.getAmountTooltip(ButtonToolTips.Amount, unwrapped).getFormattedText());
+                itemTooltip.add(Tooltips.getAmountTooltipLocal(ButtonToolTips.Amount, unwrapped));
             }
-            itemTooltip.add(Tooltips.getSetAmountTooltip().getFormattedText());
+            itemTooltip.add(Tooltips.getSetAmountTooltipLocal());
             drawTooltipLines(mouseX, mouseY, itemTooltip);
             return;
         }

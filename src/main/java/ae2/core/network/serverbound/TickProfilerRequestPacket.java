@@ -19,6 +19,9 @@ public class TickProfilerRequestPacket extends ServerboundPacket {
     @Override
     protected void read(ByteBuf buf) {
         duration = buf.readInt();
+        if (buf.isReadable()) {
+            throw new IllegalArgumentException("Trailing bytes in tick profiler request packet");
+        }
     }
 
     @Override

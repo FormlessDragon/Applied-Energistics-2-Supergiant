@@ -1,6 +1,5 @@
 package ae2.parts.automation.special;
 
-import ae2.api.config.Actionable;
 import ae2.api.networking.IGrid;
 import ae2.api.parts.IPartItem;
 import ae2.api.stacks.AEKey;
@@ -60,9 +59,5 @@ abstract class SpecialExportBusPart extends ExportBusPart {
         }
 
         return context.hasDoneWork();
-    }
-
-    protected long simulatePush(AEKey what, long amount) {
-        return getExportStrategy().push(what, amount, Actionable.SIMULATE);
     }
 }

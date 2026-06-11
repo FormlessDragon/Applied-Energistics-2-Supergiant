@@ -31,7 +31,9 @@ import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.IPatternDetails.IInput;
 import ae2.api.crafting.PatternDetailsHelper;
+import ae2.api.AECapabilities;
 import ae2.api.implementations.blockentities.ICraftingMachine;
+import ae2.api.implementations.blockentities.IPatternProviderBatchTarget;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.BaseInternalInventory;
 import ae2.api.inventories.InternalInventory;
@@ -68,11 +70,14 @@ import ae2.util.inv.AppEngInternalInventory;
 import ae2.util.inv.InternalInventoryHost;
 import ae2.util.inv.PlayerInternalInventory;
 import ae2.util.inv.filter.IAEItemFilter;
+import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
@@ -93,8 +98,8 @@ import net.minecraft.util.text.TextFormatting;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.util.Constants;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -262,6 +267,11 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         tag.setTag(NBT_RETURN_INV, this.returnInv.writeToTag());
     }
 
+    @Nullable
+    private static EnumFacing readDirection(byte ordinal) {
+        return ordinal >= 0 && ordinal < EnumFacing.VALUES.length ? EnumFacing.VALUES[ordinal] : null;
+    }
+
     public void readFromNBT(NBTTagCompound tag) {
         this.configManager.readFromNBT(tag);
         migrateLegacyBlockingMode(tag);
@@ -290,7 +300,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             for (int i = 0; i < pendingSendListTag.tagCount(); i++) {
                 NBTTagCompound pendingSendTag = pendingSendListTag.getCompoundTagAt(i);
                 GenericStack stack = GenericStack.readTag(pendingSendTag.getCompoundTag(NBT_PENDING_SEND_STACK));
-                EnumFacing direction = EnumFacing.byIndex(pendingSendTag.getByte(NBT_PENDING_SEND_DIRECTION));
+                EnumFacing direction = readDirection(pendingSendTag.getByte(NBT_PENDING_SEND_DIRECTION));
                 if (stack != null && direction != null) {
                     this.pendingSendList.add(new PendingSend(stack, direction));
                 }
@@ -298,7 +308,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         } else if (tag.hasKey(NBT_SEND_LIST, Constants.NBT.TAG_LIST)) {
             NBTTagList sendListTag = tag.getTagList(NBT_SEND_LIST, Constants.NBT.TAG_COMPOUND);
             EnumFacing direction = tag.hasKey(NBT_SEND_DIRECTION, Constants.NBT.TAG_BYTE)
-                ? EnumFacing.byIndex(tag.getByte(NBT_SEND_DIRECTION))
+                ? readDirection(tag.getByte(NBT_SEND_DIRECTION))
                 : null;
             for (GenericStack stack : GenericStack.readList(sendListTag)) {
                 if (stack != null && direction != null) {
@@ -460,8 +470,8 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         }
 
         for (MachinePushTarget machineTarget : targetSet.machineTargets) {
-            int definitionMultiplier = machineTarget.machine.getMaxPatternPushMultiplier(basePatternDetails,
-                buildPatternInputHolder(basePatternDetails, 1), maxMultiplier, machineTarget.ejectionDirection);
+            int definitionMultiplier = machineTarget.batchTarget.getMaxPatternPushMultiplier(basePatternDetails,
+                buildPatternInputHolder(basePatternDetails), maxMultiplier, machineTarget.ejectionDirection);
             if (definitionMultiplier <= 0) {
                 continue;
             }
@@ -520,7 +530,9 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
             ICraftingMachine craftingMachine = ICraftingMachine.of(level, adjacentPos, adjacentSide);
             if (craftingMachine != null && craftingMachine.acceptsPlans()) {
-                machineTargets.add(new MachinePushTarget(craftingMachine, adjacentSide));
+                IPatternProviderBatchTarget batchTarget = getBatchTarget(level, adjacentPos, adjacentSide,
+                    craftingMachine);
+                machineTargets.add(new MachinePushTarget(craftingMachine, batchTarget, adjacentSide));
                 continue;
             }
 
@@ -532,6 +544,19 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
         rearrangeRoundRobin(externalTargets);
         return new PushTargetSet(machineTargets, externalTargets);
+    }
+
+    private static IPatternProviderBatchTarget getBatchTarget(World level, BlockPos pos, EnumFacing side,
+                                                              ICraftingMachine fallback) {
+        TileEntity blockEntity = level.getTileEntity(pos);
+        if (blockEntity != null && blockEntity.hasCapability(AECapabilities.PATTERN_PROVIDER_BATCH_TARGET, side)) {
+            IPatternProviderBatchTarget batchTarget = blockEntity.getCapability(
+                AECapabilities.PATTERN_PROVIDER_BATCH_TARGET, side);
+            if (batchTarget != null) {
+                return batchTarget;
+            }
+        }
+        return fallback;
     }
 
     private boolean pushPatternSingleSide(IPatternDetails patternDetails, KeyCounter[] inputHolder,
@@ -700,7 +725,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
                                                         ObjectList<ExternalTarget> possibleTargets,
                                                         int maxMultiplier) {
         TargetMatch match = PatternProviderMergeHelper.findMergedSinglePushTarget(possibleTargets,
-            buildPatternInputHolder(patternDetails, 1), maxMultiplier, getInsertionMode(),
+            buildPatternInputHolder(patternDetails), maxMultiplier, getInsertionMode(),
             target -> this.isTargetBlocked(target.target(), patternDetails) || shouldUseSinglePushForInsertionMode(target));
         if (match != null) {
             return new SingleTargetMergePush(patternDetails, match.target(), match.matchedTargetIndex(),
@@ -749,7 +774,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         if (this.configManager.getSetting(Settings.PATTERN_PROVIDER_OUTPUT_SIDE_MODE)
             == PatternProviderOutputSideMode.SPLIT_BY_INGREDIENTS_TYPE) {
             Reference2ObjectMap<AEKeyType, KeyCounter[]> inputsByType = splitInputsByType(
-                buildPatternInputHolder(patternDetails, 1));
+                buildPatternInputHolder(patternDetails));
             for (KeyCounter[] inputs : inputsByType.values()) {
                 ExternalTarget target = findFirstExternalTarget(patternDetails, inputs, targetSet.externalTargets);
                 if (target != null && target.target().hasEmptySlots()) {
@@ -759,7 +784,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             return false;
         }
 
-        KeyCounter[] inputHolder = buildPatternInputHolder(patternDetails, 1);
+        KeyCounter[] inputHolder = buildPatternInputHolder(patternDetails);
         ExternalTarget target = findFirstExternalTarget(patternDetails, inputHolder, targetSet.externalTargets);
         return target != null && target.target().hasEmptySlots();
     }
@@ -774,7 +799,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         if (this.configManager.getSetting(Settings.PATTERN_PROVIDER_OUTPUT_SIDE_MODE)
             == PatternProviderOutputSideMode.SPLIT_BY_INGREDIENTS_TYPE) {
             Reference2ObjectMap<AEKeyType, KeyCounter[]> inputsByType = splitInputsByType(
-                buildPatternInputHolder(patternDetails, 1));
+                buildPatternInputHolder(patternDetails));
             for (KeyCounter[] inputs : inputsByType.values()) {
                 TargetMatch match = PatternProviderMergeHelper.findSinglePushTarget(targetSet.externalTargets, inputs,
                     getInsertionMode(), target -> this.isTargetBlocked(target.target(), patternDetails));
@@ -789,7 +814,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             return false;
         }
 
-        KeyCounter[] inputHolder = buildPatternInputHolder(patternDetails, 1);
+        KeyCounter[] inputHolder = buildPatternInputHolder(patternDetails);
         TargetMatch match = PatternProviderMergeHelper.findSinglePushTarget(targetSet.externalTargets, inputHolder,
             getInsertionMode(), target -> this.isTargetBlocked(target.target(), patternDetails));
         return match != null && !PatternProviderMergeHelper.acceptsAllFully(match.target().target(), inputHolder, 1,
@@ -822,10 +847,10 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     }
 
     private Reference2ObjectMap<AEKeyType, KeyCounter[]> splitPatternInputsByType(IPatternDetails patternDetails) {
-        return splitInputsByType(buildPatternInputHolder(patternDetails, 1));
+        return splitInputsByType(buildPatternInputHolder(patternDetails));
     }
 
-    private KeyCounter[] buildPatternInputHolder(IPatternDetails patternDetails, int multiplier) {
+    private KeyCounter[] buildPatternInputHolder(IPatternDetails patternDetails) {
         IInput[] inputs = patternDetails.getInputs();
         KeyCounter[] inputHolder = new KeyCounter[inputs.length];
         for (int slot = 0; slot < inputs.length; slot++) {
@@ -833,7 +858,8 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             GenericStack[] possibleInputs = inputs[slot].possibleInputs();
             if (possibleInputs.length > 0) {
                 GenericStack input = possibleInputs[0];
-                inputHolder[slot].add(input.what(), input.amount() * inputs[slot].getMultiplier() * multiplier);
+                long amount = LongMath.saturatedMultiply(input.amount(), inputs[slot].getMultiplier());
+                inputHolder[slot].add(input.what(), amount);
             }
         }
         return inputHolder;
@@ -1088,7 +1114,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         }
 
         EnumSet<EnumFacing> sides = getActiveSides();
-        Set<PatternContainerGroup> groups = new it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet<>(sides.size());
+        Set<PatternContainerGroup> groups = new ObjectLinkedOpenHashSet<>(sides.size());
         World level = blockEntity.getWorld();
         if (level != null) {
             for (EnumFacing side : sides) {
@@ -1104,7 +1130,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             return groups.iterator().next();
         }
 
-        ObjectList<ITextComponent> tooltip = it.unimi.dsi.fastutil.objects.ObjectLists.emptyList();
+        ObjectList<ITextComponent> tooltip = ObjectLists.emptyList();
         if (groups.size() > 1) {
             tooltip = new ObjectArrayList<>();
             tooltip.add(GuiText.AdjacentToDifferentMachines.text()
@@ -1248,7 +1274,8 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         boolean push(KeyCounter[] inputHolder, int multiplier);
     }
 
-    private record MachinePushTarget(ICraftingMachine machine, EnumFacing ejectionDirection) {
+    private record MachinePushTarget(ICraftingMachine machine, IPatternProviderBatchTarget batchTarget,
+                                     EnumFacing ejectionDirection) {
     }
 
     private record PushTargetSet(ObjectList<MachinePushTarget> machineTargets,
@@ -1281,7 +1308,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
         @Override
         public boolean push(KeyCounter[] inputHolder, int multiplier) {
-            int acceptedMultiplier = this.target.machine.getMaxPatternPushMultiplier(this.patternDetails, inputHolder,
+            int acceptedMultiplier = this.target.batchTarget.getMaxPatternPushMultiplier(this.patternDetails, inputHolder,
                 multiplier, this.target.ejectionDirection);
             if (acceptedMultiplier < multiplier) {
                 return false;

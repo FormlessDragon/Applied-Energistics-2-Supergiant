@@ -19,14 +19,10 @@
 package ae2.items.storage;
 
 import ae2.api.config.FuzzyMode;
-import ae2.api.stacks.AEFluidKey;
-import ae2.api.stacks.GenericStack;
 import ae2.api.storage.StorageCells;
 import ae2.api.storage.cells.ICellWorkbenchItem;
 import ae2.api.storage.cells.IStackTooltipDataProvider;
-import ae2.core.definitions.AEItems;
 import ae2.core.localization.GuiText;
-import ae2.core.localization.Tooltips;
 import ae2.items.AEBaseItem;
 import ae2.items.contents.CellConfig;
 import ae2.me.cells.CreativeCellHandler;
@@ -34,10 +30,8 @@ import ae2.me.cells.CreativeCellInventory;
 import ae2.util.ConfigInventory;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.util.ITooltipFlag;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
-import net.minecraftforge.fluids.Fluid;
 
 import java.util.List;
 import java.util.Optional;
@@ -45,24 +39,6 @@ import java.util.Optional;
 public class CreativeCellItem extends AEBaseItem implements ICellWorkbenchItem, IStackTooltipDataProvider {
     public CreativeCellItem() {
         this.setMaxStackSize(1);
-    }
-
-    public static ItemStack ofItems(Item... items) {
-        var cell = AEItems.CREATIVE_CELL.stack();
-        var configInv = AEItems.CREATIVE_CELL.get().getConfigInventory(cell);
-        for (int i = 0; i < items.length; i++) {
-            configInv.setStack(i, GenericStack.fromItemStack(new ItemStack(items[i])));
-        }
-        return cell;
-    }
-
-    public static ItemStack ofFluids(Fluid... fluids) {
-        var cell = AEItems.CREATIVE_CELL.stack();
-        var configInv = AEItems.CREATIVE_CELL.get().getConfigInventory(cell);
-        for (int i = 0; i < fluids.length; i++) {
-            configInv.setStack(i, new GenericStack(AEFluidKey.of(fluids[i]), 1));
-        }
-        return cell;
     }
 
     @Override
@@ -107,7 +83,7 @@ public class CreativeCellItem extends AEBaseItem implements ICellWorkbenchItem, 
                 lines.add(key.getDisplayName().getFormattedText());
             }
         } else {
-            lines.add(Tooltips.of(GuiText.PressShiftForFullList).getFormattedText());
+            lines.add(GuiText.PressShiftForFullList.getLocal());
         }
     }
 }

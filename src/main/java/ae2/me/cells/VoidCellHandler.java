@@ -70,7 +70,7 @@ public class VoidCellHandler implements ICellHandler {
 
         var config = workbenchItem.getConfigInventory(stack);
         if (config.isEmpty()) {
-            lines.add(GuiText.Partitioned.text().appendText(" - ").appendSibling(GuiText.Nothing.text()).getFormattedText());
+            lines.add(GuiText.Partitioned.getLocal() + " - " + GuiText.Nothing.getLocal());
             return;
         }
 
@@ -78,11 +78,10 @@ public class VoidCellHandler implements ICellHandler {
         var includeMode = upgrades.isInstalled(AEItems.INVERTER_CARD.item()) ? GuiText.Excluded : GuiText.Included;
         var precisionMode = upgrades.isInstalled(AEItems.FUZZY_CARD.item()) ? GuiText.Fuzzy : GuiText.Precise;
 
-        lines.add(GuiText.Partitioned.text()
-                                     .appendText(" - ")
-                                     .appendSibling(includeMode.text())
-                                     .appendText(" ")
-                                     .appendSibling(precisionMode.text())
-                                     .getFormattedText());
+        lines.add(GuiText.Partitioned.getLocal() +
+            " - " +
+            includeMode.getLocal() +
+            " " +
+            precisionMode.getLocal());
     }
 }

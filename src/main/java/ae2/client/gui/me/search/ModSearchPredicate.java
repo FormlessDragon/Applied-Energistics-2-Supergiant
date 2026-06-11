@@ -20,17 +20,12 @@ final class ModSearchPredicate implements Predicate<AEKey> {
     @Override
     public boolean test(AEKey what) {
         String modId = what.getModId();
-
-        if (modId != null) {
-            if (modId.contains(term)) {
-                return true;
-            }
-
-            String modName = Platform.getModName(modId);
-            modName = normalize(modName);
-            return modName.contains(term);
+        if (modId.contains(term)) {
+            return true;
         }
 
-        return false;
+        String modName = Platform.getModName(modId);
+        modName = normalize(modName);
+        return modName.contains(term);
     }
 }

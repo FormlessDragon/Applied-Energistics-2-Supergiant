@@ -193,7 +193,7 @@ public interface IPart extends ICustomCableConnection {
         return IPartModel.EMPTY;
     }
 
-    default @org.jspecify.annotations.Nullable Object getModelData() {
+    default @Nullable Object getModelData() {
         return null;
     }
 

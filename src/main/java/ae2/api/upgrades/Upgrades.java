@@ -173,7 +173,7 @@ public final class Upgrades {
             }
         }
 
-        return supportedTooltipLines;
+        return List.copyOf(supportedTooltipLines);
     }
 
     private record Association(Item upgradeCard, Item upgradableItem, int maxCount, @Nullable String tooltipGroup) {

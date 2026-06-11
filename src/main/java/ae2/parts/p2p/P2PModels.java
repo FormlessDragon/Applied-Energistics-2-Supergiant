@@ -25,7 +25,10 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.util.ResourceLocation;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Helper for maintaining the models used for a variant of the P2P bus.
@@ -37,12 +40,21 @@ public class P2PModels {
     public static final ResourceLocation MODEL_STATUS_HAS_CHANNEL = AppEng
         .makeId("part/p2p/p2p_tunnel_status_has_channel");
     public static final ResourceLocation MODEL_FREQUENCY = AppEng.makeId("part/p2p/p2p_tunnel_frequency");
+    public static final ResourceLocation TEXTURE_FRONT = AppEng.makeId("part/p2p_tunnel_front");
 
+    private final ResourceLocation frontModel;
+    private final ResourceLocation typeTexture;
     private final IPartModel modelsOff;
     private final IPartModel modelsOn;
     private final IPartModel modelsHasChannel;
 
     public P2PModels(ResourceLocation frontModel) {
+        this(frontModel, defaultTypeTexture(frontModel));
+    }
+
+    public P2PModels(ResourceLocation frontModel, ResourceLocation typeTexture) {
+        this.frontModel = frontModel;
+        this.typeTexture = typeTexture;
         this.modelsOff = new PartModel(MODEL_STATUS_OFF, MODEL_FREQUENCY, frontModel);
         this.modelsOn = new PartModel(MODEL_STATUS_ON, MODEL_FREQUENCY, frontModel);
         this.modelsHasChannel = new PartModel(MODEL_STATUS_HAS_CHANNEL, MODEL_FREQUENCY, frontModel);
@@ -66,4 +78,40 @@ public class P2PModels {
         return result;
     }
 
+    public static Optional<IconTextures> findIconTextures(Class<?> partClass) {
+        for (Class<?> current = partClass; current != null; current = current.getSuperclass()) {
+            for (Field field : current.getDeclaredFields()) {
+                if (!Modifier.isStatic(field.getModifiers()) || !P2PModels.class.isAssignableFrom(field.getType())) {
+                    continue;
+                }
+
+                try {
+                    field.setAccessible(true);
+                    P2PModels models = (P2PModels) field.get(null);
+                    if (models != null) {
+                        return Optional.of(new IconTextures(TEXTURE_FRONT, models.getTypeTexture()));
+                    }
+                } catch (IllegalAccessException ignored) {
+                    return Optional.empty();
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static ResourceLocation defaultTypeTexture(ResourceLocation frontModel) {
+        return new ResourceLocation(frontModel.getNamespace(),
+            frontModel.getPath().replace("part/p2p/", "part/"));
+    }
+
+    public ResourceLocation getFrontModel() {
+        return this.frontModel;
+    }
+
+    public ResourceLocation getTypeTexture() {
+        return this.typeTexture;
+    }
+
+    public record IconTextures(ResourceLocation front, ResourceLocation type) {
+    }
 }

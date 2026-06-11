@@ -59,9 +59,22 @@ public class Splotch {
         this.pos = data.readByte();
         final int val = data.readByte();
 
-        this.side = EnumFacing.VALUES[val & 0x07];
-        this.color = AEColor.values()[val >> 3 & 0x0F];
+        this.side = readSide(val & 0x07);
+        int colorIndex = val >> 3 & 0x0F;
+        this.color = readColor(colorIndex);
         this.lumen = (val >> 7 & 0x01) > 0;
+    }
+
+    private static EnumFacing readSide(int ordinal) {
+        if (ordinal > 0 && ordinal < EnumFacing.values().length) {
+            return EnumFacing.VALUES[ordinal];
+        }
+        return EnumFacing.NORTH;
+    }
+
+    private static AEColor readColor(int ordinal) {
+        AEColor[] colors = AEColor.values();
+        return ordinal < colors.length ? colors[ordinal] : AEColor.TRANSPARENT;
     }
 
     public void writeToStream(ByteBuf stream) {

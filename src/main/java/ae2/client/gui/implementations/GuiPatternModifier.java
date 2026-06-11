@@ -28,6 +28,10 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
     private static final ResourceLocation MULTIPLY_TEXTURE = AppEng.makeId("textures/guis/pattern_editor_1.png");
     private static final ResourceLocation CLONE_TEXTURE = AppEng.makeId("textures/guis/pattern_editor_2.png");
     private static final ResourceLocation REPLACE_TEXTURE = AppEng.makeId("textures/guis/pattern_editor_3.png");
+    private static final GuiText MODE_MULTIPLY = GuiText.PatternModifierMultiply;
+    private static final GuiText MODE_REPLACE = GuiText.PatternModifierReplace;
+    private static final GuiText MODE_PATTERN = GuiText.PatternModifierPatternMode;
+    private static final GuiText MODE_CLONE = GuiText.PatternModifierClone;
 
     private final PageButton previousProviderPageButton;
     private final PageButton nextProviderPageButton;
@@ -120,13 +124,14 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
 
     @Override
     public void drawFG(int offsetX, int offsetY, int mouseX, int mouseY) {
-        this.fontRenderer.drawString(GuiText.PatternModifier.text(getModeName()).getFormattedText(), 8, 6, 0x404040);
+        this.fontRenderer.drawString(GuiText.PatternModifier.getLocal(getModeName().getLocal()), 8, 6,
+            0x404040);
         if (this.container.getPage() == 2) {
-            this.fontRenderer.drawString(GuiText.PatternModifierSubstitute.text().getFormattedText(), 8, 22, 0x404040);
-            this.fontRenderer.drawString(GuiText.PatternModifierFluidSubstitute.text().getFormattedText(), 8, 44, 0x404040);
+            this.fontRenderer.drawString(GuiText.PatternModifierSubstitute.getLocal(), 8, 22, 0x404040);
+            this.fontRenderer.drawString(GuiText.PatternModifierFluidSubstitute.getLocal(), 8, 44, 0x404040);
         } else if (this.container.getPage() == 3) {
-            this.fontRenderer.drawString(GuiText.PatternModifierTarget.text().getFormattedText(), 51, 25, 0x404040);
-            this.fontRenderer.drawString(GuiText.PatternModifierBlank.text().getFormattedText(), 52, 62, 0x404040);
+            this.fontRenderer.drawString(GuiText.PatternModifierTarget.getLocal(), 51, 25, 0x404040);
+            this.fontRenderer.drawString(GuiText.PatternModifierBlank.getLocal(), 52, 62, 0x404040);
         }
     }
 
@@ -171,12 +176,12 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
             && (this.container.getPage() == 0 || this.container.getPage() == 1 || this.container.getPage() == 2);
     }
 
-    private ITextComponent getModeName() {
+    private GuiText getModeName() {
         return switch (this.container.getPage()) {
-            case 1 -> GuiText.PatternModifierReplace.text();
-            case 2 -> GuiText.PatternModifierPatternMode.text();
-            case 3 -> GuiText.PatternModifierClone.text();
-            default -> GuiText.PatternModifierMultiply.text();
+            case 1 -> MODE_REPLACE;
+            case 2 -> MODE_PATTERN;
+            case 3 -> MODE_CLONE;
+            default -> MODE_MULTIPLY;
         };
     }
 

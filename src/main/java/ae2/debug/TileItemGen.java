@@ -24,6 +24,8 @@ import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fml.common.registry.ForgeRegistries;
 
 import java.util.ArrayDeque;
@@ -87,9 +89,13 @@ public class TileItemGen extends AEBaseInvTile {
 
     @Override
     public void loadTag(NBTTagCompound data) {
-        if (data.hasKey("filter")) {
-            Item item = ForgeRegistries.ITEMS.getValue(new net.minecraft.util.ResourceLocation(data.getString("filter")));
-            this.setItem(item == null ? Items.AIR : item);
+        if (data.hasKey("filter", Constants.NBT.TAG_STRING)) {
+            try {
+                Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(data.getString("filter")));
+                this.setItem(item == null ? Items.AIR : item);
+            } catch (RuntimeException ignored) {
+                this.setItem(Items.AIR);
+            }
         }
         super.loadTag(data);
     }

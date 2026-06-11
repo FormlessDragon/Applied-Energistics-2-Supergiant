@@ -28,6 +28,7 @@ import ae2.api.storage.ITerminalHost;
 import ae2.container.ISubGui;
 import ae2.container.guisync.GuiSync;
 import ae2.container.guisync.PacketWritable;
+import ae2.core.network.NetworkPacketHelper;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
 import ae2.text.TextComponents;
 import ae2.util.EnumCycler;
@@ -46,6 +47,8 @@ import java.util.List;
 import java.util.WeakHashMap;
 
 public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISubGui {
+    private static final int MAX_CPU_LIST_ENTRIES = 1024;
+    private static final int MIN_CPU_LIST_ENTRY_BYTES = 17;
 
     private static final CraftingCpuList EMPTY_CPU_LIST = new CraftingCpuList(Collections.emptyList());
 
@@ -107,7 +110,7 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         }
 
         if (selectedCpuSerial != -1) {
-            if (cpuList.cpus().stream().noneMatch(cpu -> cpu.serial() == selectedCpuSerial)) {
+            if (!containsCpuSerial(selectedCpuSerial)) {
                 selectCpu(-1);
             }
         }
@@ -182,6 +185,15 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         }
     }
 
+    private boolean containsCpuSerial(int serial) {
+        for (var cpu : cpuList.cpus()) {
+            if (cpu.serial() == serial) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void cycleCpuMode(int serial, boolean backwards) {
         if (serial <= 0) {
             return;
@@ -223,6 +235,7 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
     private void updateCpuModeClientSide(int serial, boolean backwards) {
         ObjectList<CraftingCpuListEntry> updatedCpus = new ObjectArrayList<>(cpuList.cpus().size());
         boolean changed = false;
+        CpuSelectionMode selectedUpdatedMode = null;
 
         for (var cpu : cpuList.cpus()) {
             if (cpu.serial() == serial) {
@@ -240,6 +253,9 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
                     cpu.progress(),
                     cpu.elapsedTimeNanos()));
                 changed = true;
+                if (selectedCpuSerial == serial) {
+                    selectedUpdatedMode = updatedMode;
+                }
             } else {
                 updatedCpus.add(cpu);
             }
@@ -247,12 +263,8 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
 
         if (changed) {
             this.cpuList = new CraftingCpuList(updatedCpus);
-            if (selectedCpuSerial == serial) {
-                this.schedulingMode = updatedCpus.stream()
-                                                 .filter(cpu -> cpu.serial() == serial)
-                                                 .map(CraftingCpuListEntry::mode)
-                                                 .findFirst()
-                                                 .orElse(this.schedulingMode);
+            if (selectedUpdatedMode != null) {
+                this.schedulingMode = selectedUpdatedMode;
             }
         }
     }
@@ -270,6 +282,10 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         public CraftingCpuList(ByteBuf data) {
             PacketBuffer buffer = new PacketBuffer(data);
             int count = buffer.readInt();
+            if (count < 0 || count > MAX_CPU_LIST_ENTRIES
+                || count > buffer.readableBytes() / MIN_CPU_LIST_ENTRY_BYTES) {
+                throw new IllegalArgumentException("Invalid crafting CPU list entry count: " + count);
+            }
             ObjectList<CraftingCpuListEntry> readCpus = new ObjectArrayList<>(count);
             for (int i = 0; i < count; i++) {
                 readCpus.add(CraftingCpuListEntry.readFromPacket(buffer));
@@ -298,12 +314,20 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         long elapsedTimeNanos) {
 
         public static CraftingCpuListEntry readFromPacket(PacketBuffer buffer) {
+            int serial = buffer.readInt();
+            long storage = buffer.readLong();
+            int coProcessors = buffer.readInt();
+            ITextComponent name = TextComponents.readFromPacket(buffer);
+            CpuSelectionMode mode = NetworkPacketHelper.readEnumOrNull(buffer, CpuSelectionMode.class);
+            if (mode == null) {
+                throw new IllegalArgumentException("Invalid crafting CPU selection mode");
+            }
             return new CraftingCpuListEntry(
-                buffer.readInt(),
-                buffer.readLong(),
-                buffer.readInt(),
-                TextComponents.readFromPacket(buffer),
-                buffer.readEnumValue(CpuSelectionMode.class),
+                serial,
+                storage,
+                coProcessors,
+                name,
+                mode,
                 GenericStack.readBuffer(buffer),
                 buffer.readFloat(),
                 buffer.readVarLong());

@@ -16,13 +16,16 @@ import java.util.List;
 import java.util.Objects;
 
 public interface IKeyTypeSelectionContainer {
+    int MAX_SYNCED_KEY_TYPES = 128;
+    int MIN_SYNCED_KEY_TYPE_BYTES = 2;
+
     KeyTypeSelection getServerKeyTypeSelection();
 
     SyncedKeyTypes getClientKeyTypeSelection();
 
     @ApiStatus.NonExtendable
-    default void selectKeyType(AEKeyType keyType, boolean enabled) {
-        InitNetwork.sendToServer(new SelectKeyTypePacket(keyType, enabled));
+    default void selectKeyType(int windowId, AEKeyType keyType, boolean enabled) {
+        InitNetwork.sendToServer(new SelectKeyTypePacket(windowId, keyType, enabled));
         getClientKeyTypeSelection().keyTypes().put(keyType, enabled);
     }
 
@@ -39,6 +42,10 @@ public interface IKeyTypeSelectionContainer {
             this(new Object2BooleanLinkedOpenHashMap<>());
             var packetBuffer = new PacketBuffer(buf);
             int size = packetBuffer.readVarInt();
+            if (size < 0 || size > MAX_SYNCED_KEY_TYPES
+                || size > packetBuffer.readableBytes() / MIN_SYNCED_KEY_TYPE_BYTES) {
+                throw new IllegalArgumentException("Invalid synced key type count: " + size);
+            }
             for (int i = 0; i < size; i++) {
                 var keyType = AEKeyType.fromRawId(packetBuffer.readVarInt());
                 var enabled = packetBuffer.readBoolean();

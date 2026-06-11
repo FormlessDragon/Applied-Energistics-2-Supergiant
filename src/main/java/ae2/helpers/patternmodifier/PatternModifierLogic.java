@@ -8,6 +8,7 @@ import ae2.api.stacks.GenericStack;
 import ae2.core.definitions.AEItems;
 import ae2.crafting.pattern.AECraftingPattern;
 import ae2.crafting.pattern.AEProcessingPattern;
+import com.google.common.primitives.Ints;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
@@ -170,7 +171,7 @@ public final class PatternModifierLogic {
 
     private static ItemStack itemize(@Nullable GenericStack stack) {
         if (stack != null && stack.what() instanceof AEItemKey itemKey) {
-            return itemKey.toStack((int) stack.amount());
+            return itemKey.toStack(Ints.saturatedCast(stack.amount()));
         }
         return ItemStack.EMPTY;
     }

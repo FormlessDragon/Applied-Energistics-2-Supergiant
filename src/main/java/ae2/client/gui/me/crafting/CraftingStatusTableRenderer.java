@@ -40,20 +40,20 @@ public class CraftingStatusTableRenderer extends AbstractTableRenderer<CraftingS
     }
 
     @Override
-    protected List<ITextComponent> getEntryDescription(CraftingStatusEntry entry) {
+    protected List<String> getEntryDescription(CraftingStatusEntry entry) {
         AEKey what = Objects.requireNonNull(entry.what());
-        List<ITextComponent> lines = new ObjectArrayList<>(3);
+        List<String> lines = new ObjectArrayList<>(3);
         if (entry.storedAmount() > 0) {
             String amount = what.getType().formatAmount(entry.storedAmount(), AmountFormat.SLOT);
-            lines.add(GuiText.FromStorage.text(amount));
+            lines.add(GuiText.FromStorage.getLocal(amount));
         }
         if (entry.activeAmount() > 0) {
             String amount = what.getType().formatAmount(entry.activeAmount(), AmountFormat.SLOT);
-            lines.add(GuiText.Crafting.text(amount));
+            lines.add(GuiText.Crafting.getLocal(amount));
         }
         if (entry.pendingAmount() > 0) {
             String amount = what.getType().formatAmount(entry.pendingAmount(), AmountFormat.SLOT);
-            lines.add(GuiText.Scheduled.text(amount));
+            lines.add(GuiText.Scheduled.getLocal(amount));
         }
         return lines;
     }

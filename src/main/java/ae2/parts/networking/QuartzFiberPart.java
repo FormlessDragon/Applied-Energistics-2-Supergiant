@@ -38,10 +38,9 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
 
 public class QuartzFiberPart extends AEBasePart {
 
@@ -65,13 +64,19 @@ public class QuartzFiberPart extends AEBasePart {
                                    .addService(IEnergyOverlayGridConnection.class, this::getOurEnergyServices);
     }
 
-    private List<EnergyService> getOurEnergyServices() {
-        var grid = Objects.requireNonNull(getMainNode().getGrid());
+    private Collection<EnergyService> getOurEnergyServices() {
+        var grid = getMainNode().getGrid();
+        if (grid == null) {
+            return Collections.emptyList();
+        }
         return Collections.singletonList((EnergyService) grid.getEnergyService());
     }
 
-    private List<EnergyService> getTheirEnergyServices() {
-        var grid = Objects.requireNonNull(this.outerNode.getGrid());
+    private Collection<EnergyService> getTheirEnergyServices() {
+        var grid = this.outerNode.getGrid();
+        if (grid == null) {
+            return Collections.emptyList();
+        }
         return Collections.singletonList((EnergyService) grid.getEnergyService());
     }
 

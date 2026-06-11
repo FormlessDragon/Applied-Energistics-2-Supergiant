@@ -27,6 +27,7 @@ import ae2.items.tools.MemoryCardItem;
 import ae2.items.tools.quartz.QuartzCuttingKnifeItem;
 import ae2.tile.AEBaseInvTile;
 import ae2.tile.AEBaseTile;
+import ae2.util.CustomNameUtil;
 import ae2.util.InteractionUtil;
 import ae2.util.Platform;
 import ae2.util.SettingsFrom;
@@ -47,6 +48,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraftforge.common.property.ExtendedBlockState;
@@ -102,6 +104,10 @@ public abstract class AEBaseTileBlock<T extends AEBaseTile> extends AEBaseBlock 
 
     @Nullable
     public T getTileEntity(IBlockAccess level, BlockPos pos) {
+        if (level == null || pos == null) {
+            return null;
+        }
+
         final TileEntity te = level.getTileEntity(pos);
         if (this.tileEntityClass != null && this.tileEntityClass.isInstance(te)) {
             return this.tileEntityClass.cast(te);
@@ -110,7 +116,7 @@ public abstract class AEBaseTileBlock<T extends AEBaseTile> extends AEBaseBlock 
     }
 
     @Override
-    public boolean hasTileEntity(net.minecraft.block.state.IBlockState state) {
+    public boolean hasTileEntity(IBlockState state) {
         return this.tileEntityClass != null;
     }
 
@@ -146,11 +152,9 @@ public abstract class AEBaseTileBlock<T extends AEBaseTile> extends AEBaseBlock 
             ((IOwnerAwareTile) tile).setOwner((EntityPlayer) placer);
         }
 
-        if (stack.hasDisplayName()) {
-            NBTTagCompound display = stack.getSubCompound("display");
-            if (display != null && display.hasKey("Name", 8)) {
-                tile.setCustomName(display.getString("Name"));
-            }
+        String customName = CustomNameUtil.getDisplayName(stack);
+        if (customName != null) {
+            tile.setCustomName(customName);
         }
 
         EntityPlayer player = placer instanceof EntityPlayer ? (EntityPlayer) placer : null;
@@ -314,5 +318,17 @@ public abstract class AEBaseTileBlock<T extends AEBaseTile> extends AEBaseBlock 
             }
         }
         return this.getLocalizedName();
+    }
+
+    @Override
+    public ItemStack getPickBlock(IBlockState state, RayTraceResult target, World world, BlockPos pos, EntityPlayer player) {
+        var i = super.getPickBlock(state, target, world, pos, player);
+        if (this.hasTileEntity(state)) {
+            var t = this.getTileEntity(world, pos);
+            if (t != null && t.hasCustomName()) {
+                i.setStackDisplayName(t.getCustomName());
+            }
+        }
+        return i;
     }
 }

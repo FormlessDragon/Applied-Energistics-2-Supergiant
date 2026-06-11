@@ -9,6 +9,8 @@ import net.minecraft.block.BlockLiquid;
 import net.minecraft.block.material.EnumPushReaction;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.NonNullList;
@@ -35,7 +37,7 @@ public class EntroBuddingBlock extends AEBaseBlock {
 
     public static boolean canClusterGrowAtState(IBlockState state) {
         return state.getMaterial() == Material.AIR
-            || state.getBlock() == net.minecraft.init.Blocks.WATER && state.getValue(BlockLiquid.LEVEL) == 0;
+            || state.getBlock() == Blocks.WATER && state.getValue(BlockLiquid.LEVEL) == 0;
     }
 
     @Override
@@ -74,7 +76,7 @@ public class EntroBuddingBlock extends AEBaseBlock {
 
     @Override
     public boolean canSilkHarvest(World world, BlockPos pos, IBlockState state,
-                                  net.minecraft.entity.player.EntityPlayer player) {
+                                  EntityPlayer player) {
         return true;
     }
 

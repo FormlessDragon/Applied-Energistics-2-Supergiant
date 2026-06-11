@@ -41,16 +41,20 @@ import ae2.core.definitions.AEBlocks;
 import ae2.me.service.StatisticsService;
 import ae2.server.services.ChunkLoadingService;
 import ae2.tile.grid.AENetworkedTile;
+import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.WorldServer;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
 
@@ -58,6 +62,8 @@ public class TileSpatialAnchor extends AENetworkedTile
     implements IGridTickable, IConfigurableObject, IOverlayDataSource {
 
     private static final int SPATIAL_TRANSFER_TEMPORARY_CHUNK_RANGE = 4;
+    private static final int MAX_SYNCED_CHUNKS = (SPATIAL_TRANSFER_TEMPORARY_CHUNK_RANGE * 2 + 1)
+        * (SPATIAL_TRANSFER_TEMPORARY_CHUNK_RANGE * 2 + 1);
 
     static {
         GridHelper.addNodeOwnerEventHandler(GridChunkAdded.class, TileSpatialAnchor.class,
@@ -86,13 +92,13 @@ public class TileSpatialAnchor extends AENetworkedTile
     }
 
     @Override
-    public void loadTag(net.minecraft.nbt.NBTTagCompound data) {
+    public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
         this.manager.readFromNBT(data);
     }
 
     @Override
-    public void saveAdditional(net.minecraft.nbt.NBTTagCompound data) {
+    public void saveAdditional(NBTTagCompound data) {
         super.saveAdditional(data);
         this.manager.writeToNBT(data);
     }
@@ -126,6 +132,9 @@ public class TileSpatialAnchor extends AENetworkedTile
         }
 
         int chunkCount = data.readInt();
+        if (chunkCount < 0 || chunkCount > MAX_SYNCED_CHUNKS || data.readableBytes() < chunkCount * Integer.BYTES * 2) {
+            return changed;
+        }
         for (int i = 0; i < chunkCount; i++) {
             this.chunks.add(new ChunkPos(data.readInt(), data.readInt()));
         }
@@ -212,7 +221,7 @@ public class TileSpatialAnchor extends AENetworkedTile
 
     @SuppressWarnings("unused")
     public Set<ChunkPos> getLoadedChunks() {
-        return this.chunks;
+        return Collections.unmodifiableSet(this.chunks);
     }
 
     public int countLoadedChunks() {
@@ -279,7 +288,7 @@ public class TileSpatialAnchor extends AENetworkedTile
 
         Multiset<ChunkPos> requiredChunks = grid.getService(StatisticsService.class).getChunks().get(this.getServerLevel());
         if (requiredChunks == null) {
-            requiredChunks = com.google.common.collect.HashMultiset.create();
+            requiredChunks = HashMultiset.create();
         }
 
         for (Iterator<ChunkPos> iterator = this.chunks.iterator(); iterator.hasNext(); ) {
@@ -333,7 +342,7 @@ public class TileSpatialAnchor extends AENetworkedTile
 
     @Override
     public Set<ChunkPos> getOverlayChunks() {
-        return this.chunks;
+        return Collections.unmodifiableSet(this.chunks);
     }
 
     @Override

@@ -126,11 +126,15 @@ public class FormationPlanePart extends UpgradeablePart
                 return PlacementStrategy.noop();
             }
             var self = this.getHost().getTileEntity();
-            var pos = self.getPos().offset(this.getSide());
-            var side = getSide().getOpposite();
+            var side = getSide();
+            if (side == null) {
+                return PlacementStrategy.noop();
+            }
+            var pos = self.getPos().offset(side);
+            var fromSide = side.getOpposite();
             var owningEntityPlayerId = getMainNode().getNode().getOwningPlayerProfileId();
             placementStrategies = StackWorldBehaviors.createPlacementStrategies(
-                (WorldServer) self.getWorld(), pos, side, self, owningEntityPlayerId);
+                (WorldServer) self.getWorld(), pos, fromSide, self, owningEntityPlayerId);
         }
         return placementStrategies;
     }
@@ -202,7 +206,10 @@ public class FormationPlanePart extends UpgradeablePart
 
     @Override
     public void onNeighborChanged(IBlockAccess level, BlockPos pos, BlockPos neighbor) {
-        if (pos.offset(this.getSide()).equals(neighbor)) {
+        var side = getSide();
+        if (side == null) {
+            connectionHelper.updateConnections();
+        } else if (pos.offset(side).equals(neighbor)) {
             // The neighbor this plane is facing has changed
             if (!isClientSide()) {
                 getPlacementStrategies().clearBlocked();
@@ -215,6 +222,9 @@ public class FormationPlanePart extends UpgradeablePart
     @Override
     public void onUpdateShape(EnumFacing side) {
         var ourSide = getSide();
+        if (ourSide == null) {
+            return;
+        }
         // A block might have been changed in front of us
         if (side.equals(ourSide)) {
             if (!isClientSide()) {
@@ -373,7 +383,11 @@ public class FormationPlanePart extends UpgradeablePart
 
     private boolean canPlaceInTargetChunk() {
         var self = this.getHost().getTileEntity();
-        var targetPos = self.getPos().offset(getSide());
+        var side = getSide();
+        if (side == null) {
+            return false;
+        }
+        var targetPos = self.getPos().offset(side);
         return Platform.areBlockEntitiesTicking(self.getWorld(), targetPos);
     }
 

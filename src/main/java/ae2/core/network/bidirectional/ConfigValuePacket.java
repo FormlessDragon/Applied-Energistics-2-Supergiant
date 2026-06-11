@@ -3,20 +3,25 @@ package ae2.core.network.bidirectional;
 import ae2.api.config.Setting;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigurableObject;
+import ae2.core.network.NetworkPacketHelper;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.network.PacketBuffer;
 import net.minecraftforge.fml.common.network.ByteBufUtils;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class ConfigValuePacket implements IMessage {
+    private static final int MAX_SETTING_NAME_LENGTH = 64;
+    private static final int MAX_SETTING_VALUE_LENGTH = 64;
+
     private String name;
     private String value;
+    private boolean invalid;
 
     public ConfigValuePacket() {
     }
@@ -39,8 +44,15 @@ public class ConfigValuePacket implements IMessage {
 
     @Override
     public void fromBytes(ByteBuf buf) {
-        this.name = ByteBufUtils.readUTF8String(buf);
-        this.value = ByteBufUtils.readUTF8String(buf);
+        try {
+            PacketBuffer packetBuffer = new PacketBuffer(buf);
+            this.name = packetBuffer.readString(MAX_SETTING_NAME_LENGTH);
+            this.value = packetBuffer.readString(MAX_SETTING_VALUE_LENGTH);
+        } catch (RuntimeException e) {
+            this.invalid = true;
+            NetworkPacketHelper.warnMalformedPacket(e, getClass().getSimpleName(),
+                "Ignoring malformed config value packet");
+        }
     }
 
     @Override
@@ -51,13 +63,10 @@ public class ConfigValuePacket implements IMessage {
 
     @SideOnly(Side.CLIENT)
     public void handleClient(Minecraft minecraft) {
-        if (minecraft.player != null && minecraft.player.openContainer instanceof IConfigurableObject configurableObject) {
-            loadSetting(configurableObject);
+        if (this.invalid) {
+            return;
         }
-    }
-
-    public void handleServer(EntityPlayerMP player) {
-        if (player.openContainer instanceof IConfigurableObject configurableObject) {
+        if (minecraft.player != null && minecraft.player.openContainer instanceof IConfigurableObject configurableObject) {
             loadSetting(configurableObject);
         }
     }
@@ -75,17 +84,11 @@ public class ConfigValuePacket implements IMessage {
     public static final class ClientHandler implements IMessageHandler<ConfigValuePacket, IMessage> {
         @Override
         public @Nullable IMessage onMessage(ConfigValuePacket message, MessageContext ctx) {
+            if (message.invalid) {
+                return null;
+            }
             Minecraft minecraft = Minecraft.getMinecraft();
             minecraft.addScheduledTask(() -> message.handleClient(minecraft));
-            return null;
-        }
-    }
-
-    public static final class ServerHandler implements IMessageHandler<ConfigValuePacket, IMessage> {
-        @Override
-        public @Nullable IMessage onMessage(ConfigValuePacket message, MessageContext ctx) {
-            EntityPlayerMP player = ctx.getServerHandler().player;
-            player.getServerWorld().addScheduledTask(() -> message.handleServer(player));
             return null;
         }
     }

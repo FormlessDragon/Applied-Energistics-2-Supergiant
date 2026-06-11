@@ -31,6 +31,14 @@ public enum GridNodeState {
         return state;
     }
 
+    public static @Nullable GridNodeState fromOrdinal(int ordinal) {
+        var values = values();
+        if (ordinal < 0 || ordinal >= values.length) {
+            return null;
+        }
+        return values[ordinal];
+    }
+
     public LocalizationEnum text() {
         return text;
     }

@@ -18,12 +18,10 @@
 
 package ae2.client.render.model;
 
-import ae2.api.implementations.items.IMemoryCard;
 import ae2.api.implementations.items.MemoryCardColors;
 import ae2.api.util.AEColor;
 import ae2.client.render.cablebus.CubeBuilder;
 import ae2.core.AELog;
-import ae2.items.tools.MemoryCardItem;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
@@ -42,11 +40,12 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.model.TRSRTransformation;
 import org.apache.commons.lang3.tuple.Pair;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import javax.vecmath.Matrix4f;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 
 @SuppressWarnings("deprecation")
 class MemoryCardBakedModel implements IBakedModel {
@@ -54,19 +53,42 @@ class MemoryCardBakedModel implements IBakedModel {
     private final IBakedModel baseModel;
     private final TextureAtlasSprite texture;
     private final MemoryCardColors colors;
+    private final Function<ItemStack, MemoryCardColors> colorProvider;
     private final Cache<MemoryCardColors, MemoryCardBakedModel> modelCache;
     private final ImmutableList<BakedQuad> generalQuads;
+    private final ItemOverrideList overrides = new ItemOverrideList(Collections.emptyList()) {
+        @Override
+        public IBakedModel handleItemState(IBakedModel originalModel, ItemStack stack, World world,
+                                           EntityLivingBase entity) {
+            try {
+                if (!stack.isEmpty()) {
+                    MemoryCardColors colors = MemoryCardBakedModel.this.colorProvider.apply(stack);
+                    return MemoryCardBakedModel.this.modelCache.get(colors,
+                        () -> new MemoryCardBakedModel(MemoryCardBakedModel.this.format,
+                            MemoryCardBakedModel.this.baseModel, MemoryCardBakedModel.this.texture, colors,
+                            MemoryCardBakedModel.this.colorProvider, MemoryCardBakedModel.this.modelCache));
+                }
+            } catch (ExecutionException e) {
+                AELog.error(e);
+            }
 
-    MemoryCardBakedModel(VertexFormat format, IBakedModel baseModel, TextureAtlasSprite texture) {
-        this(format, baseModel, texture, MemoryCardColors.DEFAULT, createCache());
+            return MemoryCardBakedModel.this;
+        }
+    };
+
+    MemoryCardBakedModel(VertexFormat format, IBakedModel baseModel, TextureAtlasSprite texture,
+                         Function<ItemStack, MemoryCardColors> colorProvider) {
+        this(format, baseModel, texture, MemoryCardColors.DEFAULT, colorProvider, createCache());
     }
 
     private MemoryCardBakedModel(VertexFormat format, IBakedModel baseModel, TextureAtlasSprite texture,
-                                 MemoryCardColors colors, Cache<MemoryCardColors, MemoryCardBakedModel> modelCache) {
+                                 MemoryCardColors colors, Function<ItemStack, MemoryCardColors> colorProvider,
+                                 Cache<MemoryCardColors, MemoryCardBakedModel> modelCache) {
         this.format = format;
         this.baseModel = baseModel;
         this.texture = texture;
         this.colors = colors;
+        this.colorProvider = colorProvider;
         this.generalQuads = ImmutableList.copyOf(this.buildGeneralQuads());
         this.modelCache = modelCache;
     }
@@ -130,25 +152,7 @@ class MemoryCardBakedModel implements IBakedModel {
 
     @Override
     public ItemOverrideList getOverrides() {
-        return new ItemOverrideList(Collections.emptyList()) {
-            @Override
-            public IBakedModel handleItemState(IBakedModel originalModel, ItemStack stack, World world,
-                                               EntityLivingBase entity) {
-                try {
-                    if (stack.getItem() instanceof IMemoryCard) {
-                        MemoryCardColors colors = MemoryCardItem.getMemoryCardColors(stack);
-                        return MemoryCardBakedModel.this.modelCache.get(colors,
-                            () -> new MemoryCardBakedModel(MemoryCardBakedModel.this.format,
-                                MemoryCardBakedModel.this.baseModel, MemoryCardBakedModel.this.texture, colors,
-                                MemoryCardBakedModel.this.modelCache));
-                    }
-                } catch (ExecutionException e) {
-                    AELog.error(e);
-                }
-
-                return MemoryCardBakedModel.this;
-            }
-        };
+        return this.overrides;
     }
 
     @Override

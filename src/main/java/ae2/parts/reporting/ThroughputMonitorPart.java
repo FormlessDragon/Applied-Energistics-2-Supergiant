@@ -4,9 +4,11 @@ import ae2.api.networking.IGridNode;
 import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.networking.ticking.TickRateModulation;
 import ae2.api.networking.ticking.TickingRequest;
+import ae2.api.orientation.BlockOrientation;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
 import ae2.api.stacks.AmountFormat;
+import ae2.client.render.BlockEntityRenderHelper;
 import ae2.core.AppEng;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.PlayerMessages;
@@ -18,6 +20,7 @@ import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.PacketBuffer;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.fml.relauncher.Side;
@@ -226,14 +229,17 @@ public class ThroughputMonitorPart extends AbstractMonitorPart implements IGridT
         if (!isActive() || getDisplayed() == null) {
             return;
         }
+        EnumFacing side = getSide();
+        if (side == null) {
+            return;
+        }
         GlStateManager.pushMatrix();
         try {
             GlStateManager.translate(x + 0.5, y + 0.5, z + 0.5);
-            ae2.client.render.BlockEntityRenderHelper.rotateToFace(
-                ae2.api.orientation.BlockOrientation.get(getSide(), getSpin()));
+            BlockEntityRenderHelper.rotateToFace(BlockOrientation.get(side, getSpin()));
             GlStateManager.translate(0, 0.05, 0.5);
 
-            ae2.client.render.BlockEntityRenderHelper.renderItem2dWithAmount(getDisplayed(), getAmount(), canCraft(),
+            BlockEntityRenderHelper.renderItem2dWithAmount(getDisplayed(), getAmount(), canCraft(),
                 6 / 16f, -0.12f, getColor().contrastTextColor);
 
             GlStateManager.translate(0, -0.22, 0.02);

@@ -19,8 +19,10 @@
 package ae2.client.gui.widgets;
 
 import ae2.api.config.Setting;
+import ae2.client.gui.AEBaseGui;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.ConfigButtonPacket;
+import net.minecraft.client.Minecraft;
 
 public class ServerSettingToggleButton<T extends Enum<T>> extends SettingToggleButton<T> {
 
@@ -29,7 +31,10 @@ public class ServerSettingToggleButton<T extends Enum<T>> extends SettingToggleB
     }
 
     private static <T extends Enum<T>> void sendToServer(SettingToggleButton<T> button, boolean backwards) {
-        InitNetwork.sendToServer(new ConfigButtonPacket(button.getSetting(), backwards));
+        if (Minecraft.getMinecraft().currentScreen instanceof AEBaseGui<?> gui) {
+            InitNetwork.sendToServer(new ConfigButtonPacket(gui.getContainer().windowId, button.getSetting(),
+                backwards));
+        }
     }
 }
 

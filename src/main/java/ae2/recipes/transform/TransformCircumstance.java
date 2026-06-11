@@ -2,12 +2,13 @@ package ae2.recipes.transform;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonSyntaxException;
 
 import net.minecraft.util.JsonUtils;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidRegistry;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class TransformCircumstance {
     private static final TransformCircumstance EXPLOSION = new TransformCircumstance("explosion", null);
@@ -46,14 +47,23 @@ public class TransformCircumstance {
         }
         if ("fluid".equals(type)) {
             if (json.has("fluid")) {
-                return fluid(new ResourceLocation(JsonUtils.getString(json, "fluid")));
+                return fluid(readResourceLocation(json, "fluid"));
             }
             if (json.has("tag")) {
-                return fluid(new ResourceLocation(JsonUtils.getString(json, "tag")));
+                return fluid(readResourceLocation(json, "tag"));
             }
             return water();
         }
         throw new JsonParseException("Unknown transform circumstance: " + type);
+    }
+
+    private static ResourceLocation readResourceLocation(JsonObject json, String key) {
+        String id = JsonUtils.getString(json, key);
+        try {
+            return new ResourceLocation(id);
+        } catch (RuntimeException e) {
+            throw new JsonSyntaxException("Invalid transform circumstance " + key + ": " + id, e);
+        }
     }
 
     public boolean isExplosion() {

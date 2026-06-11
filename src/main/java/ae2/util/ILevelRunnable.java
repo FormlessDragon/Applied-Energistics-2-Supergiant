@@ -19,7 +19,7 @@ package ae2.util;
 
 import net.minecraft.world.World;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 @FunctionalInterface
 public interface ILevelRunnable {

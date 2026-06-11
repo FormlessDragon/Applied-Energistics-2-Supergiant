@@ -23,11 +23,11 @@ public class CableBusPartLeftClickPacket extends ServerboundPacket {
         this.localHit = localHit;
     }
 
-    @Override
-    protected void read(ByteBuf buf) {
-        PacketBuffer packetBuffer = new PacketBuffer(buf);
-        this.pos = packetBuffer.readBlockPos();
-        this.localHit = new Vec3d(packetBuffer.readDouble(), packetBuffer.readDouble(), packetBuffer.readDouble());
+    private static boolean isValidLocalHit(Vec3d localHit) {
+        return Double.isFinite(localHit.x) && Double.isFinite(localHit.y) && Double.isFinite(localHit.z)
+            && localHit.x >= -0.5 && localHit.x <= 1.5
+            && localHit.y >= -0.5 && localHit.y <= 1.5
+            && localHit.z >= -0.5 && localHit.z <= 1.5;
     }
 
     @Override
@@ -40,8 +40,16 @@ public class CableBusPartLeftClickPacket extends ServerboundPacket {
     }
 
     @Override
+    protected void read(ByteBuf buf) {
+        PacketBuffer packetBuffer = new PacketBuffer(buf);
+        this.pos = packetBuffer.readBlockPos();
+        this.localHit = new Vec3d(packetBuffer.readDouble(), packetBuffer.readDouble(), packetBuffer.readDouble());
+    }
+
+    @Override
     public void handleServer(EntityPlayerMP player) {
-        if (this.pos == null || this.localHit == null || player.getDistanceSqToCenter(this.pos) > 64.0) {
+        if (this.pos == null || this.localHit == null || !isValidLocalHit(this.localHit)
+            || player.getDistanceSqToCenter(this.pos) > 64.0) {
             return;
         }
 

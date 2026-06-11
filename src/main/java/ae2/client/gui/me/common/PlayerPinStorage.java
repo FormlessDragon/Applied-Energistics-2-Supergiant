@@ -40,8 +40,9 @@ final class PlayerPinStorage {
 
             int rows = Math.clamp(root.getInteger(TAG_ROWS), 0, PinnedKeys.MAX_PLAYER_PIN_ROWS);
             NBTTagList list = root.getTagList(TAG_KEYS, 10);
-            ObjectArrayList<AEKey> keys = new ObjectArrayList<>(list.tagCount());
-            for (int i = 0; i < list.tagCount(); i++) {
+            int keyCount = Math.min(list.tagCount(), PinnedKeys.MAX_PLAYER_PIN_ROWS * PinnedKeys.MAX_PINNED);
+            ObjectArrayList<AEKey> keys = new ObjectArrayList<>(keyCount);
+            for (int i = 0; i < keyCount; i++) {
                 AEKey key = AEKey.fromTagGeneric(list.getCompoundTagAt(i));
                 if (key != null && !keys.contains(key)) {
                     keys.add(key);

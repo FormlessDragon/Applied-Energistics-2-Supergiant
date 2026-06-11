@@ -22,6 +22,7 @@ import ae2.client.render.effects.ParticleTypes;
 import ae2.core.AELog;
 import ae2.core.AppEngBase;
 import ae2.core.network.ClientboundPacket;
+import ae2.core.network.NetworkPacketHelper;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.block.Block;
 import net.minecraft.block.SoundType;
@@ -64,16 +65,22 @@ public class BlockTransitionEffectPacket extends ClientboundPacket {
         var data = new PacketBuffer(buf);
         this.pos = data.readBlockPos();
         int blockStateId = data.readVarInt();
-        this.blockState = net.minecraft.block.Block.getStateById(blockStateId);
-        this.direction = data.readEnumValue(EnumFacing.class);
-        this.soundMode = data.readEnumValue(SoundMode.class);
+        this.blockState = Block.getStateById(blockStateId);
+        this.direction = NetworkPacketHelper.readEnumOrNull(data, EnumFacing.class);
+        if (this.direction == null) {
+            this.direction = EnumFacing.UP;
+        }
+        this.soundMode = NetworkPacketHelper.readEnumOrNull(data, SoundMode.class);
+        if (this.soundMode == null) {
+            this.soundMode = SoundMode.NONE;
+        }
     }
 
     @Override
     protected void write(ByteBuf buf) {
         var data = new PacketBuffer(buf);
         data.writeBlockPos(this.pos);
-        int blockStateId = net.minecraft.block.Block.getStateId(this.blockState);
+        int blockStateId = Block.getStateId(this.blockState);
         if (blockStateId < 0) {
             AELog.warn("Failed to find numeric id for block state %s", this.blockState);
             blockStateId = 0;

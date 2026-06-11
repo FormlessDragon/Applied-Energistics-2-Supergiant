@@ -256,7 +256,8 @@ public class StorageBusPart extends UpgradeablePart
 
     @Override
     public void onNeighborChanged(IBlockAccess level, BlockPos pos, BlockPos neighbor) {
-        if (pos.offset(getSide()).equals(neighbor) && !isClientSide()) {
+        EnumFacing side = getSide();
+        if (side != null && pos.offset(side).equals(neighbor) && !isClientSide()) {
             this.adjacentStorageAccessor.onNeighborChanged(neighbor);
             this.clearCachedExternalStorageStrategies();
             this.scheduleUpdate();
@@ -320,7 +321,8 @@ public class StorageBusPart extends UpgradeablePart
         MEStorage foundMonitor = null;
         Reference2ObjectMap<AEKeyType, MEStorage> foundExternalApi = new Reference2ObjectOpenHashMap<>(0);
 
-        if (Platform.areBlockEntitiesTicking(getLevel(), getTileEntity().getPos().offset(getSide()))) {
+        EnumFacing side = getSide();
+        if (side != null && Platform.areBlockEntitiesTicking(getLevel(), getTileEntity().getPos().offset(side))) {
             this.updateStatus = PendingUpdateStatus.NO_UPDATE;
 
             foundMonitor = adjacentStorageAccessor.find();
@@ -402,8 +404,9 @@ public class StorageBusPart extends UpgradeablePart
 
         int slotsToUse = 18 + getInstalledUpgrades(AEItems.CAPACITY_CARD) * 9;
         for (int x = 0; x < this.config.size() && x < slotsToUse; x++) {
-            if (this.config.getKey(x) != null) {
-                filterKeys.add(this.config.getKey(x), 1);
+            var key = this.config.getKey(x);
+            if (key != null) {
+                filterKeys.add(key, 1);
             }
         }
         if (filterKeys.isEmpty()) {

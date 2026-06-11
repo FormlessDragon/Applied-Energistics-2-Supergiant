@@ -1,6 +1,7 @@
 package ae2.core.network.serverbound;
 
 import ae2.api.util.AEColor;
+import ae2.core.network.NetworkPacketHelper;
 import ae2.core.network.ServerboundPacket;
 import ae2.items.tools.powered.ColorApplicatorItem;
 import io.netty.buffer.ByteBuf;
@@ -8,12 +9,13 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketBuffer;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class ColorApplicatorSelectColorPacket extends ServerboundPacket {
 
     @Nullable
     private AEColor color;
+    private boolean invalidRequest;
 
     public ColorApplicatorSelectColorPacket() {
     }
@@ -31,7 +33,17 @@ public class ColorApplicatorSelectColorPacket extends ServerboundPacket {
     @Override
     protected void read(ByteBuf buf) {
         PacketBuffer data = new PacketBuffer(buf);
-        this.color = data.readBoolean() ? data.readEnumValue(AEColor.class) : null;
+        if (data.readBoolean()) {
+            this.color = NetworkPacketHelper.readEnumOrNull(data, AEColor.class);
+            this.invalidRequest = this.color == null;
+        } else {
+            this.color = null;
+            this.invalidRequest = false;
+        }
+        if (data.isReadable()) {
+            throw new IllegalArgumentException("Trailing color applicator selection packet payload bytes: "
+                + data.readableBytes());
+        }
     }
 
     @Override
@@ -45,6 +57,9 @@ public class ColorApplicatorSelectColorPacket extends ServerboundPacket {
 
     @Override
     public void handleServer(EntityPlayerMP player) {
+        if (this.invalidRequest) {
+            return;
+        }
         switchColor(player.getHeldItemMainhand(), this.color);
         switchColor(player.getHeldItemOffhand(), this.color);
     }

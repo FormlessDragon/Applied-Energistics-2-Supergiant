@@ -20,6 +20,7 @@ package ae2.facade;
 
 import ae2.api.parts.IFacadePart;
 import ae2.api.parts.IPartCollisionHelper;
+import ae2.core.definitions.AEItems;
 import ae2.core.localization.PlayerMessages;
 import ae2.util.InteractionUtil;
 import net.minecraft.block.properties.IProperty;
@@ -33,7 +34,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.ITextComponent;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Objects;
@@ -141,7 +142,7 @@ public class FacadePart implements IFacadePart {
 
     @Override
     public ItemStack getItemStack() {
-        return ae2.core.definitions.AEItems.FACADE.get().createFacadeForItemUnchecked(getTextureItem());
+        return AEItems.FACADE.get().createFacadeForItemUnchecked(getTextureItem());
     }
 
     @Override

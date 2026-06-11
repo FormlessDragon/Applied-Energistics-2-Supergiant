@@ -36,12 +36,15 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 
+import java.util.List;
+
 public class GuiInscriber extends GuiUpgradeable<ContainerInscriber> {
     private final ProgressBar progressBar;
     private final SettingToggleButton<YesNo> separateSidesBtn;
     private final SettingToggleButton<YesNo> autoExportBtn;
     private final IconButton outputSidesBtn;
     private final SettingToggleButton<InscriberInputCapacity> bufferSizeBtn;
+    private String lastProgressText = "";
 
     public GuiInscriber(ContainerInscriber container, InventoryPlayer playerInventory, ITextComponent title,
                         GuiStyle style) {
@@ -64,8 +67,8 @@ public class GuiInscriber extends GuiUpgradeable<ContainerInscriber> {
             }
 
             @Override
-            public java.util.List<net.minecraft.util.text.ITextComponent> getTooltipMessage() {
-                return java.util.List.of(
+            public List<ITextComponent> getTooltipMessage() {
+                return List.of(
                     ButtonToolTips.OutputSideConfig.text(),
                     ButtonToolTips.OutputSideConfigHint.text());
             }
@@ -79,11 +82,18 @@ public class GuiInscriber extends GuiUpgradeable<ContainerInscriber> {
         super.updateBeforeRender();
         int maxProgress = this.container.getMaxProgress();
         int progress = maxProgress > 0 ? this.container.getCurrentProgress() * 100 / maxProgress : 0;
-        this.progressBar.setFullMsg(new TextComponentString(progress + "%"));
+        updateProgressTooltip(progress + "%");
         this.separateSidesBtn.set(this.container.getSeparateSides());
         this.autoExportBtn.set(this.container.getAutoExport());
         this.outputSidesBtn.setVisibility(this.container.getAutoExport() == YesNo.YES);
         this.bufferSizeBtn.set(this.container.getBufferSize());
+    }
+
+    private void updateProgressTooltip(String progressText) {
+        if (!progressText.equals(this.lastProgressText)) {
+            this.lastProgressText = progressText;
+            this.progressBar.setFullMsg(new TextComponentString(progressText));
+        }
     }
 
     private void openOutputSides() {

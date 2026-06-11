@@ -27,7 +27,6 @@ import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.lwjgl.opengl.GL11;
 
-import java.util.Map.Entry;
 import java.util.Objects;
 
 public class OverlayManager {
@@ -64,10 +63,12 @@ public class OverlayManager {
         GlStateManager.glLineWidth(2.0F);
         GlStateManager.depthMask(false);
 
-        for (OverlayRenderer renderer : this.overlayHandlers.entrySet().stream()
-                                                            .filter(entry -> entry.getKey().isInWorld(minecraft.world))
-                                                            .map(Entry::getValue)
-                                                            .toList()) {
+        for (var entry : this.overlayHandlers.object2ObjectEntrySet()) {
+            if (!entry.getKey().isInWorld(minecraft.world)) {
+                continue;
+            }
+
+            OverlayRenderer renderer = entry.getValue();
             GlStateManager.depthFunc(GL11.GL_GREATER);
             renderer.renderOccludedLines();
 

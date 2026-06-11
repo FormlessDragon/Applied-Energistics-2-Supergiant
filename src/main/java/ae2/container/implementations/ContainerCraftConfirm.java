@@ -18,6 +18,7 @@
 
 package ae2.container.implementations;
 
+import ae2.api.crafting.IPatternDetails;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.crafting.CalculationStrategy;
@@ -46,6 +47,7 @@ import ae2.container.me.crafting.CraftingPlanSummary;
 import ae2.core.AELog;
 import ae2.core.gui.locator.GuiHostLocator;
 import ae2.core.localization.PlayerMessages;
+import ae2.core.network.NetworkPacketHelper;
 import ae2.core.network.clientbound.CraftConfirmPlanPacket;
 import ae2.core.network.serverbound.SwitchGuisPacket;
 import ae2.crafting.CraftingCalculationFailure;
@@ -285,7 +287,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
                     this.setAutoStart(false);
                 }
 
-                this.plan = CraftingPlanSummary.fromJob(this.getGrid(), this.getActionSrc(), this.result);
+                this.plan = CraftingPlanSummary.fromJob(this.getGrid(), this.result);
                 sendPacketToClient(new CraftConfirmPlanPacket(this.plan));
             } catch (Throwable e) {
                 ITextComponent error = getCraftingErrorText(e);
@@ -301,7 +303,10 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
 
     @Nullable
     private IGrid getGrid() {
-        IActionHost actionHost = (IActionHost) this.getTarget();
+        IActionHost actionHost = getActionHost();
+        if (actionHost == null) {
+            return null;
+        }
         IGridNode node = actionHost.getActionableNode();
         return node != null ? node.grid() : null;
     }
@@ -370,7 +375,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     }
 
     private IActionSource getActionSrc() {
-        return new PlayerSource(this.getPlayerInventory().player, (IActionHost) this.getTarget());
+        return new PlayerSource(this.getPlayerInventory().player, getActionHost());
     }
 
     @Override
@@ -511,7 +516,11 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
                 return CraftingSubmitResult.successful(null);
             }
 
-            CraftingSubmitErrorCode errorCode = buffer.readEnumValue(CraftingSubmitErrorCode.class);
+            CraftingSubmitErrorCode errorCode = NetworkPacketHelper.readEnumOrNull(buffer,
+                CraftingSubmitErrorCode.class);
+            if (errorCode == null) {
+                throw new IllegalArgumentException("Invalid crafting submit error code");
+            }
             return switch (errorCode) {
                 case NO_SUITABLE_CPU_FOUND -> CraftingSubmitResult.noSuitableCpu(new UnsuitableCpus(
                     buffer.readInt(),
@@ -571,12 +580,12 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         @Override
         @Nullable
         public IGridNode getGridNode() {
-            IActionHost actionHost = (IActionHost) ContainerCraftConfirm.this.getTarget();
-            return actionHost.getActionableNode();
+            IActionHost actionHost = ContainerCraftConfirm.this.getActionHost();
+            return actionHost != null ? actionHost.getActionableNode() : null;
         }
 
         @Override
-        public List<ae2.api.crafting.IPatternDetails> getAdditionalPatterns() {
+        public List<IPatternDetails> getAdditionalPatterns() {
             return List.of(this.provider.pattern());
         }
 

@@ -26,6 +26,7 @@ import ae2.me.netdata.LinkFlag;
 import ae2.me.netdata.NodeFlag;
 import ae2.me.netdata.State;
 import ae2.me.tracker.PlayerTracker;
+import ae2.util.EmptyArrays;
 import ae2.util.Platform;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.entity.Entity;
@@ -41,8 +42,10 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -61,7 +64,7 @@ public class NetworkAnalyserItem extends AEBaseItem implements IGuiItem {
 
     public static NetworkAnalyserConfig getConfig(ItemStack stack) {
         NBTTagCompound tag = stack.getTagCompound();
-        return tag != null && tag.hasKey(CONFIG_TAG, 10)
+        return tag != null && tag.hasKey(CONFIG_TAG, Constants.NBT.TAG_COMPOUND)
             ? NetworkAnalyserConfig.fromTag(tag.getCompoundTag(CONFIG_TAG))
             : NetworkAnalyserConfig.DEFAULT;
     }
@@ -78,7 +81,9 @@ public class NetworkAnalyserItem extends AEBaseItem implements IGuiItem {
     @Nullable
     public static TargetPos getTarget(ItemStack stack) {
         NBTTagCompound tag = stack.getTagCompound();
-        if (tag == null || !tag.hasKey(TARGET_DIM_TAG) || !tag.hasKey(TARGET_POS_TAG)) {
+        if (tag == null
+            || !tag.hasKey(TARGET_DIM_TAG, Constants.NBT.TAG_ANY_NUMERIC)
+            || !tag.hasKey(TARGET_POS_TAG, Constants.NBT.TAG_ANY_NUMERIC)) {
             return null;
         }
         return new TargetPos(tag.getInteger(TARGET_DIM_TAG), BlockPos.fromLong(tag.getLong(TARGET_POS_TAG)));
@@ -164,7 +169,7 @@ public class NetworkAnalyserItem extends AEBaseItem implements IGuiItem {
 
     private NetworkData scanNetwork(IGrid grid, World world) {
         var connections = new ObjectOpenHashSet<IGridConnection>();
-        Map<BlockPos, NetworkData.ANode> nodes = new java.util.HashMap<>();
+        Map<BlockPos, NetworkData.ANode> nodes = new HashMap<>();
         for (IGridNode node : grid.getNodes()) {
             if (node.getLevel().provider.getDimension() != world.provider.getDimension()) {
                 continue;
@@ -193,7 +198,7 @@ public class NetworkAnalyserItem extends AEBaseItem implements IGuiItem {
             }
         }
 
-        return new NetworkData(nodes.values().toArray(new NetworkData.ANode[0]), links.toArray(new NetworkData.ALink[0]));
+        return new NetworkData(nodes.values().toArray(EmptyArrays.EMPTY_NETWORK_DATA_ANODE_ARRAY), links.toArray(EmptyArrays.EMPTY_NETWORK_DATA_ALINK_ARRAY));
     }
 
     @Nullable

@@ -63,7 +63,7 @@ import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
-import ae2.core.network.bidirectional.ConfigValuePacket;
+import ae2.core.network.serverbound.ConfigValueServerPacket;
 import ae2.core.network.serverbound.SwitchGuisPacket;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
@@ -74,6 +74,7 @@ import ae2.text.TextComponentItemStack;
 import ae2.util.Platform;
 import ae2.util.prioritylist.IPartitionList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiTextField;
@@ -109,6 +110,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     private static final int MIN_ROWS = 2;
     private static final int DEFAULT_ROWS = 5;
     private static final int RAINBOW_BORDER_PIXELS = 72;
+    private static final int RAINBOW_BORDER_ALPHA = 220;
     private static String rememberedSearch = "";
 
     protected final Repo repo;
@@ -204,7 +206,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         addWirelessUniversalTerminalButton();
 
         this.searchField = this.widgets.addTextField("search");
-        this.searchField.setPlaceholder(GuiText.SearchPlaceholder.text());
+        this.searchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.searchField.setTooltipMessage(Arrays.asList(
             GuiText.SearchTooltip.text(),
             GuiText.SearchTooltipModId.text(),
@@ -241,15 +243,31 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
-    private static int[] getRainbowBorderPoint(int x, int y, int index) {
+    private static void addRainbowBorderPixel(BufferBuilder buffer, int x, int y, int index, int red, int green,
+                                              int blue) {
         int side = index / 18;
         int offset = index % 18;
-        return switch (side) {
-            case 0 -> new int[]{x + offset, y};
-            case 1 -> new int[]{x + 17, y + offset};
-            case 2 -> new int[]{x + 17 - offset, y + 17};
-            default -> new int[]{x, y + 17 - offset};
-        };
+        int px;
+        int py;
+        switch (side) {
+            case 0 -> {
+                px = x + offset;
+                py = y;
+            }
+            case 1 -> {
+                px = x + 17;
+                py = y + offset;
+            }
+            case 2 -> {
+                px = x + 17 - offset;
+                py = y + 17;
+            }
+            default -> {
+                px = x;
+                py = y + 17 - offset;
+            }
+        }
+        addColoredQuad(buffer, px, py, px + 1, py + 1, red, green, blue);
     }
 
     private int getConfiguredRows() {
@@ -259,11 +277,11 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     }
 
     private static void addColoredQuad(BufferBuilder buffer, int left, int top, int right, int bottom,
-                                       int red, int green, int blue, int alpha) {
-        buffer.pos(left, bottom, 0).color(red, green, blue, alpha).endVertex();
-        buffer.pos(right, bottom, 0).color(red, green, blue, alpha).endVertex();
-        buffer.pos(right, top, 0).color(red, green, blue, alpha).endVertex();
-        buffer.pos(left, top, 0).color(red, green, blue, alpha).endVertex();
+                                       int red, int green, int blue) {
+        buffer.pos(left, bottom, 0).color(red, green, blue, RAINBOW_BORDER_ALPHA).endVertex();
+        buffer.pos(right, bottom, 0).color(red, green, blue, RAINBOW_BORDER_ALPHA).endVertex();
+        buffer.pos(right, top, 0).color(red, green, blue, RAINBOW_BORDER_ALPHA).endVertex();
+        buffer.pos(left, top, 0).color(red, green, blue, RAINBOW_BORDER_ALPHA).endVertex();
     }
 
     private void onContainerReceivedClientUpdate() {
@@ -342,7 +360,8 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void toggleTerminalStyle(SettingToggleButton button, boolean backwards) {
-        var nextValue = (ae2.api.config.TerminalStyle) button.getNextValue(backwards);
+        var nextValue = AEConfig.instance().getTerminalStyle().getDeclaringClass()
+                                .cast(button.getNextValue(backwards));
         button.set(nextValue);
         AEConfig.instance().setTerminalStyle(nextValue);
         rememberedSearch = this.searchField.getText();
@@ -542,12 +561,11 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         BufferBuilder buffer = tessellator.getBuffer();
         buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
         for (int i = 0; i < RAINBOW_BORDER_PIXELS; i++) {
-            int[] point = getRainbowBorderPoint(x, y, i);
             int color = Color.HSBtoRGB((i / (float) RAINBOW_BORDER_PIXELS + phase) % 1.0F, 0.95F, 1.0F);
             int r = color >> 16 & 0xFF;
             int g = color >> 8 & 0xFF;
             int b = color & 0xFF;
-            addColoredQuad(buffer, point[0], point[1], point[0] + 1, point[1] + 1, r, g, b, 220);
+            addRainbowBorderPixel(buffer, x, y, i, r, g, b);
         }
         tessellator.draw();
 
@@ -890,7 +908,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         T nextValue = btn.getNextValue(backwards);
         btn.set(nextValue);
         this.configSrc.putSetting(btn.getSetting(), nextValue);
-        InitNetwork.CHANNEL.sendToServer(new ConfigValuePacket(btn.getSetting(), nextValue));
+        InitNetwork.sendToServer(new ConfigValueServerPacket(this.container.windowId, btn.getSetting(), nextValue));
         this.repo.updateView();
         updateScrollbar();
     }
@@ -912,7 +930,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
     @Override
     public Set<AEKeyType> getSortKeyTypes() {
-        Set<AEKeyType> selected = new it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet<>(this.container.getClientKeyTypeSelection().enabledSet());
+        Set<AEKeyType> selected = new ObjectLinkedOpenHashSet<>(this.container.getClientKeyTypeSelection().enabledSet());
         if (selected.isEmpty()) {
             selected.addAll(AEKeyTypes.getAll());
         }

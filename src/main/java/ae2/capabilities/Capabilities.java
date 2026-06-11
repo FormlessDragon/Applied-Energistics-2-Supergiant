@@ -19,8 +19,11 @@ import net.minecraft.nbt.NBTBase;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.CapabilityManager;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
+/**
+ * {@link ae2.api.AECapabilities}
+ */
 public final class Capabilities {
 
     private static boolean registered;

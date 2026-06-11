@@ -75,7 +75,9 @@ public final class P2PTunnelAttunement {
     public static final ResourceLocation LIGHT_TUNNEL = AEPartIds.LIGHT_P2P_TUNNEL;
     private static final int INITIAL_CAPACITY = 40;
     static final Map<String, Item> tagTunnels = new Object2ObjectOpenHashMap<>(INITIAL_CAPACITY);
+    static final Map<Item, Boolean> multipleInputTunnels = new Object2ObjectOpenHashMap<>(INITIAL_CAPACITY);
     static final List<ApiAttunement> apiAttunements = new ObjectArrayList<>(INITIAL_CAPACITY);
+    static final List<Item> manageableTunnels = new ObjectArrayList<>(INITIAL_CAPACITY);
 
     private P2PTunnelAttunement() {
     }
@@ -89,7 +91,16 @@ public final class P2PTunnelAttunement {
      * Attunement based on the standard item tag: {@code <tunnel item namespace>:p2p_attunements/<tunnel item path>}
      */
     public synchronized static void registerAttunementTag(ResourceLocation tunnel) {
-        tagTunnels.put(getAttunementTag(tunnel), validateTunnelPartItem(tunnel));
+        registerAttunementTag(tunnel, false);
+    }
+
+    /**
+     * Attunement based on the standard item tag: {@code <tunnel item namespace>:p2p_attunements/<tunnel item path>}
+     */
+    public synchronized static void registerAttunementTag(ResourceLocation tunnel, boolean supportsMultipleInputs) {
+        var tunnelItem = validateTunnelPartItem(tunnel);
+        tagTunnels.put(getAttunementTag(tunnel), tunnelItem);
+        registerManageableTunnel(tunnelItem, supportsMultipleInputs);
     }
 
     /**
@@ -100,8 +111,23 @@ public final class P2PTunnelAttunement {
      */
     public synchronized static void registerAttunementApi(ResourceLocation tunnelPart, Capability<?> cap,
                                                           ITextComponent description) {
+        registerAttunementApi(tunnelPart, cap, description, false);
+    }
+
+    /**
+     * Attunement based on the ability of getting a capability from the item.
+     *
+     * @param tunnelPart             The P2P-tunnel part item.
+     * @param description            Description for display in item-list and recipe-view integrations.
+     * @param supportsMultipleInputs Whether this tunnel type allows more than one input on the same frequency.
+     */
+    public synchronized static void registerAttunementApi(ResourceLocation tunnelPart, Capability<?> cap,
+                                                          ITextComponent description,
+                                                          boolean supportsMultipleInputs) {
         Objects.requireNonNull(cap, "cap");
-        apiAttunements.add(new ApiAttunement(cap, validateTunnelPartItem(tunnelPart), description));
+        var tunnelItem = validateTunnelPartItem(tunnelPart);
+        apiAttunements.add(new ApiAttunement(cap, tunnelItem, description));
+        registerManageableTunnel(tunnelItem, supportsMultipleInputs);
     }
 
     /**
@@ -147,6 +173,18 @@ public final class P2PTunnelAttunement {
         }
 
         return item;
+    }
+
+    private static void registerManageableTunnel(Item item, boolean supportsMultipleInputs) {
+        Boolean existing = multipleInputTunnels.get(item);
+        if (existing != null && existing != supportsMultipleInputs) {
+            throw new IllegalArgumentException("P2P tunnel " + item
+                + " was registered with conflicting multiple-input support");
+        }
+        multipleInputTunnels.put(item, supportsMultipleInputs);
+        if (!manageableTunnels.contains(item)) {
+            manageableTunnels.add(item);
+        }
     }
 
     record ApiAttunement(Capability<?> capability, Item tunnelType, ITextComponent description) {

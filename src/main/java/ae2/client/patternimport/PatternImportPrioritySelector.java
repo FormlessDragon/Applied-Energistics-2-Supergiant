@@ -18,6 +18,10 @@ public final class PatternImportPrioritySelector {
     public static GenericStack selectIngredient(List<GenericStack> possibleIngredients,
                                                 PatternImportPriorityContext context,
                                                 boolean preferFilledBucket) {
+        if (possibleIngredients == null || possibleIngredients.isEmpty()) {
+            throw new IllegalStateException("Expected at least one ingredient candidate");
+        }
+
         if (preferFilledBucket) {
             for (GenericStack possibleIngredient : possibleIngredients) {
                 if (isFilledBucketIngredient(possibleIngredient)) {
@@ -28,20 +32,22 @@ public final class PatternImportPrioritySelector {
 
         for (PatternImportPriority priority : PatternImportPriorityOrder.getOrderedPriorities()) {
             for (GenericStack possibleIngredient : possibleIngredients) {
-                if (priority.matches(context, possibleIngredient)) {
+                if (possibleIngredient != null && priority.matches(context, possibleIngredient)) {
                     return possibleIngredient;
                 }
             }
         }
 
-        if (possibleIngredients.isEmpty()) {
-            throw new IllegalStateException("Expected at least one ingredient candidate");
+        for (GenericStack possibleIngredient : possibleIngredients) {
+            if (possibleIngredient != null) {
+                return possibleIngredient;
+            }
         }
-        return possibleIngredients.get(0);
+        throw new IllegalStateException("Expected at least one ingredient candidate");
     }
 
     private static boolean isFilledBucketIngredient(GenericStack stack) {
-        if (!(stack.what() instanceof AEItemKey itemKey)) {
+        if (stack == null || !(stack.what() instanceof AEItemKey itemKey)) {
             return false;
         }
 

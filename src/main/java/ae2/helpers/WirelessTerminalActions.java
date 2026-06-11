@@ -50,6 +50,16 @@ public final class WirelessTerminalActions {
     private WirelessTerminalActions() {
     }
 
+    public static void clear() {
+        PENDING_RESTOCKS.clear();
+        RESTOCKS_IN_FLIGHT.clear();
+    }
+
+    public static void clear(UUID playerId) {
+        PENDING_RESTOCKS.keySet().removeIf(key -> key.playerId.equals(playerId));
+        RESTOCKS_IN_FLIGHT.removeIf(key -> key.playerId.equals(playerId));
+    }
+
     public static boolean toggleRestock(EntityPlayerMP player) {
         TerminalContext context = findUsableTerminal(player, ignored -> true);
         if (context == null) {

@@ -2,6 +2,7 @@ package ae2.core.network.clientbound;
 
 import ae2.client.gui.me.patternaccess.GuiPatternAccessTerm;
 import ae2.core.network.ClientboundPacket;
+import ae2.core.network.NetworkPacketHelper;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.PacketBuffer;
@@ -34,7 +35,7 @@ public class PatternAccessTerminalInfoPacket extends ClientboundPacket {
         this.inventoryId = data.readVarLong();
         this.dimensionId = data.readInt();
         this.pos = data.readBlockPos();
-        this.face = data.readBoolean() ? EnumFacing.byIndex(data.readVarInt()) : null;
+        this.face = data.readBoolean() ? NetworkPacketHelper.readEnumOrNull(data, EnumFacing.class) : null;
     }
 
     @Override

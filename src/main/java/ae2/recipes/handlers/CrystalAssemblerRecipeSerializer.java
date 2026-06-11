@@ -24,9 +24,12 @@ public class CrystalAssemblerRecipeSerializer implements IAERecipeFactory {
         JsonArray array = JsonUtils.getJsonArray(json, "input_items");
         List<CrystalAssemblerRecipe.SizedIngredient> result = new ObjectArrayList<>(array.size());
         for (var element : array) {
-            JsonObject input = element.getAsJsonObject();
+            JsonObject input = JsonRecipeUtils.readObject(element, "input_items entry");
             Ingredient ingredient = JsonRecipeUtils.readIngredient(input, "ingredient", ctx);
             int amount = JsonUtils.getInt(input, "amount", 1);
+            if (amount <= 0) {
+                throw new JsonSyntaxException("input_items amount must be positive");
+            }
             result.add(new CrystalAssemblerRecipe.SizedIngredient(ingredient, amount));
         }
         return result;
@@ -40,7 +43,10 @@ public class CrystalAssemblerRecipeSerializer implements IAERecipeFactory {
 
         JsonObject input = JsonUtils.getJsonObject(json, "input_fluid");
         JsonObject fluidObject = input.has("ingredient") ? JsonUtils.getJsonObject(input, "ingredient") : input;
-        int amount = JsonUtils.getInt(input, "amount", JsonUtils.getInt(fluidObject, "amount", 1000));
+        int amount = readFluidAmount(input, fluidObject);
+        if (amount <= 0) {
+            throw new JsonSyntaxException("input_fluid amount must be positive");
+        }
         if (fluidObject.has("fluid")) {
             Fluid fluid = FluidRegistry.getFluid(JsonUtils.getString(fluidObject, "fluid"));
             if (fluid == null) {
@@ -63,6 +69,13 @@ public class CrystalAssemblerRecipeSerializer implements IAERecipeFactory {
             throw new JsonSyntaxException("input_fluid could not be converted to AE fluid key");
         }
         return new CrystalAssemblerRecipe.SizedFluidIngredient(key, amount);
+    }
+
+    private static int readFluidAmount(JsonObject input, JsonObject fluidObject) {
+        if (input.has("amount")) {
+            return JsonUtils.getInt(input, "amount");
+        }
+        return JsonUtils.getInt(fluidObject, "amount", 1000);
     }
 
     @Override

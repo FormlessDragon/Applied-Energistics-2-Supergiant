@@ -6,7 +6,6 @@ import ae2.api.stacks.GenericStack;
 import ae2.container.AEBaseContainer;
 import ae2.container.SlotSemantics;
 import ae2.container.slot.RequestSlot;
-import ae2.core.AELog;
 import ae2.core.network.clientbound.RequesterSyncPacket;
 import ae2.helpers.InventoryAction;
 import ae2.tile.crafting.TileRequester;
@@ -91,7 +90,6 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
         }
 
         if (slot < 0 || slot >= inv.getServer().size()) {
-            AELog.warn("Requester Screen refers to invalid slot {} of {}", slot, inv.getName().getFormattedText());
             return;
         }
 
@@ -144,7 +142,6 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
 
         int requestIndex = slot.getRequestIndex();
         if (requestIndex < 0 || requestIndex >= inv.getServer().size()) {
-            AELog.warn("Requester Screen refers to invalid slot {} of {}", requestIndex, inv.getName().getFormattedText());
             return;
         }
 
@@ -184,6 +181,9 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
             return;
         }
         request.updateAmount(amount);
+        if (amount <= 0) {
+            return;
+        }
         request.updateBatchSize(batchSize);
     }
 

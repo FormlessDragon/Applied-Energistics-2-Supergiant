@@ -48,6 +48,8 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Objects;
+
 public abstract class AbstractMonitorPart extends AbstractDisplayPart implements IStorageMonitorPart {
 
     @Nullable
@@ -72,10 +74,10 @@ public abstract class AbstractMonitorPart extends AbstractDisplayPart implements
             @Override
             public void onStackChange(AEKey what, long amount) {
                 if (what.equals(configuredItem)) {
-                    AbstractMonitorPart.this.amount = amount;
+                    AbstractMonitorPart.this.amount = normalizeAmount(amount);
 
-                    var humanReadableText = amount == 0 && canCraft ? "Craft"
-                        : what.formatAmount(amount, AmountFormat.SLOT);
+                    var humanReadableText = AbstractMonitorPart.this.amount == 0 && canCraft ? "Craft"
+                        : what.formatAmount(AbstractMonitorPart.this.amount, AmountFormat.SLOT);
 
                     if (!humanReadableText.equals(lastHumanReadableText)) {
                         lastHumanReadableText = humanReadableText;
@@ -103,6 +105,10 @@ public abstract class AbstractMonitorPart extends AbstractDisplayPart implements
         });
     }
 
+    private static long normalizeAmount(long amount) {
+        return Math.max(0, amount);
+    }
+
     @Override
     public void readFromNBT(NBTTagCompound data) {
         super.readFromNBT(data);
@@ -110,8 +116,14 @@ public abstract class AbstractMonitorPart extends AbstractDisplayPart implements
 
         if (data.hasKey("configuredItem", 10)) {
             this.configuredItem = AEKey.fromTagGeneric(data.getCompoundTag("configuredItem"));
+            if (this.configuredItem == null) {
+                this.amount = 0;
+                this.canCraft = false;
+            }
         } else {
             this.configuredItem = null;
+            this.amount = 0;
+            this.canCraft = false;
         }
     }
 
@@ -144,14 +156,22 @@ public abstract class AbstractMonitorPart extends AbstractDisplayPart implements
         needRedraw |= this.locked != locked;
         this.locked = locked;
 
+        AEKey oldConfiguredItem = this.configuredItem;
+        long oldAmount = this.amount;
+        boolean oldCanCraft = this.canCraft;
+
         this.configuredItem = AEKey.readOptionalKey(data);
         if (this.configuredItem != null) {
-            this.amount = data.readVarLong();
+            this.amount = normalizeAmount(data.readVarLong());
             this.canCraft = data.readBoolean();
         } else {
             this.amount = 0;
             this.canCraft = false;
         }
+
+        needRedraw |= !Objects.equals(oldConfiguredItem, this.configuredItem)
+            || oldAmount != this.amount
+            || oldCanCraft != this.canCraft;
 
         return needRedraw;
     }
@@ -166,7 +186,7 @@ public abstract class AbstractMonitorPart extends AbstractDisplayPart implements
     @Override
     public void readVisualStateFromNBT(NBTTagCompound data) {
         super.readVisualStateFromNBT(data);
-        this.amount = data.getLong("amount");
+        this.amount = normalizeAmount(data.getLong("amount"));
         this.canCraft = data.getBoolean("canCraft");
     }
 
@@ -193,7 +213,7 @@ public abstract class AbstractMonitorPart extends AbstractDisplayPart implements
     }
 
     @Override
-    public boolean onUseItemOn(ItemStack heldItem, EntityPlayer player, net.minecraft.util.EnumHand hand, Vec3d pos) {
+    public boolean onUseItemOn(ItemStack heldItem, EntityPlayer player, EnumHand hand, Vec3d pos) {
         if (!this.locked && !InteractionUtil.isInAlternateUseMode(player)) {
             if (isClientSide()) {
                 return true;
@@ -246,7 +266,7 @@ public abstract class AbstractMonitorPart extends AbstractDisplayPart implements
     protected void updateReportingValue(IGrid grid) {
         this.lastHumanReadableText = null;
         if (this.configuredItem != null) {
-            this.amount = grid.getStorageService().getCachedInventory().get(this.configuredItem);
+            this.amount = normalizeAmount(grid.getStorageService().getCachedInventory().get(this.configuredItem));
             this.canCraft = grid.getCraftingService().isCraftable(this.configuredItem);
         } else {
             this.amount = 0;

@@ -43,9 +43,9 @@ public class CubeBuilder {
     private final EnumMap<EnumFacing, TextureAtlasSprite> textures = new EnumMap<>(
         EnumFacing.class);
     private final EnumMap<EnumFacing, Vector4f> customUv = new EnumMap<>(EnumFacing.class);
-    private final byte[] uvRotations = new byte[EnumFacing.values().length];
-    private final boolean[] flipU = new boolean[EnumFacing.values().length];
-    private final boolean[] flipV = new boolean[EnumFacing.values().length];
+    private final EnumMap<EnumFacing, Byte> uvRotations = new EnumMap<>(EnumFacing.class);
+    private final EnumSet<EnumFacing> flipU = EnumSet.noneOf(EnumFacing.class);
+    private final EnumSet<EnumFacing> flipV = EnumSet.noneOf(EnumFacing.class);
     private VertexFormat format;
     private EnumSet<EnumFacing> drawFaces = EnumSet.allOf(EnumFacing.class);
     private int color = 0xFFFFFFFF;
@@ -131,13 +131,13 @@ public class CubeBuilder {
             uv = this.getDefaultUv(face, texture, x1, y1, z1, x2, y2, z2);
         }
 
-        if (this.flipV[face.ordinal()]) {
+        if (this.flipV.contains(face)) {
             float tmp = uv.v1;
             uv.v1 = uv.v2;
             uv.v2 = tmp;
         }
 
-        if (this.flipU[face.ordinal()]) {
+        if (this.flipU.contains(face)) {
             float tmp = uv.u1;
             uv.u1 = uv.u2;
             uv.u2 = tmp;
@@ -272,7 +272,7 @@ public class CubeBuilder {
     private void putVertexTL(UnpackedBakedQuad.Builder builder, EnumFacing face, float x, float y, float z,
                              UvVector uv) {
         float u;
-        float v = switch (this.uvRotations[face.ordinal()]) {
+        float v = switch (this.uvRotations.getOrDefault(face, (byte) 0)) {
             case 1 -> {
                 u = uv.u1;
                 yield uv.v2;
@@ -297,7 +297,7 @@ public class CubeBuilder {
     private void putVertexTR(UnpackedBakedQuad.Builder builder, EnumFacing face, float x, float y, float z,
                              UvVector uv) {
         float u;
-        float v = switch (this.uvRotations[face.ordinal()]) {
+        float v = switch (this.uvRotations.getOrDefault(face, (byte) 0)) {
             case 1 -> {
                 u = uv.u1;
                 yield uv.v1;
@@ -322,7 +322,7 @@ public class CubeBuilder {
     private void putVertexBR(UnpackedBakedQuad.Builder builder, EnumFacing face, float x, float y, float z,
                              UvVector uv) {
         float u;
-        float v = switch (this.uvRotations[face.ordinal()]) {
+        float v = switch (this.uvRotations.getOrDefault(face, (byte) 0)) {
             case 1 -> {
                 u = uv.u2;
                 yield uv.v1;
@@ -347,7 +347,7 @@ public class CubeBuilder {
     private void putVertexBL(UnpackedBakedQuad.Builder builder, EnumFacing face, float x, float y, float z,
                              UvVector uv) {
         float u;
-        float v = switch (this.uvRotations[face.ordinal()]) {
+        float v = switch (this.uvRotations.getOrDefault(face, (byte) 0)) {
             case 1 -> {
                 u = uv.u2;
                 yield uv.v2;
@@ -451,11 +451,19 @@ public class CubeBuilder {
     }
 
     public void setFlipV(EnumFacing facing, boolean enable) {
-        this.flipV[facing.ordinal()] = enable;
+        if (enable) {
+            this.flipV.add(facing);
+        } else {
+            this.flipV.remove(facing);
+        }
     }
 
     public void setFlipU(EnumFacing facing, boolean enable) {
-        this.flipU[facing.ordinal()] = enable;
+        if (enable) {
+            this.flipU.add(facing);
+        } else {
+            this.flipU.remove(facing);
+        }
     }
 
     public void setUvRotation(EnumFacing facing, int rotation) {
@@ -465,7 +473,11 @@ public class CubeBuilder {
             rotation = 2;
         }
         Preconditions.checkArgument(rotation >= 0 && rotation <= 3, "rotation");
-        this.uvRotations[facing.ordinal()] = (byte) rotation;
+        if (rotation == 0) {
+            this.uvRotations.remove(facing);
+        } else {
+            this.uvRotations.put(facing, (byte) rotation);
+        }
     }
 
     /**

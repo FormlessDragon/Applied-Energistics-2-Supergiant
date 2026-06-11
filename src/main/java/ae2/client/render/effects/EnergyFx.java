@@ -20,6 +20,7 @@ package ae2.client.render.effects;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.entity.Entity;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
 
@@ -66,7 +67,7 @@ public class EnergyFx extends Particle {
     }
 
     @Override
-    public void renderParticle(BufferBuilder buffer, net.minecraft.entity.Entity entityIn, float partialTicks,
+    public void renderParticle(BufferBuilder buffer, Entity entityIn, float partialTicks,
                                float rotationX, float rotationZ, float rotationYZ, float rotationXY, float rotationXZ) {
         int blockX = MathHelper.floor(this.posX);
         int blockY = MathHelper.floor(this.posY);

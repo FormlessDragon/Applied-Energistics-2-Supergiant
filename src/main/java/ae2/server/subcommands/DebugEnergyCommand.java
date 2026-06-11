@@ -8,6 +8,7 @@ import ae2.hooks.ticking.TickHandler;
 import ae2.me.Grid;
 import ae2.me.service.EnergyService;
 import ae2.server.ISubCommand;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
@@ -63,7 +64,7 @@ public class DebugEnergyCommand implements ISubCommand {
         AEConfig.instance().save();
 
         int gridCount = 0;
-        for (Grid grid : TickHandler.instance().getGridList()) {
+        for (Grid grid : new ObjectArrayList<>(TickHandler.instance().getGridList())) {
             ((EnergyService) grid.getEnergyService()).onCreativePowerModeChanged();
             gridCount++;
         }

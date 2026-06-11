@@ -21,6 +21,7 @@ package ae2.container.implementations;
 import ae2.api.config.CpuSelectionMode;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
+import ae2.api.networking.IManagedGridNode;
 import ae2.api.networking.crafting.ICraftingCPU;
 import ae2.api.networking.security.IActionHost;
 import ae2.api.stacks.AEKey;
@@ -34,11 +35,15 @@ import ae2.container.me.crafting.CraftingStatus;
 import ae2.core.localization.PlayerMessages;
 import ae2.core.network.clientbound.CraftingStatusPacket;
 import ae2.core.network.clientbound.CraftingSupplierLocationsPacket;
+import ae2.crafting.execution.CraftingCpuLogic;
 import ae2.crafting.execution.CraftingSupplierLocation;
+import ae2.hooks.ticking.TickHandler;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
 import ae2.tile.crafting.ICraftingCPUTileEntity;
 import ae2.util.NullConfigManager;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
 import org.jetbrains.annotations.Nullable;
 
@@ -63,6 +68,7 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
     @Nullable
     private CraftingCPUCluster cpu;
     private boolean cachedSuspend;
+    private long nextSupplierTraceTick;
 
     public ContainerCraftingCPU(InventoryPlayer ip, ICraftingCPUTileEntity host) {
         this(ip, (Object) host);
@@ -89,7 +95,7 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
     @Nullable
     private static IGrid extractGrid(Object host) {
         if (host instanceof ICraftingCPUTileEntity craftingUnit) {
-            ae2.api.networking.IManagedGridNode node = craftingUnit.getMainNode();
+            IManagedGridNode node = craftingUnit.getMainNode();
             return node != null ? node.getGrid() : null;
         }
 
@@ -118,7 +124,7 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
 
             KeyCounter allItems = new KeyCounter();
             cluster.craftingLogic.getAllItems(allItems);
-            for (it.unimi.dsi.fastutil.objects.Object2LongMap.Entry<AEKey> entry : allItems) {
+            for (Object2LongMap.Entry<AEKey> entry : allItems) {
                 incrementalUpdateHelper.addChange(entry.getKey());
             }
 
@@ -141,7 +147,7 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
         if (isClientSide()) {
             sendClientAction(ACTION_TOGGLE_SCHEDULING);
         } else if (this.cpu != null) {
-            ae2.crafting.execution.CraftingCpuLogic logic = this.cpu.craftingLogic;
+            CraftingCpuLogic logic = this.cpu.craftingLogic;
             logic.setJobSuspended(!logic.isJobSuspended());
         }
     }
@@ -191,7 +197,7 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
     }
 
     public void traceSupplierForSerial(long serial) {
-        if (!(this.getPlayer() instanceof net.minecraft.entity.player.EntityPlayerMP player)) {
+        if (!(this.getPlayer() instanceof EntityPlayerMP player)) {
             return;
         }
         if (this.cpu == null || this.grid == null) {
@@ -209,6 +215,12 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
         if (activeAmount <= 0 && pendingAmount <= 0) {
             return;
         }
+
+        long currentTick = TickHandler.instance().getCurrentTick();
+        if (currentTick < this.nextSupplierTraceTick) {
+            return;
+        }
+        this.nextSupplierTraceTick = currentTick + 10;
 
         List<CraftingSupplierLocation> locations = logic.findSupplierLocations(this.grid, key);
         if (locations.isEmpty()) {

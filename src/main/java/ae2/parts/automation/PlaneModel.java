@@ -25,7 +25,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.model.IModel;
 import net.minecraftforge.common.model.IModelState;
 import net.minecraftforge.common.model.TRSRTransformation;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -58,7 +58,7 @@ public class PlaneModel implements IModel {
     }
 
     @Override
-    public IBakedModel bake(@NonNull IModelState state, @NonNull VertexFormat format,
+    public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
                             Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         TextureAtlasSprite frontSprite = bakedTextureGetter.apply(this.frontTexture);
         TextureAtlasSprite sidesSprite = bakedTextureGetter.apply(this.sidesTexture);

@@ -21,6 +21,7 @@ package ae2.spatial;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraftforge.common.util.Constants.NBT;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
@@ -43,6 +44,9 @@ public class SpatialStoragePlot {
         this.id = id;
         this.size = size.toImmutable();
         this.owner = owner;
+        if (id < 1) {
+            throw new IllegalArgumentException("Plot id " + id + " must be positive.");
+        }
         if (size.getX() < 1 || size.getY() < 1 || size.getZ() < 1) {
             throw new IllegalArgumentException("Plot size " + size + " is smaller than minimum size.");
         }
@@ -51,12 +55,24 @@ public class SpatialStoragePlot {
         }
     }
 
-    public static SpatialStoragePlot fromTag(NBTTagCompound tag) {
-        SpatialStoragePlot plot = new SpatialStoragePlot(
-            tag.getInteger(TAG_ID),
-            readSizeTag(tag),
-            tag.getInteger(TAG_OWNER));
-        if (tag.hasKey(TAG_LAST_TRANSITION, 10)) {
+    public static @Nullable SpatialStoragePlot fromTag(NBTTagCompound tag) {
+        if (!tag.hasKey(TAG_ID, NBT.TAG_INT)
+            || !tag.hasKey(TAG_OWNER, NBT.TAG_INT)
+            || !hasSizeTag(tag)) {
+            return null;
+        }
+
+        SpatialStoragePlot plot;
+        try {
+            plot = new SpatialStoragePlot(
+                tag.getInteger(TAG_ID),
+                readSizeTag(tag),
+                tag.getInteger(TAG_OWNER));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+
+        if (tag.hasKey(TAG_LAST_TRANSITION, NBT.TAG_COMPOUND)) {
             plot.lastTransition = TransitionInfo.fromTag(tag.getCompoundTag(TAG_LAST_TRANSITION));
         }
         return plot;
@@ -71,11 +87,23 @@ public class SpatialStoragePlot {
     }
 
     private static BlockPos readSizeTag(NBTTagCompound tag) {
-        if (tag.hasKey(TAG_SIZE, 10)) {
+        if (tag.hasKey(TAG_SIZE, NBT.TAG_COMPOUND)) {
             NBTTagCompound sizeTag = tag.getCompoundTag(TAG_SIZE);
             return new BlockPos(sizeTag.getInteger("x"), sizeTag.getInteger("y"), sizeTag.getInteger("z"));
         }
         return new BlockPos(tag.getInteger("sizeX"), tag.getInteger("sizeY"), tag.getInteger("sizeZ"));
+    }
+
+    private static boolean hasSizeTag(NBTTagCompound tag) {
+        if (tag.hasKey(TAG_SIZE, NBT.TAG_COMPOUND)) {
+            NBTTagCompound sizeTag = tag.getCompoundTag(TAG_SIZE);
+            return sizeTag.hasKey("x", NBT.TAG_INT)
+                && sizeTag.hasKey("y", NBT.TAG_INT)
+                && sizeTag.hasKey("z", NBT.TAG_INT);
+        }
+        return tag.hasKey("sizeX", NBT.TAG_INT)
+            && tag.hasKey("sizeY", NBT.TAG_INT)
+            && tag.hasKey("sizeZ", NBT.TAG_INT);
     }
 
     public int getId() {
@@ -95,7 +123,7 @@ public class SpatialStoragePlot {
         return lastTransition;
     }
 
-    void setLastTransition(@org.jspecify.annotations.Nullable TransitionInfo info) {
+    void setLastTransition(@Nullable TransitionInfo info) {
         this.lastTransition = info;
     }
 

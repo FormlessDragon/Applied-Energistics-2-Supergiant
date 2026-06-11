@@ -22,11 +22,11 @@ public interface ItemGuiHostLocator extends GuiHostLocator {
             if (hostInterface.isInstance(guiHost)) {
                 return hostInterface.cast(guiHost);
             } else if (guiHost != null) {
-                AELog.warn("Item in %s of %s did not create a compatible container of type %s: %s",
+                AELog.debug("Item in %s of %s did not create a compatible container of type %s: %s",
                     this, player, hostInterface, guiHost);
             }
         } else {
-            AELog.warn("Item in %s of %s is not an IGuiItem: %s",
+            AELog.debug("Item in %s of %s is not an IGuiItem: %s",
                 this, player, it);
         }
 

@@ -18,6 +18,7 @@
 package ae2.hooks.ticking;
 
 import ae2.util.ChunkPosUtils;
+import ae2.util.EmptyArrays;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
@@ -37,7 +38,7 @@ import java.util.function.Consumer;
 class ServerBlockEntityRepo {
     private final Object2ObjectMap<World, Long2ObjectMap<ObjectList<FirstTickInfo<?>>>> blockEntities = new Object2ObjectOpenHashMap<>();
 
-    void clear() {
+    synchronized void clear() {
         this.blockEntities.clear();
     }
 
@@ -56,18 +57,23 @@ class ServerBlockEntityRepo {
         this.blockEntities.remove(level);
     }
 
-    synchronized void removeChunk(World level, long chunkPos) {
+    synchronized ObjectList<FirstTickInfo<?>> removeChunk(World level, long chunkPos) {
         Long2ObjectMap<ObjectList<FirstTickInfo<?>>> queue = this.blockEntities.get(level);
         if (queue != null) {
-            queue.remove(chunkPos);
+            return queue.remove(chunkPos);
         }
+        return null;
     }
 
-    public Long2ObjectMap<ObjectList<FirstTickInfo<?>>> getBlockEntities(World level) {
-        return this.blockEntities.get(level);
+    synchronized long[] getQueuedChunks(World level) {
+        Long2ObjectMap<ObjectList<FirstTickInfo<?>>> queue = this.blockEntities.get(level);
+        if (queue == null) {
+            return EmptyArrays.EMPTY_LONG_ARRAY;
+        }
+        return queue.keySet().toLongArray();
     }
 
-    public List<ITextComponent> getReport() {
+    public synchronized List<ITextComponent> getReport() {
         List<ITextComponent> result = new ObjectArrayList<>();
 
         for (Object2ObjectMap.Entry<World, Long2ObjectMap<ObjectList<FirstTickInfo<?>>>> levelEntry : this.blockEntities.object2ObjectEntrySet()) {
@@ -76,7 +82,7 @@ class ServerBlockEntityRepo {
             }
 
             result.add(new TextComponentString(levelEntry.getKey().provider.getDimensionType().getName())
-                .setStyle(new net.minecraft.util.text.Style().setBold(true)));
+                .setStyle(new Style().setBold(true)));
 
             for (Long2ObjectMap.Entry<ObjectList<FirstTickInfo<?>>> chunkEntry : levelEntry.getValue().long2ObjectEntrySet()) {
                 result.add(new TextComponentString(ChunkPosUtils.getX(chunkEntry.getLongKey()) + "," + ChunkPosUtils.getZ(chunkEntry.getLongKey()) + ": " + chunkEntry.getValue().size())

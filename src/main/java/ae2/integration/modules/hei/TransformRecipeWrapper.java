@@ -4,6 +4,7 @@ import ae2.api.client.AEKeyRendering;
 import ae2.api.stacks.AEFluidKey;
 import ae2.recipes.transform.TransformCircumstance;
 import ae2.recipes.transform.TransformRecipe;
+import ae2.util.EmptyArrays;
 import com.google.common.base.Splitter;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
@@ -13,6 +14,7 @@ import mezz.jei.api.ingredients.VanillaTypes;
 import mezz.jei.api.recipe.IRecipeWrapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.crafting.Ingredient;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidStack;
@@ -36,11 +38,20 @@ class TransformRecipeWrapper implements IRecipeWrapper {
         this.recipe = recipe;
         ObjectList<List<ItemStack>> inputLists = new ObjectArrayList<>();
         for (var ingredient : this.recipe.getIngredients()) {
-            ItemStack[] stacks = ingredient.getMatchingStacks();
+            ItemStack[] stacks = getMatchingStacks(ingredient);
             inputLists.add(stacks.length == 0 ? ObjectLists.singleton(ItemStack.EMPTY) : Arrays.asList(stacks));
         }
         this.inputs = ObjectLists.unmodifiable(inputLists);
         this.outputs = ObjectLists.singleton(this.recipe.getResultItem());
+    }
+
+    private static ItemStack[] getMatchingStacks(Ingredient ingredient) {
+        if (ingredient == null || ingredient == Ingredient.EMPTY) {
+            return EmptyArrays.EMPTY_ITEM_STACK_ARRAY;
+        }
+
+        ItemStack[] stacks = ingredient.getMatchingStacks();
+        return stacks == null ? EmptyArrays.EMPTY_ITEM_STACK_ARRAY : stacks;
     }
 
     @Override

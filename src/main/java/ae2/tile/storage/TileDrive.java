@@ -41,12 +41,13 @@ import ae2.util.inv.AppEngCellInventory;
 import ae2.util.inv.AppEngInternalInventory;
 import ae2.util.inv.filter.IAEItemFilter;
 import io.netty.buffer.ByteBuf;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
@@ -97,13 +98,38 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
         }
     }
 
+    private static boolean isValidCellSlot(int slot) {
+        return slot >= 0 && slot < CELL_COUNT;
+    }
+
+    @Override
+    public void loadTag(NBTTagCompound data) {
+        super.loadTag(data);
+        this.isCached = false;
+        this.priority = data.getInteger("priority");
+    }
+
+    @Override
+    public void saveAdditional(NBTTagCompound data) {
+        this.inv.persist();
+        super.saveAdditional(data);
+        data.setInteger("priority", this.priority);
+    }
+
+    @Override
+    public int getCellCount() {
+        return CELL_COUNT;
+    }
+
     @Override
     protected boolean readFromStream(ByteBuf data) {
         boolean changed = super.readFromStream(data);
 
         int packedState = data.readInt();
+        CellState[] cellStates = CellState.values();
         for (int i = 0; i < CELL_COUNT; i++) {
-            var state = CellState.values()[(packedState >> (i * 3)) & 0b111];
+            int stateIndex = (packedState >> (i * 3)) & 0b111;
+            CellState state = stateIndex < cellStates.length ? cellStates[stateIndex] : CellState.ABSENT;
             if (clientCellState[i] != state) {
                 clientCellState[i] = state;
                 changed = true;
@@ -128,35 +154,6 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
     }
 
     @Override
-    public void loadTag(NBTTagCompound data) {
-        super.loadTag(data);
-        this.isCached = false;
-        this.priority = data.getInteger("priority");
-    }
-
-    @Override
-    public void saveAdditional(NBTTagCompound data) {
-        this.inv.persist();
-        super.saveAdditional(data);
-        data.setInteger("priority", this.priority);
-    }
-
-    @Override
-    public int getCellCount() {
-        return CELL_COUNT;
-    }
-
-    @Override
-    public CellState getCellStatus(int slot) {
-        if (isClientSide()) {
-            return clientCellState[slot];
-        }
-
-        var handler = invBySlot[slot];
-        return handler != null ? handler.getStatus() : CellState.ABSENT;
-    }
-
-    @Override
     public boolean isPowered() {
         if (isClientSide()) {
             return clientPowered;
@@ -169,9 +166,25 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
         return false;
     }
 
+    @Override
+    public CellState getCellStatus(int slot) {
+        if (!isValidCellSlot(slot)) {
+            return CellState.ABSENT;
+        }
+        if (isClientSide()) {
+            return clientCellState[slot];
+        }
+
+        var handler = invBySlot[slot];
+        return handler != null ? handler.getStatus() : CellState.ABSENT;
+    }
+
     @Nullable
     @Override
     public Item getCellItem(int slot) {
+        if (!isValidCellSlot(slot)) {
+            return null;
+        }
         if (isClientSide()) {
             return clientCellItems[slot];
         }
@@ -183,13 +196,10 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
     @Nullable
     @Override
     public MEStorage getCellInventory(int slot) {
+        if (!isValidCellSlot(slot)) {
+            return null;
+        }
         return invBySlot[slot];
-    }
-
-    @Nullable
-    @Override
-    public StorageCell getOriginalCellInventory(int slot) {
-        return invBySlot[slot] != null ? invBySlot[slot].getCell() : null;
     }
 
     @Override
@@ -255,9 +265,13 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
         saveChanges();
     }
 
+    @Nullable
     @Override
-    public void returnToMainContainer(net.minecraft.entity.player.EntityPlayer player, ISubGui subGui) {
-        GuiOpener.openGui(player, GuiIds.GuiKey.DRIVE, this, true);
+    public StorageCell getOriginalCellInventory(int slot) {
+        if (!isValidCellSlot(slot)) {
+            return null;
+        }
+        return invBySlot[slot] != null ? invBySlot[slot].getCell() : null;
     }
 
     @Override
@@ -294,6 +308,11 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
     private void onCellContentChanged() {
         saveChanges();
         updateVisualState();
+    }
+
+    @Override
+    public void returnToMainContainer(EntityPlayer player, ISubGui subGui) {
+        GuiOpener.openGui(player, GuiIds.GuiKey.DRIVE, this, true);
     }
 
     private void updateVisualState() {
@@ -340,7 +359,7 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
 
     private static class CellValidInventoryFilter implements IAEItemFilter {
         @Override
-        public boolean allowInsert(ae2.api.inventories.InternalInventory inv, int slot, ItemStack stack) {
+        public boolean allowInsert(InternalInventory inv, int slot, ItemStack stack) {
             return !stack.isEmpty() && StorageCells.isCellHandled(stack);
         }
 

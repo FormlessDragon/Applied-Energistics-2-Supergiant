@@ -5,13 +5,11 @@ import ae2.api.stacks.GenericStack;
 import ae2.client.gui.PreviousExternalGui;
 import ae2.container.me.common.MEIngredientAction;
 import ae2.core.localization.GuiText;
-import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.HeiIngredientActionPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.text.ITextComponent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.client.settings.KeyConflictContext;
 import net.minecraftforge.client.settings.KeyModifier;
@@ -24,6 +22,8 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
+
+import java.util.function.Consumer;
 
 @SideOnly(Side.CLIENT)
 final class HeiClientFeatures {
@@ -68,11 +68,11 @@ final class HeiClientFeatures {
             return;
         }
 
-        addTooltipLine(event, GuiText.HeiRetrieveIngredientTooltip.text(getKeyText(RETRIEVE)));
-        addTooltipLine(event, GuiText.HeiCraftIngredientTooltip.text(getKeyText(CRAFT)));
+        addTooltipLine(event, GuiText.HeiRetrieveIngredientTooltip.getLocal(getKeyText(RETRIEVE)));
+        addTooltipLine(event, GuiText.HeiCraftIngredientTooltip.getLocal(getKeyText(CRAFT)));
     }
 
-    private static void handleInput(int eventKey, java.util.function.Consumer<Boolean> cancelEvent) {
+    private static void handleInput(int eventKey, Consumer<Boolean> cancelEvent) {
         MEIngredientAction action = getAction(eventKey);
         if (action == null) {
             return;
@@ -116,8 +116,8 @@ final class HeiClientFeatures {
         return runtime.getBookmarkOverlay().getIngredientUnderMouse();
     }
 
-    private static void addTooltipLine(ItemTooltipEvent event, ITextComponent line) {
-        event.getToolTip().add(Tooltips.of(line).getFormattedText());
+    private static void addTooltipLine(ItemTooltipEvent event, String line) {
+        event.getToolTip().add(line);
     }
 
     private static String getKeyText(KeyBinding keyBinding) {

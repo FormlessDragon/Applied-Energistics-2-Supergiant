@@ -1,6 +1,7 @@
 package ae2.crafting.pattern;
 
 import ae2.api.crafting.IPatternDetails;
+import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.crafting.PatternDetailsTooltip;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
@@ -14,6 +15,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -41,8 +43,17 @@ public class AEProcessingPattern implements IPatternDetails {
             throw new IllegalArgumentException("Given item does not encode a processing pattern: " + definition);
         }
 
-        this.sparseInputs = readGenericStackList(encodedPattern.getTagList("inputs", 10));
-        this.sparseOutputs = readGenericStackList(encodedPattern.getTagList("outputs", 10));
+        this.sparseInputs = readGenericStackList(encodedPattern.getTagList("inputs", Constants.NBT.TAG_COMPOUND));
+        this.sparseOutputs = readGenericStackList(encodedPattern.getTagList("outputs", Constants.NBT.TAG_COMPOUND));
+        validateSparseStacks(this.sparseInputs, MAX_INPUT_SLOTS, "input");
+        validateSparseStacks(this.sparseOutputs, MAX_OUTPUT_SLOTS, "output");
+        if (!hasAnyStack(this.sparseInputs)) {
+            throw new IllegalArgumentException("At least one input must be non-null.");
+        }
+        if (this.sparseOutputs.isEmpty()) {
+            throw new IllegalArgumentException("At least one output must be present.");
+        }
+        Objects.requireNonNull(this.sparseOutputs.getFirst(), "The first (primary) output must be non-null.");
         this.recipeTypeUid = encodedPattern.hasKey(TAG_RECIPE_TYPE_UID, 8)
             ? encodedPattern.getString(TAG_RECIPE_TYPE_UID)
             : null;
@@ -61,8 +72,11 @@ public class AEProcessingPattern implements IPatternDetails {
 
     public static void encode(ItemStack stack, List<GenericStack> sparseInputs, List<GenericStack> sparseOutputs,
                               @Nullable String recipeTypeUid) {
-        if (sparseInputs.stream().noneMatch(Objects::nonNull)) {
+        if (!hasAnyStack(sparseInputs)) {
             throw new IllegalArgumentException("At least one input must be non-null.");
+        }
+        if (sparseOutputs.isEmpty()) {
+            throw new IllegalArgumentException("At least one output must be present.");
         }
         Objects.requireNonNull(sparseOutputs.getFirst(), "The first (primary) output must be non-null.");
 
@@ -81,8 +95,16 @@ public class AEProcessingPattern implements IPatternDetails {
         var encoded = stack.getTagCompound();
         if (encoded != null && encoded.hasKey(ENCODED_PROCESSING_PATTERN, 10)) {
             var tag = encoded.getCompoundTag(ENCODED_PROCESSING_PATTERN);
-            readGenericStackList(tag.getTagList("inputs", 10)).stream().filter(Objects::nonNull).forEach(tooltip::addInput);
-            readGenericStackList(tag.getTagList("outputs", 10)).stream().filter(Objects::nonNull).forEach(tooltip::addOutput);
+            for (GenericStack input : readGenericStackList(tag.getTagList("inputs", 10))) {
+                if (input != null) {
+                    tooltip.addInput(input);
+                }
+            }
+            for (GenericStack output : readGenericStackList(tag.getTagList("outputs", 10))) {
+                if (output != null) {
+                    tooltip.addOutput(output);
+                }
+            }
             addRecipeTypeProperty(tooltip, tag.hasKey(TAG_RECIPE_TYPE_UID, 8) ? tag.getString(TAG_RECIPE_TYPE_UID) : null);
         }
         return tooltip;
@@ -115,6 +137,29 @@ public class AEProcessingPattern implements IPatternDetails {
 
     private static List<GenericStack> readGenericStackList(NBTTagList list) {
         return GenericStack.readList(list);
+    }
+
+    private static boolean hasAnyStack(List<GenericStack> stacks) {
+        for (GenericStack stack : stacks) {
+            if (stack != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void validateSparseStacks(List<GenericStack> stacks, int maxSlots, String role) {
+        if (stacks.size() > maxSlots) {
+            throw new IllegalArgumentException("Processing pattern has too many " + role + " slots.");
+        }
+        for (GenericStack stack : stacks) {
+            if (stack == null) {
+                continue;
+            }
+            if (stack.amount() <= 0 || stack.amount() > PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT) {
+                throw new IllegalArgumentException("Processing pattern " + role + " amount is out of range.");
+            }
+        }
     }
 
     @Override

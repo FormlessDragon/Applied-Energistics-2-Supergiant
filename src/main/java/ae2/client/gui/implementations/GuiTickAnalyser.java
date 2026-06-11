@@ -47,7 +47,7 @@ public class GuiTickAnalyser extends AEBaseGui<ContainerTickAnalyser> {
             sendConfig();
         });
         loadConfig(container.getConfig());
-        InitNetwork.sendToServer(new AnalyserGenericPacket("update"));
+        InitNetwork.sendToServer(new AnalyserGenericPacket(this.container.windowId, "update"));
     }
 
     public void loadConfig(TickAnalyserConfig config) {
@@ -101,8 +101,9 @@ public class GuiTickAnalyser extends AEBaseGui<ContainerTickAnalyser> {
     }
 
     private void sendConfig() {
-        InitNetwork.sendToServer(new TickConfigSavePacket(new TickAnalyserConfig(this.duration, this.enabled[0],
-            this.enabled[1], this.enabled[2], this.enabled[3])));
+        InitNetwork.sendToServer(new TickConfigSavePacket(this.container.windowId,
+            new TickAnalyserConfig(this.duration, this.enabled[0], this.enabled[1], this.enabled[2],
+                this.enabled[3])));
     }
 
     private boolean isNumberInput(char typedChar, int keyCode) {

@@ -21,6 +21,7 @@ package ae2.debug;
 import ae2.api.networking.GridHelper;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IManagedGridNode;
+import ae2.me.helpers.TileNodeListener;
 import ae2.tile.grid.AENetworkedTile;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
@@ -35,7 +36,7 @@ public class TilePhantomNode extends AENetworkedTile {
     @Override
     public void onReady() {
         super.onReady();
-        this.proxy = GridHelper.createManagedNode(this, ae2.me.helpers.TileNodeListener.INSTANCE)
+        this.proxy = GridHelper.createManagedNode(this, TileNodeListener.INSTANCE)
                                .setInWorldNode(true)
                                .setVisualRepresentation(getItemFromTile());
         this.proxy.create(getWorld(), getPos());

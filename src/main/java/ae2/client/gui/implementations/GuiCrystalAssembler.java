@@ -9,10 +9,10 @@ import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.ProgressBar;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
+import ae2.container.GuiIds;
 import ae2.container.implementations.ContainerCrystalAssembler;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
-import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.SwitchGuisPacket;
 import ae2.tile.misc.TileCrystalAssembler;
@@ -21,11 +21,15 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
+
+import java.util.List;
 
 public class GuiCrystalAssembler extends GuiUpgradeable<ContainerCrystalAssembler> {
     private final ProgressBar progressBar;
     private final SettingToggleButton<YesNo> autoExportBtn;
     private final IconButton outputSidesBtn;
+    private String lastProgressText = "";
 
     public GuiCrystalAssembler(ContainerCrystalAssembler container, InventoryPlayer playerInventory,
                                ITextComponent title, GuiStyle style) {
@@ -44,8 +48,8 @@ public class GuiCrystalAssembler extends GuiUpgradeable<ContainerCrystalAssemble
             }
 
             @Override
-            public java.util.List<net.minecraft.util.text.ITextComponent> getTooltipMessage() {
-                return java.util.List.of(
+            public List<ITextComponent> getTooltipMessage() {
+                return List.of(
                     ButtonToolTips.OutputSideConfig.text(),
                     ButtonToolTips.OutputSideConfigHint.text());
             }
@@ -57,9 +61,16 @@ public class GuiCrystalAssembler extends GuiUpgradeable<ContainerCrystalAssemble
         super.updateBeforeRender();
         int maxProgress = this.container.getMaxProgress();
         int progress = maxProgress > 0 ? this.container.getCurrentProgress() * 100 / maxProgress : 0;
-        this.progressBar.setFullMsg(new TextComponentString(progress + "%"));
+        updateProgressTooltip(progress + "%");
         this.autoExportBtn.set(this.container.getAutoExport());
         this.outputSidesBtn.setVisibility(this.container.getAutoExport() == YesNo.YES);
+    }
+
+    private void updateProgressTooltip(String progressText) {
+        if (!progressText.equals(this.lastProgressText)) {
+            this.lastProgressText = progressText;
+            this.progressBar.setFullMsg(new TextComponentString(progressText));
+        }
     }
 
     @Override
@@ -70,8 +81,8 @@ public class GuiCrystalAssembler extends GuiUpgradeable<ContainerCrystalAssemble
             var tooltip = new ObjectArrayList<>(getItemToolTip(slot.getStack()));
             GenericStack unwrapped = GenericStack.fromItemStack(slot.getStack());
             long amount = unwrapped == null ? 0 : unwrapped.amount();
-            tooltip.add(Tooltips.of(GuiText.CrystalAssemblerAmount.text(amount,
-                TileCrystalAssembler.TANK_CAPACITY)).getFormattedText());
+            tooltip.add(TextFormatting.GRAY + GuiText.CrystalAssemblerAmount.getLocal(amount,
+                TileCrystalAssembler.TANK_CAPACITY));
             drawTooltipLines(mouseX, mouseY, tooltip);
             return;
         }
@@ -79,6 +90,6 @@ public class GuiCrystalAssembler extends GuiUpgradeable<ContainerCrystalAssemble
     }
 
     private void openOutputSides() {
-        InitNetwork.sendToServer(SwitchGuisPacket.openSubGui(ae2.container.GuiIds.GuiKey.OUTPUT_SIDES));
+        InitNetwork.sendToServer(SwitchGuisPacket.openSubGui(GuiIds.GuiKey.OUTPUT_SIDES));
     }
 }

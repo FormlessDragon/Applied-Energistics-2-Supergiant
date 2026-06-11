@@ -37,7 +37,12 @@ public class CraftConfirmPlanPacket extends ClientboundPacket {
 
     @Override
     protected void read(ByteBuf buf) {
-        this.plan = CraftingPlanSummary.read(new PacketBuffer(buf));
+        try {
+            this.plan = CraftingPlanSummary.read(new PacketBuffer(buf));
+        } catch (RuntimeException e) {
+            this.plan = null;
+            buf.skipBytes(buf.readableBytes());
+        }
     }
 
     @Override
@@ -47,7 +52,8 @@ public class CraftConfirmPlanPacket extends ClientboundPacket {
 
     @Override
     public void handleClient(Minecraft minecraft) {
-        if (minecraft.player != null && minecraft.player.openContainer instanceof ContainerCraftConfirm container) {
+        if (this.plan != null && minecraft.player != null
+            && minecraft.player.openContainer instanceof ContainerCraftConfirm container) {
             container.setPlan(this.plan);
         }
     }

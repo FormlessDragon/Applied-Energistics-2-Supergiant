@@ -19,7 +19,7 @@ public class EncodedPatternBakedModel extends DelegateBakedModel {
                                            EntityLivingBase entity) {
             if (GuiScreen.isShiftKeyDown() && stack.getItem() instanceof EncodedPatternItem<?> encodedPattern) {
                 World level = world != null ? world : Minecraft.getMinecraft().world;
-                ItemStack output = encodedPattern.getOutput(stack, level);
+                ItemStack output = level != null ? encodedPattern.getOutput(stack, level) : ItemStack.EMPTY;
                 if (!output.isEmpty()) {
                     return Minecraft.getMinecraft().getRenderItem()
                                     .getItemModelWithOverrides(output, world, entity);

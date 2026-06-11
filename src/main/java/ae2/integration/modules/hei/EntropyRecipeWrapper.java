@@ -4,10 +4,12 @@ import ae2.core.localization.HeiText;
 import ae2.items.tools.powered.EntropyManipulatorItem;
 import ae2.recipes.entropy.EntropyRecipe;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
 import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.ingredients.VanillaTypes;
 import mezz.jei.api.recipe.IRecipeWrapper;
+import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.init.Blocks;
@@ -17,7 +19,7 @@ import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidRegistry;
 import net.minecraftforge.fluids.FluidStack;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.List;
 
@@ -57,7 +59,7 @@ class EntropyRecipeWrapper implements IRecipeWrapper {
             && (this.outputFluid.getFluid() == FluidRegistry.WATER || this.outputFluid.getFluid() == FluidRegistry.LAVA)
             && isFlowingBlock(outputBlock);
 
-        it.unimi.dsi.fastutil.objects.ObjectList<ItemStack> outputs = new ObjectArrayList<>();
+        ObjectList<ItemStack> outputs = new ObjectArrayList<>();
         if (this.outputConsumed) {
             if (this.inputItem != null && !this.inputItem.isEmpty()) {
                 outputs.add(this.inputItem.copy());
@@ -74,7 +76,7 @@ class EntropyRecipeWrapper implements IRecipeWrapper {
         this.outputItems = ObjectLists.unmodifiable(outputs);
     }
 
-    private static ItemStack createBlockStack(@Nullable net.minecraft.block.Block block, int metadata) {
+    private static ItemStack createBlockStack(@Nullable Block block, int metadata) {
         if (block == null) {
             return ItemStack.EMPTY;
         }
@@ -84,7 +86,7 @@ class EntropyRecipeWrapper implements IRecipeWrapper {
     }
 
     @Nullable
-    private static FluidStack getFluidStack(@Nullable net.minecraft.block.Block block) {
+    private static FluidStack getFluidStack(@Nullable Block block) {
         if (block == null) {
             return null;
         }
@@ -93,7 +95,7 @@ class EntropyRecipeWrapper implements IRecipeWrapper {
         return fluid == null ? null : new FluidStack(fluid, Fluid.BUCKET_VOLUME);
     }
 
-    private static boolean isFlowingBlock(@Nullable net.minecraft.block.Block block) {
+    private static boolean isFlowingBlock(@Nullable Block block) {
         return block == Blocks.FLOWING_WATER || block == Blocks.FLOWING_LAVA;
     }
 

@@ -71,19 +71,11 @@ public class ContainerMolecularAssembler extends AEBaseContainer
         return this.host;
     }
 
-    @Override
-    public void broadcastChanges() {
-        if (isServerSide()) {
-            this.craftProgress = this.host.getCraftingProgress();
-            this.showInAccessTerminal = this.host.getConfigManager().getSetting(Settings.PATTERN_ACCESS_TERMINAL);
-            this.activePatternSlots = this.host.getActivePatternSlots();
-            this.pageCount = this.host.getPatternPageCount();
-            this.currentPage = Math.min(this.currentPage, this.pageCount - 1);
-            this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
+    private static int clampPage(int page, int pageCount) {
+        if (pageCount <= 0) {
+            return 0;
         }
-
-        this.updatePatternSlotState();
-        super.broadcastChanges();
+        return Math.clamp(page, 0, pageCount - 1);
     }
 
     @Override
@@ -151,12 +143,27 @@ public class ContainerMolecularAssembler extends AEBaseContainer
         return this.patternModifierPanel;
     }
 
+    @Override
+    public void broadcastChanges() {
+        if (isServerSide()) {
+            this.craftProgress = this.host.getCraftingProgress();
+            this.showInAccessTerminal = this.host.getConfigManager().getSetting(Settings.PATTERN_ACCESS_TERMINAL);
+            this.activePatternSlots = this.host.getActivePatternSlots();
+            this.pageCount = this.host.getPatternPageCount();
+            this.currentPage = clampPage(this.currentPage, this.pageCount);
+            this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
+        }
+
+        this.updatePatternSlotState();
+        super.broadcastChanges();
+    }
+
     public void setPage(int page) {
         if (isClientSide()) {
             sendClientAction(ACTION_SET_PAGE, page);
             return;
         }
-        this.currentPage = Math.clamp(page, 0, this.host.getPatternPageCount() - 1);
+        this.currentPage = clampPage(page, this.host.getPatternPageCount());
         this.updatePatternSlotState();
         this.detectAndSendChanges();
     }

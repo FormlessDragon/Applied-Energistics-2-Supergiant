@@ -10,9 +10,12 @@ import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.recipe.IRecipeCategory;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 
-import javax.annotation.Nonnull;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
 
 class CrystalFixerRecipeCategory implements IRecipeCategory<CrystalFixerRecipeWrapper> {
     static final String UID = "ae2.crystal_fixer";
@@ -47,20 +50,23 @@ class CrystalFixerRecipeCategory implements IRecipeCategory<CrystalFixerRecipeWr
     }
 
     @Override
-    public void drawExtras(@Nonnull Minecraft minecraft) {
+    public void drawExtras(@NotNull Minecraft minecraft) {
         GlStateManager.color(1, 1, 1, 1);
         minecraft.getRenderItem().renderItemAndEffectIntoGUI(AEBlocks.CRYSTAL_FIXER.stack(), 49, 32);
     }
 
     @Override
-    public void setRecipe(IRecipeLayout recipeLayout, @Nonnull CrystalFixerRecipeWrapper recipeWrapper,
-                          @Nonnull IIngredients ingredients) {
+    public void setRecipe(IRecipeLayout recipeLayout, @NotNull CrystalFixerRecipeWrapper recipeWrapper,
+                          @NotNull IIngredients ingredients) {
         IGuiItemStackGroup itemStacks = recipeLayout.getItemStacks();
         itemStacks.init(0, true, 0, 18);
         itemStacks.init(1, true, 48, 11);
         itemStacks.init(2, false, 96, 18);
         itemStacks.set(0, recipeWrapper.getInput());
-        itemStacks.set(1, recipeWrapper.getFuelInputs().getFirst());
+        List<List<ItemStack>> fuelInputs = recipeWrapper.getFuelInputs();
+        if (!fuelInputs.isEmpty()) {
+            itemStacks.set(1, fuelInputs.getFirst());
+        }
         itemStacks.set(2, recipeWrapper.getOutput());
     }
 }

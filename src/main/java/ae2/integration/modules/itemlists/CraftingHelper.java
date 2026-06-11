@@ -1,5 +1,6 @@
 package ae2.integration.modules.itemlists;
 
+import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
@@ -9,6 +10,7 @@ import ae2.container.me.items.ContainerCraftingTerm;
 import ae2.core.AELog;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.FillCraftingGridFromRecipePacket;
+import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.util.CraftingRecipeUtil;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.item.ItemStack;
@@ -23,6 +25,7 @@ import java.util.List;
 
 public final class CraftingHelper {
     private static final int CRAFTING_GRID_SIZE = 9;
+    private static final int MAX_INGREDIENT_ALTERNATIVES = 256;
 
     private CraftingHelper() {
     }
@@ -52,18 +55,24 @@ public final class CraftingHelper {
             recipeId = null;
         }
 
-        InitNetwork.sendToServer(new FillCraftingGridFromRecipePacket(recipeId, templateItems, craftMissing,
-            temporaryPseudoInputs, temporaryPseudoOutputs));
+        InitNetwork.sendToServer(new FillCraftingGridFromRecipePacket(container.windowId, recipeId,
+            normalizeTemplateItems(templateItems), craftMissing,
+            filterGenericStacks(temporaryPseudoInputs, AEProcessingPattern.MAX_INPUT_SLOTS),
+            filterGenericStacks(temporaryPseudoOutputs, AEProcessingPattern.MAX_OUTPUT_SLOTS)));
     }
 
     private static List<List<ItemStack>> findTemplateItems(IRecipe recipe, ContainerCraftingTerm container) {
         List<List<ItemStack>> templateItems = createEmptyTemplateList();
+        if (recipe == null) {
+            return templateItems;
+        }
+
         NonNullList<Ingredient> ingredients = CraftingRecipeUtil.ensure3by3CraftingMatrix(recipe);
         IClientRepo clientRepo = container.getClientRepo();
 
         for (int i = 0; i < ingredients.size(); i++) {
             Ingredient ingredient = ingredients.get(i);
-            if (ingredient == Ingredient.EMPTY) {
+            if (i >= templateItems.size() || ingredient == null || ingredient == Ingredient.EMPTY) {
                 continue;
             }
 
@@ -82,6 +91,9 @@ public final class CraftingHelper {
         }
 
         ItemStack[] matchingStacks = ingredient.getMatchingStacks();
+        if (matchingStacks == null) {
+            return templates;
+        }
         for (ItemStack matchingStack : matchingStacks) {
             if (matchingStack == null || matchingStack.isEmpty() || containsEquivalentStack(templates, matchingStack)) {
                 continue;
@@ -98,6 +110,9 @@ public final class CraftingHelper {
             AEItemKey bestKey = null;
 
             for (GridInventoryEntry entry : clientRepo.getByIngredient(ingredient)) {
+                if (entry == null) {
+                    continue;
+                }
                 AEKey what = entry.what();
                 if (!(what instanceof AEItemKey itemKey)) {
                     continue;
@@ -121,6 +136,9 @@ public final class CraftingHelper {
         }
 
         ItemStack[] matchingStacks = ingredient.getMatchingStacks();
+        if (matchingStacks == null) {
+            return ItemStack.EMPTY;
+        }
         return matchingStacks.length > 0 ? matchingStacks[0].copy() : ItemStack.EMPTY;
     }
 
@@ -137,8 +155,49 @@ public final class CraftingHelper {
         List<List<ItemStack>> result = createEmptyTemplateList();
         for (int i = 0; i < templateItems.size() && i < result.size(); i++) {
             ItemStack template = templateItems.get(i);
-            if (!template.isEmpty()) {
+            if (template != null && !template.isEmpty()) {
                 result.get(i).add(template.copy());
+            }
+        }
+        return result;
+    }
+
+    private static List<List<ItemStack>> normalizeTemplateItems(List<List<ItemStack>> templateItems) {
+        List<List<ItemStack>> result = createEmptyTemplateList();
+        if (templateItems == null) {
+            return result;
+        }
+
+        for (int i = 0; i < templateItems.size() && i < result.size(); i++) {
+            List<ItemStack> stacks = templateItems.get(i);
+            if (stacks == null) {
+                continue;
+            }
+            for (ItemStack stack : stacks) {
+                if (stack != null && !stack.isEmpty() && !containsEquivalentStack(result.get(i), stack)) {
+                    result.get(i).add(stack.copy());
+                    if (result.get(i).size() >= MAX_INGREDIENT_ALTERNATIVES) {
+                        break;
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    private static List<GenericStack> filterGenericStacks(List<GenericStack> stacks, int maxSize) {
+        List<GenericStack> result = new ObjectArrayList<>(maxSize);
+        if (stacks == null) {
+            return result;
+        }
+
+        for (GenericStack stack : stacks) {
+            if (stack != null && stack.what() != null && stack.amount() > 0
+                && stack.amount() <= PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT) {
+                result.add(stack);
+                if (result.size() >= maxSize) {
+                    break;
+                }
             }
         }
         return result;

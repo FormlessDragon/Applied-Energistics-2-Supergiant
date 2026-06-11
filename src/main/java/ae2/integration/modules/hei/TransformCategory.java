@@ -7,8 +7,10 @@ import mezz.jei.api.IGuiHelper;
 import mezz.jei.api.gui.IDrawable;
 import mezz.jei.api.gui.IGuiItemStackGroup;
 import mezz.jei.api.gui.IRecipeLayout;
+import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.recipe.IRecipeCategory;
 import net.minecraft.client.Minecraft;
+import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fluids.Fluid;
@@ -66,7 +68,7 @@ class TransformCategory implements IRecipeCategory<TransformRecipeWrapper> {
 
     @Override
     public void setRecipe(IRecipeLayout recipeLayout, TransformRecipeWrapper recipeWrapper,
-                          mezz.jei.api.ingredients.IIngredients ingredients) {
+                          IIngredients ingredients) {
         IGuiItemStackGroup itemStacks = recipeLayout.getItemStacks();
         List<List<ItemStack>> inputs = recipeWrapper.getInputs();
         Layout layout = Layout.create();
@@ -104,7 +106,7 @@ class TransformCategory implements IRecipeCategory<TransformRecipeWrapper> {
             itemStacks.init(catalystSlot, true, layout.catalystX(), layout.yOffset());
             itemStacks.setBackground(catalystSlot, this.slotDrawable);
             itemStacks.set(catalystSlot,
-                List.of(AEBlocks.TINY_TNT.stack(), new ItemStack(net.minecraft.init.Blocks.TNT)));
+                List.of(AEBlocks.TINY_TNT.stack(), new ItemStack(Blocks.TNT)));
         }
 
         itemStacks.init(200, false, layout.outputX(), layout.yOffset());

@@ -26,6 +26,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
@@ -59,7 +60,7 @@ public class ConfigModifierItem extends AEBaseItem implements IGuiItem {
             return Settings.DEFAULT;
         }
         Mode mode = Mode.byName(tag.getString(MODE_TAG));
-        long data = tag.hasKey(DATA_TAG) ? tag.getLong(DATA_TAG) : Settings.DEFAULT.data();
+        long data = tag.hasKey(DATA_TAG, Constants.NBT.TAG_ANY_NUMERIC) ? tag.getLong(DATA_TAG) : Settings.DEFAULT.data();
         return new Settings(mode, data);
     }
 
@@ -145,11 +146,31 @@ public class ConfigModifierItem extends AEBaseItem implements IGuiItem {
             return Settings.DEFAULT.mode();
         }
 
+        private static long addClamped(long value, long data, long max) {
+            if (data <= 0) {
+                return Math.min(value, max);
+            }
+            if (value >= max || data >= max - value) {
+                return max;
+            }
+            return value + data;
+        }
+
+        private static long multiplyClamped(long value, long data, long max) {
+            if (value <= 0 || data <= 0) {
+                return 0;
+            }
+            if (value >= max || data > max / value) {
+                return max;
+            }
+            return value * data;
+        }
+
         public long modify(long value, long data, long min, long max) {
             return switch (this) {
-                case ADD -> Math.min(value + data, max);
+                case ADD -> addClamped(value, data, max);
                 case SUB -> Math.max(value - data, min);
-                case MUL -> Math.min(value * data, max);
+                case MUL -> multiplyClamped(value, data, max);
                 case DIV -> Math.max(value / Math.max(data, 1), min);
                 case MAX -> max;
                 case MIN -> min;
@@ -169,5 +190,13 @@ public class ConfigModifierItem extends AEBaseItem implements IGuiItem {
 
     public record Settings(Mode mode, long data) {
         public static final Settings DEFAULT = new Settings(Mode.MUL, 1);
+
+        public Settings {
+            data = normalizeData(data);
+        }
+
+        public static long normalizeData(long data) {
+            return Math.max(data, 0);
+        }
     }
 }

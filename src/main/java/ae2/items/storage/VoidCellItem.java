@@ -26,9 +26,6 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.RayTraceResult;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.Style;
-import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
@@ -45,28 +42,30 @@ public class VoidCellItem extends AEBaseItem implements ICellWorkbenchItem, ISta
         this.setMaxStackSize(1);
     }
 
-    private static ITextComponent createUsageLine(ITextComponent prefix) {
-        return prefix.appendText(" / ").appendSibling(obfuscatedMax());
+    private static String createUsageLine() {
+        return GuiText.BytesUsed.getLocal(numberText())
+            + TextFormatting.RESET + " / "
+            + obfuscatedMaxText();
     }
 
-    private static ITextComponent createTypesLine() {
-        return number()
-            .appendText(" ")
-            .appendSibling(GuiText.Of.text())
-            .appendText(" ")
-            .appendSibling(obfuscatedMax())
-            .appendText(" ")
-            .appendSibling(GuiText.Types.text());
+    private static String createTypesLine() {
+        return TextFormatting.LIGHT_PURPLE + "0 "
+            + GuiText.Of.getLocal() + " "
+            + obfuscatedMaxText()
+            + TextFormatting.LIGHT_PURPLE + " "
+            + GuiText.Types.getLocal()
+            + TextFormatting.RESET;
     }
 
-    private static ITextComponent number() {
-        return new TextComponentString("0").setStyle(
-            new Style().setColor(TextFormatting.LIGHT_PURPLE).setItalic(false));
+    private static String numberText() {
+        return TextFormatting.LIGHT_PURPLE + "0" + TextFormatting.RESET;
     }
 
-    private static ITextComponent obfuscatedMax() {
-        return new TextComponentString("9999").setStyle(
-            new Style().setColor(TextFormatting.DARK_RED).setObfuscated(true).setItalic(false));
+    private static String obfuscatedMaxText() {
+        return TextFormatting.DARK_RED.toString()
+            + TextFormatting.OBFUSCATED
+            + "9999"
+            + TextFormatting.RESET;
     }
 
     @Override
@@ -155,14 +154,10 @@ public class VoidCellItem extends AEBaseItem implements ICellWorkbenchItem, ISta
     @Override
     public void addToTooltip(ItemStack stack, List<String> lines) {
         CondenserOutput mode = getMode(stack);
-        lines.add(GuiText.voidCellMode(mode).text()
-            .setStyle(new Style().setColor(TextFormatting.GREEN).setItalic(false))
-            .getFormattedText());
-        lines.add(GuiText.VoidCellOpenGui.text()
-            .setStyle(new Style().setColor(TextFormatting.GRAY).setItalic(false))
-            .getFormattedText());
-        lines.add(createUsageLine(GuiText.BytesUsed.text(number())).getFormattedText());
-        lines.add(createTypesLine().getFormattedText());
+        lines.add(TextFormatting.RESET + TextFormatting.GREEN.toString() + GuiText.voidCellMode(mode).getLocal());
+        lines.add(TextFormatting.RESET + TextFormatting.GRAY.toString() + GuiText.VoidCellOpenGui.getLocal());
+        lines.add(createUsageLine());
+        lines.add(createTypesLine());
         VoidCellHandler.INSTANCE.addPartitionInformation(stack, lines);
     }
 }

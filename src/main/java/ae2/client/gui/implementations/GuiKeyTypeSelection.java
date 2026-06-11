@@ -130,7 +130,8 @@ public class GuiKeyTypeSelection<C extends AEBaseContainer & IKeyTypeSelectionCo
 
                 AECheckbox checkbox = new AECheckbox(xPos, yPos, textboxWidth, AECheckbox.SIZE,
                     Objects.requireNonNull(screen.getStyle()), text);
-                checkbox.setChangeListener(() -> getContainer().selectKeyType(keyType, checkbox.isSelected()));
+                checkbox.setChangeListener(() -> getContainer().selectKeyType(getContainer().windowId, keyType,
+                    checkbox.isSelected()));
                 addWidget.accept(checkbox);
                 checkboxes.put(keyType, checkbox);
 

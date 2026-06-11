@@ -15,6 +15,9 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 import java.io.IOException;
 
 public class PatternAccessTerminalPacket extends ClientboundPacket {
+    private static final int MAX_SLOT_UPDATES = 4096;
+    private static final int MAX_INVENTORY_SIZE = 4096;
+
     private boolean fullUpdate;
     private long inventoryId;
     private int inventorySize;
@@ -56,15 +59,25 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
         this.fullUpdate = packetBuffer.readBoolean();
         if (this.fullUpdate) {
             this.inventorySize = packetBuffer.readVarInt();
+            if (this.inventorySize < 0 || this.inventorySize > MAX_INVENTORY_SIZE) {
+                throw new IllegalArgumentException("Invalid pattern access terminal inventory size: "
+                    + this.inventorySize);
+            }
             this.sortBy = packetBuffer.readVarLong();
             this.canEditTerminalName = packetBuffer.readBoolean();
             this.group = PatternContainerGroup.readFromPacket(packetBuffer);
         }
 
         var slotCount = packetBuffer.readVarInt();
+        if (slotCount < 0 || slotCount > MAX_SLOT_UPDATES) {
+            throw new IllegalArgumentException("Invalid pattern access terminal slot count: " + slotCount);
+        }
         this.slots = new Int2ObjectOpenHashMap<>(slotCount);
         for (int i = 0; i < slotCount; i++) {
             var slot = packetBuffer.readVarInt();
+            if (slot < 0 || (this.fullUpdate && slot >= this.inventorySize)) {
+                throw new IllegalArgumentException("Invalid pattern access terminal slot index: " + slot);
+            }
             try {
                 this.slots.put(slot, packetBuffer.readItemStack());
             } catch (IOException e) {

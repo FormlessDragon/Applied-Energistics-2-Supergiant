@@ -10,8 +10,12 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.PacketBuffer;
 
 public class QuickMovePatternPacket extends ServerboundPacket {
+    // The client sends at most visibleRows * 9 targets; 1024 covers extreme GUI sizes while bounding packet work.
+    private static final int MAX_TARGETS = 1024;
+
     private int windowId;
     private int clickedSlot;
+    private boolean invalidTargetCount;
     private LongList allowedPatternContainerIds = LongLists.emptyList();
     private LongList allowedPatternSlots = LongLists.emptyList();
 
@@ -32,6 +36,14 @@ public class QuickMovePatternPacket extends ServerboundPacket {
         this.windowId = packetBuffer.readVarInt();
         this.clickedSlot = packetBuffer.readVarInt();
         int targetCount = packetBuffer.readVarInt();
+        if (targetCount < 0 || targetCount > MAX_TARGETS) {
+            this.invalidTargetCount = true;
+            this.allowedPatternContainerIds = LongLists.emptyList();
+            this.allowedPatternSlots = LongLists.emptyList();
+            invalidateMalformed(buf, new IllegalArgumentException(
+                "Quick move pattern target count out of bounds: " + targetCount));
+            return;
+        }
         var containerIds = new LongArrayList(targetCount);
         var slots = new LongArrayList(targetCount);
         for (int i = 0; i < targetCount; i++) {
@@ -40,6 +52,10 @@ public class QuickMovePatternPacket extends ServerboundPacket {
         }
         this.allowedPatternContainerIds = containerIds;
         this.allowedPatternSlots = slots;
+        if (packetBuffer.isReadable()) {
+            throw new IllegalArgumentException("Trailing quick move pattern payload bytes: "
+                + packetBuffer.readableBytes());
+        }
     }
 
     @Override
@@ -57,13 +73,19 @@ public class QuickMovePatternPacket extends ServerboundPacket {
 
     @Override
     public void handleServer(EntityPlayerMP player) {
-        if (player.openContainer.windowId == this.windowId
-            && player.openContainer instanceof ContainerPatternAccessTerm container) {
-            container.quickMovePattern(
-                player,
-                this.clickedSlot,
-                this.allowedPatternContainerIds,
-                this.allowedPatternSlots);
+        if (this.invalidTargetCount) {
+            return;
         }
+        if (!(player.openContainer instanceof ContainerPatternAccessTerm container)) {
+            return;
+        }
+        if (container.windowId != this.windowId) {
+            return;
+        }
+        container.quickMovePattern(
+            player,
+            this.clickedSlot,
+            this.allowedPatternContainerIds,
+            this.allowedPatternSlots);
     }
 }

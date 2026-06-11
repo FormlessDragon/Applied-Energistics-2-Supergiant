@@ -24,9 +24,15 @@ public class CraftingStatusPacket extends ClientboundPacket {
 
     @Override
     protected void read(ByteBuf buf) {
-        var data = new PacketBuffer(buf);
-        this.containerId = data.readInt();
-        this.status = CraftingStatus.read(data);
+        try {
+            var data = new PacketBuffer(buf);
+            this.containerId = data.readInt();
+            this.status = CraftingStatus.read(data);
+        } catch (RuntimeException e) {
+            this.containerId = -1;
+            this.status = CraftingStatus.EMPTY;
+            buf.skipBytes(buf.readableBytes());
+        }
     }
 
     @Override

@@ -1,24 +1,20 @@
 package ae2.api.behaviors;
 
-import ae2.api.inventories.InternalInventory;
-import ae2.api.stacks.AEFluidKey;
 import ae2.api.stacks.AEKeyType;
-import ae2.util.CowMap;
+import ae2.core.AEConfig;
+import ae2.util.CowReference2LongMap;
 import com.google.common.base.Preconditions;
-import org.jetbrains.annotations.ApiStatus;
-
-import java.util.Map;
+import it.unimi.dsi.fastutil.objects.Reference2LongMap;
 
 /**
  * Allows custom key types to define slot capacities for pattern providers and interfaces.
  */
-@ApiStatus.Experimental
 public class GenericSlotCapacities {
-    private static final CowMap<AEKeyType, Long> map = CowMap.identityHashMap();
+    private static final CowReference2LongMap<AEKeyType> map = CowReference2LongMap.newMap();
 
     static {
-        register(AEKeyType.items(), InternalInventory.DEFAULT_SLOT_LIMIT);
-        register(AEKeyType.fluids(), 4L * AEFluidKey.AMOUNT_BUCKET);
+        register(AEKeyType.items(), AEConfig.instance().getInterfaceItemSlotCapacity());
+        register(AEKeyType.fluids(), AEConfig.instance().getInterfaceFluidSlotCapacity());
     }
 
     private GenericSlotCapacities() {
@@ -29,9 +25,15 @@ public class GenericSlotCapacities {
         map.putIfAbsent(type, capacity);
     }
 
-    public static Map<AEKeyType, Long> getMap() {
+    public static void modifyValue(AEKeyType key, long value) {
+        try {
+            map.modifyValue(key, value);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Unregistered AEKeyType");
+        }
+    }
+
+    public static Reference2LongMap<AEKeyType> getMap() {
         return map.getMap();
     }
 }
-
-

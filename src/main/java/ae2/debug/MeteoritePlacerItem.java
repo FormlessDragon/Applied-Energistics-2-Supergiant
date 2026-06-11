@@ -24,6 +24,7 @@ import ae2.items.AEBaseItem;
 import ae2.util.InteractionUtil;
 import ae2.worldgen.meteorite.CraterType;
 import ae2.worldgen.meteorite.MeteoritePlacer;
+import ae2.worldgen.meteorite.MeteoritesWorldData;
 import ae2.worldgen.meteorite.PlacedMeteoriteSettings;
 import ae2.worldgen.meteorite.debug.MeteoriteSpawner;
 import net.minecraft.entity.player.EntityPlayer;
@@ -58,8 +59,8 @@ public class MeteoritePlacerItem extends AEBaseItem {
                 stack.setTagCompound(tag);
             }
 
-            byte mode = tag.hasKey(MODE_TAG) ? tag.getByte(MODE_TAG) : (byte) CraterType.NORMAL.ordinal();
-            tag.setByte(MODE_TAG, (byte) ((mode + 1) % CraterType.values().length));
+            byte mode = (byte) ((getCraterType(stack).ordinal() + 1) % CraterType.values().length);
+            tag.setByte(MODE_TAG, mode);
             player.sendMessage(PlayerMessages.MeteoriteModeSet.text(getCraterTypeName(getCraterType(stack))));
             return new ActionResult<>(EnumActionResult.SUCCESS, stack);
         }
@@ -93,6 +94,7 @@ public class MeteoritePlacerItem extends AEBaseItem {
             pos.getZ() - range, pos.getX() + range, pos.getY() + 10, pos.getZ() + range);
 
         MeteoritePlacer.place(world, spawned, boundingBox, world.rand);
+        MeteoritesWorldData.get(world).addMeteorite((WorldServer) world, spawned);
         syncVisibleChunksToPlayer((WorldServer) world, (EntityPlayerMP) player, spawned.pos());
         player.sendMessage(PlayerMessages.MeteoriteSpawned.text(spawned.pos().getY(), range));
         return EnumActionResult.SUCCESS;
@@ -110,8 +112,7 @@ public class MeteoritePlacerItem extends AEBaseItem {
 
     private CraterType getCraterType(ItemStack stack) {
         NBTTagCompound tag = stack.getTagCompound();
-        return tag == null ? CraterType.values()[CraterType.NORMAL.ordinal()]
-            : CraterType.values()[tag.getByte(MODE_TAG)];
+        return tag == null ? CraterType.NORMAL : CraterType.fromOrdinal(tag.getByte(MODE_TAG));
     }
 
     private ITextComponent getCraterTypeName(CraterType craterType) {

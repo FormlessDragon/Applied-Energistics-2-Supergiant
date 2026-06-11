@@ -2,6 +2,7 @@ package ae2.items.tools;
 
 import io.netty.buffer.ByteBuf;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraftforge.common.util.Constants;
 
 public record TickAnalyserConfig(
     int duration,
@@ -13,6 +14,9 @@ public record TickAnalyserConfig(
     public static final TickAnalyserConfig DEFAULT = new TickAnalyserConfig(60, true, true, true, true);
 
     public static TickAnalyserConfig read(ByteBuf buf) {
+        if (buf.readableBytes() < 9) {
+            return null;
+        }
         return new TickAnalyserConfig(clampDurationSeconds(buf.readInt()), buf.readBoolean(),
             buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
     }
@@ -21,7 +25,8 @@ public record TickAnalyserConfig(
         if (tag == null) {
             return DEFAULT;
         }
-        return new TickAnalyserConfig(clampDurationSeconds(tag.getInteger("duration")),
+        int duration = tag.hasKey("duration", Constants.NBT.TAG_ANY_NUMERIC) ? tag.getInteger("duration") : DEFAULT.duration;
+        return new TickAnalyserConfig(clampDurationSeconds(duration),
             !tag.hasKey("op1") || tag.getBoolean("op1"),
             !tag.hasKey("op2") || tag.getBoolean("op2"),
             !tag.hasKey("op3") || tag.getBoolean("op3"),

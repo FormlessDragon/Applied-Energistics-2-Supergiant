@@ -24,7 +24,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidStack;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -145,7 +145,7 @@ public record EntropyRecipe(EntropyMode mode, Input input, Output output) {
             this.properties = properties;
         }
 
-        public @org.jspecify.annotations.Nullable IBlockState apply(IBlockState originalBlockState) {
+        public @Nullable IBlockState apply(IBlockState originalBlockState) {
             Block fluidBlock = this.fluid.getBlock();
             if (fluidBlock == null) {
                 return null;

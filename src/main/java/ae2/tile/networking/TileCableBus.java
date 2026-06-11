@@ -18,6 +18,7 @@
 
 package ae2.tile.networking;
 
+import ae2.api.AECapabilities;
 import ae2.api.implementations.tiles.IColorableTile;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IInWorldGridNodeHost;
@@ -51,7 +52,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.minecraftforge.common.capabilities.Capability;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridNodeHost, IColorableTile, ClientTickingTile {
@@ -368,6 +369,9 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
 
     @Override
     public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+        if (capability == AECapabilities.IN_WORLD_GRID_NODE_HOST) {
+            return true;
+        }
         if (RegisterPartCapabilitiesEventInternal.hasCapability(this, capability, facing)) {
             return true;
         }
@@ -377,6 +381,9 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
     @Nullable
     @Override
     public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+        if (capability == AECapabilities.IN_WORLD_GRID_NODE_HOST) {
+            return AECapabilities.IN_WORLD_GRID_NODE_HOST.cast(this);
+        }
         T result = RegisterPartCapabilitiesEventInternal.getCapability(this, capability, facing);
         if (result != null) {
             return result;

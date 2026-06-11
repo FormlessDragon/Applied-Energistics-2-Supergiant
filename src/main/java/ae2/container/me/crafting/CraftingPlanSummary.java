@@ -18,12 +18,13 @@
 
 package ae2.container.me.crafting;
 
+import ae2.api.crafting.IPatternDetails;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.crafting.ICraftingPlan;
-import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEKey;
 import ae2.crafting.CraftingPlan;
 import com.google.common.collect.ImmutableList;
+import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -36,11 +37,21 @@ import java.util.List;
 import java.util.Objects;
 
 public record CraftingPlanSummary(long usedBytes, boolean simulation, List<CraftingPlanSummaryEntry> entries) {
+    private static final int MAX_ENTRY_COUNT = 4096;
+    private static final int MIN_ENTRY_BYTES = 7;
 
     public static CraftingPlanSummary read(PacketBuffer buffer) {
         long bytesUsed = buffer.readVarLong();
+        if (bytesUsed < 0) {
+            throw new IllegalArgumentException("Crafting plan summary contains negative byte usage");
+        }
+
         boolean simulation = buffer.readBoolean();
         int entryCount = buffer.readVarInt();
+        if (entryCount < 0 || entryCount > MAX_ENTRY_COUNT || entryCount > buffer.readableBytes() / MIN_ENTRY_BYTES) {
+            throw new IllegalArgumentException("Invalid crafting plan summary entry count: " + entryCount);
+        }
+
         ImmutableList.Builder<CraftingPlanSummaryEntry> entries = ImmutableList.builder();
         for (int i = 0; i < entryCount; i++) {
             entries.add(CraftingPlanSummaryEntry.read(buffer));
@@ -48,7 +59,7 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
         return new CraftingPlanSummary(bytesUsed, simulation, entries.build());
     }
 
-    public static CraftingPlanSummary fromJob(IGrid grid, IActionSource actionSource, ICraftingPlan job) {
+    public static CraftingPlanSummary fromJob(IGrid grid, ICraftingPlan job) {
         Object2ObjectMap<AEKey, KeyStats> plan = new Object2ObjectOpenHashMap<>();
         var hiddenOutputs = getHiddenTemporaryOutputs(job);
 
@@ -66,12 +77,14 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
             entry.stored += emitted.getLongValue();
             entry.crafting += emitted.getLongValue();
         }
-        for (Object2LongMap.Entry<ae2.api.crafting.IPatternDetails> entry : job.patternTimes().object2LongEntrySet()) {
+        for (Object2LongMap.Entry<IPatternDetails> entry : job.patternTimes().object2LongEntrySet()) {
             for (var out : entry.getKey().getOutputs()) {
                 if (hiddenOutputs.contains(out.what())) {
                     continue;
                 }
-                mapping(plan, out.what()).crafting += out.amount() * entry.getLongValue();
+                var stats = mapping(plan, out.what());
+                stats.crafting = LongMath.saturatedAdd(stats.crafting,
+                    LongMath.saturatedMultiply(out.amount(), entry.getLongValue()));
             }
         }
 

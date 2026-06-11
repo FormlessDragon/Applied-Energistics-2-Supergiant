@@ -22,7 +22,7 @@ import ae2.api.storage.cells.CellState;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
 
 import javax.vecmath.Vector3f;
@@ -61,7 +61,7 @@ public final class CellLedRenderer {
     }
 
     public static void renderLed(IChestOrDrive drive, int slot) {
-        Vector3f color = getColorForSlot(drive, slot);
+        Vector3f color = getColorForSlot(drive, slot, Float.NaN);
         if (color == null) {
             return;
         }
@@ -69,14 +69,53 @@ public final class CellLedRenderer {
         Tessellator tessellator = Tessellator.getInstance();
         BufferBuilder buffer = tessellator.getBuffer();
         buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
-        for (int i = 0; i < LED_QUADS.length; i += 3) {
-            buffer.pos(LED_QUADS[i], LED_QUADS[i + 1], LED_QUADS[i + 2]).color(color.x, color.y, color.z, 1.0f)
-                  .endVertex();
+        renderLed(buffer, color, 0, 0, 0);
+        tessellator.draw();
+    }
+
+    public static void renderLeds(IChestOrDrive drive, int slotCount, SlotOriginProvider slotOriginProvider) {
+        float blinkFactor = getBlinkFactor();
+        int firstSlot = -1;
+        Vector3f firstColor = null;
+        for (int slot = 0; slot < slotCount; slot++) {
+            firstColor = getColorForSlot(drive, slot, blinkFactor);
+            if (firstColor != null) {
+                firstSlot = slot;
+                break;
+            }
+        }
+        if (firstSlot == -1) {
+            return;
+        }
+
+        Vector3f slotOrigin = new Vector3f();
+
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder buffer = tessellator.getBuffer();
+        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
+        slotOriginProvider.getSlotOrigin(firstSlot, slotOrigin);
+        renderLed(buffer, firstColor, slotOrigin.x, slotOrigin.y, slotOrigin.z);
+        for (int slot = firstSlot + 1; slot < slotCount; slot++) {
+            Vector3f color = getColorForSlot(drive, slot, blinkFactor);
+            if (color == null) {
+                continue;
+            }
+
+            slotOriginProvider.getSlotOrigin(slot, slotOrigin);
+            renderLed(buffer, color, slotOrigin.x, slotOrigin.y, slotOrigin.z);
         }
         tessellator.draw();
     }
 
-    private static @Nullable Vector3f getColorForSlot(IChestOrDrive drive, int slot) {
+    private static void renderLed(BufferBuilder buffer, Vector3f color, float x, float y, float z) {
+        for (int i = 0; i < LED_QUADS.length; i += 3) {
+            buffer.pos(x + LED_QUADS[i], y + LED_QUADS[i + 1], z + LED_QUADS[i + 2])
+                  .color(color.x, color.y, color.z, 1.0f)
+                  .endVertex();
+        }
+    }
+
+    private static @Nullable Vector3f getColorForSlot(IChestOrDrive drive, int slot, float blinkFactor) {
         CellState state = drive.getCellStatus(slot);
         if (state == CellState.ABSENT) {
             return null;
@@ -85,14 +124,28 @@ public final class CellLedRenderer {
             return UNPOWERED_COLOR;
         }
 
-        Vector3f color = new Vector3f(STATE_COLORS.get(state));
-        if (drive.isCellBlinking(slot)) {
-            long t = System.currentTimeMillis() % 200;
-            float factor = (t - 100) / 200.0f + 0.5f;
-            factor = easeInOutCubic(factor);
-            color.interpolate(BLINK_COLOR, factor);
+        Vector3f color = STATE_COLORS.get(state);
+        if (!drive.isCellBlinking(slot)) {
+            return color;
         }
+
+        color = new Vector3f(color);
+        if (Float.isNaN(blinkFactor)) {
+            blinkFactor = getBlinkFactor();
+        }
+        color.interpolate(BLINK_COLOR, blinkFactor);
         return color;
+    }
+
+    private static float getBlinkFactor() {
+        long t = System.currentTimeMillis() % 200;
+        float factor = (t - 100) / 200.0f + 0.5f;
+        return easeInOutCubic(factor);
+    }
+
+    @FunctionalInterface
+    public interface SlotOriginProvider {
+        void getSlotOrigin(int slot, Vector3f slotOrigin);
     }
 
     private static float easeInOutCubic(float x) {

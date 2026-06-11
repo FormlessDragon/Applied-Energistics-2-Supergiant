@@ -10,7 +10,8 @@ import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 
-import javax.annotation.Nonnull;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
@@ -64,8 +65,8 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
         if (node.getDisplayNodes() != null) {
             boolean recursiveDisplayNode = node.getRecursiveDisplayAmount() > 0;
             for (CraftingTreeProcess process : node.getDisplayNodes()) {
-                LiteCraftTreeProc proc = LiteCraftTreeProc.of(process, node, amount, missingAllocator,
-                    patternTimesAllocator, recursiveDisplayNode);
+                LiteCraftTreeProc proc = LiteCraftTreeProc.of(process, missingAllocator, patternTimesAllocator,
+                    recursiveDisplayNode);
                 if (proc != null) {
                     inputs.add(proc);
                 }
@@ -74,20 +75,31 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
         return new LiteCraftTreeNode(parent, new GenericStack(node.getWhat(), amount), inputs, missing);
     }
 
-    public static LiteCraftTreeNode fromBuffer(final ByteBuf buf, final CraftingTreeStackRegistry stackSet, final LiteCraftTreeProc parent) {
-        int stackID = (int) CraftingTreeByteBuf.readVarLong(buf);
+    @SuppressWarnings("unused")
+    public static LiteCraftTreeNode fromBuffer(final ByteBuf buf, final CraftingTreeStackRegistry stackSet,
+                                               final LiteCraftTreeProc parent) {
+        return fromBuffer(buf, stackSet, parent, new CraftingTreeStackRegistry.DecodeLimits(), 0);
+    }
+
+    public static LiteCraftTreeNode fromBuffer(final ByteBuf buf, final CraftingTreeStackRegistry stackSet,
+                                               final LiteCraftTreeProc parent,
+                                               final CraftingTreeStackRegistry.DecodeLimits limits, final int depth) {
+        limits.addNode(depth);
+
+        long stackID = CraftingTreeByteBuf.readVarLong(buf);
         GenericStack output = stackSet.get(stackID);
 
-        long stackSize = CraftingTreeByteBuf.readVarLong(buf);
+        long stackSize = CraftingTreeByteBuf.readNonNegativeVarLong(buf, "Crafting tree stack size");
         output = new GenericStack(output.what(), stackSize);
 
-        int size = buf.readByte();
+        int size = buf.readUnsignedByte();
+        limits.checkNodeChildCount(size);
         List<LiteCraftTreeProc> inputs = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            inputs.add(LiteCraftTreeProc.fromBuffer(buf, stackSet));
+            inputs.add(LiteCraftTreeProc.fromBuffer(buf, stackSet, limits, depth + 1));
         }
 
-        long missing = CraftingTreeByteBuf.readVarLong(buf);
+        long missing = CraftingTreeByteBuf.readNonNegativeVarLong(buf, "Crafting tree missing amount");
         return new LiteCraftTreeNode(parent, output, inputs, missing);
     }
 
@@ -155,7 +167,7 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
     }
 
     @Override
-    public int compareTo(@Nonnull final LiteCraftTreeNode o) {
+    public int compareTo(@NotNull final LiteCraftTreeNode o) {
         return Integer.compare(diveToDeep(this, 0, new DepthRecorder()), diveToDeep(o, 0, new DepthRecorder()));
     }
 

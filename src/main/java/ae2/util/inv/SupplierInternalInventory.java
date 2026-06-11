@@ -22,7 +22,7 @@ import ae2.api.inventories.InternalInventory;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.items.IItemHandler;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Iterator;
 import java.util.function.Supplier;
@@ -98,7 +98,7 @@ public class SupplierInternalInventory<T extends InternalInventory> implements I
     }
 
     @Override
-    public @NonNull Iterator<ItemStack> iterator() {
+    public @NotNull Iterator<ItemStack> iterator() {
         return getDelegate().iterator();
     }
 

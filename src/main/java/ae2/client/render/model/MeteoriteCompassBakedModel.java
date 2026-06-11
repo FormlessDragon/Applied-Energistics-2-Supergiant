@@ -3,6 +3,7 @@ package ae2.client.render.model;
 import ae2.hooks.CompassManager;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.IBakedModel;
 import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
@@ -18,7 +19,7 @@ import net.minecraftforge.client.model.pipeline.UnpackedBakedQuad;
 import net.minecraftforge.common.model.TRSRTransformation;
 import org.apache.commons.lang3.tuple.Pair;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import javax.vecmath.Matrix4f;
 import javax.vecmath.Vector4f;
 import java.util.Collections;
@@ -26,6 +27,21 @@ import java.util.List;
 
 @SuppressWarnings("deprecation")
 public class MeteoriteCompassBakedModel implements IBakedModel {
+    private static final ItemOverrideList OVERRIDES = new ItemOverrideList(Collections.emptyList()) {
+        @Override
+        public IBakedModel handleItemState(IBakedModel originalModel, ItemStack stack, World world,
+                                           EntityLivingBase entity) {
+            if (!(originalModel instanceof MeteoriteCompassBakedModel model)) {
+                return originalModel;
+            }
+
+            BlockPos pos = entity != null ? entity.getPosition() : getPlayerPos();
+            float playerRotation = entity != null ? (float) (entity.rotationYaw / 180.0F * Math.PI + Math.PI) : 0.0F;
+            float animatedRotation = getAnimatedRotation(pos, entity != null, playerRotation);
+            return new MeteoriteCompassBakedModel(model.base, model.pointer, animatedRotation);
+        }
+    };
+
     private final IBakedModel base;
     private final IBakedModel pointer;
     private final float rotation;
@@ -45,8 +61,8 @@ public class MeteoriteCompassBakedModel implements IBakedModel {
             ChunkPos ourChunkPos = new ChunkPos(pos);
             BlockPos closestMeteorite = CompassManager.INSTANCE.getClosestMeteorite(ourChunkPos, prefetch);
             if (closestMeteorite != null) {
-                double dx = pos.getX() - closestMeteorite.getX();
-                double dz = pos.getZ() - closestMeteorite.getZ();
+                double dx = (double) pos.getX() - closestMeteorite.getX();
+                double dz = (double) pos.getZ() - closestMeteorite.getZ();
                 double distanceSq = dx * dx + dz * dz;
                 if (distanceSq <= 36.0D) {
                     long timeMillis = System.currentTimeMillis() % 500L;
@@ -109,19 +125,12 @@ public class MeteoriteCompassBakedModel implements IBakedModel {
         return this.base.getItemCameraTransforms();
     }
 
-    @Override
-    public ItemOverrideList getOverrides() {
-        return new ItemOverrideList(Collections.emptyList()) {
-            @Override
-            public IBakedModel handleItemState(IBakedModel originalModel, ItemStack stack, World world,
-                                               EntityLivingBase entity) {
-                BlockPos pos = entity != null ? entity.getPosition() : getPlayerPos();
-                float playerRotation = entity != null ? (float) (entity.rotationYaw / 180.0F * Math.PI + Math.PI) : 0.0F;
-                float animatedRotation = getAnimatedRotation(pos, entity != null, playerRotation);
-                return new MeteoriteCompassBakedModel(MeteoriteCompassBakedModel.this.base,
-                    MeteoriteCompassBakedModel.this.pointer, animatedRotation);
-            }
-        };
+    @Nullable
+    private static BlockPos getPlayerPos() {
+        if (Minecraft.getMinecraft().player == null) {
+            return null;
+        }
+        return Minecraft.getMinecraft().player.getPosition();
     }
 
     @Override
@@ -135,12 +144,9 @@ public class MeteoriteCompassBakedModel implements IBakedModel {
         return Pair.of(new MeteoriteCompassBakedModel(this.base, this.pointer, adjustedRotation), matrix);
     }
 
-    @Nullable
-    private BlockPos getPlayerPos() {
-        if (net.minecraft.client.Minecraft.getMinecraft().player == null) {
-            return null;
-        }
-        return net.minecraft.client.Minecraft.getMinecraft().player.getPosition();
+    @Override
+    public ItemOverrideList getOverrides() {
+        return OVERRIDES;
     }
 
     private Matrix4f createRotationMatrix(float rotation) {

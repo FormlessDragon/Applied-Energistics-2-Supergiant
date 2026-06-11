@@ -7,6 +7,7 @@ import ae2.hooks.ticking.TickHandler;
 import ae2.me.Grid;
 import ae2.me.service.TickManagerService;
 import ae2.server.ISubCommand;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
@@ -50,7 +51,7 @@ public class TickMonitoring implements ISubCommand {
 
         if ("true".equalsIgnoreCase(args[1]) || "on".equalsIgnoreCase(args[1])) {
             AEConfig.instance().setTickMonitoringEnabled(true);
-            for (Grid grid : TickHandler.instance().getGridList()) {
+            for (Grid grid : new ObjectArrayList<>(TickHandler.instance().getGridList())) {
                 ((TickManagerService) grid.getTickManager()).resetMonitoringStatistics();
             }
         } else if ("false".equalsIgnoreCase(args[1]) || "off".equalsIgnoreCase(args[1])) {

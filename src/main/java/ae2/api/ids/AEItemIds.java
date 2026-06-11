@@ -43,6 +43,7 @@ public final class AEItemIds {
     public static final ResourceLocation PATTERN_MODIFIER = id("pattern_modifier");
     public static final ResourceLocation VIEW_CELL = id("view_cell");
     public static final ResourceLocation MEMORY_CARD = id("memory_card");
+    public static final ResourceLocation ADVANCED_MEMORY_CARD = id("advanced_memory_card");
     public static final ResourceLocation DEBUG_CARD = id("debug_card");
     public static final ResourceLocation DEBUG_ERASER = id("debug_eraser");
     public static final ResourceLocation DEBUG_METEORITE_PLACER = id("debug_meteorite_placer");

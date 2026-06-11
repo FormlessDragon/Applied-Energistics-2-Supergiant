@@ -49,6 +49,9 @@ public class ContainerOutputSides extends AEBaseContainer implements ISubGui {
             sendClientAction(ACTION_SET_SIDE, state);
             return;
         }
+        if (state == null || state.side() == null) {
+            return;
+        }
 
         EnumFacing side = this.host.getBlockOrientation().getSide(state.side());
         if (!this.host.isOutputSideAllowed(side)) {

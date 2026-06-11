@@ -47,8 +47,13 @@ public class RequesterSlotUpdatePacket extends ServerboundPacket {
                 this.requesterId = 0;
                 this.requestIndex = -1;
             }
+            if (packetBuffer.isReadable()) {
+                throw new IllegalArgumentException("Trailing requester slot update payload bytes: "
+                    + packetBuffer.readableBytes());
+            }
         } catch (RuntimeException e) {
             this.invalid = true;
+            invalidateMalformed(buf, e);
         }
     }
 
@@ -70,13 +75,15 @@ public class RequesterSlotUpdatePacket extends ServerboundPacket {
             return;
         }
 
-        if (player.openContainer.windowId != this.windowId) {
+        if (!(player.openContainer instanceof AbstractContainerRequester container)) {
             return;
         }
 
-        if (player.openContainer instanceof AbstractContainerRequester container) {
-            container.updateRequestSlot(this.row, this.visible, this.requesterId, this.requestIndex);
+        if (container.windowId != this.windowId) {
+            return;
         }
+
+        container.updateRequestSlot(this.row, this.visible, this.requesterId, this.requestIndex);
     }
 
     int getWindowId() {

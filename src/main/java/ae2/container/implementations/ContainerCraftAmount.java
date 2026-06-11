@@ -47,6 +47,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Objects;
 
 public class ContainerCraftAmount extends AEBaseContainer implements ISubGui {
+    public static final int MAX_AUTO_CRAFT_AMOUNT = 1_000_000;
 
     private final AppEngSlot craftingItem;
     private final ISubGuiHost host;
@@ -88,17 +89,21 @@ public class ContainerCraftAmount extends AEBaseContainer implements ISubGui {
 
     private void setWhatToCraft(AEKey whatToCraft, int initialAmount) {
         this.whatToCraft = Objects.requireNonNull(whatToCraft, "whatToCraft");
-        this.initialAmount = Math.max(1, initialAmount);
+        this.initialAmount = Math.clamp(initialAmount, 1, MAX_AUTO_CRAFT_AMOUNT);
         this.craftingItem.putStack(GenericStack.wrapInItemStack(whatToCraft, 1));
     }
 
     public void confirm(int amount, boolean craftMissingAmount, boolean autoStart) {
         if (!isServerSide()) {
-            InitNetwork.sendToServer(new ConfirmAutoCraftPacket(amount, craftMissingAmount, autoStart));
+            InitNetwork.sendToServer(new ConfirmAutoCraftPacket(this.windowId, amount, craftMissingAmount, autoStart));
             return;
         }
 
         if (this.whatToCraft == null) {
+            return;
+        }
+
+        if (amount <= 0 || amount > MAX_AUTO_CRAFT_AMOUNT) {
             return;
         }
 
@@ -108,12 +113,12 @@ public class ContainerCraftAmount extends AEBaseContainer implements ISubGui {
                 IGridNode node = actionHost.getActionableNode();
                 if (node != null) {
                     IStorageService storage = node.grid().getStorageService();
-                    int existingAmount = (int) Math.min(storage.getCachedInventory().get(this.whatToCraft),
-                        Integer.MAX_VALUE);
-                    if (existingAmount > amount) {
+                    long storedAmount = Math.max(0, storage.getCachedInventory().get(this.whatToCraft));
+                    if (storedAmount >= amount) {
                         amount = 0;
                     } else {
-                        amount -= existingAmount;
+                        long missingAmount = amount - storedAmount;
+                        amount = (int) missingAmount;
                     }
                 }
             }

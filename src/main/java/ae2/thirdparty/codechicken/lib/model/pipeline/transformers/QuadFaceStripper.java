@@ -49,11 +49,14 @@ public class QuadFaceStripper implements RenderContext.QuadTransform {
 
     @Override
     public boolean transform(MutableQuadView quad) {
-        if (this.mask == 0) {
+        if (this.mask == 0 || this.bounds == null) {
             return true;
         }
 
         EnumFacing face = quad.nominalFace();
+        if (face == null) {
+            return true;
+        }
         if ((this.mask & 1 << face.ordinal()) != 0) {
             EnumFacing.AxisDirection dir = face.getAxisDirection();
             switch (face.getAxis()) {

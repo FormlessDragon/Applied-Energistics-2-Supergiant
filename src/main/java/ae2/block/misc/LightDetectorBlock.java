@@ -4,6 +4,7 @@ import ae2.api.orientation.IOrientationStrategy;
 import ae2.api.orientation.OrientationStrategies;
 import ae2.block.AEBaseTileBlock;
 import ae2.tile.misc.TileLightDetector;
+import ae2.util.EmptyArrays;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockDirectional;
@@ -76,7 +77,7 @@ public class LightDetectorBlock extends AEBaseTileBlock<TileLightDetector> {
             ordered.add(axisFacing.facing.getOpposite());
         }
 
-        return ordered.toArray(new EnumFacing[0]);
+        return ordered.toArray(EmptyArrays.EMPTY_FACING_ARRAY);
     }
 
     @Override

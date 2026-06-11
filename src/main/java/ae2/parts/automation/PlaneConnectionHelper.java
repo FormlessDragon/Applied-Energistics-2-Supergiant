@@ -165,7 +165,7 @@ public final class PlaneConnectionHelper {
         return false;
     }
 
-    private @org.jspecify.annotations.Nullable TileEntity getHostTileEntity() {
+    private @Nullable TileEntity getHostTileEntity() {
         IPartHost host = part.getHost();
         if (host != null) {
             return host.getTileEntity();

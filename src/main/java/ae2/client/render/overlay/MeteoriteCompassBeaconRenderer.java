@@ -18,8 +18,11 @@ import org.lwjgl.opengl.GL11;
 public final class MeteoriteCompassBeaconRenderer {
     private static final int SEGMENTS = 16;
     private static final double MAX_RENDER_LENGTH = 96.0D;
-    private static final double OUTER_RADIUS = 0.07D;
-    private static final double INNER_RADIUS = 0.03D;
+    private static final double BEACON_RADIUS = 0.03D;
+    private static final int BEACON_RED = 196;
+    private static final int BEACON_GREEN = 96;
+    private static final int BEACON_BLUE = 255;
+    private static final int BEACON_ALPHA = 255;
 
     private static boolean isHoldingBeaconCompass(EntityPlayer player) {
         return MeteoriteCompassItem.hasBeacon(player.getHeldItemMainhand())
@@ -67,7 +70,7 @@ public final class MeteoriteCompassBeaconRenderer {
         return new Vec3d(x, y, z);
     }
 
-    private static void renderCylinder(Vec3d start, Vec3d end, double radius, int red, int green, int blue, int alpha) {
+    private static void renderCylinder(Vec3d start, Vec3d end) {
         Vec3d axis = end.subtract(start).normalize();
         Vec3d reference = Math.abs(axis.y) > 0.99D ? new Vec3d(1.0D, 0.0D, 0.0D) : new Vec3d(0.0D, 1.0D, 0.0D);
         Vec3d side = axis.crossProduct(reference).normalize();
@@ -81,17 +84,17 @@ public final class MeteoriteCompassBeaconRenderer {
             double angle = Math.PI * 2.0D * i / SEGMENTS;
             double cos = Math.cos(angle);
             double sin = Math.sin(angle);
-            Vec3d offset = side.scale(cos * radius).add(up.scale(sin * radius));
+            Vec3d offset = side.scale(cos * BEACON_RADIUS).add(up.scale(sin * BEACON_RADIUS));
 
-            addVertex(buffer, start.add(offset), red, green, blue, alpha);
-            addVertex(buffer, end.add(offset), red, green, blue, alpha);
+            addVertex(buffer, start.add(offset));
+            addVertex(buffer, end.add(offset));
         }
 
         tessellator.draw();
     }
 
-    private static void addVertex(BufferBuilder buffer, Vec3d pos, int red, int green, int blue, int alpha) {
-        buffer.pos(pos.x, pos.y, pos.z).color(red, green, blue, alpha).endVertex();
+    private static void addVertex(BufferBuilder buffer, Vec3d pos) {
+        buffer.pos(pos.x, pos.y, pos.z).color(BEACON_RED, BEACON_GREEN, BEACON_BLUE, BEACON_ALPHA).endVertex();
     }
 
     @SubscribeEvent
@@ -136,7 +139,7 @@ public final class MeteoriteCompassBeaconRenderer {
             GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
             GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
 
-        renderCylinder(start, end, INNER_RADIUS, 196, 96, 255, 255);
+        renderCylinder(start, end);
 
         GlStateManager.depthMask(true);
         GlStateManager.enableDepth();

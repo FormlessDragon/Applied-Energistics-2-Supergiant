@@ -8,7 +8,7 @@ import net.minecraft.util.NonNullList;
 import net.minecraft.world.World;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.registries.IForgeRegistryEntry;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public final class RemoveItemUpgradeRecipe extends IForgeRegistryEntry.Impl<IRecipe> implements IRecipe {
     private static @Nullable RemovalResult attemptRemoval(InventoryCrafting inv) {

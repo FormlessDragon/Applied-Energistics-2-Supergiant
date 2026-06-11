@@ -4,7 +4,7 @@ import ae2.recipes.AERecipeTypes;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public record CraftingUnitTransformRecipe(Block upgradedBlock, Item upgradeItem) {
 

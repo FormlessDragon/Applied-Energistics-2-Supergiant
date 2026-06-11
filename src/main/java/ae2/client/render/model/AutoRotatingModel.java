@@ -39,8 +39,8 @@ import net.minecraftforge.client.model.pipeline.QuadGatheringTransformer;
 import net.minecraftforge.client.model.pipeline.UnpackedBakedQuad;
 import net.minecraftforge.common.property.IExtendedBlockState;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 import javax.vecmath.Vector3f;
 import javax.vecmath.Vector4f;
@@ -55,8 +55,8 @@ public class AutoRotatingModel extends DelegateBakedModel implements IResourceMa
         this.quadCache = CacheBuilder.newBuilder().maximumSize(256).build(
             new CacheLoader<>() {
                 @Override
-                @Nonnull
-                public List<BakedQuad> load(@Nonnull AutoRotatingCacheKey key) {
+                @NotNull
+                public List<BakedQuad> load(@NotNull AutoRotatingCacheKey key) {
                     return AutoRotatingModel.this.getRotatedModel(key.blockState(), key.side(), key.forward(),
                         key.up());
                 }
@@ -98,7 +98,7 @@ public class AutoRotatingModel extends DelegateBakedModel implements IResourceMa
     }
 
     @Override
-    public void onResourceManagerReload(@Nonnull IResourceManager resourceManager) {
+    public void onResourceManagerReload(@NotNull IResourceManager resourceManager) {
         this.quadCache.invalidateAll();
     }
 

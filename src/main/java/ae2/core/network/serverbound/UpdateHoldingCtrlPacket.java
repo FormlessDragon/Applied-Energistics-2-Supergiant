@@ -19,7 +19,12 @@ public class UpdateHoldingCtrlPacket extends ServerboundPacket {
 
     @Override
     protected void read(ByteBuf buf) {
-        this.keyDown = new PacketBuffer(buf).readBoolean();
+        PacketBuffer packetBuffer = new PacketBuffer(buf);
+        this.keyDown = packetBuffer.readBoolean();
+        if (packetBuffer.isReadable()) {
+            throw new IllegalArgumentException("Trailing update holding ctrl packet payload bytes: "
+                + packetBuffer.readableBytes());
+        }
     }
 
     @Override

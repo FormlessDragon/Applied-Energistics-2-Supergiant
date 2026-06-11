@@ -5,6 +5,7 @@ import ae2.client.gui.me.common.PendingCraftingJobs;
 import ae2.client.gui.me.common.PinnedKeys;
 import ae2.core.AEConfig;
 import ae2.core.network.ClientboundPacket;
+import ae2.core.network.NetworkPacketHelper;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.PacketBuffer;
@@ -37,12 +38,27 @@ public class CraftingJobStatusPacket extends ClientboundPacket {
 
     @Override
     protected void read(ByteBuf buf) {
-        var data = new PacketBuffer(buf);
-        this.jobId = data.readUniqueId();
-        this.status = data.readEnumValue(Status.class);
-        this.what = AEKey.readKey(data);
-        this.requestedAmount = data.readLong();
-        this.remainingAmount = data.readLong();
+        try {
+            var data = new PacketBuffer(buf);
+            this.jobId = data.readUniqueId();
+            this.status = NetworkPacketHelper.readEnumOrNull(data, Status.class);
+            if (this.status == null) {
+                this.status = Status.CANCELLED;
+            }
+            this.what = AEKey.readKey(data);
+            this.requestedAmount = data.readLong();
+            this.remainingAmount = data.readLong();
+            if (this.requestedAmount < 0 || this.remainingAmount < 0) {
+                throw new IllegalArgumentException("Crafting job status contains negative amounts");
+            }
+        } catch (RuntimeException e) {
+            this.jobId = null;
+            this.what = null;
+            this.requestedAmount = 0;
+            this.remainingAmount = 0;
+            this.status = Status.CANCELLED;
+            buf.skipBytes(buf.readableBytes());
+        }
     }
 
     @Override

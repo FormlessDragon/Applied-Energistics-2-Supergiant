@@ -116,7 +116,7 @@ final class ODExpressionParser {
                 case '&' -> tokens.add(Token.binary(Op.AND));
                 case '|' -> tokens.add(Token.binary(Op.OR));
                 case '^' -> tokens.add(Token.binary(Op.XOR));
-                case '!' -> tokens.add(Token.unary(Op.NOT));
+                case '!' -> tokens.add(Token.unary());
                 case '(' -> tokens.add(new Token(Kind.LEFT, null, null));
                 case ')' -> tokens.add(new Token(Kind.RIGHT, null, null));
                 default -> {
@@ -211,8 +211,8 @@ final class ODExpressionParser {
             return new Token(Kind.TAG, null, content);
         }
 
-        static Token unary(Op op) {
-            return new Token(Kind.UNARY, op, null);
+        static Token unary() {
+            return new Token(Kind.UNARY, Op.NOT, null);
         }
 
         static Token binary(Op op) {

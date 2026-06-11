@@ -19,10 +19,10 @@ import mezz.jei.bookmarks.BookmarkItem;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidUtil;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Mouse;
 
-import javax.annotation.Nonnull;
 import java.awt.Rectangle;
 import java.util.List;
 
@@ -121,7 +121,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         return stack != null ? GenericStack.wrapInItemStack(stack) : ItemStack.EMPTY;
     }
 
-    @Nonnull
+    @NotNull
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public Class<AEBaseGui<?>> getGuiContainerClass() {
@@ -129,7 +129,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
     }
 
     @Override
-    public List<Rectangle> getGuiExtraAreas(@Nonnull AEBaseGui<?> guiContainer) {
+    public List<Rectangle> getGuiExtraAreas(@NotNull AEBaseGui<?> guiContainer) {
         return guiContainer.getExclusionZones()
                            .stream()
                            .map(AEGuiHandler::toRectangle)
@@ -137,7 +137,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
     }
 
     @Override
-    public @Nullable Object getIngredientUnderMouse(@Nonnull AEBaseGui<?> guiContainer, int mouseX, int mouseY) {
+    public @Nullable Object getIngredientUnderMouse(@NotNull AEBaseGui<?> guiContainer, int mouseX, int mouseY) {
         StackWithBounds hoveredStack = guiContainer.getStackUnderMouse(mouseX, mouseY);
         if (hoveredStack != null) {
             return GenericIngredientHelper.stackToIngredient(hoveredStack.stack());
@@ -150,10 +150,10 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         return null;
     }
 
-    @Nonnull
+    @NotNull
     @Override
     @SuppressWarnings("unchecked")
-    public <I> List<Target<I>> getTargets(@Nonnull AEBaseGui<?> gui, @Nonnull I ingredient, boolean doStart) {
+    public <I> List<Target<I>> getTargets(@NotNull AEBaseGui<?> gui, @NotNull I ingredient, boolean doStart) {
         if (doStart) {
             this.currentGhostIngredient = ingredient;
         }
@@ -208,7 +208,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         }
 
         @Override
-        public void accept(@Nonnull Object ingredient) {
+        public void accept(@NotNull Object ingredient) {
             if (!this.slot.isEnabled()) {
                 return;
             }
@@ -240,7 +240,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         }
 
         @Override
-        public void accept(@Nonnull Object ingredient) {
+        public void accept(@NotNull Object ingredient) {
             String text = getTextFieldInsertionText(ingredient, Mouse.getEventButton());
             if (text == null) {
                 return;

@@ -28,7 +28,8 @@ public enum WirelessTerminalMagnetMode {
     }
 
     public static WirelessTerminalMagnetMode fromId(byte id) {
-        return values()[id];
+        WirelessTerminalMagnetMode[] values = values();
+        return id >= 0 && id < values.length ? values[id] : OFF;
     }
 
     public byte id() {

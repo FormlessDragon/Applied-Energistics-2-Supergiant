@@ -20,6 +20,7 @@ package ae2.thirdparty.codechicken.lib.model.pipeline.transformers;
 
 import ae2.client.render.mesh.MutableQuadView;
 import ae2.client.render.mesh.RenderContext;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.MathHelper;
 
@@ -53,7 +54,12 @@ public class QuadClamper implements RenderContext.QuadTransform {
 
     @Override
     public boolean transform(MutableQuadView quad) {
-        int s = quad.nominalFace().ordinal() >> 1;
+        EnumFacing face = quad.nominalFace();
+        if (this.clampBounds == null || face == null) {
+            return true;
+        }
+
+        int s = face.ordinal() >> 1;
 
         clamp(quad, this.clampBounds);
 

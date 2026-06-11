@@ -10,7 +10,7 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidRegistry;
@@ -129,11 +129,16 @@ public final class AEFluidKey extends AEKey {
     }
 
     @Override
+    public String getModId() {
+        var modId = FluidRegistry.getModId(stack);
+        return modId != null ? modId : "";
+    }
+
+    @Override
     @Nullable
     public ResourceLocation getId() {
-        return FluidRegistry.getFluidName(getFluid()) != null
-            ? new ResourceLocation(FluidRegistry.getFluidName(getFluid()))
-            : null;
+        String fluidName = FluidRegistry.getFluidName(stack);
+        return fluidName != null ? new ResourceLocation(fluidName) : null;
     }
 
     @Override
@@ -143,7 +148,7 @@ public final class AEFluidKey extends AEKey {
 
     @Override
     protected ITextComponent computeDisplayName() {
-        return new TextComponentString(stack.getLocalizedName());
+        return new TextComponentTranslation(stack.getUnlocalizedName());
     }
 
     @Override
@@ -189,7 +194,7 @@ public final class AEFluidKey extends AEKey {
     @Override
     public String toString() {
         var id = getId();
-        String idString = id != null ? id.toString() : getFluid().getClass().getName() + "(unregistered)";
+        String idString = id != null ? id.toString() : getFluid().getClass().getSimpleName() + "(unregistered)";
         return hasComponents() ? idString + " (+components)" : idString;
     }
 }

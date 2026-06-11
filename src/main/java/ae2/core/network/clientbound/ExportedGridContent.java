@@ -3,7 +3,10 @@ package ae2.core.network.clientbound;
 import ae2.core.AELog;
 import ae2.core.localization.PlayerMessages;
 import ae2.core.network.ClientboundPacket;
+import ae2.core.network.NetworkPacketHelper;
+import ae2.util.EmptyArrays;
 import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
@@ -13,7 +16,7 @@ import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.util.text.event.ClickEvent;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.OpenOption;
@@ -22,9 +25,14 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.TimeUnit;
 
 public class ExportedGridContent extends ClientboundPacket {
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd_HHmm");
+    private static final int MAX_CHUNK_BYTES = 512 * 1024;
+    private static final long MAX_EXPORT_BYTES = 64L * 1024 * 1024;
+    private static final int MAX_ACTIVE_EXPORTS = 4;
+    private static final long ACTIVE_EXPORT_TTL_NANOS = TimeUnit.MINUTES.toNanos(10);
     private static final Int2ObjectOpenHashMap<ExportState> EXPORTS = new Int2ObjectOpenHashMap<>();
     private static final OpenOption[] CREATE_OR_TRUNCATE_OPTIONS = {
         StandardOpenOption.CREATE,
@@ -110,20 +118,44 @@ public class ExportedGridContent extends ClientboundPacket {
         return component;
     }
 
-    @Override
-    protected void read(ByteBuf buf) {
-        var packetBuffer = new PacketBuffer(buf);
-        this.serialNumber = packetBuffer.readInt();
-        this.contentType = packetBuffer.readEnumValue(ContentType.class);
-        int length = packetBuffer.readVarInt();
-        this.compressedData = new byte[length];
-        packetBuffer.readBytes(this.compressedData);
+    private static void pruneActiveExports() {
+        long cutoffNanos = System.nanoTime() - ACTIVE_EXPORT_TTL_NANOS;
+        var iterator = EXPORTS.int2ObjectEntrySet().iterator();
+        while (iterator.hasNext()) {
+            Int2ObjectMap.Entry<ExportState> entry = iterator.next();
+            ExportState state = entry.getValue();
+            if (state.createdAtNanos <= cutoffNanos) {
+                deleteTempFile(state);
+                iterator.remove();
+            }
+        }
+    }
+
+    private static void evictOldestExportIfNeeded() {
+        if (EXPORTS.size() < MAX_ACTIVE_EXPORTS) {
+            return;
+        }
+
+        int oldestSerialNumber = 0;
+        ExportState oldestState = null;
+        for (Int2ObjectMap.Entry<ExportState> entry : EXPORTS.int2ObjectEntrySet()) {
+            ExportState state = entry.getValue();
+            if (oldestState == null || state.createdAtNanos < oldestState.createdAtNanos) {
+                oldestSerialNumber = entry.getIntKey();
+                oldestState = state;
+            }
+        }
+
+        if (oldestState != null) {
+            EXPORTS.remove(oldestSerialNumber);
+            deleteTempFile(oldestState);
+        }
     }
 
     @Override
     protected void write(ByteBuf buf) {
         var packetBuffer = new PacketBuffer(buf);
-        byte[] data = this.compressedData != null ? this.compressedData : new byte[0];
+        byte[] data = this.compressedData != null ? this.compressedData : EmptyArrays.EMPTY_BYTE_ARRAY;
         packetBuffer.writeInt(this.serialNumber);
         packetBuffer.writeEnumValue(this.contentType != null ? this.contentType : ContentType.CHUNK);
         packetBuffer.writeVarInt(data.length);
@@ -141,10 +173,15 @@ public class ExportedGridContent extends ClientboundPacket {
             return;
         }
 
+        byte[] data = this.compressedData != null ? this.compressedData : EmptyArrays.EMPTY_BYTE_ARRAY;
+        if (!export.state.addBytes(data.length)) {
+            failExport(minecraft, export.state, null, "Exported grid data exceeded the client size limit",
+                PlayerMessages.GridExportWriteFailed.text(export.state.tempPath));
+            return;
+        }
+
         try {
-            Files.write(export.state.tempPath,
-                this.compressedData != null ? this.compressedData : new byte[0],
-                export.options);
+            Files.write(export.state.tempPath, data, export.options);
         } catch (IOException e) {
             failExport(minecraft, export.state, e, "Failed to write exported grid data",
                 PlayerMessages.GridExportWriteFailed.text(export.state.tempPath));
@@ -172,13 +209,36 @@ public class ExportedGridContent extends ClientboundPacket {
         }
     }
 
+    @Override
+    protected void read(ByteBuf buf) {
+        var packetBuffer = new PacketBuffer(buf);
+        this.serialNumber = packetBuffer.readInt();
+        this.contentType = NetworkPacketHelper.readEnumOrNull(packetBuffer, ContentType.class);
+        if (this.contentType == null) {
+            throw new IllegalArgumentException("Invalid exported grid chunk content type");
+        }
+        int length = packetBuffer.readVarInt();
+        if (length < 0 || length > MAX_CHUNK_BYTES || length > packetBuffer.readableBytes()) {
+            throw new IllegalArgumentException("Invalid exported grid chunk length: " + length);
+        }
+        this.compressedData = new byte[length];
+        packetBuffer.readBytes(this.compressedData);
+        if (packetBuffer.isReadable()) {
+            throw new IllegalArgumentException("Trailing exported grid chunk payload bytes: "
+                + packetBuffer.readableBytes());
+        }
+    }
+
     private @Nullable PreparedExport prepareExport(Minecraft minecraft) {
         if (this.contentType == ContentType.FIRST_CHUNK) {
-            ExportState state = createState(minecraft);
-            ExportState previousState = EXPORTS.put(this.serialNumber, state);
+            ExportState previousState = EXPORTS.remove(this.serialNumber);
             if (previousState != null) {
                 deleteTempFile(previousState);
             }
+            pruneActiveExports();
+            evictOldestExportIfNeeded();
+            ExportState state = createState(minecraft);
+            EXPORTS.put(this.serialNumber, state);
             return new PreparedExport(state, CREATE_OR_TRUNCATE_OPTIONS);
         }
 
@@ -193,18 +253,22 @@ public class ExportedGridContent extends ClientboundPacket {
         return null;
     }
 
-    private void failExport(Minecraft minecraft, ExportState state, IOException exception, String logMessage,
+    private void failExport(Minecraft minecraft, ExportState state, @Nullable IOException exception, String logMessage,
                             ITextComponent playerMessage) {
         EXPORTS.remove(this.serialNumber);
         deleteTempFile(state);
-        AELog.error(exception, logMessage);
+        if (exception != null) {
+            AELog.error(exception, logMessage);
+        } else {
+            AELog.error(logMessage);
+        }
         minecraft.player.sendMessage(error(playerMessage));
     }
 
     private ExportState createState(Minecraft minecraft) {
         String filename = buildFilename(minecraft);
         Path finalPath = resolveFinalPath(minecraft, filename);
-        return new ExportState(finalPath.resolveSibling(filename + ".tmp"), finalPath);
+        return new ExportState(finalPath.resolveSibling(filename + ".tmp"), finalPath, System.nanoTime());
     }
 
     private String buildFilename(Minecraft minecraft) {
@@ -229,6 +293,25 @@ public class ExportedGridContent extends ClientboundPacket {
     private record PreparedExport(ExportState state, OpenOption[] options) {
     }
 
-    private record ExportState(Path tempPath, Path finalPath) {
+    private static final class ExportState {
+        private final Path tempPath;
+        private final Path finalPath;
+        private final long createdAtNanos;
+        private long writtenBytes;
+
+        private ExportState(Path tempPath, Path finalPath, long createdAtNanos) {
+            this.tempPath = tempPath;
+            this.finalPath = finalPath;
+            this.createdAtNanos = createdAtNanos;
+        }
+
+        private boolean addBytes(int bytes) {
+            long newWrittenBytes = this.writtenBytes + bytes;
+            if (newWrittenBytes > MAX_EXPORT_BYTES) {
+                return false;
+            }
+            this.writtenBytes = newWrittenBytes;
+            return true;
+        }
     }
 }

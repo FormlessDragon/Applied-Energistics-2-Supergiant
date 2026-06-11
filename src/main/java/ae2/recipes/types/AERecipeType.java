@@ -10,6 +10,7 @@ import java.util.function.Predicate;
 public final class AERecipeType<T> {
     private final ResourceLocation id;
     private final List<T> recipes = new ObjectArrayList<>();
+    private final List<T> recipesView = Collections.unmodifiableList(this.recipes);
 
     public AERecipeType(ResourceLocation id) {
         this.id = id;
@@ -43,6 +44,6 @@ public final class AERecipeType<T> {
     }
 
     public List<T> getRecipes() {
-        return Collections.unmodifiableList(this.recipes);
+        return this.recipesView;
     }
 }

@@ -7,7 +7,7 @@ import mezz.jei.api.ingredients.VanillaTypes;
 import mezz.jei.api.recipe.IRecipeWrapper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.Ingredient;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.List;
@@ -24,6 +24,10 @@ class CrystalAssemblerRecipeWrapper implements IRecipeWrapper {
     }
 
     private static List<ItemStack> getStacks(Ingredient ingredient) {
+        if (ingredient == null || ingredient == Ingredient.EMPTY) {
+            return List.of(ItemStack.EMPTY);
+        }
+
         ItemStack[] stacks = ingredient.getMatchingStacks();
         return stacks.length == 0 ? List.of(ItemStack.EMPTY) : Arrays.asList(stacks);
     }
@@ -33,11 +37,14 @@ class CrystalAssemblerRecipeWrapper implements IRecipeWrapper {
         for (var input : recipe.getInputs()) {
             var stacks = new ObjectArrayList<ItemStack>();
             for (ItemStack stack : getStacks(input.ingredient())) {
+                if (stack == null || stack.isEmpty()) {
+                    continue;
+                }
                 ItemStack copy = stack.copy();
                 copy.setCount(input.amount());
                 stacks.add(copy);
             }
-            inputLists.add(stacks);
+            inputLists.add(stacks.isEmpty() ? List.of(ItemStack.EMPTY) : stacks);
         }
         return inputLists;
     }
@@ -51,7 +58,7 @@ class CrystalAssemblerRecipeWrapper implements IRecipeWrapper {
     }
 
     @Override
-    public void getIngredients(@NonNull IIngredients ingredients) {
+    public void getIngredients(@NotNull IIngredients ingredients) {
         ingredients.setInputLists(VanillaTypes.ITEM, this.itemInputs);
         var fluid = this.recipe.getFluid();
         if (fluid != null) {

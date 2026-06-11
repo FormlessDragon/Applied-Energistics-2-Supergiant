@@ -48,11 +48,13 @@ public class GuiSpecialStorageBus<T extends ContainerStorageBus> extends GuiUpgr
             ? this.style.getColor(PaletteColor.DEFAULT_TEXT_COLOR).toARGB() & 0xFFFFFF
             : 0x404040;
         ITextComponent connectedTo = container.getConnectedTo();
-        if (connectedTo != null) {
-            this.fontRenderer.drawString(GuiText.AttachedTo.text(connectedTo).getFormattedText(), 0, 0, color);
-        } else {
-            this.fontRenderer.drawString(GuiText.Unattached.getLocal(), 0, 0, color);
-        }
+        this.fontRenderer.drawString(getConnectedToLine(connectedTo), 0, 0, color);
         GlStateManager.popMatrix();
+    }
+
+    private String getConnectedToLine(ITextComponent connectedTo) {
+        return connectedTo != null
+            ? GuiText.AttachedTo.getLocal(connectedTo.getFormattedText())
+            : GuiText.Unattached.getLocal();
     }
 }

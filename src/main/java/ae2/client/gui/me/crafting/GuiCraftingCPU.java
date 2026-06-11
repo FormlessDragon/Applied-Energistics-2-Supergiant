@@ -20,6 +20,7 @@ package ae2.client.gui.me.crafting;
 
 import ae2.api.config.CpuSelectionMode;
 import ae2.api.config.Settings;
+import ae2.api.config.TerminalStyle;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.StackWithBounds;
 import ae2.client.gui.me.search.AEKeySearch;
@@ -65,7 +66,7 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
     private final AE2Button suspend;
     private final Scrollbar scrollbar;
     private final SettingToggleButton<CpuSelectionMode> schedulingModeButton;
-    private final SettingToggleButton<ae2.api.config.TerminalStyle> terminalStyleButton;
+    private final SettingToggleButton<TerminalStyle> terminalStyleButton;
     private final AETextField searchField;
     private final AEKeySearch search = new AEKeySearch();
     private final List<CraftingStatusEntry> visibleEntries = new ObjectArrayList<>();
@@ -82,7 +83,7 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
         this.table = new CraftingStatusTableRenderer(this, 9, 19);
         this.scrollbar = widgets.addScrollBar("scrollbar", Scrollbar.BIG);
         this.searchField = widgets.addTextField("search");
-        this.searchField.setPlaceholder(GuiText.SearchPlaceholder.text());
+        this.searchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.searchField.setTooltipMessage(Arrays.asList(
             GuiText.SearchTooltip.text(),
             GuiText.SearchTooltipModId.text(),
@@ -256,7 +257,7 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
         this.addToLeftToolbar(this.terminalStyleButton);
     }
 
-    protected SettingToggleButton<ae2.api.config.TerminalStyle> getTerminalStyleButton() {
+    protected SettingToggleButton<TerminalStyle> getTerminalStyleButton() {
         return this.terminalStyleButton;
     }
 
@@ -290,7 +291,7 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void toggleTerminalStyle(SettingToggleButton button, boolean backwards) {
-        var nextValue = (ae2.api.config.TerminalStyle) button.getNextValue(backwards);
+        var nextValue = (TerminalStyle) button.getNextValue(backwards);
         button.set(nextValue);
         AEConfig.instance().setTerminalStyle(nextValue);
         this.setWorldAndResolution(this.mc, this.width, this.height);

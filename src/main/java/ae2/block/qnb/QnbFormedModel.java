@@ -29,7 +29,7 @@ import net.minecraftforge.client.model.ModelLoaderRegistry;
 import net.minecraftforge.common.model.IModelState;
 import net.minecraftforge.common.model.TRSRTransformation;
 
-import javax.annotation.Nonnull;
+import org.jetbrains.annotations.NotNull;
 import java.util.Collection;
 import java.util.function.Function;
 
@@ -48,8 +48,8 @@ public class QnbFormedModel implements IModel {
     }
 
     @Override
-    public IBakedModel bake(@Nonnull IModelState state, @Nonnull VertexFormat format,
-                            @Nonnull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
+    public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
+                            @NotNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         try {
             IBakedModel ringModel = ModelLoaderRegistry.getModel(MODEL_RING).bake(state, format, bakedTextureGetter);
             return new QnbFormedBakedModel(ringModel, format, bakedTextureGetter);

@@ -8,11 +8,11 @@ import mezz.jei.api.ingredients.VanillaTypes;
 import mezz.jei.api.recipe.IRecipeWrapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
-import org.jspecify.annotations.NonNull;
+import net.minecraft.item.crafting.Ingredient;
+import org.jetbrains.annotations.NotNull;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.util.Arrays;
 import java.util.List;
 
 class CrystalFixerRecipeWrapper implements IRecipeWrapper {
@@ -33,11 +33,21 @@ class CrystalFixerRecipeWrapper implements IRecipeWrapper {
     private static List<List<ItemStack>> buildFuelInputs(CrystalFixerRecipe recipe) {
         var fuels = new ObjectArrayList<List<ItemStack>>();
         var alternatives = new ObjectArrayList<ItemStack>();
-        Arrays.stream(recipe.fuel().getMatchingStacks()).forEach(stack -> {
+        Ingredient fuel = recipe.fuel();
+        ItemStack[] matchingStacks = fuel == null ? null : fuel.getMatchingStacks();
+        if (matchingStacks == null) {
+            fuels.add(alternatives);
+            return fuels;
+        }
+
+        for (ItemStack stack : matchingStacks) {
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
             ItemStack copy = stack.copy();
             copy.setCount(recipe.fuelAmount());
             alternatives.add(copy);
-        });
+        }
         fuels.add(alternatives);
         return fuels;
     }
@@ -59,7 +69,7 @@ class CrystalFixerRecipeWrapper implements IRecipeWrapper {
     }
 
     @Override
-    public void getIngredients(@NonNull IIngredients ingredients) {
+    public void getIngredients(@NotNull IIngredients ingredients) {
         var inputs = new ObjectArrayList<List<ItemStack>>();
         inputs.add(List.of(this.input));
         inputs.addAll(this.fuelInputs);
@@ -68,7 +78,7 @@ class CrystalFixerRecipeWrapper implements IRecipeWrapper {
     }
 
     @Override
-    public void drawInfo(@NonNull Minecraft minecraft, int recipeWidth, int recipeHeight, int mouseX, int mouseY) {
+    public void drawInfo(@NotNull Minecraft minecraft, int recipeWidth, int recipeHeight, int mouseX, int mouseY) {
         String chance = HeiText.CrystalFixerSuccessChance.getLocal(PERCENT.format(this.recipe.getChancePercent()));
         minecraft.fontRenderer.drawString(chance, 1, 2, 0x7E7E7E);
     }

@@ -35,15 +35,19 @@ import ae2.helpers.patternprovider.PatternContainer;
 import ae2.helpers.patternprovider.PatternProviderLogic;
 import ae2.helpers.patternprovider.PseudoPatternDetails;
 import ae2.me.service.CraftingService;
+import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A crafting tree process is what represents a pattern in the crafting process. It has a parent node (its output), and
@@ -53,7 +57,7 @@ public class CraftingTreeProcess {
 
     final IPatternDetails details;
     private static final Comparator<PatternContainerGroup> MACHINE_GROUP_COMPARATOR =
-        Comparator.comparing(group -> group.name().getFormattedText().toLowerCase(java.util.Locale.ROOT));
+        Comparator.comparing(group -> group.name().getFormattedText().toLowerCase(Locale.ROOT));
     private final List<PatternContainerGroup> machineGroups;
     private final CraftingTreeNode parent;
     private final CraftingCalculation job;
@@ -215,7 +219,7 @@ public class CraftingTreeProcess {
                 var entry = this.nodes.object2LongEntrySet().getFirst();
                 long requiredPerPattern = entry.getLongValue();
                 long availableInputs = entry.getKey().extractAvailableForCrafting(sharedInputs,
-                    requiredPerPattern * craftableTimes);
+                    LongMath.saturatedMultiply(requiredPerPattern, craftableTimes));
                 craftableTimes = availableInputs / requiredPerPattern;
                 if (craftableTimes > 0) {
                     var recursiveMissingSeeds = copyPositiveDelta(this.job.getRecursiveMissingSeedsMarker(),
@@ -241,7 +245,7 @@ public class CraftingTreeProcess {
             for (Object2LongMap.Entry<CraftingTreeNode> entry : this.nodes.object2LongEntrySet()) {
                 long requiredPerPattern = entry.getLongValue();
                 long availableInputs = entry.getKey().extractAvailableForCrafting(sharedInputs,
-                    requiredPerPattern * craftableTimes);
+                    LongMath.saturatedMultiply(requiredPerPattern, craftableTimes));
                 craftableTimes = Math.min(craftableTimes, availableInputs / requiredPerPattern);
                 if (craftableTimes == 0) {
                     return 0;
@@ -268,10 +272,11 @@ public class CraftingTreeProcess {
         }
 
         for (var out : this.details.getOutputs()) {
+            long outputAmount = LongMath.saturatedMultiply(out.amount(), times);
             if (isFinalOutputPseudoPattern()) {
-                preview.state().insertPseudo(out.what(), out.amount() * times, Actionable.MODULATE);
+                preview.state().insertPseudo(out.what(), outputAmount, Actionable.MODULATE);
             } else {
-                preview.state().insert(out.what(), out.amount() * times, Actionable.MODULATE);
+                preview.state().insert(out.what(), outputAmount, Actionable.MODULATE);
             }
         }
 
@@ -330,10 +335,11 @@ public class CraftingTreeProcess {
 
             // add crafting results.
             for (var out : this.details.getOutputs()) {
+                long outputAmount = LongMath.saturatedMultiply(out.amount(), times);
                 if (isFinalOutputPseudoPattern()) {
-                    inv.insertPseudo(out.what(), out.amount() * times, Actionable.MODULATE);
+                    inv.insertPseudo(out.what(), outputAmount, Actionable.MODULATE);
                 } else {
-                    inv.insert(out.what(), out.amount() * times, Actionable.MODULATE);
+                    inv.insert(out.what(), outputAmount, Actionable.MODULATE);
                 }
             }
 
@@ -356,7 +362,7 @@ public class CraftingTreeProcess {
             }
             var requiredExtractMarker = inv.getRequiredExtractMarker();
             var missingItemsMarker = this.job.getMissingItemsMarker();
-            node.request(inv, entry.getLongValue() * times, containerItems);
+            node.request(inv, LongMath.saturatedMultiply(entry.getLongValue(), times), containerItems);
             recordTreeInputDisplayAmount(inv, node, requiredExtractMarker, missingItemsMarker);
         }
     }
@@ -483,7 +489,8 @@ public class CraftingTreeProcess {
         for (var input : this.details.getInputs()) {
             for (var possibleInput : input.possibleInputs()) {
                 if (what.matches(possibleInput)) {
-                    total += possibleInput.amount() * input.getMultiplier();
+                    total = LongMath.saturatedAdd(total,
+                        LongMath.saturatedMultiply(possibleInput.amount(), input.getMultiplier()));
                     break;
                 }
             }
@@ -492,41 +499,19 @@ public class CraftingTreeProcess {
         return total;
     }
 
-    AEKey getFirstInputKey() {
-        var inputs = this.details.getInputs();
-        if (inputs.length == 0) {
-            return null;
-        }
-        var possibleInputs = inputs[0].possibleInputs();
-        if (possibleInputs.length == 0) {
-            return null;
-        }
-        return possibleInputs[0].what();
-    }
-
-    long getFirstInputAmount() {
-        var inputs = this.details.getInputs();
-        if (inputs.length == 0) {
-            return 0;
-        }
-        var possibleInputs = inputs[0].possibleInputs();
-        if (possibleInputs.length == 0) {
-            return 0;
-        }
-        return possibleInputs[0].amount() * inputs[0].getMultiplier();
-    }
-
     void accumulateNet(KeyCounter netByKey) {
         for (var output : this.details.getOutputs()) {
             netByKey.add(output.what(), output.amount());
         }
         for (Object2LongMap.Entry<CraftingTreeNode> entry : this.nodes.object2LongEntrySet()) {
             var node = entry.getKey();
-            netByKey.add(node.getWhat(), -node.getTemplateAmount() * entry.getLongValue());
+            netByKey.add(node.getWhat(),
+                LongMath.saturatedSubtract(0, LongMath.saturatedMultiply(node.getTemplateAmount(),
+                    entry.getLongValue())));
         }
     }
 
-    void accumulateInputKeys(java.util.Set<AEKey> inputKeys) {
+    void accumulateInputKeys(Set<AEKey> inputKeys) {
         for (CraftingTreeNode node : this.nodes.keySet()) {
             inputKeys.add(node.getWhat());
         }
@@ -573,9 +558,9 @@ public class CraftingTreeProcess {
     private record Preview(CraftingSimulationState parent, ChildCraftingSimulationState state, long times,
                            long intermediateFinalOutputAmount, KeyCounter recursiveMissingSeeds,
                            KeyCounter clearedRecursiveMissingSeeds,
-                           java.util.Set<AEKey> realSeededRecursiveRequests,
-                           java.util.Set<AEKey> realRecursiveSeeds,
-                           java.util.Set<AEKey> realSeededRecursiveKeys,
-                           java.util.IdentityHashMap<CraftingTreeNode, Long> recursiveDisplayRequestsDelta) {
+                           Set<AEKey> realSeededRecursiveRequests,
+                           Set<AEKey> realRecursiveSeeds,
+                           Set<AEKey> realSeededRecursiveKeys,
+                           IdentityHashMap<CraftingTreeNode, Long> recursiveDisplayRequestsDelta) {
     }
 }

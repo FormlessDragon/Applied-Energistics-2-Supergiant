@@ -19,6 +19,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.EnumHand;
 import net.minecraft.util.NonNullList;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.BlockPos;
@@ -26,15 +27,15 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public final class WrenchHook {
     public WrenchHook() {
     }
 
-    public static EnumActionResult onPlayerUseBlock(EntityPlayer player, World world, net.minecraft.util.EnumHand hand,
+    public static EnumActionResult onPlayerUseBlock(EntityPlayer player, World world, EnumHand hand,
                                                     BlockPos pos, EnumFacing clickedFace, Vec3d localHit) {
-        if (player == null || world == null || pos == null || clickedFace == null || hand != net.minecraft.util.EnumHand.MAIN_HAND) {
+        if (player == null || world == null || pos == null || clickedFace == null || hand != EnumHand.MAIN_HAND) {
             return EnumActionResult.PASS;
         }
 

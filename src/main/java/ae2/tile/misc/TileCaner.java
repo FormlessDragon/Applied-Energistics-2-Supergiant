@@ -35,6 +35,7 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.capabilities.Capability;
@@ -317,17 +318,26 @@ public class TileCaner extends AENetworkedPoweredTile
         }
     }
 
+    private static ItemStack readStack(NBTTagCompound tag) {
+        try {
+            return new ItemStack(tag);
+        } catch (RuntimeException ignored) {
+            return ItemStack.EMPTY;
+        }
+    }
+
     @Override
     public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
         this.container.readFromNBT(data, "container");
         this.stuff.readFromChildTag(data, "stuff");
-        this.target = data.hasKey("target", 10) ? new ItemStack(data.getCompoundTag("target")) : ItemStack.EMPTY;
+        this.target = data.hasKey("target", 10) ? readStack(data.getCompoundTag("target")) : ItemStack.EMPTY;
         this.ejectSide = data.hasKey("ejectSide") ? EnumFacing.byName(data.getString("ejectSide")) : null;
         if (data.hasKey("mode")) {
             int ordinal = data.getByte("mode");
-            if (ordinal >= 0 && ordinal < CanerMode.values().length) {
-                this.mode = CanerMode.values()[ordinal];
+            CanerMode[] modes = CanerMode.values();
+            if (ordinal >= 0 && ordinal < modes.length) {
+                this.mode = modes[ordinal];
             }
         }
         this.emptyKey = data.hasKey("emptyKey", 10) ? AEKey.fromTagGeneric(data.getCompoundTag("emptyKey")) : null;
@@ -338,7 +348,7 @@ public class TileCaner extends AENetworkedPoweredTile
         super.writeToStream(data);
         data.writeBoolean(!this.container.getStackInSlot(0).isEmpty());
         if (!this.container.getStackInSlot(0).isEmpty()) {
-            net.minecraft.network.PacketBuffer packet = new net.minecraft.network.PacketBuffer(data);
+            PacketBuffer packet = new PacketBuffer(data);
             packet.writeItemStack(this.container.getStackInSlot(0));
         }
     }
@@ -349,7 +359,7 @@ public class TileCaner extends AENetworkedPoweredTile
         ItemStack old = this.clientContainer;
         if (data.readBoolean()) {
             try {
-                this.clientContainer = new net.minecraft.network.PacketBuffer(data).readItemStack();
+                this.clientContainer = new PacketBuffer(data).readItemStack();
             } catch (IOException e) {
                 AELog.warn(e, "Failed to read caner item from update stream");
                 this.clientContainer = ItemStack.EMPTY;
@@ -412,6 +422,9 @@ public class TileCaner extends AENetworkedPoweredTile
         }
         var first = inputs[0].getFirstEntry();
         var second = inputs[1].getFirstEntry();
+        if (first == null || second == null) {
+            return false;
+        }
         GenericStack output = patternDetails.getPrimaryOutput();
         var content = first;
         var containerEntry = second;
@@ -419,10 +432,15 @@ public class TileCaner extends AENetworkedPoweredTile
             content = second;
             containerEntry = first;
         }
+        var contentKey = content.getKey();
+        var containerKey = containerEntry.getKey();
+        if (!(containerKey instanceof AEItemKey containerItem) || contentKey == null
+            || content.getLongValue() <= 0) {
+            return false;
+        }
         AEItemKey outputItem = (AEItemKey) output.what();
-        AEItemKey containerItem = (AEItemKey) containerEntry.getKey();
 
-        this.stuff.setStack(0, new GenericStack(content.getKey(), content.getLongValue()));
+        this.stuff.setStack(0, new GenericStack(contentKey, content.getLongValue()));
         this.container.setItemDirect(0, containerItem.toStack());
         this.target = outputItem.toStack();
         this.ejectSide = ejectionDirection;
@@ -447,9 +465,13 @@ public class TileCaner extends AENetworkedPoweredTile
             content = second;
             containerEntry = first;
         }
-        return containerEntry.getKey() instanceof AEItemKey
+        var contentKey = content.getKey();
+        var containerKey = containerEntry.getKey();
+        return containerKey instanceof AEItemKey
             && containerEntry.getLongValue() == 1
-            && !(content.getKey() instanceof AEItemKey);
+            && contentKey != null
+            && content.getLongValue() > 0
+            && !(contentKey instanceof AEItemKey);
     }
 
     private boolean pushEmptyPattern(IPatternDetails patternDetails, KeyCounter[] inputs, EnumFacing ejectionDirection) {
@@ -457,7 +479,12 @@ public class TileCaner extends AENetworkedPoweredTile
             return false;
         }
         var input = inputs[0].getFirstEntry();
-        AEItemKey inputItem = (AEItemKey) input.getKey();
+        if (input == null) {
+            return false;
+        }
+        if (!(input.getKey() instanceof AEItemKey inputItem)) {
+            return false;
+        }
 
         GenericStack firstOutput = patternDetails.getOutputs().get(0);
         GenericStack secondOutput = patternDetails.getOutputs().get(1);
@@ -507,6 +534,7 @@ public class TileCaner extends AENetworkedPoweredTile
     public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
         return capability == AECapabilities.GENERIC_INTERNAL_INV
             || capability == AECapabilities.CRAFTING_MACHINE
+            || capability == AECapabilities.PATTERN_PROVIDER_BATCH_TARGET
             || capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY
             || super.hasCapability(capability, facing);
     }
@@ -518,6 +546,9 @@ public class TileCaner extends AENetworkedPoweredTile
             return (T) this.stuff;
         }
         if (capability == AECapabilities.CRAFTING_MACHINE) {
+            return (T) this;
+        }
+        if (capability == AECapabilities.PATTERN_PROVIDER_BATCH_TARGET) {
             return (T) this;
         }
         if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {

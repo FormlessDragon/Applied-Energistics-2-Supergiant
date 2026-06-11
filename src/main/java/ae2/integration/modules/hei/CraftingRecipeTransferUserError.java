@@ -12,7 +12,7 @@ import mezz.jei.gui.recipes.RecipeTransferButton;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.fml.client.config.GuiUtils;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -67,7 +67,7 @@ final class CraftingRecipeTransferUserError implements IRecipeTransferError {
     }
 
     @Override
-    public void showError(Minecraft minecraft, int mouseX, int mouseY, @NonNull IRecipeLayout recipeLayout, int recipeX,
+    public void showError(Minecraft minecraft, int mouseX, int mouseY, @NotNull IRecipeLayout recipeLayout, int recipeX,
                           int recipeY) {
         int screenWidth = minecraft.currentScreen != null ? minecraft.currentScreen.width : minecraft.displayWidth;
         int screenHeight = minecraft.currentScreen != null ? minecraft.currentScreen.height : minecraft.displayHeight;

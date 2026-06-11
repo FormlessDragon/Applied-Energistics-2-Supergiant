@@ -174,6 +174,7 @@ public final class AEItemKey extends AEKey {
     }
 
     @Override
+    @Nullable
     public ResourceLocation getId() {
         return Item.REGISTRY.getNameForObject(stack.getItem());
     }
@@ -224,7 +225,7 @@ public final class AEItemKey extends AEKey {
     }
 
     @Override
-    public @org.jspecify.annotations.Nullable NBTBase get(String componentId) {
+    public @Nullable NBTBase get(String componentId) {
         var tag = stack.getTagCompound();
         var value = tag == null ? null : tag.getTag(componentId);
         return value == null ? null : value.copy();
@@ -246,7 +247,7 @@ public final class AEItemKey extends AEKey {
     @Override
     public String toString() {
         var id = Item.REGISTRY.getNameForObject(stack.getItem());
-        String idString = id != null ? id.toString() : stack.getItem().getClass().getName() + "(unregistered)";
+        String idString = id != null ? id.toString() : stack.getItem().getClass().getSimpleName() + "(unregistered)";
         return stack.hasTagCompound() ? idString + " (with tag)" : idString;
     }
 }

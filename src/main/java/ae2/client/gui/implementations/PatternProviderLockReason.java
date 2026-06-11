@@ -56,21 +56,21 @@ public class PatternProviderLockReason implements ICompositeWidget {
     public void drawForegroundLayer(Rectangle bounds, Point mouse) {
         ContainerPatternProvider container = this.screen.getContainer();
         Icon icon;
-        ITextComponent text;
+        String text;
         int color;
 
         if (container.getCraftingLockedReason() == LockCraftingMode.NONE) {
             icon = Icon.UNLOCKED;
-            text = GuiText.CraftingLockIsUnlocked.text();
+            text = GuiText.CraftingLockIsUnlocked.getLocal();
             color = 0x7DA9D2;
         } else {
             icon = Icon.LOCKED;
-            text = GuiText.CraftingLockIsLocked.text();
+            text = GuiText.CraftingLockIsLocked.getLocal();
             color = 0xC1424B;
         }
 
         icon.getBlitter().dest(this.x, this.y).blit();
-        Minecraft.getMinecraft().fontRenderer.drawString(text.getFormattedText(), this.x + 15, this.y + 5, color);
+        Minecraft.getMinecraft().fontRenderer.drawString(text, this.x + 15, this.y + 5, color);
     }
 
     @Nullable

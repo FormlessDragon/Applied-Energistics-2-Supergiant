@@ -50,6 +50,7 @@ public class ContainerConfigModifier extends AEBaseContainer {
     }
 
     public void setData(long data) {
+        data = ConfigModifierItem.Settings.normalizeData(data);
         if (isClientSide()) {
             this.data = data;
             sendClientAction(ACTION_SET_DATA, data);

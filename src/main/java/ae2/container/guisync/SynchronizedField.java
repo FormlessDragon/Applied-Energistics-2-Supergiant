@@ -32,11 +32,15 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 
 public abstract class SynchronizedField<T> {
+    private static final int MAX_STRING_BYTES = 4096;
+    private static final int MAX_CUSTOM_FIELD_BYTES = 1024 * 1024;
+
     private final Object source;
     private final MethodHandle getter;
     private final MethodHandle setter;
@@ -88,16 +92,22 @@ public abstract class SynchronizedField<T> {
     }
 
     private static void writeString(ByteBuf data, String value) {
-        byte[] bytes = value.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > MAX_STRING_BYTES) {
+            throw new IllegalArgumentException("Synchronized string is too long: " + bytes.length);
+        }
         data.writeInt(bytes.length);
         data.writeBytes(bytes);
     }
 
     private static String readString(ByteBuf data) {
         int length = data.readInt();
+        if (length < 0 || length > MAX_STRING_BYTES || length > data.readableBytes()) {
+            throw new IllegalArgumentException("Invalid synchronized string length: " + length);
+        }
         byte[] bytes = new byte[length];
         data.readBytes(bytes);
-        return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 
     @SuppressWarnings("unchecked")
@@ -282,7 +292,7 @@ public abstract class SynchronizedField<T> {
         @Nullable
         protected T readValue(ByteBuf data) {
             short ordinal = data.readShort();
-            return ordinal < 0 ? null : this.values[ordinal];
+            return ordinal >= 0 && ordinal < this.values.length ? this.values[ordinal] : null;
         }
     }
 
@@ -318,6 +328,10 @@ public abstract class SynchronizedField<T> {
 
         @Override
         protected Object readValue(ByteBuf data) {
+            int before = data.readableBytes();
+            if (before > MAX_CUSTOM_FIELD_BYTES) {
+                throw new IllegalArgumentException("Custom synchronized field payload is too large: " + before);
+            }
             return FACTORIES.computeIfAbsent(this.fieldType, CustomField::getFactory).apply(data);
         }
     }

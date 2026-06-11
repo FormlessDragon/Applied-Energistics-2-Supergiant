@@ -6,6 +6,8 @@ import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
 public final class ClientRequester implements Comparable<ClientRequester> {
+    public static final int MAX_REQUEST_COUNT = 64;
+
     private final long requesterId;
     private final RequestList requestManager;
     private @Nullable ITextComponent displayName;
@@ -15,10 +17,14 @@ public final class ClientRequester implements Comparable<ClientRequester> {
         this.requesterId = requesterId;
         this.displayName = displayName;
         this.sortValue = sortValue;
-        this.requestManager = new RequestList(null, requestCount);
+        this.requestManager = new RequestList(null, sanitizeRequestCount(requestCount));
         for (int i = 0; i < this.requestManager.size(); i++) {
             this.requestManager.get(i).setRequesterLocation(this.requesterId, i);
         }
+    }
+
+    private static int sanitizeRequestCount(int requestCount) {
+        return Math.clamp(requestCount, 0, MAX_REQUEST_COUNT);
     }
 
     public void update(@Nullable ITextComponent displayName, long sortValue) {

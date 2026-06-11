@@ -1,6 +1,6 @@
 package ae2.client;
 
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.awt.Rectangle;
 
@@ -34,7 +34,7 @@ public record Point(int x, int y) {
     }
 
     @Override
-    public @NonNull String toString() {
+    public @NotNull String toString() {
         return "Point{"
             + "x=" + x
             + ", y=" + y

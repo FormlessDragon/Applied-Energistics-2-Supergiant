@@ -35,7 +35,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.MathHelper;
 import net.minecraftforge.common.property.IExtendedBlockState;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
@@ -52,6 +52,7 @@ class PaintBakedModel implements IBakedModel {
 
     private final VertexFormat vertexFormat;
     private final TextureAtlasSprite[] textures;
+    private final List<BakedQuad> fallbackQuads;
 
     PaintBakedModel(VertexFormat vertexFormat, Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         this.vertexFormat = vertexFormat;
@@ -60,6 +61,11 @@ class PaintBakedModel implements IBakedModel {
             bakedTextureGetter.apply(TEXTURE_PAINT2),
             bakedTextureGetter.apply(TEXTURE_PAINT3)
         };
+        List<BakedQuad> fallbackQuads = new ObjectArrayList<>(6);
+        CubeBuilder builder = new CubeBuilder(this.vertexFormat, fallbackQuads);
+        builder.setTexture(this.textures[0]);
+        builder.addCube(0, 0, 0, 16, 16, 16);
+        this.fallbackQuads = Collections.unmodifiableList(fallbackQuads);
     }
 
     static List<ResourceLocation> getRequiredTextures() {
@@ -73,11 +79,7 @@ class PaintBakedModel implements IBakedModel {
         }
 
         if (!(state instanceof IExtendedBlockState)) {
-            List<BakedQuad> quads = new ObjectArrayList<>(1);
-            CubeBuilder builder = new CubeBuilder(this.vertexFormat, quads);
-            builder.setTexture(this.textures[0]);
-            builder.addCube(0, 0, 0, 16, 16, 16);
-            return quads;
+            return this.fallbackQuads;
         }
 
         PaintSplotches splotchesState = ((IExtendedBlockState) state).getValue(PaintSplotchesBlock.SPLOTCHES);

@@ -40,6 +40,7 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.client.renderer.tileentity.TileEntityItemStackRenderer;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
+import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
@@ -83,10 +84,6 @@ public final class InitStackRenderHandlers {
         }
 
         return encodedPattern.getOutput(stack, level);
-    }
-
-    static GuiRenderCleanupState getGuiRenderCleanupState() {
-        return GUI_RENDER_CLEANUP_STATE;
     }
 
     private static void restoreGuiRenderState() {
@@ -165,8 +162,8 @@ public final class InitStackRenderHandlers {
             List<String> lines = stack.getReadOnlyStack().getTooltip(
                 minecraft.player,
                 minecraft.gameSettings.advancedItemTooltips
-                    ? net.minecraft.client.util.ITooltipFlag.TooltipFlags.ADVANCED
-                    : net.minecraft.client.util.ITooltipFlag.TooltipFlags.NORMAL);
+                    ? ITooltipFlag.TooltipFlags.ADVANCED
+                    : ITooltipFlag.TooltipFlags.NORMAL);
             List<ITextComponent> result = new ObjectArrayList<>(lines.size());
             for (String line : lines) {
                 result.add(new TextComponentString(line));

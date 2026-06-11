@@ -28,7 +28,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.model.IModel;
 import net.minecraftforge.common.model.IModelState;
 import net.minecraftforge.common.model.TRSRTransformation;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -89,7 +89,7 @@ public class CraftingCubeModel implements IModel {
     }
 
     @Override
-    public IBakedModel bake(@NonNull IModelState state, @NonNull VertexFormat format,
+    public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
                             Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         TextureAtlasSprite ringCorner = bakedTextureGetter.apply(RING_CORNER);
         TextureAtlasSprite ringSideHor = bakedTextureGetter.apply(RING_SIDE_HOR);

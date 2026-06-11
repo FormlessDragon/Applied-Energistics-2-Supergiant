@@ -87,7 +87,9 @@ public class QuantumCalculator extends MBCalculator<TileQuantumBridge, QuantumCl
         byte ringNum = 0;
 
         for (BlockPos p : BlockPos.getAllInBox(min, max)) {
-            final TileQuantumBridge te = (TileQuantumBridge) level.getTileEntity(p);
+            if (!(level.getTileEntity(p) instanceof TileQuantumBridge te)) {
+                continue;
+            }
 
             num++;
             final byte flags;

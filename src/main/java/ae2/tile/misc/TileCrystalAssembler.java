@@ -42,6 +42,7 @@ import ae2.util.inv.CombinedInternalInventory;
 import ae2.util.inv.FilteredInternalInventory;
 import ae2.util.inv.filter.IAEItemFilter;
 import io.netty.buffer.ByteBuf;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
@@ -442,7 +443,7 @@ public class TileCrystalAssembler extends AENetworkedPoweredTile
     }
 
     @Override
-    public void returnToMainContainer(net.minecraft.entity.player.EntityPlayer player, ISubGui subGui) {
+    public void returnToMainContainer(EntityPlayer player, ISubGui subGui) {
         GuiOpener.openGui(player, GuiIds.GuiKey.CRYSTAL_ASSEMBLER, this, true);
     }
 

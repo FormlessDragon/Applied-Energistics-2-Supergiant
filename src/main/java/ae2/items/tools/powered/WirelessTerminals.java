@@ -1,5 +1,6 @@
 package ae2.items.tools.powered;
 
+import ae2.api.config.Setting;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigManagerBuilder;
 import ae2.util.ConfigManager;
@@ -77,7 +78,7 @@ public final class WirelessTerminals {
 
         return new IConfigManagerBuilder() {
             @Override
-            public <T extends Enum<T>> IConfigManagerBuilder registerSetting(ae2.api.config.Setting<T> setting,
+            public <T extends Enum<T>> IConfigManagerBuilder registerSetting(Setting<T> setting,
                                                                              T defaultValue) {
                 manager.registerSetting(setting, defaultValue);
                 return this;

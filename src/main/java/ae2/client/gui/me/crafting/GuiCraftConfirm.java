@@ -21,6 +21,7 @@ package ae2.client.gui.me.crafting;
 import ae2.api.config.CraftingPlanSortMode;
 import ae2.api.config.Settings;
 import ae2.api.config.SortDir;
+import ae2.api.config.TerminalStyle;
 import ae2.api.stacks.GenericStack;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
@@ -69,11 +70,9 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
     private final AE2Button start;
     private final AE2Button bookmarkMissing;
     private final AE2Button selectCPU;
-    private final AE2Button cancel;
-    private final TabButton craftTree;
     private final Scrollbar scrollbar;
     private final AETextField searchField;
-    private final SettingToggleButton<ae2.api.config.TerminalStyle> terminalStyleButton;
+    private final SettingToggleButton<TerminalStyle> terminalStyleButton;
     private final SettingToggleButton<CraftingPlanSortMode> sortModeButton;
     private final SettingToggleButton<SortDir> sortDirectionButton;
     private final AEKeySearch search = new AEKeySearch();
@@ -91,7 +90,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
 
         this.scrollbar = widgets.addScrollBar("scrollbar", Scrollbar.BIG);
         this.searchField = widgets.addTextField("search");
-        this.searchField.setPlaceholder(GuiText.SearchPlaceholder.text());
+        this.searchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.searchField.setTooltipMessage(Arrays.asList(
             GuiText.SearchTooltip.text(),
             GuiText.SearchTooltipModId.text(),
@@ -109,10 +108,10 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
         this.selectCPU = widgets.addButton("selectCpu", getNextCpuButtonLabel(), this::selectNextCpu);
         this.selectCPU.enabled = false;
 
-        this.cancel = widgets.addButton("cancel", GuiText.Cancel.text(), container::goBack);
+        widgets.addButton("cancel", GuiText.Cancel.text(), container::goBack);
 
-        this.craftTree = new TabButton(Icon.CTL_CRAFT_TREE, GuiText.CraftTree.text(), this::showCraftingTree);
-        widgets.add("craftTree", this.craftTree);
+        TabButton craftTree = new TabButton(Icon.CTL_CRAFT_TREE, GuiText.CraftTree.text(), this::showCraftingTree);
+        widgets.add("craftTree", craftTree);
         this.terminalStyleButton = new SettingToggleButton<>(
             Settings.TERMINAL_STYLE, AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle);
         addToLeftToolbar(this.terminalStyleButton);
@@ -295,7 +294,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
     }
 
     private void showCraftingTree() {
-        InitNetwork.sendToServer(new SwitchCraftingTreePacket());
+        InitNetwork.sendToServer(new SwitchCraftingTreePacket(this.container.windowId));
     }
 
     @Override
@@ -329,7 +328,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void toggleTerminalStyle(SettingToggleButton button, boolean backwards) {
-        var nextValue = (ae2.api.config.TerminalStyle) button.getNextValue(backwards);
+        var nextValue = (TerminalStyle) button.getNextValue(backwards);
         button.set(nextValue);
         AEConfig.instance().setTerminalStyle(nextValue);
         this.setWorldAndResolution(this.mc, this.width, this.height);
@@ -402,7 +401,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
         this.visibleEntries.sort(getSortComparator());
 
         if (finalOutput != null) {
-            this.visibleEntries.add(0, finalOutput);
+            this.visibleEntries.addFirst(finalOutput);
         }
     }
 

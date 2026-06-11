@@ -24,6 +24,7 @@ import ae2.api.implementations.items.IAEItemPowerStorage;
 import ae2.block.AEBaseBlockItem;
 import ae2.core.localization.ItemModText;
 import ae2.util.Platform;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -46,13 +47,12 @@ public class EnergyCellBlockItem extends AEBaseBlockItem implements IAEItemPower
     @Override
     public void addCheckedInformation(ItemStack itemStack, World worldIn, List<String> toolTip,
                                       ITooltipFlag advancedTooltips) {
-        toolTip.add(ItemModText.StoredEnergy.text((int) getAECurrentPower(itemStack), (int) getAEMaxPower(itemStack))
-                                            .getFormattedText());
+        toolTip.add(ItemModText.StoredEnergy.getLocal((long) getAECurrentPower(itemStack), (long) getAEMaxPower(itemStack)));
     }
 
     @Override
     public boolean placeBlockAt(ItemStack stack, EntityPlayer player, World world, BlockPos pos, EnumFacing side,
-                                float hitX, float hitY, float hitZ, net.minecraft.block.state.IBlockState newState) {
+                                float hitX, float hitY, float hitZ, IBlockState newState) {
         syncBlockEntityTag(stack);
         return super.placeBlockAt(stack, player, world, pos, side, hitX, hitY, hitZ, newState);
     }

@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import mezz.jei.api.gui.IGuiIngredient;
 import mezz.jei.api.gui.IRecipeLayout;
 import mezz.jei.api.ingredients.VanillaTypes;
+import mezz.jei.api.recipe.IRecipeCategory;
 import mezz.jei.api.recipe.VanillaRecipeCategoryUid;
 import mezz.jei.api.recipe.transfer.IRecipeTransferError;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandler;
@@ -31,7 +32,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.Ingredient;
 
-import javax.annotation.Nonnull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Objects;
@@ -52,10 +53,12 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
             ItemStack stack = ItemStack.EMPTY;
             if (i < inputs.size() && !inputs.get(i).isEmpty()) {
                 GenericStack genericStack = PatternImportPrioritySelector.selectIngredient(inputs.get(i), context, true);
-                if (genericStack.what() instanceof AEItemKey itemKey) {
-                    stack = itemKey.toStack();
-                } else {
-                    stack = GenericStack.wrapInItemStack(genericStack.what(), 1);
+                if (isValidStack(genericStack)) {
+                    if (genericStack.what() instanceof AEItemKey itemKey) {
+                        stack = itemKey.toStack();
+                    } else {
+                        stack = GenericStack.wrapInItemStack(genericStack.what(), 1);
+                    }
                 }
             }
             setFilter(container, slots[i], stack);
@@ -75,7 +78,7 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
             getGenericInputs(recipeLayout), context, container.getProcessingInputSlots());
         encodeSelectedStacksIntoSlots(container, getGenericOutputs(recipeLayout), context,
             container.getProcessingOutputSlots());
-        container.setHeiProcessingRecipe(recipeLayout.getRecipeCategory().getUid(), inputCandidateKeyTags);
+        container.setHeiProcessingRecipe(getRecipeCategoryUid(recipeLayout), inputCandidateKeyTags);
     }
 
     private static List<List<GenericStack>> getGenericInputs(IRecipeLayout recipeLayout) {
@@ -95,11 +98,15 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
         IntList missingSlots = new IntArrayList();
         IntList craftableSlots = new IntArrayList();
         IClientRepo repo = container.getClientRepo();
-        if (repo == null) {
+        var ingredientGroup = recipeLayout.getIngredientsGroup(VanillaTypes.ITEM);
+        if (repo == null || ingredientGroup == null) {
             return new RecipeTransferSlots(missingSlots, craftableSlots);
         }
         Object2IntMap<Object> reservedAmounts = new Object2IntOpenHashMap<>();
-        var map = recipeLayout.getIngredientsGroup(VanillaTypes.ITEM).getGuiIngredients();
+        var map = ingredientGroup.getGuiIngredients();
+        if (map == null || map.isEmpty()) {
+            return new RecipeTransferSlots(missingSlots, craftableSlots);
+        }
 
         if (map instanceof Int2ObjectMap<? extends IGuiIngredient<ItemStack>> m) {
             for (var entry : m.int2ObjectEntrySet()) {
@@ -126,6 +133,11 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
             }
         } else {
             for (var entry : map.entrySet()) {
+                Integer guiSlotKey = entry.getKey();
+                if (guiSlotKey == null) {
+                    continue;
+                }
+                int guiSlot = guiSlotKey;
                 IGuiIngredient<ItemStack> guiIngredient = entry.getValue();
                 if (guiIngredient == null || !guiIngredient.isInput()) {
                     continue;
@@ -142,9 +154,9 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
                 }
 
                 if (isCraftable(repo, ingredient)) {
-                    craftableSlots.add(entry.getKey().intValue());
+                    craftableSlots.add(guiSlot);
                 } else {
-                    missingSlots.add(entry.getKey().intValue());
+                    missingSlots.add(guiSlot);
                 }
             }
         }
@@ -153,7 +165,8 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
 
     private static boolean isCraftable(IClientRepo repo, Ingredient ingredient) {
         for (GridInventoryEntry entry : repo.getAllEntries()) {
-            if (entry.what() instanceof AEItemKey itemKey && itemKey.matches(ingredient) && entry.craftable()) {
+            if (entry != null && entry.what() instanceof AEItemKey itemKey && itemKey.matches(ingredient)
+                && entry.craftable()) {
                 return true;
             }
         }
@@ -175,13 +188,17 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
         List<GenericStack> encodedInputs = new ObjectArrayList<>();
         for (List<GenericStack> genericIngredient : possibleInputsBySlot) {
             if (!genericIngredient.isEmpty()) {
-                addOrMerge(encodedInputs, PatternImportPrioritySelector.selectIngredient(genericIngredient, context,
-                    false));
+                GenericStack selected = PatternImportPrioritySelector.selectIngredient(genericIngredient, context,
+                    false);
+                if (isValidStack(selected)) {
+                    addOrMerge(encodedInputs, selected);
+                }
             }
         }
 
         for (int i = 0; i < slots.length; i++) {
-            ItemStack stack = i < encodedInputs.size() ? GenericStack.wrapInItemStack(encodedInputs.get(i))
+            ItemStack stack = i < encodedInputs.size() && isValidStack(encodedInputs.get(i))
+                ? GenericStack.wrapInItemStack(encodedInputs.get(i))
                 : ItemStack.EMPTY;
             setFilter(container, slots[i], stack);
         }
@@ -195,14 +212,17 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
         List<List<AEKey>> candidatesByEncodedSlot = new ObjectArrayList<>();
         for (List<GenericStack> genericIngredient : possibleInputsBySlot) {
             if (!genericIngredient.isEmpty()) {
-                addOrMergeInput(encodedInputs, candidatesByEncodedSlot,
-                    PatternImportPrioritySelector.selectIngredient(genericIngredient, context, false),
-                    genericIngredient);
+                GenericStack selected = PatternImportPrioritySelector.selectIngredient(genericIngredient, context,
+                    false);
+                if (isValidStack(selected)) {
+                    addOrMergeInput(encodedInputs, candidatesByEncodedSlot, selected, genericIngredient);
+                }
             }
         }
 
         for (int i = 0; i < slots.length; i++) {
-            ItemStack stack = i < encodedInputs.size() ? GenericStack.wrapInItemStack(encodedInputs.get(i))
+            ItemStack stack = i < encodedInputs.size() && isValidStack(encodedInputs.get(i))
+                ? GenericStack.wrapInItemStack(encodedInputs.get(i))
                 : ItemStack.EMPTY;
             setFilter(container, slots[i], stack);
         }
@@ -221,12 +241,15 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
     private static void addOrMergeInput(List<GenericStack> stacks, List<List<AEKey>> candidatesByEncodedSlot,
                                         GenericStack newStack, List<GenericStack> possibleInputs) {
         List<AEKey> newCandidates = getCandidateKeys(possibleInputs);
+        if (!isValidStack(newStack)) {
+            return;
+        }
         if (!newCandidates.contains(newStack.what())) {
             newCandidates.add(newStack.what());
         }
         for (int i = 0; i < stacks.size(); i++) {
             GenericStack existingStack = stacks.get(i);
-            if (Objects.equals(existingStack.what(), newStack.what())) {
+            if (isValidStack(existingStack) && Objects.equals(existingStack.what(), newStack.what())) {
                 long newAmount = LongMath.saturatedAdd(existingStack.amount(), newStack.amount());
                 stacks.set(i, new GenericStack(newStack.what(), newAmount));
                 candidatesByEncodedSlot.set(i, intersectCandidates(candidatesByEncodedSlot.get(i), newCandidates));
@@ -247,7 +270,7 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
     private static List<AEKey> getCandidateKeys(List<GenericStack> possibleInputs) {
         List<AEKey> candidates = new ObjectArrayList<>();
         for (GenericStack possibleInput : possibleInputs) {
-            if (possibleInput != null && !candidates.contains(possibleInput.what())) {
+            if (isValidStack(possibleInput) && !candidates.contains(possibleInput.what())) {
                 candidates.add(possibleInput.what());
             }
         }
@@ -265,9 +288,12 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
     }
 
     private static void addOrMerge(List<GenericStack> stacks, GenericStack newStack) {
+        if (!isValidStack(newStack)) {
+            return;
+        }
         for (int i = 0; i < stacks.size(); i++) {
             GenericStack existingStack = stacks.get(i);
-            if (Objects.equals(existingStack.what(), newStack.what())) {
+            if (isValidStack(existingStack) && Objects.equals(existingStack.what(), newStack.what())) {
                 long newAmount = LongMath.saturatedAdd(existingStack.amount(), newStack.amount());
                 stacks.set(i, new GenericStack(newStack.what(), newAmount));
 
@@ -283,6 +309,9 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
     }
 
     private static void setFilter(ContainerPatternEncodingTerm container, FakeSlot slot, ItemStack stack) {
+        if (slot == null) {
+            return;
+        }
         InitNetwork.sendToServer(new InventoryActionPacket(
             container.windowId,
             InventoryAction.SET_FILTER,
@@ -295,12 +324,29 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
         return ContainerPatternEncodingTerm.class;
     }
 
+    private static String getRecipeCategoryUid(IRecipeLayout recipeLayout) {
+        IRecipeCategory<?> category = recipeLayout.getRecipeCategory();
+        return category == null ? "" : category.getUid();
+    }
+
+    private record RecipeTransferSlots(IntList missingGuiSlots, IntList craftableGuiSlots) {
+    }
+
+    private static boolean isValidStack(GenericStack stack) {
+        return stack != null && stack.what() != null && stack.amount() > 0;
+    }
+
     @Override
-    public IRecipeTransferError transferRecipe(@Nonnull ContainerPatternEncodingTerm container,
-                                               @Nonnull IRecipeLayout recipeLayout,
-                                               @Nonnull EntityPlayer player, boolean maxTransfer, boolean doTransfer) {
-        if (recipeLayout.getRecipeCategory().getUid().equals(VanillaRecipeCategoryUid.INFORMATION)
-            || recipeLayout.getRecipeCategory().getUid().equals(VanillaRecipeCategoryUid.FUEL)) {
+    public IRecipeTransferError transferRecipe(@NotNull ContainerPatternEncodingTerm container,
+                                               @NotNull IRecipeLayout recipeLayout,
+                                               @NotNull EntityPlayer player, boolean maxTransfer, boolean doTransfer) {
+        if (recipeLayout == null) {
+            return null;
+        }
+
+        String recipeCategoryUid = getRecipeCategoryUid(recipeLayout);
+        if (VanillaRecipeCategoryUid.INFORMATION.equals(recipeCategoryUid)
+            || VanillaRecipeCategoryUid.FUEL.equals(recipeCategoryUid)) {
             return null;
         }
 
@@ -309,14 +355,11 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
             return new PatternRecipeTransferUserError(recipeLayout, slots.missingGuiSlots(), slots.craftableGuiSlots());
         }
 
-        if (recipeLayout.getRecipeCategory().getUid().equals(VanillaRecipeCategoryUid.CRAFTING)) {
+        if (VanillaRecipeCategoryUid.CRAFTING.equals(recipeCategoryUid)) {
             encodeCraftingRecipe(container, recipeLayout);
         } else {
             encodeProcessingRecipe(container, recipeLayout);
         }
         return null;
-    }
-
-    private record RecipeTransferSlots(IntList missingGuiSlots, IntList craftableGuiSlots) {
     }
 }

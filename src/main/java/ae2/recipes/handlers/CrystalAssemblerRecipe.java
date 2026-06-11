@@ -66,6 +66,35 @@ public class CrystalAssemblerRecipe {
         return false;
     }
 
+    private static int multiplyClamped(int value, int multiplier) {
+        long result = (long) value * multiplier;
+        return result > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) result;
+    }
+
+    private static long multiplyClamped(long value, int multiplier) {
+        if (value > Long.MAX_VALUE / multiplier) {
+            return Long.MAX_VALUE;
+        }
+        return value * multiplier;
+    }
+
+    private static int clampToInt(long value) {
+        return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
+    }
+
+    private static int getMaxRunsForItems(Iterable<ItemStack> input, SizedIngredient ingredient) {
+        long available = 0;
+        for (ItemStack stack : input) {
+            if (!stack.isEmpty() && ingredient.ingredient().apply(stack)) {
+                available += stack.getCount();
+                if (available >= Integer.MAX_VALUE) {
+                    return Integer.MAX_VALUE / ingredient.amount();
+                }
+            }
+        }
+        return (int) (available / ingredient.amount());
+    }
+
     public List<SizedIngredient> getInputs() {
         return this.inputs;
     }
@@ -99,16 +128,22 @@ public class CrystalAssemblerRecipe {
     }
 
     public void consume(Iterable<ItemStack> input, GenericStackInv tank, int runs) {
+        if (runs <= 0) {
+            return;
+        }
         List<ItemStack> live = new ObjectArrayList<>();
         for (ItemStack stack : input) {
             live.add(stack);
         }
         for (var ingredient : this.inputs) {
-            consume(live, new SizedIngredient(ingredient.ingredient(), ingredient.amount() * runs), true);
+            consume(live, new SizedIngredient(ingredient.ingredient(), multiplyClamped(ingredient.amount(), runs)),
+                true);
         }
-        if (this.fluid != null && tank.getStack(0) != null) {
-            var stack = tank.getStack(0);
-            long remaining = stack.amount() - this.fluid.amount() * runs;
+        var fluid = this.fluid;
+        var stack = tank.getStack(0);
+        if (fluid != null && stack != null) {
+            long amount = multiplyClamped(fluid.amount(), runs);
+            long remaining = stack.amount() <= amount ? 0 : stack.amount() - amount;
             tank.setStack(0, remaining <= 0 ? null : new GenericStack(stack.what(), remaining));
         }
     }
@@ -120,14 +155,18 @@ public class CrystalAssemblerRecipe {
             if (fluidStack == null || !fluidStack.what().equals(this.fluid.fluid())) {
                 return 0;
             }
-            runs = Math.min(runs, (int) (fluidStack.amount() / this.fluid.amount()));
+            runs = Math.min(runs, clampToInt(fluidStack.amount() / this.fluid.amount()));
+        }
+        for (var ingredient : this.inputs) {
+            runs = Math.min(runs, getMaxRunsForItems(input, ingredient));
         }
 
         for (int i = runs; i > 0; i--) {
             List<ItemStack> remaining = copyInput(input);
             boolean matches = true;
             for (var ingredient : this.inputs) {
-                if (!consume(remaining, new SizedIngredient(ingredient.ingredient(), ingredient.amount() * i), false)) {
+                if (!consume(remaining, new SizedIngredient(ingredient.ingredient(), multiplyClamped(ingredient.amount(), i)),
+                    false)) {
                     matches = false;
                     break;
                 }
@@ -144,14 +183,28 @@ public class CrystalAssemblerRecipe {
     }
 
     public record SizedIngredient(Ingredient ingredient, int amount) {
+        public SizedIngredient {
+            if (amount <= 0) {
+                throw new IllegalArgumentException("Crystal assembler item ingredient amount must be positive.");
+            }
+        }
     }
 
     public record SizedFluidIngredient(AEFluidKey fluid, long amount) {
+        public SizedFluidIngredient {
+            if (amount <= 0) {
+                throw new IllegalArgumentException("Crystal assembler fluid ingredient amount must be positive.");
+            }
+        }
+
         public boolean matches(@Nullable GenericStack stack) {
             return stack != null && stack.what().equals(this.fluid) && stack.amount() >= this.amount;
         }
 
         public FluidStack toFluidStack() {
+            if (this.amount > Integer.MAX_VALUE) {
+                throw new IllegalStateException("Crystal assembler fluid ingredient amount is too large.");
+            }
             return this.fluid.toStack((int) this.amount);
         }
     }

@@ -8,10 +8,14 @@ import ae2.core.AELog;
 import ae2.core.network.clientbound.CraftingJobStatusPacket;
 import ae2.items.tools.powered.WirelessTerminals;
 import ae2.util.SearchInventoryEvent;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
@@ -24,16 +28,18 @@ import java.util.UUID;
 @SideOnly(Side.CLIENT)
 public final class PendingCraftingJobs {
     private static final Map<UUID, PendingJob> jobs = new Object2ObjectOpenHashMap<>();
+    private static final Object2IntMap<AEKey> pendingJobCounts = new Object2IntOpenHashMap<>();
 
     private PendingCraftingJobs() {
     }
 
     public static boolean hasPendingJob(AEKey what) {
-        return jobs.entrySet().stream().anyMatch(s -> s.getValue().what().equals(what));
+        return pendingJobCounts.containsKey(what);
     }
 
     public static void clearPendingJobs() {
         jobs.clear();
+        pendingJobCounts.clear();
     }
 
     public static void jobStatus(UUID id,
@@ -50,11 +56,12 @@ public final class PendingCraftingJobs {
             case STARTED -> {
                 if (existing == null) {
                     jobs.put(id, new PendingJob(id, what, requestedAmount, remainingAmount));
+                    pendingJobCounts.put(what, pendingJobCounts.getInt(what) + 1);
                 }
             }
-            case CANCELLED -> jobs.remove(id);
+            case CANCELLED -> removeJob(id);
             case FINISHED -> {
-                jobs.remove(id);
+                removeJob(id);
                 Minecraft minecraft = Minecraft.getMinecraft();
                 if (AEConfig.instance().isNotifyForFinishedCraftingJobs()
                     && minecraft.player != null && hasNotificationEnablingItem(minecraft.player)) {
@@ -66,14 +73,29 @@ public final class PendingCraftingJobs {
         }
     }
 
+    private static void removeJob(UUID id) {
+        PendingJob removed = jobs.remove(id);
+        if (removed == null) {
+            return;
+        }
+
+        AEKey what = removed.what();
+        int count = pendingJobCounts.getInt(what) - 1;
+        if (count > 0) {
+            pendingJobCounts.put(what, count);
+        } else {
+            pendingJobCounts.removeInt(what);
+        }
+    }
+
     private static boolean hasNotificationEnablingItem(EntityPlayerSP player) {
         for (ItemStack stack : SearchInventoryEvent.getItems(player)) {
-            net.minecraft.nbt.NBTTagCompound tag = stack.getTagCompound();
+            NBTTagCompound tag = stack.getTagCompound();
             if (!stack.isEmpty()
-                && stack.getItem() instanceof IAEItemPowerStorage
-                && ((IAEItemPowerStorage) stack.getItem()).getAECurrentPower(stack) > 0
+                && stack.getItem() instanceof IAEItemPowerStorage s
+                && s.getAECurrentPower(stack) > 0
                 && tag != null
-                && tag.hasKey(WirelessTerminals.TAG_LINK, 10)) {
+                && tag.hasKey(WirelessTerminals.TAG_LINK, Constants.NBT.TAG_COMPOUND)) {
                 return true;
             }
         }

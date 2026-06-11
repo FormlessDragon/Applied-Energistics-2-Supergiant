@@ -21,6 +21,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
+import org.lwjgl.opengl.GL11;
 
 import java.util.List;
 
@@ -129,6 +130,7 @@ public class StackTooltipRenderer {
         int labelY = y + (16 - font.FONT_HEIGHT) / 2;
 
         int xOffset = font.getStringWidth(label) + UPGRADES_LABEL_GAP;
+        TooltipGlState previousGlState = TooltipGlState.capture();
         for (ItemStack upgrade : data.upgrades()) {
             renderItem.renderItemAndEffectIntoGUI(upgrade, x + xOffset, y);
             renderItem.renderItemOverlayIntoGUI(font, upgrade, x + xOffset, y, null);
@@ -144,9 +146,8 @@ public class StackTooltipRenderer {
             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
             font.drawString(label, x, labelY, 0x7E7E7E);
         } finally {
-            GlStateManager.enableDepth();
-            GlStateManager.enableLighting();
             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            previousGlState.restore();
             GlStateManager.popMatrix();
         }
     }
@@ -204,6 +205,46 @@ public class StackTooltipRenderer {
             event.getHeight(), event.getLines());
     }
 
+    private static void setBlend(boolean enabled) {
+        if (enabled) {
+            GlStateManager.enableBlend();
+        } else {
+            GlStateManager.disableBlend();
+        }
+    }
+
+    private static void setColorMaterial(boolean enabled) {
+        if (enabled) {
+            GlStateManager.enableColorMaterial();
+        } else {
+            GlStateManager.disableColorMaterial();
+        }
+    }
+
+    private static void setDepth(boolean enabled) {
+        if (enabled) {
+            GlStateManager.enableDepth();
+        } else {
+            GlStateManager.disableDepth();
+        }
+    }
+
+    private static void setLight(int light, boolean enabled) {
+        if (enabled) {
+            GlStateManager.enableLight(light);
+        } else {
+            GlStateManager.disableLight(light);
+        }
+    }
+
+    private static void setLighting(boolean enabled) {
+        if (enabled) {
+            GlStateManager.enableLighting();
+        } else {
+            GlStateManager.disableLighting();
+        }
+    }
+
     public void drawTooltipImage(Minecraft minecraft, FontRenderer font, ItemStack stack, int tooltipX, int tooltipY,
                                  int tooltipHeight, List<String> tooltipLines) {
         if (stack.isEmpty() || !(stack.getItem() instanceof IStackTooltipDataProvider provider)) {
@@ -222,6 +263,7 @@ public class StackTooltipRenderer {
         int y = reservedLineStart >= 0
             ? tooltipY + reservedLineStart * 10 + 2
             : tooltipY + tooltipHeight - getReservedLineCount(data) * 10 + 2;
+        TooltipGlState previousGlState = TooltipGlState.capture();
         var renderItem = minecraft.getRenderItem();
         float previousRenderItemZLevel = renderItem.zLevel;
 
@@ -243,12 +285,31 @@ public class StackTooltipRenderer {
             }
         } finally {
             renderItem.zLevel = previousRenderItemZLevel;
-            RenderHelper.disableStandardItemLighting();
-            GlStateManager.disableLighting();
-            GlStateManager.enableDepth();
-            GlStateManager.enableBlend();
             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            previousGlState.restore();
             GlStateManager.popMatrix();
+        }
+    }
+
+    private record TooltipGlState(boolean lighting, boolean light0, boolean light1, boolean colorMaterial,
+                                  boolean depth, boolean blend) {
+        static TooltipGlState capture() {
+            return new TooltipGlState(
+                GL11.glIsEnabled(GL11.GL_LIGHTING),
+                GL11.glIsEnabled(GL11.GL_LIGHT0),
+                GL11.glIsEnabled(GL11.GL_LIGHT1),
+                GL11.glIsEnabled(GL11.GL_COLOR_MATERIAL),
+                GL11.glIsEnabled(GL11.GL_DEPTH_TEST),
+                GL11.glIsEnabled(GL11.GL_BLEND));
+        }
+
+        void restore() {
+            setLighting(lighting);
+            setLight(0, light0);
+            setLight(1, light1);
+            setColorMaterial(colorMaterial);
+            setDepth(depth);
+            setBlend(blend);
         }
     }
 }

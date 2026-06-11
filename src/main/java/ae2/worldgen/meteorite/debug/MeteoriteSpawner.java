@@ -26,12 +26,12 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class MeteoriteSpawner {
 
-    public @org.jspecify.annotations.Nullable PlacedMeteoriteSettings trySpawnMeteoriteAtSuitableHeight(World level, BlockPos startPos, float coreRadius,
-                                                                                                        CraterType craterType, boolean pureCrater) {
+    public @Nullable PlacedMeteoriteSettings trySpawnMeteoriteAtSuitableHeight(World level, BlockPos startPos, float coreRadius,
+                                                                               CraterType craterType, boolean pureCrater) {
         int stepSize = Math.min(5, (int) Math.ceil(coreRadius) + 1);
         int minY = 10 + stepSize;
         BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos(startPos.getX(), startPos.getY(),

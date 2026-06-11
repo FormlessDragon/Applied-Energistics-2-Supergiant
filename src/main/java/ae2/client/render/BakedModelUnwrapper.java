@@ -19,7 +19,7 @@
 package ae2.client.render;
 
 import net.minecraft.client.renderer.block.model.IBakedModel;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Helper to get a specific baked model class out of a chain of delegating baked models.

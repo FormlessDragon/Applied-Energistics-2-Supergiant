@@ -44,8 +44,9 @@ public class NamePressItem extends AEBaseItem {
         super.addCheckedInformation(stack, world, lines, advancedTooltips);
 
         ITextComponent inscribedName = null;
-        if (stack.hasTagCompound()) {
-            String rawName = stack.getTagCompound().getString(NAME_PRESS_NAME_TAG);
+        var tag = stack.getTagCompound();
+        if (tag != null) {
+            String rawName = tag.getString(NAME_PRESS_NAME_TAG);
             if (!rawName.isEmpty()) {
                 try {
                     inscribedName = Serializer.jsonToComponent(rawName);

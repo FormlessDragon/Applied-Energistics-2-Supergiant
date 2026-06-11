@@ -18,7 +18,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.Objects;
 
 public class ContainerSetStockAmount extends AEBaseContainer implements ISubGui {
@@ -78,6 +78,11 @@ public class ContainerSetStockAmount extends AEBaseContainer implements ISubGui 
         }
 
         GenericStackInv config = host.getConfig();
+        if (this.whatToStock == null || this.slot < 0 || this.slot >= config.size()) {
+            host.returnToMainContainer(getPlayer(), this);
+            return;
+        }
+
         if (!Objects.equals(config.getKey(this.slot), whatToStock)) {
             host.returnToMainContainer(getPlayer(), this);
             return;

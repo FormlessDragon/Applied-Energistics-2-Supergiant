@@ -18,6 +18,7 @@
 
 package ae2.spatial;
 
+import ae2.core.definitions.AEBlocks;
 import ae2.init.worldgen.InitBiomes;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EnumCreatureType;
@@ -28,7 +29,7 @@ import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkPrimer;
 import net.minecraft.world.gen.IChunkGenerator;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -46,7 +47,7 @@ public class SpatialStorageChunkGenerator implements IChunkGenerator {
     @Override
     public Chunk generateChunk(int x, int z) {
         ChunkPrimer primer = new ChunkPrimer();
-        IBlockState matrixFrame = ae2.core.definitions.AEBlocks.MATRIX_FRAME.block().getDefaultState();
+        IBlockState matrixFrame = AEBlocks.MATRIX_FRAME.block().getDefaultState();
         for (int localX = 0; localX < 16; localX++) {
             for (int localZ = 0; localZ < 16; localZ++) {
                 for (int y = 0; y < HEIGHT; y++) {

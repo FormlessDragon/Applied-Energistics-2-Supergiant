@@ -20,6 +20,7 @@ package ae2.tile.misc;
 import ae2.api.config.Actionable;
 import ae2.api.implementations.IPowerChannelState;
 import ae2.api.implementations.blockentities.ICrankable;
+import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridNodeListener;
 import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.networking.ticking.TickRateModulation;
@@ -37,7 +38,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.WorldServer;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -53,13 +54,13 @@ public class TileGrowthAccelerator extends AENetworkedPoweredTile implements IPo
         getMainNode().setIdlePowerUsage(POWER_PER_TICK);
         getMainNode().addService(IGridTickable.class, new IGridTickable() {
             @Override
-            public TickingRequest getTickingRequest(ae2.api.networking.IGridNode node) {
+            public TickingRequest getTickingRequest(IGridNode node) {
                 int speed = AEConfig.instance().getGrowthAcceleratorSpeed();
                 return new TickingRequest(speed, speed, false);
             }
 
             @Override
-            public TickRateModulation tickingRequest(ae2.api.networking.IGridNode node, int ticksSinceLastCall) {
+            public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
                 onTick(ticksSinceLastCall);
                 return TickRateModulation.SAME;
             }

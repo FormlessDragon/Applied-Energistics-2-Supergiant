@@ -76,16 +76,19 @@ public class AEKeyRendering {
 
     @SuppressWarnings("rawtypes")
     private static AEKeyRenderHandler getUnchecked(AEKey stack) {
+        Objects.requireNonNull(stack, "stack");
         return getOrThrow(stack.getType());
     }
 
     @SuppressWarnings("unchecked")
     public static void drawInGui(Minecraft minecraft, int x, int y, AEKey what) {
+        Objects.requireNonNull(minecraft, "minecraft");
         getUnchecked(what).drawInGui(minecraft, x, y, what);
     }
 
     @SuppressWarnings({"unchecked", "unused"})
     public static void drawOnBlockFace(AEKey what, float scale, int combinedLightIn, World level) {
+        Objects.requireNonNull(level, "level");
         getUnchecked(what).drawOnBlockFace(what, scale, combinedLightIn, level);
     }
 

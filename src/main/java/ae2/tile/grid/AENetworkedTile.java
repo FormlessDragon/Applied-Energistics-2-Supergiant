@@ -18,6 +18,7 @@
 
 package ae2.tile.grid;
 
+import ae2.api.AECapabilities;
 import ae2.api.networking.GridHelper;
 import ae2.api.networking.IManagedGridNode;
 import ae2.api.orientation.BlockOrientation;
@@ -27,6 +28,8 @@ import ae2.me.helpers.TileNodeListener;
 import ae2.tile.AEBaseTile;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
+import net.minecraftforge.common.capabilities.Capability;
+import org.jetbrains.annotations.Nullable;
 
 public class AENetworkedTile extends AEBaseTile implements IGridConnectedTile {
 
@@ -88,6 +91,23 @@ public class AENetworkedTile extends AEBaseTile implements IGridConnectedTile {
 
     protected final void onGridConnectableSidesChanged() {
         getMainNode().setExposedOnSides(getGridConnectableSides(getOrientation()));
+    }
+
+    @Override
+    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+        if (capability == AECapabilities.IN_WORLD_GRID_NODE_HOST) {
+            return true;
+        }
+        return super.hasCapability(capability, facing);
+    }
+
+    @Nullable
+    @Override
+    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+        if (capability == AECapabilities.IN_WORLD_GRID_NODE_HOST) {
+            return AECapabilities.IN_WORLD_GRID_NODE_HOST.cast(this);
+        }
+        return super.getCapability(capability, facing);
     }
 
     @Override

@@ -199,7 +199,7 @@ public interface ICraftingService extends IGridService {
     }
 
     /**
-     * Updates the grid-wide recursive ingredient reserve amount. Values below zero are clamped by implementations.
+     * Updates the grid-wide recursive ingredient reserve amount. Implementations clamp values to the supported range.
      */
     default void setRecursiveIngredientReserveAmount(long amount) {
     }

@@ -36,9 +36,8 @@ import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.TextureStitchEvent;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
-
-import javax.annotation.Nullable;
 
 public final class InscriberTESR extends TileEntitySpecialRenderer<TileInscriber> {
     private static final float ITEM_RENDER_SCALE = 1.0f / 1.2f;

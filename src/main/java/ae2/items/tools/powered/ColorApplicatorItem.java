@@ -25,8 +25,10 @@ import ae2.api.implementations.tiles.IColorableTile;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKeyType;
+import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.StorageCells;
 import ae2.api.storage.cells.IBasicCellItem;
+import ae2.api.storage.cells.StorageCell;
 import ae2.api.upgrades.IUpgradeInventory;
 import ae2.api.upgrades.UpgradeInventories;
 import ae2.api.upgrades.Upgrades;
@@ -40,6 +42,7 @@ import ae2.items.tools.powered.powersink.AEBasePoweredItem;
 import ae2.me.helpers.BaseActionSource;
 import ae2.util.ConfigInventory;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.block.Block;
@@ -64,7 +67,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraftforge.oredict.OreDictionary;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -191,38 +194,28 @@ public class ColorApplicatorItem extends AEBasePoweredItem implements IBasicCell
         return EnumActionResult.FAIL;
     }
 
+    private static ItemStack readStack(NBTTagCompound tag) {
+        try {
+            return new ItemStack(tag);
+        } catch (RuntimeException ignored) {
+            return ItemStack.EMPTY;
+        }
+    }
+
     public boolean consumeColor(ItemStack applicator, AEColor color, boolean simulate) {
-        ae2.api.storage.cells.StorageCell inv = StorageCells.getCellInventory(applicator, null);
+        StorageCell inv = StorageCells.getCellInventory(applicator, null);
         if (inv == null) {
             return false;
         }
 
-        ae2.api.stacks.KeyCounter availableItems = inv.getAvailableStacks();
-        for (it.unimi.dsi.fastutil.objects.Object2LongMap.Entry<AEKey> entry : availableItems) {
+        KeyCounter availableItems = inv.getAvailableStacks();
+        for (Object2LongMap.Entry<AEKey> entry : availableItems) {
             if (getColorFromKey(entry.getKey()) == color) {
                 return consumeItem(applicator, entry.getKey(), simulate);
             }
         }
 
         return false;
-    }
-
-    public boolean consumeItem(ItemStack applicator, AEKey key, boolean simulate) {
-        ae2.api.storage.cells.StorageCell inv = StorageCells.getCellInventory(applicator, null);
-        if (inv == null) {
-            return false;
-        }
-
-        Actionable mode = simulate ? Actionable.SIMULATE : Actionable.MODULATE;
-        boolean success = inv.extract(key, 1, mode, new BaseActionSource()) >= 1
-            && this.extractAEPower(applicator, POWER_PER_USE, mode) >= POWER_PER_USE;
-
-        if (success && !simulate && getColorFromKey(key) == getActiveColor(applicator)
-            && inv.getAvailableStacks().get(key) == 0) {
-            setColor(applicator, ItemStack.EMPTY);
-        }
-
-        return success;
     }
 
     public AEColor getActiveColor(final ItemStack tol) {
@@ -267,57 +260,22 @@ public class ColorApplicatorItem extends AEBasePoweredItem implements IBasicCell
         return this.findNextColor(is, ItemStack.EMPTY, 0);
     }
 
-    private ItemStack findNextColor(final ItemStack is, final ItemStack anchor, final int scrollOffset) {
-        ItemStack newColor = ItemStack.EMPTY;
-
-        ae2.api.storage.cells.StorageCell inv = StorageCells.getCellInventory(is, null);
-        if (inv != null) {
-            ae2.api.stacks.KeyCounter keyList = inv.getAvailableStacks();
-            if (anchor.isEmpty()) {
-                AEKey firstItem = keyList.getFirstKey();
-                if (firstItem instanceof AEItemKey itemKey) {
-                    newColor = itemKey.toStack();
-                }
-            } else {
-                final ObjectList<AEItemKey> list = new ObjectArrayList<>();
-                for (it.unimi.dsi.fastutil.objects.Object2LongMap.Entry<AEKey> entry : keyList) {
-                    if (entry.getKey() instanceof AEItemKey itemKey) {
-                        list.add(itemKey);
-                    }
-                }
-
-                list.sort(Comparator.comparingInt(key -> key.toStack().getItemDamage()));
-                if (list.isEmpty()) {
-                    return ItemStack.EMPTY;
-                }
-
-                AEItemKey where = list.getFirst();
-                int cycles = 1 + list.size();
-                AEItemKey anchorKey = AEItemKey.of(anchor);
-
-                while (cycles > 0 && !where.equals(anchorKey)) {
-                    list.add(list.removeFirst());
-                    cycles--;
-                    where = list.getFirst();
-                }
-
-                if (scrollOffset > 0) {
-                    list.add(list.removeFirst());
-                }
-
-                if (scrollOffset < 0) {
-                    list.addFirst(list.removeLast());
-                }
-
-                return list.getFirst().toStack();
-            }
+    public boolean consumeItem(ItemStack applicator, AEKey key, boolean simulate) {
+        StorageCell inv = StorageCells.getCellInventory(applicator, null);
+        if (inv == null) {
+            return false;
         }
 
-        if (!newColor.isEmpty()) {
-            this.setColor(is, newColor);
+        Actionable mode = simulate ? Actionable.SIMULATE : Actionable.MODULATE;
+        boolean success = inv.extract(key, 1, mode, new BaseActionSource()) >= 1
+            && this.extractAEPower(applicator, POWER_PER_USE, mode) >= POWER_PER_USE;
+
+        if (success && !simulate && getColorFromKey(key) == getActiveColor(applicator)
+            && inv.getAvailableStacks().get(key) == 0) {
+            setColor(applicator, ItemStack.EMPTY);
         }
 
-        return newColor;
+        return success;
     }
 
     private void setColor(final ItemStack is, final ItemStack newColor) {
@@ -461,18 +419,76 @@ public class ColorApplicatorItem extends AEBasePoweredItem implements IBasicCell
         cycleColors(is, getColor(is), up ? 1 : -1);
     }
 
+    private ItemStack findNextColor(final ItemStack is, final ItemStack anchor, final int scrollOffset) {
+        ItemStack newColor = ItemStack.EMPTY;
+
+        StorageCell inv = StorageCells.getCellInventory(is, null);
+        if (inv != null) {
+            KeyCounter keyList = inv.getAvailableStacks();
+            if (anchor.isEmpty()) {
+                AEKey firstItem = keyList.getFirstKey();
+                if (firstItem instanceof AEItemKey itemKey) {
+                    newColor = itemKey.toStack();
+                }
+            } else {
+                final ObjectList<AEItemKey> list = new ObjectArrayList<>();
+                for (Object2LongMap.Entry<AEKey> entry : keyList) {
+                    if (entry.getKey() instanceof AEItemKey itemKey) {
+                        list.add(itemKey);
+                    }
+                }
+
+                list.sort(Comparator.comparingInt(key -> key.toStack().getItemDamage()));
+                if (list.isEmpty()) {
+                    return ItemStack.EMPTY;
+                }
+
+                AEItemKey where = list.getFirst();
+                int cycles = 1 + list.size();
+                AEItemKey anchorKey = AEItemKey.of(anchor);
+
+                while (cycles > 0 && !where.equals(anchorKey)) {
+                    list.add(list.removeFirst());
+                    cycles--;
+                    where = list.getFirst();
+                }
+
+                if (scrollOffset > 0) {
+                    list.add(list.removeFirst());
+                }
+
+                if (scrollOffset < 0) {
+                    list.addFirst(list.removeLast());
+                }
+
+                return list.getFirst().toStack();
+            }
+        }
+
+        if (!newColor.isEmpty()) {
+            this.setColor(is, newColor);
+        }
+
+        return newColor;
+    }
+
+    private void onUpgradesChanged(ItemStack stack, IUpgradeInventory upgrades) {
+        setAEMaxPower(stack, AEConfig.instance().getColorApplicatorBattery()
+            * (1 + Upgrades.getEnergyCardMultiplier(upgrades) * 8));
+    }
+
     public void setActiveColor(ItemStack applicator, @Nullable AEColor color) {
         if (color == null) {
             setSelectedColor(applicator, null);
             return;
         }
 
-        ae2.api.storage.cells.StorageCell inv = StorageCells.getCellInventory(applicator, null);
+        StorageCell inv = StorageCells.getCellInventory(applicator, null);
         if (inv == null) {
             return;
         }
 
-        for (it.unimi.dsi.fastutil.objects.Object2LongMap.Entry<AEKey> entry : inv.getAvailableStacks()) {
+        for (Object2LongMap.Entry<AEKey> entry : inv.getAvailableStacks()) {
             if (entry.getKey() instanceof AEItemKey itemKey) {
                 if (getColorFromKey(itemKey) == color) {
                     setSelectedColor(applicator, color);
@@ -482,9 +498,16 @@ public class ColorApplicatorItem extends AEBasePoweredItem implements IBasicCell
         }
     }
 
-    private void onUpgradesChanged(ItemStack stack, IUpgradeInventory upgrades) {
-        setAEMaxPower(stack, AEConfig.instance().getColorApplicatorBattery()
-            * (1 + Upgrades.getEnergyCardMultiplier(upgrades) * 8));
+    private void setSelectedColor(ItemStack stack, @Nullable AEColor color) {
+        final NBTTagCompound tag = openNbtData(stack);
+        if (color == null) {
+            tag.removeTag(SELECTED_COLOR);
+            tag.removeTag("color");
+            return;
+        }
+
+        tag.setString(SELECTED_COLOR, color.name());
+        tag.removeTag("color");
     }
 
     @Nullable
@@ -502,32 +525,20 @@ public class ColorApplicatorItem extends AEBasePoweredItem implements IBasicCell
         }
 
         if (tag.hasKey("color", 10)) {
-            ItemStack legacyColor = new ItemStack(tag.getCompoundTag("color"));
+            ItemStack legacyColor = readStack(tag.getCompoundTag("color"));
             return getColorFromItem(legacyColor);
         }
 
         return null;
     }
 
-    private void setSelectedColor(ItemStack stack, @Nullable AEColor color) {
-        final NBTTagCompound tag = openNbtData(stack);
-        if (color == null) {
-            tag.removeTag(SELECTED_COLOR);
-            tag.removeTag("color");
-            return;
-        }
-
-        tag.setString(SELECTED_COLOR, color.name());
-        tag.removeTag("color");
-    }
-
     private ItemStack findColorStack(ItemStack applicator, AEColor color) {
-        ae2.api.storage.cells.StorageCell inv = StorageCells.getCellInventory(applicator, null);
+        StorageCell inv = StorageCells.getCellInventory(applicator, null);
         if (inv == null) {
             return ItemStack.EMPTY;
         }
 
-        for (it.unimi.dsi.fastutil.objects.Object2LongMap.Entry<AEKey> entry : inv.getAvailableStacks()) {
+        for (Object2LongMap.Entry<AEKey> entry : inv.getAvailableStacks()) {
             if (entry.getKey() instanceof AEItemKey itemKey && getColorFromKey(itemKey) == color) {
                 return itemKey.toStack();
             }

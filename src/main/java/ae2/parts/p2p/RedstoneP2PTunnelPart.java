@@ -121,12 +121,16 @@ public class RedstoneP2PTunnelPart extends P2PTunnelPart<RedstoneP2PTunnelPart> 
     @Override
     public void onNeighborChanged(IBlockAccess level, BlockPos pos, BlockPos neighbor) {
         if (!this.isOutput()) {
-            final BlockPos target = this.getTileEntity().getPos().offset(this.getSide());
+            EnumFacing srcSide = this.getSide();
+            if (srcSide == null) {
+                this.sendToOutput(0);
+                return;
+            }
+            final BlockPos target = this.getTileEntity().getPos().offset(srcSide);
             final World world = this.getTileEntity().getWorld();
             final IBlockState state = world.getBlockState(target);
             final Block block = state.getBlock();
             if (block != null) {
-                EnumFacing srcSide = this.getSide();
                 if (block instanceof BlockRedstoneWire) {
                     srcSide = EnumFacing.UP;
                 }

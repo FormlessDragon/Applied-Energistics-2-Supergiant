@@ -33,8 +33,10 @@ import ae2.client.render.model.GlassModel;
 import ae2.client.render.model.MemoryCardModel;
 import ae2.client.render.model.MeteoriteCompassModel;
 import ae2.client.render.model.WrappedGenericStackModel;
+import ae2.client.render.overlay.AdvancedMemoryCardHighlightHandler;
 import ae2.client.render.tesr.spatial.SpatialPylonModel;
 import ae2.core.AppEng;
+import ae2.parts.automation.PlaneModel;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraftforge.client.model.IModel;
 import net.minecraftforge.client.model.ModelLoaderRegistry;
@@ -83,6 +85,9 @@ public final class InitBuiltInModels {
         addBuiltInModel("item/meteorite_compass", MeteoriteCompassModel::new);
         addBuiltInModel("item/facade", FacadeItemModel::new);
         addBuiltInModel("item/memory_card", MemoryCardModel::new);
+        addBuiltInModel("item/advanced_memory_card",
+            () -> new MemoryCardModel(AppEng.makeId("item/advanced_memory_card_base"),
+                ignored -> AdvancedMemoryCardHighlightHandler.INSTANCE.getMemoryCardColors()));
         addBuiltInModel("item/wrapped_generic_stack", WrappedGenericStackModel::new);
         addBuiltInModel("part/p2p/p2p_tunnel_frequency", P2PTunnelFrequencyModel::new);
         addPlaneModel("part/annihilation_plane", "part/annihilation_plane");
@@ -115,7 +120,7 @@ public final class InitBuiltInModels {
         var frontTextureId = AppEng.makeId(frontTexture);
         var sidesTextureId = AppEng.makeId("part/plane_sides");
         var backTextureId = AppEng.makeId("part/transition_plane_back");
-        addBuiltInModel(planeName, () -> new ae2.parts.automation.PlaneModel(frontTextureId, sidesTextureId,
+        addBuiltInModel(planeName, () -> new PlaneModel(frontTextureId, sidesTextureId,
             backTextureId));
     }
 }

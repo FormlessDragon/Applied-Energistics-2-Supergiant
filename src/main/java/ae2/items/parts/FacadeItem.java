@@ -21,6 +21,7 @@ package ae2.items.parts;
 import ae2.api.implementations.items.IFacadeItem;
 import ae2.api.parts.IFacadePart;
 import ae2.api.parts.IPartHost;
+import ae2.api.parts.PartHelper;
 import ae2.facade.FacadePart;
 import ae2.items.AEBaseItem;
 import ae2.text.TextComponentItemStack;
@@ -40,6 +41,7 @@ import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumBlockRenderType;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.NonNullList;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.BlockPos;
@@ -76,7 +78,7 @@ public class FacadeItem extends AEBaseItem implements IFacadeItem {
     }
 
     private static boolean placeFacade(FacadePart facade, World world, BlockPos pos) {
-        IPartHost host = ae2.api.parts.PartHelper.getPartHost(world, pos);
+        IPartHost host = PartHelper.getPartHost(world, pos);
         if (host == null) {
             return false;
         }
@@ -160,9 +162,13 @@ public class FacadeItem extends AEBaseItem implements IFacadeItem {
         return super.getItemStackDisplayName(stack);
     }
 
-    @Override
-    protected void getCheckedSubItems(CreativeTabs creativeTab, net.minecraft.util.NonNullList<ItemStack> itemStacks) {
-        itemStacks.addAll(this.getFacades());
+    @Nullable
+    private static ResourceLocation parseResourceLocation(String id) {
+        try {
+            return new ResourceLocation(id);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     public List<ItemStack> getFacades() {
@@ -177,27 +183,9 @@ public class FacadeItem extends AEBaseItem implements IFacadeItem {
         return facades.isEmpty() ? new ItemStack(Items.CAKE) : facades.getFirst();
     }
 
-    private List<ItemStack> calculateSubTypes() {
-        List<ItemStack> result = new ObjectArrayList<>(1000);
-        for (Block block : Block.REGISTRY) {
-            try {
-                Item item = Item.getItemFromBlock(block);
-                if (item == Items.AIR) {
-                    continue;
-                }
-
-                net.minecraft.util.NonNullList<ItemStack> subBlocks = net.minecraft.util.NonNullList.create();
-                block.getSubBlocks(block.getCreativeTab(), subBlocks);
-                for (ItemStack subBlock : subBlocks) {
-                    ItemStack facade = this.createFacadeForItem(subBlock, false);
-                    if (!facade.isEmpty()) {
-                        result.add(facade);
-                    }
-                }
-            } catch (Throwable ignored) {
-            }
-        }
-        return Collections.unmodifiableList(result);
+    @Override
+    protected void getCheckedSubItems(CreativeTabs creativeTab, NonNullList<ItemStack> itemStacks) {
+        itemStacks.addAll(this.getFacades());
     }
 
     @SuppressWarnings("deprecation")
@@ -255,6 +243,29 @@ public class FacadeItem extends AEBaseItem implements IFacadeItem {
         return null;
     }
 
+    private List<ItemStack> calculateSubTypes() {
+        List<ItemStack> result = new ObjectArrayList<>(1000);
+        for (Block block : Block.REGISTRY) {
+            try {
+                Item item = Item.getItemFromBlock(block);
+                if (item == Items.AIR) {
+                    continue;
+                }
+
+                NonNullList<ItemStack> subBlocks = NonNullList.create();
+                block.getSubBlocks(block.getCreativeTab(), subBlocks);
+                for (ItemStack subBlock : subBlocks) {
+                    ItemStack facade = this.createFacadeForItem(subBlock, false);
+                    if (!facade.isEmpty()) {
+                        result.add(facade);
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return Collections.unmodifiableList(result);
+    }
+
     @Override
     public ItemStack getTextureItem(ItemStack is) {
         NBTTagCompound nbt = is.getTagCompound();
@@ -266,7 +277,7 @@ public class FacadeItem extends AEBaseItem implements IFacadeItem {
         int itemDamage;
 
         if (nbt.hasKey(FACADE_ITEM, 8)) {
-            itemId = new ResourceLocation(nbt.getString(FACADE_ITEM));
+            itemId = parseResourceLocation(nbt.getString(FACADE_ITEM));
             itemDamage = nbt.getInteger(TAG_DAMAGE);
         } else if (nbt.hasKey("x")) {
             int[] data = nbt.getIntArray("x");
@@ -282,10 +293,13 @@ public class FacadeItem extends AEBaseItem implements IFacadeItem {
             itemId = item.getRegistryName();
             itemDamage = data[1];
         } else {
-            itemId = new ResourceLocation(nbt.getString(TAG_ITEM_ID));
+            itemId = parseResourceLocation(nbt.getString(TAG_ITEM_ID));
             itemDamage = nbt.getInteger(TAG_DAMAGE);
         }
 
+        if (itemId == null) {
+            return ItemStack.EMPTY;
+        }
         Item baseItem = Item.REGISTRY.getObject(itemId);
         if (baseItem == null) {
             return ItemStack.EMPTY;

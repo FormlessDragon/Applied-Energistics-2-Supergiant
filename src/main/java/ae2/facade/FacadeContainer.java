@@ -25,10 +25,12 @@ import ae2.api.parts.IPartHost;
 import ae2.parts.CableBusStorage;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.EnumFacing;
+import net.minecraftforge.common.util.Constants;
 
 import java.util.function.Consumer;
 
@@ -45,9 +47,8 @@ public class FacadeContainer implements IFacadeContainer {
         this.changeCallback = changeCallback;
     }
 
-    @Override
-    public boolean canAddFacade(IFacadePart facade) {
-        return facade != null && getFacade(facade.getSide()) == null;
+    private static boolean isValidFacadeState(IBlockState blockState) {
+        return blockState != null && blockState.getBlock() != Blocks.AIR;
     }
 
     @Override
@@ -80,10 +81,18 @@ public class FacadeContainer implements IFacadeContainer {
     }
 
     @Override
+    public boolean canAddFacade(IFacadePart facade) {
+        return facade != null
+            && facade.getSide() != null
+            && isValidFacadeState(facade.getBlockState())
+            && getFacade(facade.getSide()) == null;
+    }
+
+    @Override
     public void writeToNBT(NBTTagCompound data) {
         for (EnumFacing side : EnumFacing.VALUES) {
             IFacadePart facade = this.storage.getFacade(side);
-            if (facade != null) {
+            if (facade != null && isValidFacadeState(facade.getBlockState())) {
                 data.setInteger(NBT_KEY_PREFIX + side.ordinal(), Block.getStateId(facade.getBlockState()));
             }
         }
@@ -98,8 +107,11 @@ public class FacadeContainer implements IFacadeContainer {
             int bit = 1 << side.ordinal();
             if ((facadeMask & bit) != 0) {
                 IBlockState blockState = Block.getStateById(data.readVarInt());
-                if (blockState != null) {
+                if (isValidFacadeState(blockState)) {
                     this.storage.setFacade(side, new FacadePart(blockState, side));
+                    changed = true;
+                } else if (this.storage.getFacade(side) != null) {
+                    this.storage.removeFacade(side);
                     changed = true;
                 }
             } else if (this.storage.getFacade(side) != null) {
@@ -117,38 +129,23 @@ public class FacadeContainer implements IFacadeContainer {
             this.storage.removeFacade(side);
 
             String stateKey = NBT_KEY_PREFIX + side.ordinal();
-            if (data.hasKey(stateKey, 3)) {
+            if (data.hasKey(stateKey, Constants.NBT.TAG_INT)) {
                 IBlockState blockState = Block.getStateById(data.getInteger(stateKey));
-                if (blockState != null) {
+                if (isValidFacadeState(blockState)) {
                     this.storage.setFacade(side, new FacadePart(blockState, side));
                 }
                 continue;
             }
 
             String legacyKey = LEGACY_NBT_KEY_PREFIX + side.ordinal();
-            if (data.hasKey(legacyKey, 10)) {
+            if (data.hasKey(legacyKey, Constants.NBT.TAG_COMPOUND)) {
                 ItemStack facadeStack = new ItemStack(data.getCompoundTag(legacyKey));
                 if (!facadeStack.isEmpty() && facadeStack.getItem() instanceof IFacadeItem facadeItem) {
-                    this.storage.setFacade(side, facadeItem.createPartFromItemStack(facadeStack, side));
+                    IFacadePart facade = facadeItem.createPartFromItemStack(facadeStack, side);
+                    if (facade != null && isValidFacadeState(facade.getBlockState())) {
+                        this.storage.setFacade(side, facade);
+                    }
                 }
-            }
-        }
-    }
-
-    @Override
-    public void writeToStream(PacketBuffer data) {
-        int facadeMask = 0;
-        for (EnumFacing side : EnumFacing.VALUES) {
-            if (this.storage.getFacade(side) != null) {
-                facadeMask |= 1 << side.ordinal();
-            }
-        }
-
-        data.writeByte(facadeMask);
-        for (EnumFacing side : EnumFacing.VALUES) {
-            IFacadePart facade = this.storage.getFacade(side);
-            if (facade != null) {
-                data.writeVarInt(Block.getStateId(facade.getBlockState()));
             }
         }
     }
@@ -166,5 +163,24 @@ public class FacadeContainer implements IFacadeContainer {
 
     private void notifyChange(EnumFacing side) {
         this.changeCallback.accept(side);
+    }
+
+    @Override
+    public void writeToStream(PacketBuffer data) {
+        int facadeMask = 0;
+        for (EnumFacing side : EnumFacing.VALUES) {
+            IFacadePart facade = this.storage.getFacade(side);
+            if (facade != null && isValidFacadeState(facade.getBlockState())) {
+                facadeMask |= 1 << side.ordinal();
+            }
+        }
+
+        data.writeByte(facadeMask);
+        for (EnumFacing side : EnumFacing.VALUES) {
+            IFacadePart facade = this.storage.getFacade(side);
+            if (facade != null && isValidFacadeState(facade.getBlockState())) {
+                data.writeVarInt(Block.getStateId(facade.getBlockState()));
+            }
+        }
     }
 }

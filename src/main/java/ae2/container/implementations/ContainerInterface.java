@@ -45,15 +45,11 @@ public class ContainerInterface extends UpgradeableContainer<InterfaceLogicHost>
         }
     }
 
-    @Override
-    public void broadcastChanges() {
-        if (isServerSide()) {
-            this.pageCount = this.getHost().getInterfaceLogic().getPageCount();
-            this.currentPage = Math.min(this.currentPage, this.pageCount - 1);
+    private static int clampPage(int page, int pageCount) {
+        if (pageCount <= 0) {
+            return 0;
         }
-        this.configPageInventory.setPage(this.currentPage);
-        this.storagePageInventory.setPage(this.currentPage);
-        super.broadcastChanges();
+        return Math.clamp(page, 0, pageCount - 1);
     }
 
     @Override
@@ -68,6 +64,17 @@ public class ContainerInterface extends UpgradeableContainer<InterfaceLogicHost>
         this.setFuzzyMode(cm.getSetting(Settings.FUZZY_MODE));
     }
 
+    @Override
+    public void broadcastChanges() {
+        if (isServerSide()) {
+            this.pageCount = this.getHost().getInterfaceLogic().getPageCount();
+            this.currentPage = clampPage(this.currentPage, this.pageCount);
+        }
+        this.configPageInventory.setPage(this.currentPage);
+        this.storagePageInventory.setPage(this.currentPage);
+        super.broadcastChanges();
+    }
+
     public void openSetAmountGui(int configSlot) {
         if (isClientSide()) {
             sendClientAction(ACTION_OPEN_SET_AMOUNT, configSlot);
@@ -75,6 +82,10 @@ public class ContainerInterface extends UpgradeableContainer<InterfaceLogicHost>
         }
 
         int actualSlot = this.currentPage * InterfaceLogic.SLOTS_PER_PAGE + configSlot;
+        if (configSlot < 0 || configSlot >= InterfaceLogic.SLOTS_PER_PAGE
+            || actualSlot < 0 || actualSlot >= getHost().getConfig().size()) {
+            return;
+        }
         var stack = getHost().getConfig().getStack(actualSlot);
         if (stack != null) {
             ContainerSetStockAmount.open((EntityPlayerMP) getPlayer(), getLocator(), actualSlot, stack.what(),
@@ -87,7 +98,7 @@ public class ContainerInterface extends UpgradeableContainer<InterfaceLogicHost>
             sendClientAction(ACTION_SET_PAGE, page);
             return;
         }
-        this.currentPage = Math.max(0, Math.min(page, this.getHost().getInterfaceLogic().getPageCount() - 1));
+        this.currentPage = clampPage(page, this.getHost().getInterfaceLogic().getPageCount());
         this.configPageInventory.setPage(this.currentPage);
         this.storagePageInventory.setPage(this.currentPage);
         this.detectAndSendChanges();

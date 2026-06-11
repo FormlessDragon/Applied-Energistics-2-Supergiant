@@ -65,6 +65,7 @@ public abstract class CablePart extends AEBasePart implements ICablePart {
     };
 
     private static final Map<AECableType, Map<AEColor, ResourceLocation>> PART_IDS = new EnumMap<>(AECableType.class);
+    private static final Predicate<@Nullable EnumFacing> ALL_CONNECTIONS = ignored -> true;
 
     static {
         PART_IDS.put(AECableType.GLASS, AEPartIds.CABLE_GLASS);
@@ -96,8 +97,6 @@ public abstract class CablePart extends AEBasePart implements ICablePart {
             case SOUTH -> bch.addBox(min, min, max, max, max, 16.0 - distanceFromEnd);
             case UP -> bch.addBox(min, max, min, max, 16.0 - distanceFromEnd, max);
             case WEST -> bch.addBox(distanceFromEnd, min, min, min, max, max);
-            default -> {
-            }
         }
     }
 
@@ -121,7 +120,7 @@ public abstract class CablePart extends AEBasePart implements ICablePart {
 
     @Override
     public final void getBoxes(IPartCollisionHelper bch) {
-        getBoxes(bch, dir -> true);
+        getBoxes(bch, ALL_CONNECTIONS);
     }
 
     public abstract void getBoxes(IPartCollisionHelper bch, Predicate<@Nullable EnumFacing> filterConnections);
@@ -313,6 +312,9 @@ public abstract class CablePart extends AEBasePart implements ICablePart {
     @Override
     public boolean readFromStream(PacketBuffer data) {
         var changed = super.readFromStream(data);
+        if (data.readableBytes() < 1) {
+            return changed;
+        }
 
         int connectedSidesPacked = data.readByte();
         var previousConnections = this.getConnections();
@@ -320,6 +322,7 @@ public abstract class CablePart extends AEBasePart implements ICablePart {
         boolean channelsChanged = false;
 
         var connections = EnumSet.noneOf(EnumFacing.class);
+        int[] channelsOnSide = this.channelsOnSide.clone();
         for (var d : EnumFacing.VALUES) {
             boolean conOnSide = (connectedSidesPacked & (1 << d.ordinal())) != 0;
             if (conOnSide) {
@@ -329,13 +332,19 @@ public abstract class CablePart extends AEBasePart implements ICablePart {
             int ch = 0;
 
             if (conOnSide || this.getHost().getPart(d) != null) {
+                if (data.readableBytes() < 1) {
+                    return changed;
+                }
                 ch = data.readByte() & 0xFF;
             }
 
-            if (ch != this.channelsOnSide[d.ordinal()]) {
+            if (ch != channelsOnSide[d.ordinal()]) {
                 channelsChanged = true;
-                this.setChannelsOnSide(d.ordinal(), ch);
+                channelsOnSide[d.ordinal()] = ch;
             }
+        }
+        for (int i = 0; i < channelsOnSide.length; i++) {
+            this.setChannelsOnSide(i, channelsOnSide[i]);
         }
         this.setConnections(connections);
 

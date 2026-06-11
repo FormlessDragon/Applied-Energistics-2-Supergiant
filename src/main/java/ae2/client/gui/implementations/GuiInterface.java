@@ -9,6 +9,7 @@ import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.container.SlotSemantics;
 import ae2.container.implementations.ContainerInterface;
+import ae2.container.slot.AppEngSlot;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
@@ -41,7 +42,7 @@ public class GuiInterface extends GuiUpgradeable<ContainerInterface> {
         for (int i = 0; i < configSlots.size(); i++) {
             int slotIndex = i;
             var button = new SetAmountButton(() -> {
-                var configSlot = (ae2.container.slot.AppEngSlot) container.getSlots(SlotSemantics.CONFIG).get(slotIndex);
+                var configSlot = (AppEngSlot) container.getSlots(SlotSemantics.CONFIG).get(slotIndex);
                 container.openSetAmountGui(configSlot.getSlotIndex());
             });
             button.setDisableBackground(true);

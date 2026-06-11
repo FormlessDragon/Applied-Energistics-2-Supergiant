@@ -1,5 +1,6 @@
 package ae2.me.ticker;
 
+import ae2.util.EmptyArrays;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.util.math.BlockPos;
@@ -26,12 +27,15 @@ public final class ProfilerJob {
     public ProfileData generateData() {
         var ticks = new ObjectArrayList<ProfileData.ATick>(this.nanoseconds.size());
         for (var entry : this.nanoseconds.object2LongEntrySet()) {
+            if (ticks.size() >= ProfileData.MAX_PROFILE_TICKS) {
+                break;
+            }
             SamplePos pos = entry.getKey();
             long tickCount = this.ticks.getLong(pos);
             double rate = tickCount == 0L ? 0.0D : (double) entry.getLongValue() / tickCount / 1000.0D;
             ticks.add(new ProfileData.ATick(pos.dimension(), pos.pos(), rate, ProfileData.getColor(rate)));
         }
-        return new ProfileData(ticks.toArray(new ProfileData.ATick[0]));
+        return new ProfileData(ticks.toArray(EmptyArrays.EMPTY_PROFILE_DATA_ATICK_ARRAY));
     }
 
     public record SamplePos(int dimension, BlockPos pos) {

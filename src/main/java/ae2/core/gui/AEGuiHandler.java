@@ -4,7 +4,9 @@ import ae2.api.implementations.guiobjects.IGuiItem;
 import ae2.api.implementations.guiobjects.IPortableTerminal;
 import ae2.api.implementations.guiobjects.ItemGuiHost;
 import ae2.api.storage.ITerminalHost;
+import ae2.api.util.ICustomName;
 import ae2.client.gui.implementations.GuiAdvancedIOBus;
+import ae2.client.gui.implementations.GuiAdvancedMemoryCard;
 import ae2.client.gui.implementations.GuiAnnihilationPlane;
 import ae2.client.gui.implementations.GuiCaner;
 import ae2.client.gui.implementations.GuiCellRestriction;
@@ -62,6 +64,7 @@ import ae2.client.gui.style.GuiStyleManager;
 import ae2.container.AEBaseContainer;
 import ae2.container.GuiIds;
 import ae2.container.implementations.ContainerAdvancedIOBus;
+import ae2.container.implementations.ContainerAdvancedMemoryCard;
 import ae2.container.implementations.ContainerAnnihilationPlane;
 import ae2.container.implementations.ContainerCaner;
 import ae2.container.implementations.ContainerCellRestriction;
@@ -123,6 +126,7 @@ import ae2.helpers.WirelessCraftingTerminalGuiHost;
 import ae2.helpers.WirelessPatternAccessTerminalGuiHost;
 import ae2.helpers.WirelessPatternEncodingTerminalGuiHost;
 import ae2.helpers.WirelessRequesterTerminalGuiHost;
+import ae2.items.contents.AdvancedMemoryCardGuiHost;
 import ae2.items.contents.ConfigModifierGuiHost;
 import ae2.items.contents.NetworkToolGuiHost;
 import ae2.items.contents.PatternModifierGuiHost;
@@ -182,11 +186,13 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraft.world.IWorldNameable;
 import net.minecraft.world.World;
 import net.minecraftforge.fml.common.network.IGuiHandler;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
 
@@ -199,6 +205,7 @@ public class AEGuiHandler implements IGuiHandler {
             || bridge == GuiIds.GuiKey.TICK_ANALYSER
             || bridge == GuiIds.GuiKey.CONFIG_MODIFIER
             || bridge == GuiIds.GuiKey.PATTERN_MODIFIER
+            || bridge == GuiIds.GuiKey.ADVANCED_MEMORY_CARD
             || bridge == GuiIds.GuiKey.NETWORK_STATUS
             || bridge == GuiIds.GuiKey.PORTABLE_ITEM_CELL
             || bridge == GuiIds.GuiKey.VOID_CELL
@@ -238,7 +245,10 @@ public class AEGuiHandler implements IGuiHandler {
 
     private static @Nullable PartLocator partLocator(int x, int y, int z) {
         int side = y >> 8;
-        if (side < 0 || side >= EnumFacing.VALUES.length) {
+        if (side == EnumFacing.VALUES.length) {
+            return new PartLocator(new BlockPos(x, y & 255, z), null);
+        }
+        if (side < 0 || side > EnumFacing.VALUES.length) {
             return null;
         }
         return new PartLocator(new BlockPos(x, y & 255, z), EnumFacing.VALUES[side]);
@@ -268,7 +278,7 @@ public class AEGuiHandler implements IGuiHandler {
     }
 
     private static @Nullable ITextComponent getDefaultGuiTitle(Object host) {
-        if (host instanceof net.minecraft.world.IWorldNameable nameable) {
+        if (host instanceof IWorldNameable nameable) {
             if (nameable.hasCustomName()) {
                 return nameable.getDisplayName();
             }
@@ -290,19 +300,28 @@ public class AEGuiHandler implements IGuiHandler {
         return customName == null || customName.isEmpty() ? null : new TextComponentString(customName);
     }
 
-    private static net.minecraft.util.math.RayTraceResult unpackPatternModifierHitResult(int x, int y, int z) {
+    private static @Nullable RayTraceResult unpackItemUseHitResult(int x, int y, int z) {
         BlockPos pos = new BlockPos(x, y & 255, z);
         int sideIndex = (y >> 16) & 0x7;
+        if (sideIndex >= EnumFacing.VALUES.length) {
+            return null;
+        }
         int hitX = (y >> 19) & 0xF;
         int hitY = (y >> 23) & 0xF;
         int hitZ = (y >> 27) & 0xF;
-        return GuiHostLocators.createItemUseHitResult(pos, net.minecraft.util.EnumFacing.VALUES[sideIndex],
+        return GuiHostLocators.createItemUseHitResult(pos, EnumFacing.VALUES[sideIndex],
             hitX / 15.0f, hitY / 15.0f, hitZ / 15.0f);
     }
 
     @Override
     public Object getServerGuiElement(int ID, EntityPlayer player, World world, int x, int y, int z) {
+        if (player == null || world == null) {
+            return null;
+        }
         GuiIds.GuiKey bridge = GuiIds.GuiKey.fromId(ID);
+        if (bridge == null) {
+            return null;
+        }
         TileEntity te = isItemGui(bridge) || isPartGui(bridge) ? null : world.getTileEntity(new BlockPos(x, y, z));
 
         switch (bridge) {
@@ -449,13 +468,13 @@ public class AEGuiHandler implements IGuiHandler {
                 }
             }
             case RENAMER -> {
-                ContainerRenamer renamer = createPartContainer(player, partLocator(x, y, z), ID, AEBasePart.class,
+                ContainerRenamer renamer = createPartContainer(player, partLocator(x, y, z), ID, ICustomName.class,
                     host -> new ContainerRenamer(player.inventory, host));
                 if (renamer != null) {
                     return renamer;
                 }
-                if (te instanceof AEBaseTile tile) {
-                    return initTileContainer(new ContainerRenamer(player.inventory, tile), te, ID);
+                if (te instanceof ICustomName customName) {
+                    return initTileContainer(new ContainerRenamer(player.inventory, customName), te, ID);
                 }
             }
             case IMPORT_BUS -> {
@@ -568,6 +587,9 @@ public class AEGuiHandler implements IGuiHandler {
             case PATTERN_MODIFIER -> {
                 return createPatternModifierContainer(player, x, y, z, ID);
             }
+            case ADVANCED_MEMORY_CARD -> {
+                return createAdvancedMemoryCardContainer(player, x, y, z, ID);
+            }
             case NETWORK_STATUS -> {
                 return createNetworkStatusContainer(player, y >> 8, new BlockPos(x, y & 255, z), ID);
             }
@@ -641,7 +663,13 @@ public class AEGuiHandler implements IGuiHandler {
 
     @Override
     public Object getClientGuiElement(int ID, EntityPlayer player, World world, int x, int y, int z) {
+        if (player == null || world == null) {
+            return null;
+        }
         GuiIds.GuiKey bridge = GuiIds.GuiKey.fromId(ID);
+        if (bridge == null) {
+            return null;
+        }
         TileEntity te = isItemGui(bridge) || isPartGui(bridge) ? null : world.getTileEntity(new BlockPos(x, y, z));
 
         switch (bridge) {
@@ -671,7 +699,7 @@ public class AEGuiHandler implements IGuiHandler {
                 if (te instanceof TileDrive) {
                     ContainerDrive container = initTileContainer(new ContainerDrive(player.inventory, (TileDrive) te),
                         te, ID);
-                    return new GuiDrive(container, player.inventory, customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                    return new GuiDrive(container, player.inventory, customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/drive.json"));
                 }
             }
@@ -680,7 +708,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerCellWorkbench container = initTileContainer(new ContainerCellWorkbench(player.inventory,
                         (TileCellWorkbench) te), te, ID);
                     return new GuiCellWorkbench(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/cell_workbench.json"));
                 }
             }
@@ -697,7 +725,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerCondenser container = initTileContainer(new ContainerCondenser(player.inventory,
                         (TileCondenser) te), te, ID);
                     return new GuiCondenser(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/condenser.json"));
                 }
             }
@@ -706,7 +734,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerSkyChest container = initTileContainer(new ContainerSkyChest(player.inventory,
                         (TileSkyChest) te), te, ID);
                     return new GuiSkyChest(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/sky_chest.json"));
                 }
             }
@@ -715,7 +743,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerInscriber container = initTileContainer(new ContainerInscriber(player.inventory,
                         (TileInscriber) te), te, ID);
                     return new GuiInscriber(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/inscriber.json"));
                 }
             }
@@ -724,7 +752,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerCrystalAssembler container = initTileContainer(new ContainerCrystalAssembler(
                         player.inventory, (TileCrystalAssembler) te), te, ID);
                     return new GuiCrystalAssembler(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/crystal_assembler.json"));
                 }
             }
@@ -733,7 +761,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerIngredientBuffer container = initTileContainer(new ContainerIngredientBuffer(
                         player.inventory, (TileIngredientBuffer) te), te, ID);
                     return new GuiIngredientBuffer(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/ingredient_buffer.json"));
                 }
             }
@@ -742,7 +770,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerCaner container = initTileContainer(new ContainerCaner(player.inventory,
                         (TileCaner) te), te, ID);
                     return new GuiCaner(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/caner.json"));
                 }
             }
@@ -751,7 +779,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerIOPort container = initTileContainer(new ContainerIOPort(player.inventory,
                         (TileIOPort) te), te, ID);
                     return new GuiIOPort(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/io_port.json"));
                 }
             }
@@ -760,7 +788,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerMolecularAssembler container = initTileContainer(
                         new ContainerMolecularAssembler(player.inventory, (TileMolecularAssembler) te), te, ID);
                     return new GuiMolecularAssembler(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/molecular_assembler.json"));
                 }
             }
@@ -769,7 +797,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerVibrationChamber container = initTileContainer(new ContainerVibrationChamber(
                         player.inventory, (TileVibrationChamber) te), te, ID);
                     return new GuiVibrationChamber(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/vibration_chamber.json"));
                 }
             }
@@ -778,7 +806,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerQNB container = initTileContainer(new ContainerQNB(player.inventory,
                         (TileQuantumBridge) te), te, ID);
                     return new GuiQNB(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/qnb.json"));
                 }
             }
@@ -787,7 +815,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerWirelessAccessPoint container = initTileContainer(new ContainerWirelessAccessPoint(
                         player.inventory, (TileWirelessAccessPoint) te), te, ID);
                     return new GuiWirelessAccessPoint(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/wireless_access_point.json"));
                 }
             }
@@ -796,7 +824,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerSpatialIOPort container = initTileContainer(new ContainerSpatialIOPort(player.inventory,
                         (TileSpatialIOPort) te), te, ID);
                     return new GuiSpatialIOPort(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/spatial_io_port.json"));
                 }
             }
@@ -805,7 +833,7 @@ public class AEGuiHandler implements IGuiHandler {
                     ContainerSpatialAnchor container = initTileContainer(new ContainerSpatialAnchor(player.inventory,
                         (TileSpatialAnchor) te), te, ID);
                     return new GuiSpatialAnchor(container, player.inventory,
-                        customTitle(((ae2.tile.AEBaseTile) te).getCustomName()),
+                        customTitle(((AEBaseTile) te).getCustomName()),
                         GuiStyleManager.loadStyleDoc("/screens/spatial_anchor.json"));
                 }
             }
@@ -866,10 +894,10 @@ public class AEGuiHandler implements IGuiHandler {
                 }
             }
             case RENAMER -> {
-                ContainerRenamer renamer = createPartContainer(player, partLocator(x, y, z), ID, AEBasePart.class,
+                ContainerRenamer renamer = createPartContainer(player, partLocator(x, y, z), ID, ICustomName.class,
                     host -> new ContainerRenamer(player.inventory, host));
-                if (renamer == null && te instanceof AEBaseTile tile) {
-                    renamer = initTileContainer(new ContainerRenamer(player.inventory, tile), te, ID);
+                if (renamer == null && te instanceof ICustomName customName) {
+                    renamer = initTileContainer(new ContainerRenamer(player.inventory, customName), te, ID);
                 }
                 return renamer == null ? null : new GuiRenamer(renamer, player.inventory, null,
                     GuiStyleManager.loadStyleDoc("/screens/renamer.json"));
@@ -1099,6 +1127,10 @@ public class AEGuiHandler implements IGuiHandler {
                 return container == null ? null : new GuiPatternModifier(container, player.inventory,
                     GuiStyleManager.loadStyleDoc("/screens/pattern_modifier.json"));
             }
+            case ADVANCED_MEMORY_CARD -> {
+                ContainerAdvancedMemoryCard container = createAdvancedMemoryCardContainer(player, x, y, z, ID);
+                return container == null ? null : new GuiAdvancedMemoryCard(container, player.inventory);
+            }
             case NETWORK_STATUS -> {
                 ContainerNetworkStatus networkStatusContainer = createNetworkStatusContainer(player, y >> 8,
                     new BlockPos(x, y & 255, z), ID);
@@ -1193,12 +1225,18 @@ public class AEGuiHandler implements IGuiHandler {
     private @Nullable ContainerPatternModifier createPatternModifierContainer(EntityPlayer player, int x, int y, int z,
                                                                               int guiId) {
         int encodedSlot = (y >> 8) & 0xFF;
-        ItemGuiHostLocator locator = x < 0 && y == 0 && z == 0
-            ? GuiHostLocators.forBaubleSlot(-x - 1)
-            : encodedSlot > 0
-              ? GuiHostLocators.forInventorySlot(encodedSlot - 1,
-            unpackPatternModifierHitResult(x, y, z))
-              : GuiHostLocators.forInventorySlot(x);
+        ItemGuiHostLocator locator;
+        if (x < 0 && y == 0 && z == 0) {
+            locator = GuiHostLocators.forBaubleSlot(-x - 1);
+        } else if (encodedSlot > 0) {
+            RayTraceResult hitResult = unpackItemUseHitResult(x, y, z);
+            if (hitResult == null) {
+                return null;
+            }
+            locator = GuiHostLocators.forInventorySlot(encodedSlot - 1, hitResult);
+        } else {
+            locator = GuiHostLocators.forInventorySlot(x);
+        }
         ItemGuiHost<?> host = createItemGuiHost(player, locator, GuiIds.GuiKey.PATTERN_MODIFIER);
         if (!(host instanceof PatternModifierGuiHost patternModifierHost)) {
             return null;
@@ -1209,13 +1247,33 @@ public class AEGuiHandler implements IGuiHandler {
 
     private @Nullable ContainerNetworkStatus createNetworkStatusContainer(EntityPlayer player, int slot, BlockPos pos, int guiId) {
         ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot,
-            GuiHostLocators.createItemUseHitResult(pos, net.minecraft.util.EnumFacing.UP, 0.5f, 0.5f, 0.5f));
+            GuiHostLocators.createItemUseHitResult(pos, EnumFacing.UP, 0.5f, 0.5f, 0.5f));
         NetworkToolGuiHost<?> host = createNetworkToolGuiHost(player, locator);
         if (host == null || host.getGridHost() == null) {
             return null;
         }
 
         return initContainer(new ContainerNetworkStatus(player.inventory, host), locator, guiId);
+    }
+
+    private @Nullable ContainerAdvancedMemoryCard createAdvancedMemoryCardContainer(EntityPlayer player, int x, int y,
+                                                                                    int z, int guiId) {
+        int encodedSlot = (y >> 8) & 0xFF;
+        if (encodedSlot <= 0) {
+            return null;
+        }
+        RayTraceResult hitResult = unpackItemUseHitResult(x, y, z);
+        if (hitResult == null) {
+            return null;
+        }
+        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(encodedSlot - 1, hitResult);
+        ItemGuiHost<?> host = createItemGuiHost(player, locator, GuiIds.GuiKey.ADVANCED_MEMORY_CARD);
+        if (!(host instanceof AdvancedMemoryCardGuiHost advancedMemoryCardHost)
+            || (advancedMemoryCardHost.getGridHost() == null && advancedMemoryCardHost.getClickedGridNode() == null)) {
+            return null;
+        }
+
+        return initContainer(new ContainerAdvancedMemoryCard(player.inventory, advancedMemoryCardHost), locator, guiId);
     }
 
     private @Nullable ContainerMEStorage createPortableItemCellContainer(EntityPlayer player, int slot, int guiId) {

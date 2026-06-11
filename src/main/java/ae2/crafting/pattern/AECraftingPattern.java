@@ -12,6 +12,7 @@ import ae2.api.stacks.KeyCounter;
 import ae2.core.localization.GuiText;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.util.ITooltipFlag;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.InventoryCrafting;
@@ -58,7 +59,12 @@ public class AECraftingPattern implements IAssemblerPattern {
 
         this.canSubstitute = encoded.getBoolean("canSubstitute");
         this.canSubstituteFluids = encoded.getBoolean("canSubstituteFluids");
-        this.sparseInputs = getCraftingInputs(readItemStackList(encoded.getTagList("in", 10)));
+        List<ItemStack> encodedInputs = readItemStackList(encoded.getTagList("in", 10));
+        if (encodedInputs.size() != CRAFTING_GRID_SLOTS) {
+            throw new IllegalArgumentException("Crafting pattern must contain exactly " + CRAFTING_GRID_SLOTS
+                + " input slots.");
+        }
+        this.sparseInputs = getCraftingInputs(encodedInputs);
 
         var recipeId = new ResourceLocation(encoded.getString("recipeId"));
         this.recipe = ForgeRegistries.RECIPES.getValue(recipeId);
@@ -145,7 +151,7 @@ public class AECraftingPattern implements IAssemblerPattern {
     private static InventoryCrafting createCraftingInventory(int width, int height) {
         return new InventoryCrafting(new Container() {
             @Override
-            public boolean canInteractWith(net.minecraft.entity.player.EntityPlayer playerIn) {
+            public boolean canInteractWith(EntityPlayer playerIn) {
                 return false;
             }
         }, width, height);

@@ -9,7 +9,7 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class ColorableBlockEntityBlockColor implements IBlockColor {
     public static final ColorableBlockEntityBlockColor INSTANCE = new ColorableBlockEntityBlockColor();

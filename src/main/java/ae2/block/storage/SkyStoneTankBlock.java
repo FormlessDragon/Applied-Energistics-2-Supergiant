@@ -21,6 +21,7 @@ import ae2.block.AEBaseTileBlock;
 import ae2.core.localization.GuiText;
 import ae2.tile.storage.TileSkyStoneTank;
 import net.minecraft.block.material.Material;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -50,12 +51,12 @@ public class SkyStoneTankBlock extends AEBaseTileBlock<TileSkyStoneTank> {
     }
 
     @Override
-    public boolean canRenderInLayer(net.minecraft.block.state.IBlockState state, BlockRenderLayer layer) {
+    public boolean canRenderInLayer(IBlockState state, BlockRenderLayer layer) {
         return layer == BlockRenderLayer.CUTOUT || layer == BlockRenderLayer.TRANSLUCENT;
     }
 
     @Override
-    public boolean onBlockActivated(World world, BlockPos pos, net.minecraft.block.state.IBlockState state,
+    public boolean onBlockActivated(World world, BlockPos pos, IBlockState state,
                                     EntityPlayer player, EnumHand hand, EnumFacing side, float hitX, float hitY, float hitZ) {
         if (super.onBlockActivated(world, pos, state, player, hand, side, hitX, hitY, hitZ)) {
             return true;

@@ -113,13 +113,38 @@ public enum Tooltips implements LocalizationEnum {
         return muted(ButtonToolTips.ModifyAmountAction.text(getMouseButtonText(2)));
     }
 
+    public static String getSetAmountTooltipLocal() {
+        return TextFormatting.DARK_GRAY + ButtonToolTips.ModifyAmountAction.getLocal(getMouseButtonTextLocal(2));
+    }
+
     public static ITextComponent getRenameTooltip() {
         ITextComponent input = new TextComponentString("Alt + ").appendSibling(getMouseButtonText(2));
         return muted(ButtonToolTips.RenameAction.text(input));
     }
 
+    public static String getRenameTooltipLocal() {
+        return TextFormatting.DARK_GRAY + ButtonToolTips.RenameAction.getLocal("Alt + " + getMouseButtonTextLocal(2));
+    }
+
     public static ITextComponent getAmountTooltip(LocalizationEnum baseText, AEKey what, long amount) {
         return muted(baseText.text(what.formatAmount(amount, AmountFormat.FULL)));
+    }
+
+    public static String getAmountTooltipLocal(LocalizationEnum baseText, GenericStack stack) {
+        return getAmountTooltipLocal(baseText, stack.what(), stack.amount());
+    }
+
+    public static String getAmountTooltipLocal(LocalizationEnum baseText, AEKey what, long amount) {
+        return TextFormatting.DARK_GRAY + baseText.getLocal(what.formatAmount(amount, AmountFormat.FULL));
+    }
+
+    private static String getMouseButtonTextLocal(int button) {
+        return switch (button) {
+            case 0 -> ButtonToolTips.LeftClick.getLocal();
+            case 1 -> ButtonToolTips.RightClick.getLocal();
+            case 2 -> ButtonToolTips.MiddleClick.getLocal();
+            default -> ButtonToolTips.MouseButton.getLocal(button);
+        };
     }
 
     private static ITextComponent normalTooltipText(ITextComponent text) {

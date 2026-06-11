@@ -3,12 +3,12 @@ package ae2.recipes.mattercannon;
 import ae2.recipes.AERecipeTypes;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.Ingredient;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public record MatterCannonAmmo(Ingredient ammo, float weight) {
     public MatterCannonAmmo {
-        if (weight < 0) {
-            throw new IllegalArgumentException("Weight must be non-negative");
+        if (!Float.isFinite(weight) || weight < 0) {
+            throw new IllegalArgumentException("Weight must be finite and non-negative");
         }
     }
 

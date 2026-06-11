@@ -1,17 +1,21 @@
 package ae2.api.implementations.blockentities;
 
+import ae2.api.parts.IPart;
 import ae2.api.parts.IPartHost;
 import ae2.api.stacks.AEItemKey;
 import ae2.core.localization.GuiText;
+import ae2.parts.AEBasePart;
 import ae2.text.TextComponentItemStack;
 import ae2.text.TextComponents;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.IWorldNameable;
 import net.minecraft.world.World;
 import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
@@ -31,6 +35,7 @@ public record PatternContainerGroup(
 
     private static final PatternContainerGroup NOTHING = new PatternContainerGroup(null,
         GuiText.Nothing.text(), Collections.emptyList());
+    private static final int MAX_TOOLTIP_LINES = 256;
 
     public static PatternContainerGroup nothing() {
         return NOTHING;
@@ -40,6 +45,9 @@ public record PatternContainerGroup(
         AEItemKey icon = buffer.readBoolean() ? AEItemKey.fromPacket(buffer) : null;
         ITextComponent name = TextComponents.readFromPacket(buffer);
         int lineCount = buffer.readVarInt();
+        if (lineCount < 0 || lineCount > MAX_TOOLTIP_LINES) {
+            throw new IllegalArgumentException("Invalid pattern container tooltip line count: " + lineCount);
+        }
         ObjectList<ITextComponent> lines = new ObjectArrayList<>(lineCount);
         for (int i = 0; i < lineCount; i++) {
             lines.add(TextComponents.readFromPacket(buffer));
@@ -72,7 +80,7 @@ public record PatternContainerGroup(
         List<ITextComponent> tooltip = Collections.emptyList();
 
         if (target instanceof IPartHost partHost) {
-            ae2.api.parts.IPart part = partHost.getPart(side);
+            IPart part = partHost.getPart(side);
             if (part == null) {
                 return null;
             }
@@ -82,15 +90,15 @@ public record PatternContainerGroup(
                 return null;
             }
 
-            if (part instanceof ae2.parts.AEBasePart aePart) {
-                name = new net.minecraft.util.text.TextComponentString(aePart.getDisplayName());
+            if (part instanceof AEBasePart aePart) {
+                name = new TextComponentString(aePart.getDisplayName());
             } else if (part instanceof IWorldNameable nameable) {
                 name = nameable.getDisplayName();
             } else {
                 name = icon.getDisplayName();
             }
         } else {
-            net.minecraft.item.ItemStack targetItem = new net.minecraft.item.ItemStack(target.getBlockType());
+            ItemStack targetItem = new ItemStack(target.getBlockType());
             icon = AEItemKey.of(targetItem);
 
             if (target instanceof IWorldNameable nameable && nameable.hasCustomName()) {

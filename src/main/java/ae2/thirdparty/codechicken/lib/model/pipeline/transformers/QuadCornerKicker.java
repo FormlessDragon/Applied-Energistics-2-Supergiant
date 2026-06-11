@@ -74,7 +74,12 @@ public class QuadCornerKicker implements RenderContext.QuadTransform {
 
     @Override
     public boolean transform(MutableQuadView quad) {
-        int side = quad.nominalFace().ordinal();
+        EnumFacing nominalFace = quad.nominalFace();
+        if (nominalFace == null || this.box == null || this.mySide < 0 || this.mySide >= horizonals.length) {
+            return true;
+        }
+
+        int side = nominalFace.ordinal();
         if (side != this.mySide && side != (this.mySide ^ 1)) {
             for (int hoz : horizonals[this.mySide]) {
                 if (side != hoz && side != (hoz ^ 1) && (this.facadeMask & 1 << hoz) != 0) {
@@ -85,7 +90,7 @@ public class QuadCornerKicker implements RenderContext.QuadTransform {
                         float z = quad.posByIndex(i, 2);
                         if (epsComp(x, corner.pX(this.box)) && epsComp(y, corner.pY(this.box))
                             && epsComp(z, corner.pZ(this.box))) {
-                            Vec3i vec = EnumFacing.values()[hoz].getDirectionVec();
+                            Vec3i vec = EnumFacing.byIndex(hoz).getDirectionVec();
                             x -= (float) (vec.getX() * this.thickness);
                             y -= (float) (vec.getY() * this.thickness);
                             z -= (float) (vec.getZ() * this.thickness);

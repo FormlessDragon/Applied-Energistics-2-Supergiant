@@ -18,6 +18,8 @@
 
 package ae2.spatial;
 
+import ae2.init.worldgen.InitBiomes;
+
 public final class InitSpatialStorageDimension {
 
     private static boolean initialized;
@@ -30,7 +32,7 @@ public final class InitSpatialStorageDimension {
             return;
         }
         initialized = true;
-        ae2.init.worldgen.InitBiomes.init();
+        InitBiomes.init();
         SpatialStorageDimensionIds.init();
     }
 }

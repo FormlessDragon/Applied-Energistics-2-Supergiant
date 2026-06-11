@@ -98,7 +98,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 @Optional.Interface(iface = "yalter.mousetweaks.api.IMTModGuiContainer2", modid = "mousetweaks")
 public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer implements IMTModGuiContainer2 {
@@ -521,8 +520,12 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     private void prepareDisplayStacksForVanillaRender() {
     }
 
-    private void drawTooltip(int mouseX, int mouseY, List<ITextComponent> tooltip) {
-        drawTooltipLines(mouseX, mouseY, tooltip.stream().map(ITextComponent::getFormattedText).collect(Collectors.toList()));
+    private static List<String> formatTooltipLines(List<ITextComponent> tooltip) {
+        List<String> lines = new ObjectArrayList<>(tooltip.size());
+        for (ITextComponent component : tooltip) {
+            lines.add(component.getFormattedText());
+        }
+        return lines;
     }
 
     private List<ITextComponent> getGenericStackTooltip(GenericStack stack) {
@@ -533,10 +536,12 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         return tooltip;
     }
 
+    private void drawTooltip(int mouseX, int mouseY, List<ITextComponent> tooltip) {
+        drawTooltipLines(mouseX, mouseY, formatTooltipLines(tooltip));
+    }
+
     protected final void drawKeyTooltipWithImages(int mouseX, int mouseY, AEKey what, List<ITextComponent> tooltip) {
-        drawKeyTooltipLinesWithImages(mouseX, mouseY, what, tooltip.stream()
-                                                                   .map(ITextComponent::getFormattedText)
-                                                                   .collect(Collectors.toCollection(ObjectArrayList::new)));
+        drawKeyTooltipLinesWithImages(mouseX, mouseY, what, formatTooltipLines(tooltip));
     }
 
     protected final void drawKeyTooltipLinesWithImages(int mouseX, int mouseY, AEKey what,
@@ -1507,7 +1512,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return content;
         }
 
-        private void setContent(@org.jspecify.annotations.Nullable ITextComponent content) {
+        private void setContent(@Nullable ITextComponent content) {
             this.content = content;
         }
     }

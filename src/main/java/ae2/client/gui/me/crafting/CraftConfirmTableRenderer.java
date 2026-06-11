@@ -46,6 +46,15 @@ public class CraftConfirmTableRenderer extends AbstractTableRenderer<CraftingPla
         lines.add(line);
     }
 
+    private static void addInventoryUsageText(CraftingPlanSummaryEntry entry, List<String> lines) {
+        if (entry.finalOutput() || entry.inventoryAmount() <= 0) {
+            return;
+        }
+
+        var usage = getInventoryUsage(entry);
+        lines.add(usage.color + GuiText.InventoryUsage.getLocal(usage.text));
+    }
+
     private static InventoryUsage getInventoryUsage(CraftingPlanSummaryEntry entry) {
         double percent = entry.inventoryUsageAmount() * 100.0D / entry.inventoryAmount();
         TextFormatting color = percent > 80.0D ? TextFormatting.RED : TextFormatting.GREEN;
@@ -65,27 +74,27 @@ public class CraftConfirmTableRenderer extends AbstractTableRenderer<CraftingPla
     }
 
     @Override
-    protected List<ITextComponent> getEntryDescription(CraftingPlanSummaryEntry entry) {
-        List<ITextComponent> lines = new ObjectArrayList<>(4);
+    protected List<String> getEntryDescription(CraftingPlanSummaryEntry entry) {
+        List<String> lines = new ObjectArrayList<>(4);
         if (entry.storedAmount() > 0) {
             String amount = entry.what().getType().formatAmount(entry.storedAmount(), AmountFormat.SLOT);
-            lines.add(GuiText.FromStorage.text(amount));
+            lines.add(GuiText.FromStorage.getLocal(amount));
         }
 
-        addInventoryUsageLine(entry, lines);
+        addInventoryUsageText(entry, lines);
 
         if (entry.missingAmount() > 0) {
             String amount = entry.what().getType().formatAmount(entry.missingAmount(), AmountFormat.SLOT);
-            lines.add(GuiText.Missing.text(amount));
+            lines.add(GuiText.Missing.getLocal(amount));
         }
 
         if (entry.craftAmount() > 0) {
             String amount = entry.what().getType().formatAmount(entry.craftAmount(), AmountFormat.SLOT);
-            lines.add(GuiText.ToCraft.text(amount));
+            lines.add(GuiText.ToCraft.getLocal(amount));
         }
         if (entry.intermediateCraftAmount() > 0) {
             String amount = entry.what().getType().formatAmount(entry.intermediateCraftAmount(), AmountFormat.SLOT);
-            lines.add(GuiText.IntermediateCraft.text(amount));
+            lines.add(GuiText.IntermediateCraft.getLocal(amount));
         }
         return lines;
     }

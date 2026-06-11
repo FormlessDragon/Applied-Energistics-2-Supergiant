@@ -46,8 +46,10 @@ import ae2.helpers.MultiCraftingTracker;
 import ae2.items.parts.PartModels;
 import ae2.parts.PartModel;
 import ae2.util.prioritylist.DefaultPriorityList;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.WorldServer;
@@ -59,6 +61,17 @@ import org.jetbrains.annotations.Nullable;
  * API.
  */
 public class ExportBusPart extends IOBusPart implements ICraftingForceStartRequester {
+    private static final StackExportStrategy NOOP_EXPORT_STRATEGY = new StackExportStrategy() {
+        @Override
+        public long transfer(StackTransferContext context, AEKey what, long maxAmount) {
+            return 0;
+        }
+
+        @Override
+        public long push(AEKey what, long maxAmount, Actionable mode) {
+            return 0;
+        }
+    };
 
     public static final ResourceLocation MODEL_BASE = AppEng.makeId("part/export_bus_base");
 
@@ -75,6 +88,7 @@ public class ExportBusPart extends IOBusPart implements ICraftingForceStartReque
         AppEng.makeId("part/export_bus_has_channel"));
 
     private final MultiCraftingTracker craftingTracker;
+    private final ObjectList<Object2LongMap.Entry<AEKey>> fuzzyExportCandidates = new ObjectArrayList<>();
     private int nextSlot = 0;
     @Nullable
     private StackExportStrategy exportStrategy;
@@ -109,8 +123,12 @@ public class ExportBusPart extends IOBusPart implements ICraftingForceStartReque
     protected final StackExportStrategy getExportStrategy() {
         if (exportStrategy == null) {
             var self = this.getHost().getTileEntity();
-            var fromPos = self.getPos().offset(this.getSide());
-            var fromSide = getSide().getOpposite();
+            var side = getSide();
+            if (side == null) {
+                return NOOP_EXPORT_STRATEGY;
+            }
+            var fromPos = self.getPos().offset(side);
+            var fromSide = side.getOpposite();
             exportStrategy = StackWorldBehaviors.createExportFacade((WorldServer) getLevel(), fromPos, fromSide);
         }
         return exportStrategy;
@@ -143,17 +161,22 @@ public class ExportBusPart extends IOBusPart implements ICraftingForceStartReque
 
             if (isUpgradedWith(AEItems.FUZZY_CARD)) {
                 // When fuzzy exporting, simply attempt export of all items in the set of fuzzy-equals keys
-                for (var fuzzyWhat : ImmutableList
-                    .copyOf(storageService.getCachedInventory().findFuzzy(what, fzMode))) {
-                    // The max amount exported is scaled by the key-space's transfer factor (think millibuckets vs.
-                    // items)
-                    var transferFactory = fuzzyWhat.getKey().getAmountPerOperation();
-                    long amount = (long) context.getOperationsRemaining() * transferFactory;
-                    amount = getExportStrategy().transfer(context, fuzzyWhat.getKey(), amount);
-                    context.reduceOperationsRemaining(Math.max(1, amount / transferFactory));
-                    if (!context.hasOperationsLeft()) {
-                        break;
+                this.fuzzyExportCandidates.clear();
+                this.fuzzyExportCandidates.addAll(storageService.getCachedInventory().findFuzzy(what, fzMode));
+                try {
+                    for (var fuzzyWhat : this.fuzzyExportCandidates) {
+                        // The max amount exported is scaled by the key-space's transfer factor (think millibuckets vs.
+                        // items)
+                        var transferFactory = fuzzyWhat.getKey().getAmountPerOperation();
+                        long amount = (long) context.getOperationsRemaining() * transferFactory;
+                        amount = getExportStrategy().transfer(context, fuzzyWhat.getKey(), amount);
+                        context.reduceOperationsRemaining(Math.max(1, amount / transferFactory));
+                        if (!context.hasOperationsLeft()) {
+                            break;
+                        }
                     }
+                } finally {
+                    this.fuzzyExportCandidates.clear();
                 }
             } else {
                 // The max amount exported is scaled by the key-space's transfer factor (think millibuckets vs. items)

@@ -20,6 +20,7 @@ package ae2.block.networking;
 
 import ae2.api.parts.SelectedPart;
 import ae2.api.util.AEColor;
+import ae2.api.util.ICustomName;
 import ae2.block.AEBaseTileBlock;
 import ae2.client.render.cablebus.CableBusBakedModel;
 import ae2.client.render.cablebus.CableBusBreakingParticle;
@@ -46,6 +47,7 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
 import net.minecraft.item.EnumDyeColor;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.BlockRenderLayer;
 import net.minecraft.util.EnumFacing;
@@ -63,7 +65,7 @@ import net.minecraftforge.common.property.IUnlistedProperty;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -284,7 +286,7 @@ public class CableBusBlock extends AEBaseTileBlock<TileCableBus> implements ICus
     }
 
     @Override
-    public net.minecraft.item.Item getItemDropped(IBlockState state, Random rand, int fortune) {
+    public Item getItemDropped(IBlockState state, Random rand, int fortune) {
         return Items.AIR;
     }
 
@@ -350,7 +352,11 @@ public class CableBusBlock extends AEBaseTileBlock<TileCableBus> implements ICus
         Vec3d localPos = target.hitVec.subtract(pos.getX(), pos.getY(), pos.getZ());
         SelectedPart selectedPart = tile.getCableBus().selectPartLocal(localPos);
         if (selectedPart.part != null) {
-            return new ItemStack(selectedPart.part.getPartItem().asItem());
+            var i = new ItemStack(selectedPart.part.getPartItem().asItem());
+            if (selectedPart.part instanceof ICustomName p && p.hasCustomName()) {
+                i.setStackDisplayName(p.getCustomName());
+            }
+            return i;
         }
         if (selectedPart.facade != null) {
             return selectedPart.facade.getItemStack();

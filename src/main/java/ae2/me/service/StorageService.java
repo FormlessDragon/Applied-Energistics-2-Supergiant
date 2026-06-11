@@ -41,6 +41,7 @@ import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ReferenceSet;
+import net.minecraft.nbt.NBTTagCompound;
 
 import java.io.IOException;
 
@@ -67,6 +68,10 @@ public class StorageService implements IStorageService, IGridServiceProvider {
         }
     }
 
+    private static long sanitizeAmount(long amount) {
+        return Math.max(0, amount);
+    }
+
     private void updateCachedStacks() {
         this.cachedStacksNeedUpdate = false;
 
@@ -76,21 +81,26 @@ public class StorageService implements IStorageService, IGridServiceProvider {
 
         for (var entry : this.cachedAvailableStacks) {
             var what = entry.getKey();
-            var newAmount = entry.getLongValue();
+            var newAmount = sanitizeAmount(entry.getLongValue());
             if (newAmount != this.cachedAvailableAmounts.getLong(what)) {
                 postWatcherUpdate(what, newAmount);
             }
         }
 
-        for (var what : new ReferenceOpenHashSet<>(this.cachedAvailableAmounts.keySet())) {
-            if (this.cachedAvailableStacks.get(what) == 0) {
-                postWatcherUpdate(what, 0);
+        if (!this.cachedAvailableAmounts.isEmpty()) {
+            for (var what : this.cachedAvailableAmounts.keySet()) {
+                if (this.cachedAvailableStacks.get(what) == 0) {
+                    postWatcherUpdate(what, 0);
+                }
             }
         }
 
         this.cachedAvailableAmounts.clear();
         for (var entry : this.cachedAvailableStacks) {
-            this.cachedAvailableAmounts.put(entry.getKey(), entry.getLongValue());
+            var amount = sanitizeAmount(entry.getLongValue());
+            if (amount > 0) {
+                this.cachedAvailableAmounts.put(entry.getKey(), amount);
+            }
         }
     }
 
@@ -104,7 +114,7 @@ public class StorageService implements IStorageService, IGridServiceProvider {
     }
 
     @Override
-    public void addNode(IGridNode node, net.minecraft.nbt.NBTTagCompound savedData) {
+    public void addNode(IGridNode node, NBTTagCompound savedData) {
         var storageProvider = node.getService(IStorageProvider.class);
         if (storageProvider != null) {
             var state = new ProviderState(storageProvider);

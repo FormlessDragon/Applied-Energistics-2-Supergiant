@@ -7,6 +7,7 @@ import ae2.api.parts.IPartModel;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.MEStorage;
+import ae2.container.GuiIds;
 import ae2.core.AppEng;
 import ae2.items.parts.PartModels;
 import ae2.me.storage.NullInventory;
@@ -59,7 +60,9 @@ public class PreciseStorageBusPart extends StorageBusPart {
     protected IPartitionList createFilter() {
         KeyCounter filter = new KeyCounter();
         for (var entry : this.stackConfig.getAvailableStacks()) {
-            filter.add(entry.getKey(), entry.getLongValue());
+            if (entry.getKey() != null && entry.getLongValue() > 0) {
+                filter.add(entry.getKey(), entry.getLongValue());
+            }
         }
         return new PreciseAmountFilter(filter);
     }
@@ -70,8 +73,8 @@ public class PreciseStorageBusPart extends StorageBusPart {
     }
 
     @Override
-    public ae2.container.GuiIds.GuiKey getGuiKey() {
-        return ae2.container.GuiIds.GuiKey.PRECISE_STORAGE_BUS;
+    public GuiIds.GuiKey getGuiKey() {
+        return GuiIds.GuiKey.PRECISE_STORAGE_BUS;
     }
 
     @Override

@@ -64,12 +64,10 @@ public final class SpatialStoragePlotManager {
         if (result == null) {
             SpatialStorageWorldData legacy = (SpatialStorageWorldData) storage.getOrLoadData(
                 SpatialStorageWorldData.class, SpatialStorageWorldData.LEGACY_ID);
+            result = new SpatialStorageWorldData(SpatialStorageWorldData.ID);
             if (legacy != null) {
-                result = new SpatialStorageWorldData(SpatialStorageWorldData.ID);
                 result.copyFrom(legacy);
                 result.markDirty();
-            } else {
-                result = new SpatialStorageWorldData(SpatialStorageWorldData.ID);
             }
             storage.setData(SpatialStorageWorldData.ID, result);
         }

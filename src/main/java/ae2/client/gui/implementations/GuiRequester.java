@@ -58,8 +58,10 @@ public class GuiRequester extends AbstractGuiRequester<ContainerRequester> {
 
     @Override
     protected ClientRequester getById(long requesterId, @Nullable ITextComponent name, long sortValue,
-                                         int requestCount) {
-        if (this.requesterReference == null || this.requesterReference.getRequests().size() != requestCount) {
+                                      int requestCount) {
+        int sanitizedRequestCount = Math.clamp(requestCount, 0, ClientRequester.MAX_REQUEST_COUNT);
+        if (this.requesterReference == null
+            || this.requesterReference.getRequests().size() != sanitizedRequestCount) {
             this.requesterReference = new ClientRequester(requesterId, name, sortValue, requestCount);
         } else {
             this.requesterReference.update(name, sortValue);

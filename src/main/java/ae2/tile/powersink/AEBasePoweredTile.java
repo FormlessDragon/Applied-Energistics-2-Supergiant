@@ -35,7 +35,7 @@ import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.energy.CapabilityEnergy;
 import net.minecraftforge.energy.IEnergyStorage;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -52,7 +52,6 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
     private Set<EnumFacing> internalPowerSides = ALL_SIDES;
 
     public AEBasePoweredTile() {
-        super();
         this.forgeEnergyAdapter = new ForgeEnergyAdapter(this);
         this.ic2Sink = Integrations.ic2().createPowerSink(this, this);
         this.ic2Sink.setValidFaces(this.internalPowerSides);

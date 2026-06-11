@@ -23,6 +23,7 @@ import ae2.worldgen.meteorite.fallout.FalloutMode;
 import com.google.common.math.StatsAccumulator;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
 import net.minecraft.world.biome.Biome;
 import net.minecraftforge.common.BiomeDictionary;
 import net.minecraftforge.common.BiomeDictionary.Type;
@@ -49,6 +50,9 @@ public class MeteoriteStructure {
         if (!isDimensionAllowed(world)) {
             return false;
         }
+        if (!(world instanceof WorldServer worldServer)) {
+            return false;
+        }
 
         int centerX = (chunkX << 4) + random.nextInt(16);
         int centerZ = (chunkZ << 4) + random.nextInt(16);
@@ -59,13 +63,13 @@ public class MeteoriteStructure {
 
         BlockPos pos = new BlockPos(centerX, centerY, centerZ);
         boolean craterLake = locateWaterAroundTheCrater(world, pos, radius);
-        CraterType craterType = determineCraterType(pos, spawnBiome, random);
+        CraterType craterType = determineCraterType(spawnBiome, random);
         boolean pureCrater = random.nextFloat() > 0.9f;
         FalloutMode fallout = FalloutMode.fromBiome(spawnBiome);
 
         PlacedMeteoriteSettings settings = new PlacedMeteoriteSettings(pos, radius, craterType, fallout, pureCrater,
             craterLake);
-        worldData.addMeteorite(settings);
+        worldData.addMeteorite(worldServer, settings);
         worldData.completeChunk(world, chunkX, chunkZ, createChunkRandom(world, chunkX, chunkZ));
         return true;
     }
@@ -106,7 +110,7 @@ public class MeteoriteStructure {
         return false;
     }
 
-    private static CraterType determineCraterType(BlockPos pos, Biome biome, Random random) {
+    private static CraterType determineCraterType(Biome biome, Random random) {
         float temp = biome.getDefaultTemperature();
         if (BiomeDictionary.hasType(biome, Type.OCEAN)) {
             return CraterType.NONE;

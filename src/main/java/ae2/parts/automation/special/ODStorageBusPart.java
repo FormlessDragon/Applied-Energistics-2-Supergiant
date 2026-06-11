@@ -2,6 +2,7 @@ package ae2.parts.automation.special;
 
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
+import ae2.container.GuiIds;
 import ae2.core.AppEng;
 import ae2.items.parts.PartModels;
 import ae2.parts.PartModel;
@@ -70,8 +71,8 @@ public class ODStorageBusPart extends StorageBusPart implements ODFilterHost {
     }
 
     @Override
-    public ae2.container.GuiIds.GuiKey getGuiKey() {
-        return ae2.container.GuiIds.GuiKey.OD_STORAGE_BUS;
+    public GuiIds.GuiKey getGuiKey() {
+        return GuiIds.GuiKey.OD_STORAGE_BUS;
     }
 
     @Override

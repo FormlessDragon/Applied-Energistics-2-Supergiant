@@ -10,8 +10,11 @@ import net.minecraft.network.PacketBuffer;
 import java.io.IOException;
 
 public class WirelessTerminalPickBlockPacket extends ServerboundPacket {
+    private static final int MAX_PACKET_BYTES = 128 * 1024;
+
     private ItemStack target = ItemStack.EMPTY;
     private int hotbarSlot;
+    private boolean invalid;
 
     public WirelessTerminalPickBlockPacket() {
     }
@@ -23,13 +26,34 @@ public class WirelessTerminalPickBlockPacket extends ServerboundPacket {
 
     @Override
     protected void read(ByteBuf buf) {
-        PacketBuffer packetBuffer = new PacketBuffer(buf);
-        try {
-            this.target = packetBuffer.readItemStack();
-        } catch (IOException e) {
-            throw new IllegalArgumentException("Could not read wireless pick block stack", e);
+        if (buf.readableBytes() > MAX_PACKET_BYTES) {
+            invalidate(buf);
+            return;
         }
-        this.hotbarSlot = packetBuffer.readInt();
+
+        try {
+            PacketBuffer packetBuffer = new PacketBuffer(buf);
+            this.target = packetBuffer.readItemStack();
+            this.hotbarSlot = packetBuffer.readInt();
+            if (packetBuffer.isReadable()) {
+                throw new IllegalArgumentException("Trailing wireless terminal pick block packet payload bytes: "
+                    + packetBuffer.readableBytes());
+            }
+        } catch (IOException | RuntimeException e) {
+            invalidate(buf, e);
+        }
+    }
+
+    private void invalidate(ByteBuf buf) {
+        invalidate(buf, new IllegalArgumentException("Wireless terminal pick block packet exceeds maximum size"));
+    }
+
+    private void invalidate(ByteBuf buf, Exception exception) {
+        this.invalid = true;
+        this.target = ItemStack.EMPTY;
+        invalidateMalformed(buf, exception instanceof RuntimeException runtimeException
+            ? runtimeException
+            : new IllegalArgumentException("Could not read wireless terminal pick block packet", exception));
     }
 
     @Override
@@ -41,7 +65,7 @@ public class WirelessTerminalPickBlockPacket extends ServerboundPacket {
 
     @Override
     public void handleServer(EntityPlayerMP player) {
-        if (this.target.isEmpty()) {
+        if (this.invalid || this.target.isEmpty()) {
             return;
         }
 

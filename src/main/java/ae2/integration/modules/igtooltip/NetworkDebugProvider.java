@@ -56,7 +56,7 @@ public final class NetworkDebugProvider {
             addQuantumBridgeInfo(quantumBridge, tooltipBuilder);
         }
 
-        if (!player.isSneaking()) {
+        if (player == null || !player.isSneaking()) {
             return;
         }
 
@@ -84,7 +84,7 @@ public final class NetworkDebugProvider {
             writeQuantumBridgeInfo(quantumBridge, serverData);
         }
 
-        if (!player.isSneaking()) {
+        if (player == null || !player.isSneaking()) {
             return;
         }
 
@@ -261,7 +261,7 @@ public final class NetworkDebugProvider {
     private static @Nullable ResolvedContext resolveContext(TileEntity blockEntity, Vec3d hitLocation) {
         if (blockEntity instanceof IPartHost partHost) {
             SelectedPart selected = partHost.selectPartWorld(hitLocation);
-            if (selected.part != null) {
+            if (selected != null && selected.part != null) {
                 IGridNode node = selected.part.getGridNode();
                 if (node != null) {
                     return new ResolvedContext(node, isPivot(node.grid(), node));
@@ -283,7 +283,7 @@ public final class NetworkDebugProvider {
                                                            NBTTagCompound serverData) {
         if (blockEntity instanceof IPartHost partHost) {
             SelectedPart selected = partHost.selectPartWorld(hitLocation);
-            if (selected.part == null) {
+            if (selected == null || selected.part == null) {
                 return null;
             }
 

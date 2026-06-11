@@ -23,6 +23,7 @@
 
 package ae2.api.networking;
 
+import ae2.api.AECapabilities;
 import ae2.api.networking.events.GridEvent;
 import ae2.hooks.ticking.TickHandler;
 import ae2.me.GridConnection;
@@ -128,6 +129,9 @@ public final class GridHelper {
         var tile = level.getTileEntity(pos);
         if (tile instanceof IInWorldGridNodeHost host) {
             return host;
+        }
+        if (tile != null && tile.hasCapability(AECapabilities.IN_WORLD_GRID_NODE_HOST, null)) {
+            return tile.getCapability(AECapabilities.IN_WORLD_GRID_NODE_HOST, null);
         }
         return null;
     }

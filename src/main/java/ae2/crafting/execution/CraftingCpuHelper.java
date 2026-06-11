@@ -28,6 +28,7 @@ import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.crafting.inv.ICraftingInventory;
 import ae2.crafting.inv.ListCraftingInventory;
+import com.google.common.math.LongMath;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
@@ -121,16 +122,6 @@ public class CraftingCpuHelper {
         ICraftingInventory sourceInv,
         World level,
         KeyCounter expectedOutputs,
-        KeyCounter expectedContainerItems) {
-        return extractPatternInputs(details, sourceInv, level, expectedOutputs, expectedContainerItems, 1);
-    }
-
-    @Nullable
-    public static KeyCounter @Nullable [] extractPatternInputs(
-        IPatternDetails details,
-        ICraftingInventory sourceInv,
-        World level,
-        KeyCounter expectedOutputs,
         KeyCounter expectedContainerItems,
         int multiplier) {
 
@@ -148,7 +139,7 @@ public class CraftingCpuHelper {
                     continue;
                 }
 
-                list.add(template.key(), extracted * template.amount());
+                list.add(template.key(), LongMath.saturatedMultiply(extracted, template.amount()));
 
                 // Container items!
                 var containerItem = inputs[x].getRemainingKey(template.key());
@@ -176,7 +167,7 @@ public class CraftingCpuHelper {
 
         // Add pattern outputs.
         for (var output : details.getOutputs()) {
-            expectedOutputs.add(output.what(), output.amount() * multiplier);
+            expectedOutputs.add(output.what(), LongMath.saturatedMultiply(output.amount(), multiplier));
         }
 
         return inputHolder;
@@ -190,6 +181,9 @@ public class CraftingCpuHelper {
 
         if (!canExtractPatternInputs(details, sourceInv, level, 1)) {
             return 0;
+        }
+        if (maxMultiplier == 1) {
+            return 1;
         }
         if (canExtractPatternInputs(details, sourceInv, level, maxMultiplier)) {
             return maxMultiplier;
@@ -315,14 +309,14 @@ public class CraftingCpuHelper {
      * Extract a whole number of templates, and return how many were extracted.
      */
     public static long extractTemplates(ICraftingInventory inv, InputTemplate template, long multiplier) {
-        long maxTotal = template.amount() * multiplier;
+        long maxTotal = LongMath.saturatedMultiply(template.amount(), multiplier);
         // Extract as much as possible.
         var extracted = inv.extract(template.key(), maxTotal, Actionable.SIMULATE);
         if (extracted == 0)
             return 0;
         // Adjust to have a whole number of templates.
         multiplier = extracted / template.amount();
-        maxTotal = template.amount() * multiplier;
+        maxTotal = LongMath.saturatedMultiply(template.amount(), multiplier);
         if (maxTotal == 0)
             return 0;
         extracted = inv.extract(template.key(), maxTotal, Actionable.MODULATE);

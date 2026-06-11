@@ -75,7 +75,7 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
 
         this.searchField = this.widgets.addTextField("search");
         this.searchField.setResponder(ignored -> refreshList());
-        this.searchField.setPlaceholder(GuiText.SearchPlaceholder.text());
+        this.searchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.searchField.setTooltipMessage(Collections.singletonList(GuiText.SearchTooltip.text()));
     }
 
@@ -205,9 +205,10 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
 
     @Override
     protected ClientRequester getById(long requesterId, @Nullable ITextComponent name, long sortValue,
-                                         int requestCount) {
+                                      int requestCount) {
+        int sanitizedRequestCount = Math.clamp(requestCount, 0, ClientRequester.MAX_REQUEST_COUNT);
         ClientRequester requester = this.byId.get(requesterId);
-        if (requester == null || requester.getRequests().size() != requestCount) {
+        if (requester == null || requester.getRequests().size() != sanitizedRequestCount) {
             requester = new ClientRequester(requesterId, name, sortValue, requestCount);
             this.byId.put(requesterId, requester);
         } else {

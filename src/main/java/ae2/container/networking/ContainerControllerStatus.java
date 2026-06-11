@@ -5,9 +5,13 @@ import ae2.api.networking.IGridNode;
 import ae2.api.networking.IInWorldGridNodeHost;
 import ae2.container.AEBaseContainer;
 import ae2.core.network.clientbound.NetworkStatusPacket;
+import ae2.me.Grid;
+import ae2.server.Commands;
 import ae2.server.subcommands.GridsCommand;
 import ae2.tile.networking.TileController;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.EnumFacing;
 import org.jetbrains.annotations.Nullable;
 
@@ -86,8 +90,8 @@ public class ContainerControllerStatus extends AEBaseContainer implements INetwo
             return;
         }
 
-        if (this.grid instanceof ae2.me.Grid grid) {
-            net.minecraft.server.MinecraftServer server = getPlayerInventory().player.getServer();
+        if (this.grid instanceof Grid grid) {
+            MinecraftServer server = getPlayerInventory().player.getServer();
             if (server != null) {
                 String commandLine = GridsCommand.buildExportCommand(grid.getSerialNumber());
                 if (commandLine.startsWith("/")) {
@@ -108,17 +112,16 @@ public class ContainerControllerStatus extends AEBaseContainer implements INetwo
     }
 
     private boolean computeCanExportGrid() {
-        if (!(this.grid instanceof ae2.me.Grid)) {
+        if (!(this.grid instanceof Grid)) {
             return false;
         }
 
-        net.minecraft.entity.player.EntityPlayer player = getPlayerInventory().player;
-        net.minecraft.server.MinecraftServer server = player.getServer();
+        EntityPlayer player = getPlayerInventory().player;
+        MinecraftServer server = player.getServer();
         if (server != null && !server.getCommandManager().getCommands().containsKey("ae2")) {
             return false;
         }
 
-        return player.canUseCommand(ae2.server.Commands.GRIDS.level,
-            ae2.server.Commands.GRIDS.getName());
+        return player.canUseCommand(Commands.GRIDS.level, Commands.GRIDS.getName());
     }
 }

@@ -3,9 +3,11 @@ package ae2.mixins;
 import ae2.text.CustomTextComponents;
 import ae2.text.ICustomTextComponent;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonSerializationContext;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,7 +26,7 @@ public class TextComponentSerializerMixin {
     @Unique
     private static String ae2_getRequiredString(JsonObject jsonObject) {
         JsonElement element = jsonObject.get("ae2_custom");
-        if (element == null || !element.isJsonPrimitive()) {
+        if (element == null || !element.isJsonPrimitive() || !element.getAsJsonPrimitive().isString()) {
             throw new JsonParseException("Expected string for key: " + "ae2_custom");
         }
         return element.getAsString();
@@ -44,9 +46,9 @@ public class TextComponentSerializerMixin {
         at = @At("HEAD"),
         cancellable = true)
     private void ae2_deserializeCustom(JsonElement jsonElement, Type type,
-                                       com.google.gson.JsonDeserializationContext context,
+                                       JsonDeserializationContext context,
                                        CallbackInfoReturnable<ITextComponent> cir) {
-        if (!jsonElement.isJsonObject()) {
+        if (jsonElement == null || !jsonElement.isJsonObject()) {
             return;
         }
 
@@ -71,13 +73,22 @@ public class TextComponentSerializerMixin {
         }
 
         if (jsonObject.has("extra")) {
-            JsonArray extra = jsonObject.getAsJsonArray("extra");
+            JsonElement extraElement = jsonObject.get("extra");
+            if (!extraElement.isJsonArray()) {
+                throw new JsonParseException("Expected array for key: " + "extra");
+            }
+
+            JsonArray extra = extraElement.getAsJsonArray();
             if (extra.size() <= 0) {
                 throw new JsonParseException("Unexpected empty array of components");
             }
 
             for (JsonElement siblingElement : extra) {
-                component.appendSibling(context.deserialize(siblingElement, ITextComponent.class));
+                ITextComponent sibling = context.deserialize(siblingElement, ITextComponent.class);
+                if (sibling == null) {
+                    throw new JsonParseException("Unexpected null component in extra");
+                }
+                component.appendSibling(sibling);
             }
         }
 
@@ -89,7 +100,7 @@ public class TextComponentSerializerMixin {
         at = @At("HEAD"),
         cancellable = true)
     private void ae2_serializeCustom(ITextComponent component, Type type,
-                                     com.google.gson.JsonSerializationContext context,
+                                     JsonSerializationContext context,
                                      CallbackInfoReturnable<JsonElement> cir) {
         if (!(component instanceof ICustomTextComponent customTextComponent)) {
             return;

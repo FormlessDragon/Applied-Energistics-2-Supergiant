@@ -77,11 +77,12 @@ public abstract class UpgradeablePart extends AEBasePart implements IConfigurabl
 
     protected boolean isSleeping() {
         if (isUpgradedWith(AEItems.REDSTONE_CARD)) {
-            return switch (this.getRSMode()) {
+            return switch (getRSMode()) {
                 case IGNORE -> false;
                 case HIGH_SIGNAL -> !this.getHost().hasRedstone();
                 case LOW_SIGNAL -> this.getHost().hasRedstone();
                 case SIGNAL_PULSE -> true;
+                case null -> false;
             };
         }
 
@@ -155,7 +156,7 @@ public abstract class UpgradeablePart extends AEBasePart implements IConfigurabl
         return this.upgrades.getMaxInstalled(((ItemDefinition<?>) AEItems.REDSTONE_CARD).asItem());
     }
 
-    public @org.jspecify.annotations.Nullable RedstoneMode getRSMode() {
+    public @Nullable RedstoneMode getRSMode() {
         return null;
     }
 

@@ -55,49 +55,83 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
     private static void readCounter(NBTTagList list, KeyCounter counter) {
         for (int entryIndex = 0; entryIndex < list.tagCount(); entryIndex++) {
             var stack = GenericStack.readTag(list.getCompoundTagAt(entryIndex));
-            if (stack != null) {
+            if (stack != null && stack.amount() > 0) {
                 counter.add(stack.what(), stack.amount());
             }
         }
     }
 
+    private static long saturatedAdd(long first, long second) {
+        if (first <= 0) {
+            return Math.max(0, second);
+        }
+        if (second <= 0) {
+            return first;
+        }
+        if (Long.MAX_VALUE - first < second) {
+            return Long.MAX_VALUE;
+        }
+        return first + second;
+    }
+
     public void addPending(int slot, AEKey key, long amount) {
-        if (amount <= 0) {
+        if (!isValidSlot(slot) || key == null || amount <= 0) {
             return;
         }
         buffered[slot].add(key, amount);
     }
 
-    public long getPendingAmount(int slot, AEKey key) {
-        return getBufferedAmount(slot, key) + getPendingInsertionAmount(slot, key);
+    private boolean isValidSlot(int slot) {
+        return slot >= 0 && slot < buffered.length;
     }
 
     public long getBufferedAmount(int slot, AEKey key) {
+        if (!isValidSlot(slot) || key == null) {
+            return 0;
+        }
         return buffered[slot].get(key);
     }
 
     public long getPendingInsertionAmount(int slot, AEKey key) {
+        if (!isValidSlot(slot) || key == null) {
+            return 0;
+        }
         return pendingInsertion[slot].get(key);
     }
 
     public long getRemainingTotalAmount(int slot, AEKey key) {
+        if (!isValidSlot(slot) || key == null) {
+            return 0;
+        }
         return total[slot].get(key);
     }
 
     public long getKnownAmount(int slot, AEKey key) {
+        if (!isValidSlot(slot) || key == null) {
+            return 0;
+        }
         return known[slot].get(key);
     }
 
     public @Nullable AEKey getBufferedKey(int slot) {
+        if (!isValidSlot(slot)) {
+            return null;
+        }
         return buffered[slot].getFirstKey();
     }
 
     public void setKnownAmount(int slot, AEKey key, long amount) {
+        if (!isValidSlot(slot) || key == null) {
+            return;
+        }
         known[slot].set(key, Math.max(0, amount));
         pendingInsertion[slot].remove(key);
     }
 
     public void watch(int slot, @Nullable AEKey key) {
+        if (!isValidSlot(slot)) {
+            return;
+        }
         if (Objects.equals(watchedKeys[slot], key)) {
             return;
         }
@@ -106,6 +140,9 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
     }
 
     public void setTotalAmount(int slot, AEKey key, long amount) {
+        if (!isValidSlot(slot) || key == null) {
+            return;
+        }
         total[slot].set(key, Math.max(0, amount));
         total[slot].removeZeros();
     }
@@ -130,8 +167,12 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
         }
     }
 
+    public long getPendingAmount(int slot, AEKey key) {
+        return saturatedAdd(getBufferedAmount(slot, key), getPendingInsertionAmount(slot, key));
+    }
+
     public long computeAmountToCraft(int slot, Request request) {
-        if (!request.isEnabled() || request.isEmpty()) {
+        if (!isValidSlot(slot) || !request.isEnabled() || request.isEmpty()) {
             return 0;
         }
 
@@ -140,11 +181,14 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
             return 0;
         }
 
-        long outstanding = getKnownAmount(slot, key) + getPendingAmount(slot, key);
+        long outstanding = saturatedAdd(getKnownAmount(slot, key), getPendingAmount(slot, key));
         return outstanding < request.getAmount() ? request.getBatchSize() : 0;
     }
 
     public void markExported(int slot, AEKey key, long amount) {
+        if (!isValidSlot(slot) || key == null) {
+            return;
+        }
         long exported = Math.clamp(amount, 0, getBufferedAmount(slot, key));
         if (exported <= 0) {
             return;
@@ -158,6 +202,9 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
     }
 
     public void clear(int slot) {
+        if (!isValidSlot(slot)) {
+            return;
+        }
         total[slot].clear();
         buffered[slot].clear();
         pendingInsertion[slot].clear();

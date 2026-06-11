@@ -143,7 +143,7 @@ public class ContainerPatternModifier extends AEBaseContainer {
             sendClientAction(ACTION_SET_PROVIDER_PAGE, page);
             return;
         }
-        this.providerPage = Math.clamp(page, 0, getCurrentProviderPageCount() - 1);
+        this.providerPage = clampProviderPage(page);
         this.providerPageCount = getCurrentProviderPageCount();
         this.activePatternSlots = getCurrentPatternSlotCount();
         updateVisibleSlots();
@@ -164,7 +164,7 @@ public class ContainerPatternModifier extends AEBaseContainer {
         }
         this.providerInventoryMode = !this.providerInventoryMode;
         this.activePatternSlots = getCurrentPatternSlotCount();
-        this.providerPage = Math.min(this.providerPage, getCurrentProviderPageCount() - 1);
+        this.providerPage = clampProviderPage(this.providerPage);
         this.providerPageCount = getCurrentProviderPageCount();
         updateVisibleSlots();
         detectAndSendChanges();
@@ -250,7 +250,7 @@ public class ContainerPatternModifier extends AEBaseContainer {
 
     public void updateVisibleSlots() {
         if (isServerSide()) {
-            this.providerPage = Math.min(this.providerPage, getCurrentProviderPageCount() - 1);
+            this.providerPage = clampProviderPage(this.providerPage);
             this.providerPageCount = getCurrentProviderPageCount();
             this.activePatternSlots = getCurrentPatternSlotCount();
         }
@@ -271,7 +271,7 @@ public class ContainerPatternModifier extends AEBaseContainer {
     @Override
     public void broadcastChanges() {
         if (isServerSide()) {
-            this.providerPage = Math.min(this.providerPage, getCurrentProviderPageCount() - 1);
+            this.providerPage = clampProviderPage(this.providerPage);
             this.providerPageCount = getCurrentProviderPageCount();
             this.activePatternSlots = getCurrentPatternSlotCount();
         }
@@ -308,6 +308,14 @@ public class ContainerPatternModifier extends AEBaseContainer {
             () -> setCraftingProperty(PatternModifierLogic.CraftingProperty.FLUID_SUBSTITUTE, false));
         registerClientAction(ACTION_TOGGLE_PATTERN_INVENTORY, this::togglePatternInventory);
         registerClientAction(ACTION_SET_PROVIDER_PAGE, Integer.class, this::setProviderPage);
+    }
+
+    private int clampProviderPage(int page) {
+        int pageCount = getCurrentProviderPageCount();
+        if (pageCount <= 0) {
+            return 0;
+        }
+        return Math.clamp(page, 0, pageCount - 1);
     }
 
     private void setSlotsEnabled(SlotSemantic semantic, boolean enabled) {

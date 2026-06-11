@@ -24,6 +24,7 @@ import ae2.container.GuiIds;
 import ae2.core.gui.GuiOpener;
 import ae2.tile.misc.TileCellWorkbench;
 import net.minecraft.block.material.Material;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
@@ -45,7 +46,7 @@ public class CellWorkbenchBlock extends AEBaseTileBlock<TileCellWorkbench> {
     }
 
     @Override
-    public boolean onBlockActivated(World world, BlockPos pos, net.minecraft.block.state.IBlockState state,
+    public boolean onBlockActivated(World world, BlockPos pos, IBlockState state,
                                     EntityPlayer player, EnumHand hand, EnumFacing facing, float hitX, float hitY, float hitZ) {
         if (super.onBlockActivated(world, pos, state, player, hand, facing, hitX, hitY, hitZ)) {
             return true;

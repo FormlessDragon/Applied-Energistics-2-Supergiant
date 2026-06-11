@@ -29,6 +29,7 @@ import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.PaletteColor;
 import ae2.client.gui.style.WidgetStyle;
 import ae2.core.localization.GuiText;
+import ae2.util.EmptyArrays;
 import com.google.common.primitives.Longs;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
@@ -101,12 +102,10 @@ public class NumberEntryWidget implements ICompositeWidget {
     private Point currentScreenOrigin = Point.ZERO;
 
     private List<AE2Button> amountButtons = ObjectLists.emptyList();
-    private AE2Button ceilButton;
-    private AE2Button floorButton;
     private Rectangle ceilButtonBounds = Rects.ZERO;
     private Rectangle floorButtonBounds = Rects.ZERO;
     private ButtonMode lastButtonMode;
-    private long[] lastButtonValues = new long[0];
+    private long[] lastButtonValues = EmptyArrays.EMPTY_LONG_ARRAY;
     private boolean previewFieldConfigured;
     private boolean focused = true;
     private boolean validationCacheDirty = true;
@@ -164,14 +163,6 @@ public class NumberEntryWidget implements ICompositeWidget {
             return ButtonMode.ALT_MULTIPLY;
         }
         return GuiScreen.isShiftKeyDown() ? ButtonMode.SHIFT_ADD : ButtonMode.ADD;
-    }
-
-    static OptionalLong toExternalValue(BigDecimal internalValue, int amountPerUnit) {
-        if (amountPerUnit == 1 && internalValue.scale() > 0) {
-            return OptionalLong.empty();
-        }
-
-        return toExternalValue(internalValue, BigDecimal.valueOf(amountPerUnit));
     }
 
     private static OptionalLong toExternalValue(BigDecimal internalValue, BigDecimal amountPerUnit) {
@@ -274,10 +265,6 @@ public class NumberEntryWidget implements ICompositeWidget {
         this.textField.setFocused(focused);
     }
 
-    public boolean isMouseOverTextField(int mouseX, int mouseY) {
-        return this.textFieldBounds.contains(mouseX, mouseY);
-    }
-
     @Override
     public void setPosition(Point position) {
         bounds = new Rectangle(position.x(), position.y(), bounds.width, bounds.height);
@@ -343,10 +330,10 @@ public class NumberEntryWidget implements ICompositeWidget {
         }
         this.ceilButtonBounds = new Rectangle(this.bounds.x + 124, this.bounds.y, 14, 20);
         this.floorButtonBounds = new Rectangle(this.bounds.x + 124, this.bounds.y + 42, 14, 20);
-        this.ceilButton = new AE2Button(left + 124, top, 14, 20, CEIL, () -> roundValue(RoundingMode.CEILING));
-        this.floorButton = new AE2Button(left + 124, top + 42, 14, 20, FLOOR, () -> roundValue(RoundingMode.FLOOR));
-        buttons.add(this.ceilButton);
-        buttons.add(this.floorButton);
+        var ceilButton = new AE2Button(left + 124, top, 14, 20, CEIL, () -> roundValue(RoundingMode.CEILING));
+        var floorButton = new AE2Button(left + 124, top + 42, 14, 20, FLOOR, () -> roundValue(RoundingMode.FLOOR));
+        buttons.add(ceilButton);
+        buttons.add(floorButton);
 
         buttons.subList(4, buttons.size()).forEach(addWidget);
 

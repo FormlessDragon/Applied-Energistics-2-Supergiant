@@ -33,7 +33,7 @@ import net.minecraft.world.Teleporter;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class SpatialStorageHelper {
 
@@ -188,8 +188,11 @@ public class SpatialStorageHelper {
 
         SpatialTeleporter teleporter = new SpatialTeleporter(newLevel, destination.x, destination.y, destination.z);
         if (entity instanceof EntityPlayerMP player) {
-            player.getServer().getPlayerList().transferPlayerToDimension(player, newLevel.provider.getDimension(),
-                teleporter);
+            var server = player.getServer();
+            if (server == null) {
+                return player;
+            }
+            server.getPlayerList().transferPlayerToDimension(player, newLevel.provider.getDimension(), teleporter);
             player.connection.setPlayerLocation(destination.x, destination.y, destination.z, player.rotationYaw,
                 player.rotationPitch);
             for (Entity passenger : passengersOnOtherSide) {

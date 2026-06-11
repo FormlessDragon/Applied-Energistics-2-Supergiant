@@ -57,7 +57,7 @@ public class P2PHelper {
 
         for (int i = 0; i < 4; i++) {
             int nibble = getFrequencyNibble(frequency, i);
-            colors[i] = AEColor.values()[nibble];
+            colors[i] = AEColor.VALID_COLORS[nibble];
         }
 
         return colors;
@@ -68,7 +68,9 @@ public class P2PHelper {
 
         int packed = 0;
         for (int i = 0; i < 4; i++) {
-            packed |= colors[3 - i].ordinal() << 4 * i;
+            AEColor color = colors[3 - i];
+            Preconditions.checkArgument(color != AEColor.TRANSPARENT);
+            packed |= color.ordinal() << 4 * i;
         }
 
         return (short) (packed & 0xFFFF);

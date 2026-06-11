@@ -1,6 +1,7 @@
 package ae2.init.client;
 
 import ae2.api.stacks.AEFluidKey;
+import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.util.AEColor;
 import ae2.client.render.StaticItemColor;
@@ -130,7 +131,7 @@ public final class InitItemColors {
             return -1;
         }
 
-        if (genericStack.what() instanceof ae2.api.stacks.AEItemKey itemKey) {
+        if (genericStack.what() instanceof AEItemKey itemKey) {
             ItemStack displayStack = itemKey.toStack();
             if (displayStack.getItem() == stack.getItem()) {
                 return -1;

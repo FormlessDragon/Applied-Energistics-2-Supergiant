@@ -32,26 +32,35 @@ import net.minecraftforge.client.model.pipeline.UnpackedBakedQuad;
 import net.minecraftforge.common.model.TRSRTransformation;
 import net.minecraftforge.common.property.IExtendedBlockState;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import javax.vecmath.Matrix4f;
 import javax.vecmath.Vector3f;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 @SuppressWarnings("deprecation")
 public class DriveBakedModel implements IBakedModel {
+    private static final EnumFacing[] CELL_SIDES = new EnumFacing[]{
+        null,
+        EnumFacing.DOWN,
+        EnumFacing.UP,
+        EnumFacing.NORTH,
+        EnumFacing.SOUTH,
+        EnumFacing.WEST,
+        EnumFacing.EAST
+    };
+
     private final IBakedModel bakedBase;
     private final Map<Item, IBakedModel> bakedCells;
     private final IBakedModel defaultCellModel;
-    private final TRSRTransformation transform;
+    private final Matrix4f[] slotTransforms;
 
     public DriveBakedModel(IBakedModel bakedBase, Map<Item, IBakedModel> bakedCells, IBakedModel defaultCellModel,
                            TRSRTransformation transform) {
         this.bakedBase = bakedBase;
         this.bakedCells = bakedCells;
         this.defaultCellModel = defaultCellModel;
-        this.transform = transform;
+        this.slotTransforms = createSlotTransforms(transform);
     }
 
     public static void getSlotOrigin(int row, int col, Vector3f translation) {
@@ -61,11 +70,27 @@ public class DriveBakedModel implements IBakedModel {
         translation.set(xOffset, yOffset, zOffset);
     }
 
-    private static Iterable<EnumFacing> withNullFace() {
-        List<EnumFacing> sides = new ObjectArrayList<>(7);
-        sides.add(null);
-        Collections.addAll(sides, EnumFacing.values());
-        return sides;
+    private static Matrix4f[] createSlotTransforms(TRSRTransformation transform) {
+        Matrix4f rotation = new Matrix4f();
+        rotation.set(transform.getLeftRot());
+
+        Matrix4f[] slotTransforms = new Matrix4f[10];
+        Vector3f translation = new Vector3f();
+        for (int row = 0; row < 5; row++) {
+            for (int col = 0; col < 2; col++) {
+                getSlotOrigin(row, col, translation);
+                rotation.transform(translation);
+                slotTransforms[row * 2 + col] = createTranslationMatrix(translation);
+            }
+        }
+        return slotTransforms;
+    }
+
+    private static Matrix4f createTranslationMatrix(Vector3f translation) {
+        Matrix4f transform = new Matrix4f();
+        transform.setIdentity();
+        transform.setTranslation(translation);
+        return transform;
     }
 
     @Override
@@ -78,19 +103,14 @@ public class DriveBakedModel implements IBakedModel {
                 return result;
             }
 
-            for (int row = 0; row < 5; row++) {
-                for (int col = 0; col < 2; col++) {
-                    Vector3f translation = new Vector3f();
-                    getSlotOrigin(row, col, translation);
-                    rotateSlotTranslation(translation);
-                    MatrixVertexTransformer transformer = new MatrixVertexTransformer(createTranslationMatrix(translation));
-                    for (BakedQuad bakedQuad : getCellChassisQuads(state, renderState.getItem(row * 2 + col), rand)) {
-                        UnpackedBakedQuad.Builder builder = new UnpackedBakedQuad.Builder(bakedQuad.getFormat());
-                        transformer.setParent(builder);
-                        transformer.setVertexFormat(builder.getVertexFormat());
-                        bakedQuad.pipe(transformer);
-                        result.add(builder.build());
-                    }
+            for (int slot = 0; slot < this.slotTransforms.length; slot++) {
+                MatrixVertexTransformer transformer = new MatrixVertexTransformer(this.slotTransforms[slot]);
+                for (BakedQuad bakedQuad : getCellChassisQuads(state, renderState.getItem(slot), rand)) {
+                    UnpackedBakedQuad.Builder builder = new UnpackedBakedQuad.Builder(bakedQuad.getFormat());
+                    transformer.setParent(builder);
+                    transformer.setVertexFormat(builder.getVertexFormat());
+                    bakedQuad.pipe(transformer);
+                    result.add(builder.build());
                 }
             }
         }
@@ -98,22 +118,10 @@ public class DriveBakedModel implements IBakedModel {
         return result;
     }
 
-    private void rotateSlotTranslation(Vector3f translation) {
-        Matrix4f rotation = new Matrix4f();
-        rotation.set(this.transform.getLeftRot());
-        rotation.transform(translation);
-    }
-
-    private Matrix4f createTranslationMatrix(Vector3f translation) {
-        Matrix4f transform = new Matrix4f();
-        transform.setIdentity();
-        transform.setTranslation(translation);
-        return transform;
-    }
-
     public IBakedModel getCellChassisModel(@Nullable Item item) {
         if (item == null) {
-            return this.bakedCells.get(Items.AIR);
+            IBakedModel emptyModel = this.bakedCells.get(Items.AIR);
+            return emptyModel != null ? emptyModel : this.defaultCellModel;
         }
         IBakedModel model = this.bakedCells.get(item);
         return model != null ? model : this.defaultCellModel;
@@ -121,8 +129,11 @@ public class DriveBakedModel implements IBakedModel {
 
     public List<BakedQuad> getCellChassisQuads(@Nullable IBlockState state, @Nullable Item item, long rand) {
         IBakedModel bakedCell = getCellChassisModel(item);
+        if (bakedCell == null) {
+            return List.of();
+        }
         List<BakedQuad> result = new ObjectArrayList<>();
-        for (EnumFacing cellSide : withNullFace()) {
+        for (EnumFacing cellSide : CELL_SIDES) {
             result.addAll(bakedCell.getQuads(state, cellSide, rand));
         }
         return result;

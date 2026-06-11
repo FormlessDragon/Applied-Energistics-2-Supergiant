@@ -41,10 +41,19 @@ import java.util.Optional;
 public class EntropyRecipeSerializer implements IAERecipeFactory {
     @Override
     public void register(JsonObject json, JsonContext ctx) {
-        EntropyMode mode = EntropyMode.fromString(JsonUtils.getString(json, "mode", "heat"));
+        EntropyMode mode = readMode(json);
         EntropyRecipe.Input input = readInput(JsonUtils.getJsonObject(json, "input"));
         EntropyRecipe.Output output = readOutput(JsonUtils.getJsonObject(json, "output"), ctx);
         AERecipeTypes.ENTROPY.register(new EntropyRecipe(mode, input, output));
+    }
+
+    private EntropyMode readMode(JsonObject json) {
+        String mode = JsonUtils.getString(json, "mode", "heat");
+        try {
+            return EntropyMode.fromString(mode);
+        } catch (IllegalArgumentException e) {
+            throw new JsonSyntaxException(e.getMessage(), e);
+        }
     }
 
     private EntropyRecipe.Input readInput(JsonObject json) {
@@ -71,29 +80,36 @@ public class EntropyRecipeSerializer implements IAERecipeFactory {
 
     private EntropyRecipe.BlockInput readBlockInput(JsonObject json) {
         Block block = JsonRecipeUtils.readBlock(json, "id");
-        Map<String, PropertyValueMatcher> properties = readMatchers(json.getAsJsonObject("properties"));
+        Map<String, PropertyValueMatcher> properties = readMatchers(readProperties(json));
         return new EntropyRecipe.BlockInput(block, properties);
     }
 
     private EntropyRecipe.FluidInput readFluidInput(JsonObject json) {
         Fluid fluid = readFluid(json);
-        Map<String, PropertyValueMatcher> properties = readMatchers(json.getAsJsonObject("properties"));
+        Map<String, PropertyValueMatcher> properties = readMatchers(readProperties(json));
         return new EntropyRecipe.FluidInput(fluid, properties);
     }
 
     private EntropyRecipe.BlockOutput readBlockOutput(JsonObject json) {
         Block block = JsonRecipeUtils.readBlock(json, "id");
         int metadata = JsonUtils.getInt(json, "metadata", -1);
+        if (metadata < -1 || metadata > 15) {
+            throw new JsonSyntaxException("metadata must be between 0 and 15, or -1 for the default block state");
+        }
         boolean keepProperties = JsonUtils.getBoolean(json, "keepProperties", false);
-        Map<String, String> properties = readStrings(json.getAsJsonObject("properties"));
+        Map<String, String> properties = readStrings(readProperties(json));
         return new EntropyRecipe.BlockOutput(block, metadata, keepProperties, properties);
     }
 
     private EntropyRecipe.FluidOutput readFluidOutput(JsonObject json) {
         Fluid fluid = readFluid(json);
         boolean keepProperties = JsonUtils.getBoolean(json, "keepProperties", false);
-        Map<String, String> properties = readStrings(json.getAsJsonObject("properties"));
+        Map<String, String> properties = readStrings(readProperties(json));
         return new EntropyRecipe.FluidOutput(fluid, keepProperties, properties);
+    }
+
+    private JsonObject readProperties(JsonObject json) {
+        return json.has("properties") ? JsonUtils.getJsonObject(json, "properties") : null;
     }
 
     private Map<String, PropertyValueMatcher> readMatchers(JsonObject json) {
@@ -113,7 +129,7 @@ public class EntropyRecipeSerializer implements IAERecipeFactory {
             return result;
         }
         for (Map.Entry<String, JsonElement> entry : json.entrySet()) {
-            result.put(entry.getKey(), entry.getValue().getAsString());
+            result.put(entry.getKey(), JsonUtils.getString(json, entry.getKey()));
         }
         return result;
     }
@@ -122,12 +138,20 @@ public class EntropyRecipeSerializer implements IAERecipeFactory {
         String id = JsonUtils.getString(json, "id");
         Fluid fluid = FluidRegistry.getFluid(id);
         if (fluid == null) {
-            ResourceLocation resourceLocation = new ResourceLocation(id);
+            ResourceLocation resourceLocation = readResourceLocation(id);
             fluid = FluidRegistry.getFluid(resourceLocation.getPath());
         }
         if (fluid == null) {
             throw new JsonSyntaxException("Unknown fluid: " + id);
         }
         return fluid;
+    }
+
+    private ResourceLocation readResourceLocation(String id) {
+        try {
+            return new ResourceLocation(id);
+        } catch (RuntimeException e) {
+            throw new JsonSyntaxException("Invalid fluid id: " + id, e);
+        }
     }
 }

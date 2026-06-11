@@ -31,7 +31,7 @@ import ae2.hooks.ticking.TickHandler;
 import com.google.common.collect.ImmutableSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -78,6 +78,10 @@ public class MultiCraftingTracker {
 
     public boolean handleCrafting(int x, AEKey what, long amount, World level, ICraftingService cg,
                                   IActionSource mySrc) {
+        if (x < 0 || x >= this.size || what == null || amount <= 0 || level == null || cg == null || mySrc == null) {
+            return false;
+        }
+
         var craftingJob = this.getJob(x);
         if (this.getLink(x) != null) {
             return false;

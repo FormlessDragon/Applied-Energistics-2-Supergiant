@@ -196,7 +196,7 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
         GlStateManager.translate(0, 0, 350);
         BackgroundGenerator.draw(this.bounds.width, this.bounds.height, x, y);
         this.parent.getMinecraft().fontRenderer.drawString(
-            GuiText.WirelessTerminalSelector.text().getFormattedText(),
+            GuiText.WirelessTerminalSelector.getLocal(),
             x + TITLE_X,
             y + TITLE_Y,
             0x404040);

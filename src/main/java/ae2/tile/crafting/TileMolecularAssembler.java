@@ -62,7 +62,7 @@ import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -166,6 +166,14 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         return AECableType.COVERED;
     }
 
+    private static ItemStack readStack(NBTTagCompound tag) {
+        try {
+            return new ItemStack(tag);
+        } catch (RuntimeException ignored) {
+            return ItemStack.EMPTY;
+        }
+    }
+
     @Override
     public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
@@ -181,7 +189,7 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         this.outputBuffer.readFromChildTag(data, NBT_OUTPUT_BUFFER);
         this.progress = data.getDouble(NBT_PROGRESS);
         this.currentPatternStack = data.hasKey(NBT_CURRENT_PATTERN, Constants.NBT.TAG_COMPOUND)
-            ? new ItemStack(data.getCompoundTag(NBT_CURRENT_PATTERN))
+            ? readStack(data.getCompoundTag(NBT_CURRENT_PATTERN))
             : ItemStack.EMPTY;
         this.currentPattern = null;
         this.reboot = true;
@@ -548,20 +556,15 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
             return false;
         }
 
-        ObjectList<GenericStack> results = new ObjectArrayList<>();
-        for (GenericStack cachedOutput : this.cachedOutputs) {
-            results.add(cachedOutput);
-        }
-
-        if (!canFitOutputs(results)) {
+        if (!canFitOutputs(this.cachedOutputs)) {
             return false;
         }
 
         this.pendingCrafts = 0;
-        this.cachedOutputs.clear();
-        for (GenericStack result : results) {
+        for (GenericStack result : this.cachedOutputs) {
             this.outputBuffer.insert(result.what(), result.amount(), Actionable.MODULATE, this.actionSource);
         }
+        this.cachedOutputs.clear();
 
         if (this.currentMainOutput != null && this.world != null) {
             InitNetwork.sendToAllNearExcept(null, this.pos.getX(), this.pos.getY(), this.pos.getZ(), 32,
@@ -573,7 +576,9 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
 
     private boolean canFitOutputs(List<GenericStack> results) {
         GenericStackInv simulated = new GenericStackInv(null, this.outputBuffer.size());
-        simulated.readFromList(this.outputBuffer.toList());
+        for (int i = 0; i < this.outputBuffer.size(); i++) {
+            simulated.setStack(i, this.outputBuffer.getStack(i));
+        }
         for (GenericStack result : results) {
             if (simulated.insert(result.what(), result.amount(), Actionable.MODULATE, this.actionSource) < result.amount()) {
                 return false;

@@ -20,8 +20,8 @@ package ae2.container.me.crafting;
 
 import ae2.api.stacks.AEKey;
 import net.minecraft.network.PacketBuffer;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 
 import java.util.Comparator;
 import java.util.Objects;
@@ -38,6 +38,10 @@ public record CraftingStatusEntry(long serial, @Nullable AEKey what, long stored
         long activeAmount = buffer.readVarLong();
         long storedAmount = buffer.readVarLong();
         long pendingAmount = buffer.readVarLong();
+        if (activeAmount < 0 || storedAmount < 0 || pendingAmount < 0) {
+            throw new IllegalArgumentException("Crafting status entry contains negative amounts");
+        }
+
         var what = AEKey.readOptionalKey(buffer);
         return new CraftingStatusEntry(serial, what, storedAmount, activeAmount, pendingAmount);
     }
@@ -55,7 +59,7 @@ public record CraftingStatusEntry(long serial, @Nullable AEKey what, long stored
     }
 
     @Override
-    public int compareTo(@NonNull CraftingStatusEntry other) {
+    public int compareTo(@NotNull CraftingStatusEntry other) {
         return COMPARATOR.compare(this, other);
     }
 

@@ -9,7 +9,7 @@ import mezz.jei.gui.TooltipRenderer;
 import mezz.jei.gui.recipes.RecipeLayout;
 import mezz.jei.gui.recipes.RecipeTransferButton;
 import net.minecraft.client.Minecraft;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 final class PatternRecipeTransferUserError implements IRecipeTransferError {
     private final IRecipeLayout recipeLayout;
@@ -30,7 +30,7 @@ final class PatternRecipeTransferUserError implements IRecipeTransferError {
     }
 
     @Override
-    public void showError(@NonNull Minecraft minecraft, int mouseX, int mouseY, @NonNull IRecipeLayout recipeLayout, int recipeX,
+    public void showError(@NotNull Minecraft minecraft, int mouseX, int mouseY, @NotNull IRecipeLayout recipeLayout, int recipeX,
                           int recipeY) {
         RecipeTransferHighlightHelper.drawHighlights(minecraft, recipeLayout, missingGuiSlots, craftableGuiSlots,
             recipeX, recipeY);

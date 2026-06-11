@@ -20,6 +20,7 @@ package ae2.tile.misc;
 import ae2.api.config.CopyMode;
 import ae2.api.config.Settings;
 import ae2.api.inventories.ISegmentedInventory;
+import ae2.api.inventories.InternalInventory;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.ISubGuiHost;
 import ae2.api.storage.cells.ICellWorkbenchItem;
@@ -42,8 +43,8 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.util.List;
 
 public class TileCellWorkbench extends AEBaseTile
@@ -113,7 +114,7 @@ public class TileCellWorkbench extends AEBaseTile
     }
 
     @Nullable
-    public ae2.api.inventories.InternalInventory getSubInventory(ResourceLocation id) {
+    public InternalInventory getSubInventory(ResourceLocation id) {
         if (ISegmentedInventory.CELLS.equals(id)) {
             return this.cell;
         }

@@ -12,11 +12,12 @@ import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.fml.common.eventhandler.Event;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 public class RegisterPartCapabilitiesEvent extends Event {
 
@@ -95,6 +96,7 @@ public class RegisterPartCapabilitiesEvent extends Event {
     static final class PartCapabilityRegistration<T> {
         private final Capability<T> capability;
         private final Object2ObjectOpenHashMap<Class<? extends IPart>, PartCapabilityProvider<?, T>> parts = new Object2ObjectOpenHashMap<>();
+        private final Object2ObjectOpenHashMap<Class<?>, Optional<PartCapabilityProvider<?, T>>> providerCache = new Object2ObjectOpenHashMap<>();
 
         PartCapabilityRegistration(Capability<T> capability) {
             this.capability = capability;
@@ -105,6 +107,7 @@ public class RegisterPartCapabilitiesEvent extends Event {
                 throw new IllegalStateException("Cannot register an additional capability provider for part "
                     + partClass + " since there already is one for capability " + capability);
             }
+            providerCache.clear();
         }
 
         @Nullable
@@ -119,11 +122,20 @@ public class RegisterPartCapabilitiesEvent extends Event {
         @SuppressWarnings("unchecked")
         @Nullable
         private <P extends IPart> T handlePart(P part, @Nullable EnumFacing side) {
-            Class<?> currentClass = part.getClass();
+            Class<?> partClass = part.getClass();
+            var partProvider = (PartCapabilityProvider<P, T>) providerCache
+                .computeIfAbsent(partClass, ignored -> Optional.ofNullable(findProvider(partClass)))
+                .orElse(null);
+            return partProvider != null ? partProvider.getCapability(part, side) : null;
+        }
+
+        @Nullable
+        private PartCapabilityProvider<?, T> findProvider(Class<?> partClass) {
+            Class<?> currentClass = partClass;
             while (currentClass != null && IPart.class.isAssignableFrom(currentClass)) {
-                var partProvider = (PartCapabilityProvider<P, T>) parts.get(currentClass);
+                var partProvider = parts.get(currentClass);
                 if (partProvider != null) {
-                    return partProvider.getCapability(part, side);
+                    return partProvider;
                 }
                 currentClass = currentClass.getSuperclass();
             }

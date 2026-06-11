@@ -38,11 +38,12 @@ public class ContainerVoidCell extends AEBaseContainer {
     }
 
     public void setMode(Integer mode) {
-        if (mode == null || mode < 0 || mode >= CondenserOutput.values().length) {
+        CondenserOutput[] modes = CondenserOutput.values();
+        if (mode == null || mode < 0 || mode >= modes.length) {
             return;
         }
 
-        this.host.setMode(CondenserOutput.values()[mode]);
+        this.host.setMode(modes[mode]);
         this.output = this.host.getMode();
         this.detectAndSendChanges();
     }

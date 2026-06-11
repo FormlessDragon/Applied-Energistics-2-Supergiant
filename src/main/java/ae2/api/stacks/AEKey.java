@@ -11,6 +11,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -69,11 +70,11 @@ public abstract class AEKey {
     /**
      * Reads a generic key from the given buffer.
      */
-    public static @org.jspecify.annotations.Nullable AEKey readKey(PacketBuffer buffer) {
-        var typeId = buffer.readByte();
+    public static @Nullable AEKey readKey(PacketBuffer buffer) {
+        int typeId = buffer.readByte();
         var keyType = AEKeyType.fromRawId(typeId);
         if (keyType == null) {
-            AELog.error("Received unknown key space id %d", typeId);
+            AELog.warn("Received unknown key type id %d", typeId);
             return null;
         }
         return keyType.readFromPacket(buffer);
@@ -81,7 +82,11 @@ public abstract class AEKey {
 
     @Nullable
     public static AEKey fromTagGeneric(NBTTagCompound tag) {
-        if (!tag.hasKey(TYPE_FIELD, 8)) {
+        if (tag == null) {
+            return null;
+        }
+
+        if (!tag.hasKey(TYPE_FIELD, Constants.NBT.TAG_STRING)) {
             return null;
         }
 
@@ -104,7 +109,7 @@ public abstract class AEKey {
         if (!missingContent.hasTagCompound()) {
             missingContent.setTagCompound(new NBTTagCompound());
         }
-        var missingContentTag = missingContent.getTagCompound();
+        var missingContentTag = Objects.requireNonNull(missingContent.getTagCompound());
         missingContentTag.setTag(MISSING_CONTENT_AEKEY_DATA, tag.copy());
         if (error != null) {
             missingContentTag.setString(MISSING_CONTENT_ERROR, error);
@@ -228,12 +233,14 @@ public abstract class AEKey {
      * @return The ID of the mod this resource belongs to.
      */
     public String getModId() {
-        return getId().getNamespace();
+        var id = getId();
+        return id != null ? id.getNamespace() : "";
     }
 
     /**
      * @return The ID of the resource identified by this key.
      */
+    @Nullable
     public abstract ResourceLocation getId();
 
     public abstract void writeToPacket(PacketBuffer data);

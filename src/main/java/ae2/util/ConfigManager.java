@@ -83,6 +83,10 @@ public final class ConfigManager implements IConfigManager {
         }
     }
 
+    private static void warnFailedSettingLoad(Setting<?> setting, String value, IllegalArgumentException e) {
+        LOG.warn("Failed to load setting {} from value '{}': {}", setting, value, e.getMessage());
+    }
+
     @Override
     public void readFromNBT(NBTTagCompound src) {
         for (var setting : this.settings.keySet()) {
@@ -91,7 +95,7 @@ public final class ConfigManager implements IConfigManager {
                 try {
                     setting.setFromString(this, value);
                 } catch (IllegalArgumentException e) {
-                    LOG.warn("Failed to load setting {} from value '{}': {}", setting, value, e.getMessage());
+                    warnFailedSettingLoad(setting, value, e);
                 }
             }
         }
@@ -107,7 +111,7 @@ public final class ConfigManager implements IConfigManager {
                     setting.setFromString(this, value);
                     anythingRead = true;
                 } catch (IllegalArgumentException e) {
-                    LOG.warn("Failed to load setting {} from value '{}': {}", setting, value, e.getMessage());
+                    warnFailedSettingLoad(setting, value, e);
                 }
             }
         }

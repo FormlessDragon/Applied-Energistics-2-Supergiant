@@ -34,12 +34,14 @@ import ae2.api.parts.IPartItem;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.util.AECableType;
 import ae2.api.util.AEColor;
+import ae2.api.util.ICustomName;
+import ae2.container.GuiIds;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.definitions.AEParts;
-import ae2.container.GuiIds;
 import ae2.core.gui.GuiOpener;
 import ae2.items.tools.MemoryCardItem;
 import ae2.items.tools.quartz.QuartzCuttingKnifeItem;
+import ae2.util.CustomNameUtil;
 import ae2.util.Platform;
 import ae2.util.SettingsFrom;
 import net.minecraft.crash.CrashReportCategory;
@@ -54,15 +56,15 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.MustBeInvokedByOverriders;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.EnumSet;
 import java.util.Objects;
 
-public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInventory, IPowerChannelState {
+public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInventory, IPowerChannelState, ICustomName {
 
-    private static final String CUSTOM_NAME_TAG = "customName";
     private static final String VISUAL_STATE_TAG = "visual";
     private static final String POWERED_TAG = "powered";
     private static final String MISSING_CHANNEL_TAG = "missingChannel";
@@ -156,13 +158,13 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
     public void readFromNBT(NBTTagCompound data) {
         this.mainNode.loadFromNBT(data);
 
-        if (data.hasKey(CUSTOM_NAME_TAG, 8)) {
-            this.setCustomName(data.getString(CUSTOM_NAME_TAG));
+        if (data.hasKey(CustomNameUtil.CUSTOM_NAME_TAG, Constants.NBT.TAG_STRING)) {
+            this.setCustomName(data.getString(CustomNameUtil.CUSTOM_NAME_TAG));
         } else {
             this.customName = null;
         }
 
-        if (data.hasKey(VISUAL_STATE_TAG, 10)) {
+        if (data.hasKey(VISUAL_STATE_TAG, Constants.NBT.TAG_COMPOUND)) {
             readVisualStateFromNBT(data.getCompoundTag(VISUAL_STATE_TAG));
         }
     }
@@ -172,7 +174,7 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
         this.mainNode.saveToNBT(data);
 
         if (this.customName != null) {
-            data.setString(CUSTOM_NAME_TAG, this.customName);
+            data.setString(CustomNameUtil.CUSTOM_NAME_TAG, this.customName);
         }
     }
 
@@ -190,6 +192,7 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
             flags |= 2;
         }
         data.writeByte(flags);
+        CustomNameUtil.writeNullableString(data, this.customName);
     }
 
     @MustBeInvokedByOverriders
@@ -199,12 +202,15 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
 
         boolean wasPowered = this.clientSidePowered;
         boolean wasMissingChannel = this.clientSideMissingChannel;
+        String oldCustomName = this.customName;
 
         this.clientSidePowered = (flags & 1) != 0;
         this.clientSideMissingChannel = (flags & 2) != 0;
+        this.customName = CustomNameUtil.readNullableString(data);
 
         return shouldSendPowerStateToClient() && this.clientSidePowered != wasPowered
-            || shouldSendMissingChannelStateToClient() && this.clientSideMissingChannel != wasMissingChannel;
+            || shouldSendMissingChannelStateToClient() && this.clientSideMissingChannel != wasMissingChannel
+            || !Objects.equals(this.customName, oldCustomName);
     }
 
     @MustBeInvokedByOverriders
@@ -246,8 +252,8 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
     @Override
     @MustBeInvokedByOverriders
     public void importSettings(SettingsFrom mode, NBTTagCompound input, @Nullable EntityPlayer player) {
-        if (mode == SettingsFrom.DISMANTLE_ITEM && input.hasKey(CUSTOM_NAME_TAG, 8)) {
-            setCustomName(input.getString(CUSTOM_NAME_TAG));
+        if (mode == SettingsFrom.DISMANTLE_ITEM && input.hasKey(CustomNameUtil.CUSTOM_NAME_TAG, 8)) {
+            setCustomName(input.getString(CustomNameUtil.CUSTOM_NAME_TAG));
         } else if (mode == SettingsFrom.MEMORY_CARD && input.hasKey(MEMORY_CARD_CUSTOM_NAME_TAG, 8)) {
             setCustomName(input.getString(MEMORY_CARD_CUSTOM_NAME_TAG));
         }
@@ -260,7 +266,7 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
     public void exportSettings(SettingsFrom mode, NBTTagCompound output) {
         if (mode == SettingsFrom.DISMANTLE_ITEM) {
             if (this.customName != null) {
-                output.setString(CUSTOM_NAME_TAG, this.customName);
+                output.setString(CustomNameUtil.CUSTOM_NAME_TAG, this.customName);
             }
         } else if (mode == SettingsFrom.MEMORY_CARD) {
             if (this.customName != null) {
@@ -358,6 +364,14 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
 
     public void setCustomName(@Nullable String customName) {
         this.customName = customName == null || customName.isEmpty() ? null : customName;
+    }
+
+    @Override
+    public void onCustomNameChanged() {
+        if (this.host != null) {
+            this.host.markForSave();
+            this.host.markForUpdate();
+        }
     }
 
     public boolean hasCustomName() {

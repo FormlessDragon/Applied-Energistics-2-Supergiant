@@ -16,6 +16,7 @@ import net.minecraft.util.text.TextFormatting;
 public final class P2PStateDataProvider implements BodyProvider<P2PTunnelPart>, ServerDataProvider<P2PTunnelPart> {
     public static final String TAG_P2P_STATE = "p2pState";
     public static final String TAG_P2P_OUTPUTS = "p2pOutputs";
+    public static final String TAG_P2P_INPUTS = "p2pInputs";
     public static final String TAG_P2P_FREQUENCY = "p2pFrequency";
     public static final String TAG_P2P_FREQUENCY_NAME = "p2pFrequencyName";
     public static final String TAG_P2P_ME_CARRIED_CHANNELS = "p2pCarriedChannels";
@@ -33,7 +34,14 @@ public final class P2PStateDataProvider implements BodyProvider<P2PTunnelPart>, 
 
             switch (state) {
                 case STATE_UNLINKED -> tooltip.addLine(TopText.p2p_unlinked);
-                case STATE_OUTPUT -> tooltip.addLine(TopText.p2p_output);
+                case STATE_OUTPUT -> {
+                    if (serverData.hasKey(TAG_P2P_INPUTS, 3)) {
+                        tooltip.addLabel(TopText.p2p_output_many_inputs,
+                            Integer.toString(serverData.getInteger(TAG_P2P_INPUTS)));
+                    } else {
+                        tooltip.addLine(TopText.p2p_output);
+                    }
+                }
                 case STATE_INPUT -> {
                     if (outputs <= 1) {
                         tooltip.addLine(TopText.p2p_input_one_output);
@@ -85,6 +93,9 @@ public final class P2PStateDataProvider implements BodyProvider<P2PTunnelPart>, 
             var input = part.getInput();
             if (input != null) {
                 state = STATE_OUTPUT;
+                if (part.supportsMultipleInputs()) {
+                    serverData.setInteger(TAG_P2P_INPUTS, part.getInputs().size());
+                }
                 if (input.getCustomName() != null) {
                     serverData.setString(TAG_P2P_FREQUENCY_NAME, input.getCustomName());
                 }

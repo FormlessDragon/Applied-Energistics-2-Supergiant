@@ -41,9 +41,9 @@ import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.item.Item;
 import net.minecraft.util.EnumFacing;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
 
-import javax.annotation.Nullable;
 import java.util.List;
 
 public class MEChestTESR extends TileEntitySpecialRenderer<TileMEChest> {

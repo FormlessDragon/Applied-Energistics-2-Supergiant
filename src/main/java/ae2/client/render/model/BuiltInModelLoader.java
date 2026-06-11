@@ -8,7 +8,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.model.ICustomModelLoader;
 import net.minecraftforge.client.model.IModel;
 
-import javax.annotation.Nonnull;
+import org.jetbrains.annotations.NotNull;
 import java.util.Map;
 
 @SuppressWarnings("deprecation")
@@ -62,7 +62,7 @@ public class BuiltInModelLoader implements ICustomModelLoader {
     }
 
     @Override
-    public void onResourceManagerReload(@Nonnull IResourceManager resourceManager) {
+    public void onResourceManagerReload(@NotNull IResourceManager resourceManager) {
         for (IModel model : this.builtInModels.values()) {
             if (model instanceof IResourceManagerReloadListener) {
                 ((IResourceManagerReloadListener) model).onResourceManagerReload(resourceManager);

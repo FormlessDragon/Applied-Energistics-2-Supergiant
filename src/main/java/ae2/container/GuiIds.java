@@ -1,6 +1,6 @@
 package ae2.container;
 
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public final class GuiIds {
 
@@ -95,12 +95,14 @@ public final class GuiIds {
         THRESHOLD_LEVEL_EMITTER,
         CONFIG_MODIFIER,
         PATTERN_MODIFIER,
+        ADVANCED_MEMORY_CARD,
         CELL_RESTRICTION,
         RENAMER;
 
-        public static @NotNull GuiKey fromId(int guiId) {
+        public static @Nullable GuiKey fromId(int guiId) {
             int baseGuiId = getBaseGuiId(guiId);
-            return values()[baseGuiId];
+            GuiKey[] values = values();
+            return baseGuiId >= 0 && baseGuiId < values.length ? values[baseGuiId] : null;
         }
 
         public int getGuiId() {

@@ -176,8 +176,17 @@ public class TileSpatialPylon extends AENetworkedTile implements IAEMultiBlock<S
 
         boolean powered = data.readBoolean();
         boolean online = data.readBoolean();
-        AxisPosition axisPosition = AxisPosition.values()[data.readUnsignedByte()];
-        SpatialPylonCluster.Axis axis = SpatialPylonCluster.Axis.values()[data.readUnsignedByte()];
+        AxisPosition[] axisPositions = AxisPosition.values();
+        int axisPositionOrdinal = data.readUnsignedByte();
+        AxisPosition axisPosition = axisPositionOrdinal < axisPositions.length
+            ? axisPositions[axisPositionOrdinal]
+            : AxisPosition.NONE;
+
+        SpatialPylonCluster.Axis[] axes = SpatialPylonCluster.Axis.values();
+        int axisOrdinal = data.readUnsignedByte();
+        SpatialPylonCluster.Axis axis = axisOrdinal < axes.length
+            ? axes[axisOrdinal]
+            : SpatialPylonCluster.Axis.UNFORMED;
 
         changed = changed || powered != this.clientPowered || online != this.clientOnline
             || axisPosition != this.clientAxisPosition || axis != this.clientAxis;
@@ -206,13 +215,15 @@ public class TileSpatialPylon extends AENetworkedTile implements IAEMultiBlock<S
         this.clientOnline = data.getBoolean("online");
 
         int axisPositionOrdinal = data.getByte("axisPosition");
-        if (axisPositionOrdinal >= 0 && axisPositionOrdinal < AxisPosition.values().length) {
-            this.clientAxisPosition = AxisPosition.values()[axisPositionOrdinal];
+        AxisPosition[] axisPositions = AxisPosition.values();
+        if (axisPositionOrdinal >= 0 && axisPositionOrdinal < axisPositions.length) {
+            this.clientAxisPosition = axisPositions[axisPositionOrdinal];
         }
 
         int axisOrdinal = data.getByte("axis");
-        if (axisOrdinal >= 0 && axisOrdinal < SpatialPylonCluster.Axis.values().length) {
-            this.clientAxis = SpatialPylonCluster.Axis.values()[axisOrdinal];
+        SpatialPylonCluster.Axis[] axes = SpatialPylonCluster.Axis.values();
+        if (axisOrdinal >= 0 && axisOrdinal < axes.length) {
+            this.clientAxis = axes[axisOrdinal];
         }
     }
 

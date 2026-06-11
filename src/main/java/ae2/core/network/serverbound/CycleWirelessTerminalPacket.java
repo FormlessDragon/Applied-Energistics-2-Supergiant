@@ -31,7 +31,12 @@ public class CycleWirelessTerminalPacket extends ServerboundPacket {
 
     @Override
     protected void read(ByteBuf buf) {
-        this.reverse = new PacketBuffer(buf).readBoolean();
+        PacketBuffer packetBuffer = new PacketBuffer(buf);
+        this.reverse = packetBuffer.readBoolean();
+        if (packetBuffer.isReadable()) {
+            throw new IllegalArgumentException("Trailing cycle wireless terminal packet payload bytes: "
+                + packetBuffer.readableBytes());
+        }
     }
 
     @Override

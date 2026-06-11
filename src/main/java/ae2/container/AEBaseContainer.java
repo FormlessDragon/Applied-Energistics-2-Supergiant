@@ -53,6 +53,7 @@ import ae2.util.ConfigGuiInventory;
 import com.google.common.base.Preconditions;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -77,16 +78,16 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.network.play.server.SPacketSetSlot;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.text.ITextComponent;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.Consumer;
 
 public abstract class AEBaseContainer extends Container {
-    private static final int MAX_STRING_LENGTH = 32767;
+    private static final int MAX_STRING_LENGTH = GuiActionPacket.MAX_JSON_PAYLOAD_LENGTH;
     private static final int MAX_CONTAINER_TRANSFER_ITERATIONS = 256;
     private static final String HIDE_SLOT = "HideSlot";
 
@@ -377,7 +378,7 @@ public abstract class AEBaseContainer extends Container {
         return canInteractiveDistance(player, tileEntityHost);
     }
 
-    protected boolean canInteractiveDistance(@Nonnull EntityPlayer player, @Nonnull TileEntity tileEntityHost) {
+    protected boolean canInteractiveDistance(@NotNull EntityPlayer player, @NotNull TileEntity tileEntityHost) {
         return player.getDistanceSq(tileEntityHost.getPos()) <= 64.0D;
     }
 
@@ -1022,11 +1023,20 @@ public abstract class AEBaseContainer extends Container {
     }
 
     protected final <T> void registerClientAction(String name, Class<T> argClass, Consumer<T> handler) {
+        this.registerClientAction(name, argClass, MAX_STRING_LENGTH, handler);
+    }
+
+    protected final <T> void registerClientAction(String name, Class<T> argClass, int maxPayloadLength,
+                                                  Consumer<T> handler) {
         if (this.clientActions.containsKey(name)) {
             throw new IllegalArgumentException("Duplicate client action registered: " + name);
         }
+        if (maxPayloadLength < 0 || maxPayloadLength > MAX_STRING_LENGTH) {
+            throw new IllegalArgumentException(
+                "Client action " + name + " max payload length must be between 0 and " + MAX_STRING_LENGTH);
+        }
 
-        this.clientActions.put(name, new ClientAction<>(name, argClass, handler));
+        this.clientActions.put(name, new ClientAction<>(name, argClass, maxPayloadLength, handler));
     }
 
     protected final void registerClientAction(String name, Runnable callback) {
@@ -1059,13 +1069,13 @@ public abstract class AEBaseContainer extends Container {
             jsonPayload = clientAction.gson.toJson(arg);
         }
 
-        if (jsonPayload != null && jsonPayload.length() > MAX_STRING_LENGTH) {
+        if (jsonPayload != null && jsonPayload.length() > clientAction.maxPayloadLength) {
             throw new IllegalArgumentException(
                 "Cannot send client action " + action + " because serialized argument is longer than "
-                    + MAX_STRING_LENGTH + " (" + jsonPayload.length() + ")");
+                    + clientAction.maxPayloadLength + " (" + jsonPayload.length() + ")");
         }
 
-        InitNetwork.sendToServer(new GuiActionPacket(clientAction.name, jsonPayload));
+        InitNetwork.sendToServer(new GuiActionPacket(this.windowId, clientAction.name, jsonPayload));
     }
 
     protected final void sendClientAction(String action) {
@@ -1073,6 +1083,12 @@ public abstract class AEBaseContainer extends Container {
     }
 
     public final void receiveClientAction(String actionName, @Nullable String jsonPayload) {
+        if (actionName == null || actionName.length() > GuiActionPacket.MAX_ACTION_NAME_LENGTH) {
+            return;
+        }
+        if (jsonPayload != null && jsonPayload.length() > MAX_STRING_LENGTH) {
+            return;
+        }
         ClientAction<?> action = this.clientActions.get(actionName);
         if (action == null) {
             return;
@@ -1192,18 +1208,37 @@ public abstract class AEBaseContainer extends Container {
         private final Gson gson = new GsonBuilder().create();
         private final String name;
         private final Class<T> argClass;
+        private final int maxPayloadLength;
         private final Consumer<T> handler;
 
-        private ClientAction(String name, Class<T> argClass, Consumer<T> handler) {
+        private ClientAction(String name, Class<T> argClass, int maxPayloadLength, Consumer<T> handler) {
             this.name = name;
             this.argClass = argClass;
+            this.maxPayloadLength = maxPayloadLength;
             this.handler = handler;
         }
 
         private void handle(@Nullable String jsonPayload) {
             T arg = null;
-            if (argClass != Void.class) {
-                arg = gson.fromJson(jsonPayload, argClass);
+            if (jsonPayload != null && jsonPayload.length() > this.maxPayloadLength) {
+                return;
+            }
+            if (argClass == Void.class) {
+                if (jsonPayload != null) {
+                    return;
+                }
+            } else {
+                if (jsonPayload == null) {
+                    return;
+                }
+                try {
+                    arg = gson.fromJson(jsonPayload, argClass);
+                } catch (JsonParseException e) {
+                    return;
+                }
+                if (arg == null) {
+                    return;
+                }
             }
 
             this.handler.accept(arg);

@@ -165,6 +165,14 @@ public class AppEngInternalInventory extends BaseInternalInventory {
         data.setTag(name, items);
     }
 
+    private static ItemStack readStack(NBTTagCompound tag) {
+        try {
+            return new ItemStack(tag);
+        } catch (RuntimeException ignored) {
+            return ItemStack.EMPTY;
+        }
+    }
+
     public void readFromNBT(NBTTagCompound data, String name) {
         if (data.hasKey(name, 9)) {
             var tagList = data.getTagList(name, 10);
@@ -173,7 +181,8 @@ public class AppEngInternalInventory extends BaseInternalInventory {
                 int slot = itemCompound.getInteger("Slot");
 
                 if (slot >= 0 && slot < stacks.size()) {
-                    stacks.set(slot, new ItemStack(itemCompound));
+                    ItemStack stack = readStack(itemCompound);
+                    stacks.set(slot, stack.isEmpty() ? ItemStack.EMPTY : stack);
                 }
             }
         }

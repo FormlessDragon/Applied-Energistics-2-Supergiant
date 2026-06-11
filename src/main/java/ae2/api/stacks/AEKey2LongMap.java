@@ -21,6 +21,7 @@ public interface AEKey2LongMap extends Object2LongMap<AEKey> {
     long addTo(AEKey k, long incr);
 
     final class OpenHashMap extends Object2LongOpenHashMap<AEKey> implements AEKey2LongMap {
+
     }
 
     final class AVLTreeMap extends Object2LongAVLTreeMap<AEKey> implements AEKey2LongMap {

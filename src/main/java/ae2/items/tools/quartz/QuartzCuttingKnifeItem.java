@@ -3,13 +3,12 @@ package ae2.items.tools.quartz;
 import ae2.api.implementations.guiobjects.IGuiItem;
 import ae2.api.implementations.guiobjects.ItemGuiHost;
 import ae2.api.parts.SelectedPart;
+import ae2.api.util.ICustomName;
 import ae2.container.GuiIds;
 import ae2.core.gui.GuiOpener;
 import ae2.core.gui.locator.GuiHostLocators;
 import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.items.AEBaseItem;
-import ae2.parts.AEBasePart;
-import ae2.tile.AEBaseTile;
 import ae2.tile.networking.TileCableBus;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -58,6 +57,27 @@ public class QuartzCuttingKnifeItem extends AEBaseItem implements IGuiItem {
         return new ActionResult<>(EnumActionResult.SUCCESS, held);
     }
 
+    private static boolean openRenamer(EntityPlayer player, World world, BlockPos pos, float hitX, float hitY,
+                                       float hitZ) {
+        TileEntity tile = world.getTileEntity(pos);
+        if (tile instanceof TileCableBus cableBus) {
+            SelectedPart selectedPart = cableBus.selectPartLocal(new Vec3d(hitX, hitY, hitZ));
+            if (selectedPart.part instanceof ICustomName) {
+                if (!world.isRemote) {
+                    GuiOpener.openPartGui(player, GuiIds.GuiKey.RENAMER, cableBus, selectedPart.side);
+                }
+                return true;
+            }
+        }
+        if (tile instanceof ICustomName) {
+            if (!world.isRemote) {
+                GuiOpener.openGui(player, GuiIds.GuiKey.RENAMER, tile);
+            }
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public EnumActionResult onItemUseFirst(EntityPlayer player, World world, BlockPos pos, EnumFacing side, float hitX,
                                            float hitY, float hitZ, EnumHand hand) {
@@ -65,8 +85,8 @@ public class QuartzCuttingKnifeItem extends AEBaseItem implements IGuiItem {
             return EnumActionResult.PASS;
         }
 
-        if (isRenamableAeTarget(world, pos, hitX, hitY, hitZ)) {
-            return EnumActionResult.PASS;
+        if (openRenamer(player, world, pos, hitX, hitY, hitZ)) {
+            return EnumActionResult.SUCCESS;
         }
 
         if (!world.isRemote) {
@@ -74,14 +94,5 @@ public class QuartzCuttingKnifeItem extends AEBaseItem implements IGuiItem {
                 GuiHostLocators.forItemUseContext(player, hand, pos, side, hitX, hitY, hitZ));
         }
         return EnumActionResult.SUCCESS;
-    }
-
-    private static boolean isRenamableAeTarget(World world, BlockPos pos, float hitX, float hitY, float hitZ) {
-        TileEntity tile = world.getTileEntity(pos);
-        if (tile instanceof TileCableBus cableBus) {
-            SelectedPart selectedPart = cableBus.selectPartLocal(new Vec3d(hitX, hitY, hitZ));
-            return selectedPart.part instanceof AEBasePart;
-        }
-        return tile instanceof AEBaseTile;
     }
 }

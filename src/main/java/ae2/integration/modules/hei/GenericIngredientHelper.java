@@ -11,6 +11,7 @@ import mezz.jei.bookmarks.BookmarkItem;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 
 public final class GenericIngredientHelper {
     private GenericIngredientHelper() {
@@ -66,6 +67,10 @@ public final class GenericIngredientHelper {
     public static List<List<GenericStack>> getIngredients(IRecipeLayout recipeLayout, boolean input,
                                                           boolean craftingLayout, int craftingGridSize) {
         List<List<GenericStack>> result = new ObjectArrayList<>();
+        if (recipeLayout == null) {
+            return result;
+        }
+
         if (craftingLayout) {
             for (int i = 0; i < craftingGridSize; i++) {
                 result.add(new ObjectArrayList<>());
@@ -82,7 +87,17 @@ public final class GenericIngredientHelper {
                                            IngredientConverter<T> converter, boolean input, boolean craftingLayout,
                                            int craftingGridSize) {
         int processingSlot = result.size();
-        for (var entry : converter.getIngredientGroup(recipeLayout).getGuiIngredients().entrySet()) {
+        var ingredientGroup = converter.getIngredientGroup(recipeLayout);
+        if (ingredientGroup == null) {
+            return;
+        }
+
+        Map<Integer, ? extends IGuiIngredient<T>> ingredients = ingredientGroup.getGuiIngredients();
+        if (ingredients == null || ingredients.isEmpty()) {
+            return;
+        }
+
+        for (var entry : ingredients.entrySet()) {
             IGuiIngredient<T> guiIngredient = entry.getValue();
             if (guiIngredient == null || guiIngredient.isInput() != input) {
                 continue;
@@ -90,7 +105,11 @@ public final class GenericIngredientHelper {
 
             int slotIndex;
             if (craftingLayout) {
-                int guiSlot = entry.getKey();
+                Integer guiSlotKey = entry.getKey();
+                if (guiSlotKey == null) {
+                    continue;
+                }
+                int guiSlot = guiSlotKey;
                 slotIndex = guiSlot - 1;
                 if (guiSlot == 0 || slotIndex < 0 || slotIndex >= craftingGridSize) {
                     continue;
@@ -129,7 +148,7 @@ public final class GenericIngredientHelper {
         }
 
         GenericStack stack = converter.getStackFromIngredient(ingredient);
-        if (stack != null) {
+        if (isValidStack(stack)) {
             stacks.add(stack);
         }
     }
@@ -137,7 +156,9 @@ public final class GenericIngredientHelper {
     @Nullable
     private static <T> GenericStack tryConvertToStack(IngredientConverter<T> converter, Object ingredient) {
         if (converter.getIngredientType().getIngredientClass().isInstance(ingredient)) {
-            return converter.getStackFromIngredient(converter.getIngredientType().getIngredientClass().cast(ingredient));
+            GenericStack stack = converter.getStackFromIngredient(
+                converter.getIngredientType().getIngredientClass().cast(ingredient));
+            return isValidStack(stack) ? stack : null;
         }
         return null;
     }
@@ -151,5 +172,9 @@ public final class GenericIngredientHelper {
         while (result.size() < size) {
             result.add(new ObjectArrayList<>());
         }
+    }
+
+    private static boolean isValidStack(@Nullable GenericStack stack) {
+        return stack != null && stack.what() != null && stack.amount() > 0;
     }
 }

@@ -14,10 +14,6 @@ public class SwapSlotsPacket extends ServerboundPacket {
     public SwapSlotsPacket() {
     }
 
-    public SwapSlotsPacket(int slotA, int slotB) {
-        this(-1, slotA, slotB);
-    }
-
     public SwapSlotsPacket(int windowId, int slotA, int slotB) {
         this.windowId = windowId;
         this.slotA = slotA;
@@ -30,6 +26,9 @@ public class SwapSlotsPacket extends ServerboundPacket {
         this.windowId = data.readInt();
         this.slotA = data.readInt();
         this.slotB = data.readInt();
+        if (data.isReadable()) {
+            throw new IllegalArgumentException("Trailing swap slots payload bytes: " + data.readableBytes());
+        }
     }
 
     @Override
@@ -42,9 +41,12 @@ public class SwapSlotsPacket extends ServerboundPacket {
 
     @Override
     public void handleServer(EntityPlayerMP player) {
-        if ((this.windowId < 0 || player.openContainer.windowId == this.windowId)
-            && player.openContainer instanceof AEBaseContainer container) {
-            container.swapSlotContents(this.slotA, this.slotB);
+        if (!(player.openContainer instanceof AEBaseContainer container)) {
+            return;
         }
+        if (container.windowId != this.windowId) {
+            return;
+        }
+        container.swapSlotContents(this.slotA, this.slotB);
     }
 }

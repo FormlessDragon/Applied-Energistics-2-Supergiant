@@ -2,6 +2,8 @@ package ae2.api.orientation;
 
 import net.minecraft.util.EnumFacing;
 
+import java.util.Objects;
+
 public enum RelativeSide {
     FRONT(EnumFacing.NORTH),
     BACK(EnumFacing.SOUTH),
@@ -28,6 +30,7 @@ public enum RelativeSide {
      * Find the relative side on the given absolute side of a block, assuming its default orientation.
      */
     public static RelativeSide fromUnrotatedSide(EnumFacing side) {
+        Objects.requireNonNull(side, "side");
         return BY_UNROTATED_SIDE[side.ordinal()];
     }
 

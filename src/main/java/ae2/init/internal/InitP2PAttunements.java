@@ -37,21 +37,23 @@ public final class InitP2PAttunements {
 
     public static void init() {
         P2PTunnelAttunement.registerAttunementTag(AEPartIds.ME_P2P_TUNNEL);
-        P2PTunnelAttunement.registerAttunementTag(AEPartIds.FE_P2P_TUNNEL);
+        P2PTunnelAttunement.registerAttunementTag(AEPartIds.FE_P2P_TUNNEL, true);
         P2PTunnelAttunement.registerAttunementTag(AEPartIds.REDSTONE_P2P_TUNNEL);
-        P2PTunnelAttunement.registerAttunementTag(AEPartIds.FLUID_P2P_TUNNEL);
-        P2PTunnelAttunement.registerAttunementTag(AEPartIds.ITEM_P2P_TUNNEL);
-        P2PTunnelAttunement.registerAttunementTag(AEPartIds.IC2_P2P_TUNNEL);
+        P2PTunnelAttunement.registerAttunementTag(AEPartIds.FLUID_P2P_TUNNEL, true);
+        P2PTunnelAttunement.registerAttunementTag(AEPartIds.ITEM_P2P_TUNNEL, true);
+        P2PTunnelAttunement.registerAttunementTag(AEPartIds.IC2_P2P_TUNNEL, true);
         P2PTunnelAttunement.registerAttunementTag(AEPartIds.LIGHT_P2P_TUNNEL);
         registerTagAttunementBridges();
         Integrations.ic2().registerP2PAttunements();
 
         P2PTunnelAttunement.registerAttunementApi(P2PTunnelAttunement.ENERGY_TUNNEL,
             CapabilityEnergy.ENERGY,
-            GuiText.P2PAttunementEnergy.text());
+            GuiText.P2PAttunementEnergy.text(),
+            true);
         P2PTunnelAttunement.registerAttunementApi(P2PTunnelAttunement.FLUID_TUNNEL,
             CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY,
-            GuiText.P2PAttunementFluid.text());
+            GuiText.P2PAttunementFluid.text(),
+            true);
     }
 
     private static void registerTagAttunementBridges() {

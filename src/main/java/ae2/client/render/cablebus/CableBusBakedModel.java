@@ -1,5 +1,7 @@
 package ae2.client.render.cablebus;
 
+import ae2.api.orientation.BlockOrientation;
+import ae2.api.orientation.RelativeSide;
 import ae2.api.parts.IPartBakedModel;
 import ae2.api.parts.IPartModel;
 import ae2.api.util.AECableType;
@@ -23,7 +25,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.MinecraftForgeClient;
 import net.minecraftforge.common.property.IExtendedBlockState;
 
-import javax.annotation.Nonnull;
+import org.jetbrains.annotations.NotNull;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Iterator;
@@ -34,6 +36,8 @@ import java.util.Map.Entry;
 public class CableBusBakedModel implements IBakedModel {
 
     private static final int CACHE_QUAD_COUNT = 5000;
+    private static final EnumFacing[] DIRECTIONS = EnumFacing.values();
+    private static final QuadRotator QUAD_ROTATOR = new QuadRotator();
 
     private final LoadingCache<CableBusRenderState, List<BakedQuad>> cableModelCache;
     private final CableBuilder cableBuilder;
@@ -54,7 +58,7 @@ public class CableBusBakedModel implements IBakedModel {
                                            .weigher((Weigher<CableBusRenderState, List<BakedQuad>>) (ignored, value) -> value.size())
                                            .build(new CacheLoader<>() {
                                                @Override
-                                               public @Nonnull List<BakedQuad> load(@Nonnull CableBusRenderState renderState) {
+                                               public @NotNull List<BakedQuad> load(@NotNull CableBusRenderState renderState) {
                                                    List<BakedQuad> result = new ObjectArrayList<>();
                                                    addCableQuads(renderState, result);
                                                    return result;
@@ -123,9 +127,7 @@ public class CableBusBakedModel implements IBakedModel {
     }
 
     private void addAttachmentQuads(CableBusRenderState renderState, long rand, List<BakedQuad> quadsOut) {
-        QuadRotator rotator = new QuadRotator();
-
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : DIRECTIONS) {
             IPartModel partModel = renderState.getAttachments().get(facing);
             if (partModel == null) {
                 continue;
@@ -147,14 +149,13 @@ public class CableBusBakedModel implements IBakedModel {
                     partQuads = bakedModel.getQuads(null, null, rand);
                 }
 
-                quadsOut.addAll(rotator.rotateQuads(partQuads, facing, spinToUpFacing(facing, spin)));
+                quadsOut.addAll(QUAD_ROTATOR.rotateQuads(partQuads, facing, spinToUpFacing(facing, spin)));
             }
         }
     }
 
     private EnumFacing spinToUpFacing(EnumFacing facing, int spin) {
-        return ae2.api.orientation.BlockOrientation.get(facing, spin).getSide(
-            ae2.api.orientation.RelativeSide.TOP);
+        return BlockOrientation.get(facing, spin).getSide(RelativeSide.TOP);
     }
 
     private int getAttachmentSpin(CableBusRenderState renderState, EnumFacing facing) {

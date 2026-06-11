@@ -25,6 +25,7 @@ import ae2.core.definitions.AEEntities;
 import ae2.core.gui.AEGuiHandler;
 import ae2.core.network.InitNetwork;
 import ae2.core.registries.AppEngRegistries;
+import ae2.helpers.WirelessTerminalActions;
 import ae2.hooks.CableBusLeftClickHook;
 import ae2.hooks.SkyStoneBreakSpeed;
 import ae2.hooks.WirelessTerminalEventHandler;
@@ -50,6 +51,7 @@ import ae2.me.tracker.PlayerTracker;
 import ae2.recipes.AERecipeLoader;
 import ae2.server.AECommand;
 import ae2.server.services.ChunkLoadingService;
+import ae2.server.services.compass.ServerCompassService;
 import ae2.spatial.InitSpatialStorageDimension;
 import ae2.worldgen.MeteoriteWorldGen;
 import net.minecraftforge.common.ForgeChunkManager;
@@ -86,6 +88,7 @@ public final class AppEngBase implements AppEng {
     private static final String COMMON_PROXY = "ae2.core.AppEngServer";
     @Mod.Instance(Tags.MOD_ID)
     public static AppEngBase INSTANCE;
+    @SuppressWarnings("unused")
     @SidedProxy(clientSide = CLIENT_PROXY, serverSide = COMMON_PROXY)
     private static AppEngServer runtime;
     private boolean commonBootstrapInitialized;
@@ -148,6 +151,8 @@ public final class AppEngBase implements AppEng {
         RequestBox.clear();
         PlayerTracker.clear();
         NetworkAnalyserItem.clearCache();
+        ServerCompassService.clearCache();
+        WirelessTerminalActions.clear();
         TickHandler.instance().shutdown();
     }
 

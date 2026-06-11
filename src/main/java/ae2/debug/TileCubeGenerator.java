@@ -29,6 +29,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
+import net.minecraftforge.common.util.Constants;
 
 public class TileCubeGenerator extends AEBaseTile implements ServerTickingTile {
 
@@ -56,13 +57,13 @@ public class TileCubeGenerator extends AEBaseTile implements ServerTickingTile {
     @Override
     public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
-        if (data.hasKey("size")) {
+        if (data.hasKey("size", Constants.NBT.TAG_ANY_NUMERIC)) {
             this.size = data.getInteger("size");
         }
-        if (data.hasKey("countdown")) {
+        if (data.hasKey("countdown", Constants.NBT.TAG_ANY_NUMERIC)) {
             this.countdown = data.getInteger("countdown");
         }
-        if (data.hasKey("item")) {
+        if (data.hasKey("item", Constants.NBT.TAG_COMPOUND)) {
             this.itemStack = new ItemStack(data.getCompoundTag("item"));
         }
     }

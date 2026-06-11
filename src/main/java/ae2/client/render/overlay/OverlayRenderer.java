@@ -18,31 +18,23 @@ public class OverlayRenderer {
     }
 
     private static void addLine(BufferBuilder buffer, double x1, double y1, double z1,
-                                double x2, double y2, double z2, int[] colors) {
-        addVertex(buffer, x1, y1, z1, colors);
-        addVertex(buffer, x2, y2, z2, colors);
+                                double x2, double y2, double z2, int alpha, int red, int green, int blue) {
+        addVertex(buffer, x1, y1, z1, alpha, red, green, blue);
+        addVertex(buffer, x2, y2, z2, alpha, red, green, blue);
     }
 
     private static void addQuad(BufferBuilder buffer, double x1, double y1, double z1,
                                 double x2, double y2, double z2, double x3, double y3, double z3, double x4, double y4, double z4,
-                                int[] colors) {
-        addVertex(buffer, x1, y1, z1, colors);
-        addVertex(buffer, x2, y2, z2, colors);
-        addVertex(buffer, x3, y3, z3, colors);
-        addVertex(buffer, x4, y4, z4, colors);
+                                int alpha, int red, int green, int blue) {
+        addVertex(buffer, x1, y1, z1, alpha, red, green, blue);
+        addVertex(buffer, x2, y2, z2, alpha, red, green, blue);
+        addVertex(buffer, x3, y3, z3, alpha, red, green, blue);
+        addVertex(buffer, x4, y4, z4, alpha, red, green, blue);
     }
 
-    private static void addVertex(BufferBuilder buffer, double x, double y, double z, int[] colors) {
-        buffer.pos(x, y, z).color(colors[1], colors[2], colors[3], colors[0]).endVertex();
-    }
-
-    private static int[] decomposeColor(int color) {
-        return new int[]{
-            color >> 24 & 0xFF,
-            color >> 16 & 0xFF,
-            color >> 8 & 0xFF,
-            color & 0xFF
-        };
+    private static void addVertex(BufferBuilder buffer, double x, double y, double z, int alpha, int red, int green,
+                                  int blue) {
+        buffer.pos(x, y, z).color(red, green, blue, alpha).endVertex();
     }
 
     public void renderFaces() {
@@ -58,19 +50,23 @@ public class OverlayRenderer {
     }
 
     private void render(boolean renderLines, int color) {
-        int[] colors = decomposeColor(color);
+        int alpha = color >> 24 & 0xFF;
+        int red = color >> 16 & 0xFF;
+        int green = color >> 8 & 0xFF;
+        int blue = color & 0xFF;
         Tessellator tessellator = Tessellator.getInstance();
         BufferBuilder buffer = tessellator.getBuffer();
         buffer.begin(renderLines ? GL11.GL_LINES : GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
 
         for (ChunkPos pos : this.source.getOverlayChunks()) {
-            addVertices(buffer, pos, colors, renderLines);
+            addVertices(buffer, pos, alpha, red, green, blue, renderLines);
         }
 
         tessellator.draw();
     }
 
-    private void addVertices(BufferBuilder buffer, ChunkPos pos, int[] colors, boolean renderLines) {
+    private void addVertices(BufferBuilder buffer, ChunkPos pos, int alpha, int red, int green, int blue,
+                             boolean renderLines) {
         Set<ChunkPos> chunks = this.source.getOverlayChunks();
 
         double x1 = (pos.x << 4) + INSET;
@@ -87,48 +83,48 @@ public class OverlayRenderer {
 
         if (renderLines) {
             if (noNorth || noWest) {
-                addLine(buffer, x1, y1, z1, x1, y2, z1, colors);
+                addLine(buffer, x1, y1, z1, x1, y2, z1, alpha, red, green, blue);
             }
             if (noNorth || noEast) {
-                addLine(buffer, x2, y2, z1, x2, y1, z1, colors);
+                addLine(buffer, x2, y2, z1, x2, y1, z1, alpha, red, green, blue);
             }
             if (noSouth || noEast) {
-                addLine(buffer, x2, y1, z2, x2, y2, z2, colors);
+                addLine(buffer, x2, y1, z2, x2, y2, z2, alpha, red, green, blue);
             }
             if (noSouth || noWest) {
-                addLine(buffer, x1, y2, z2, x1, y1, z2, colors);
+                addLine(buffer, x1, y2, z2, x1, y1, z2, alpha, red, green, blue);
             }
             if (noNorth) {
-                addLine(buffer, x1, y1, z1, x2, y1, z1, colors);
-                addLine(buffer, x2, y2, z1, x1, y2, z1, colors);
+                addLine(buffer, x1, y1, z1, x2, y1, z1, alpha, red, green, blue);
+                addLine(buffer, x2, y2, z1, x1, y2, z1, alpha, red, green, blue);
             }
             if (noSouth) {
-                addLine(buffer, x2, y1, z2, x1, y1, z2, colors);
-                addLine(buffer, x1, y2, z2, x2, y2, z2, colors);
+                addLine(buffer, x2, y1, z2, x1, y1, z2, alpha, red, green, blue);
+                addLine(buffer, x1, y2, z2, x2, y2, z2, alpha, red, green, blue);
             }
             if (noWest) {
-                addLine(buffer, x1, y1, z1, x1, y1, z2, colors);
-                addLine(buffer, x1, y2, z2, x1, y2, z1, colors);
+                addLine(buffer, x1, y1, z1, x1, y1, z2, alpha, red, green, blue);
+                addLine(buffer, x1, y2, z2, x1, y2, z1, alpha, red, green, blue);
             }
             if (noEast) {
-                addLine(buffer, x2, y1, z2, x2, y1, z1, colors);
-                addLine(buffer, x2, y2, z1, x2, y2, z2, colors);
+                addLine(buffer, x2, y1, z2, x2, y1, z1, alpha, red, green, blue);
+                addLine(buffer, x2, y2, z1, x2, y2, z2, alpha, red, green, blue);
             }
         } else {
             if (noNorth) {
-                addQuad(buffer, x1, y1, z1, x1, y2, z1, x2, y2, z1, x2, y1, z1, colors);
+                addQuad(buffer, x1, y1, z1, x1, y2, z1, x2, y2, z1, x2, y1, z1, alpha, red, green, blue);
             }
             if (noSouth) {
-                addQuad(buffer, x1, y1, z2, x2, y1, z2, x2, y2, z2, x1, y2, z2, colors);
+                addQuad(buffer, x1, y1, z2, x2, y1, z2, x2, y2, z2, x1, y2, z2, alpha, red, green, blue);
             }
             if (noWest) {
-                addQuad(buffer, x1, y1, z1, x1, y1, z2, x1, y2, z2, x1, y2, z1, colors);
+                addQuad(buffer, x1, y1, z1, x1, y1, z2, x1, y2, z2, x1, y2, z1, alpha, red, green, blue);
             }
             if (noEast) {
-                addQuad(buffer, x2, y1, z1, x2, y2, z1, x2, y2, z2, x2, y1, z2, colors);
+                addQuad(buffer, x2, y1, z1, x2, y2, z1, x2, y2, z2, x2, y1, z2, alpha, red, green, blue);
             }
-            addQuad(buffer, x1, y1, z1, x2, y1, z1, x2, y1, z2, x1, y1, z2, colors);
-            addQuad(buffer, x1, y2, z1, x1, y2, z2, x2, y2, z2, x2, y2, z1, colors);
+            addQuad(buffer, x1, y1, z1, x2, y1, z1, x2, y1, z2, x1, y1, z2, alpha, red, green, blue);
+            addQuad(buffer, x1, y2, z1, x1, y2, z2, x2, y2, z2, x2, y2, z1, alpha, red, green, blue);
         }
     }
 }

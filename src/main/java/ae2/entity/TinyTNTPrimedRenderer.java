@@ -19,6 +19,7 @@
 package ae2.entity;
 
 import ae2.core.definitions.AEBlocks;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockRendererDispatcher;
 import net.minecraft.client.renderer.GlStateManager;
@@ -32,7 +33,7 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 @SideOnly(Side.CLIENT)
 public class TinyTNTPrimedRenderer extends Render<TinyTNTPrimedEntity> {
 
-    private static final net.minecraft.block.state.IBlockState TINY_TNT_STATE = AEBlocks.TINY_TNT.block().getDefaultState();
+    private static final IBlockState TINY_TNT_STATE = AEBlocks.TINY_TNT.block().getDefaultState();
 
     public TinyTNTPrimedRenderer(final RenderManager renderManager) {
         super(renderManager);

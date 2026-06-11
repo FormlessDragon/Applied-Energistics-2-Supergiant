@@ -28,18 +28,20 @@ public final class TextComponents {
 
     @Nullable
     public static ITextComponent readFromPacket(PacketBuffer buffer) {
-        if (!buffer.readBoolean()) {
-            return null;
-        }
-
-        if (buffer.readBoolean()) {
-            return CustomTextComponents.decodePacket(buffer.readString(256), buffer);
-        }
-
         try {
+            if (!buffer.readBoolean()) {
+                return null;
+            }
+
+            if (buffer.readBoolean()) {
+                return CustomTextComponents.decodePacket(buffer.readString(256), buffer);
+            }
+
             return buffer.readTextComponent();
         } catch (IOException e) {
             throw new IllegalArgumentException("Could not read text component", e);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("Could not read text component packet", e);
         }
     }
 

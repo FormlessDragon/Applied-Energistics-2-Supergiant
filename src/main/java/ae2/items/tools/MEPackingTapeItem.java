@@ -26,11 +26,11 @@ import net.minecraftforge.fml.common.registry.ForgeRegistries;
 import java.util.Set;
 
 public class MEPackingTapeItem extends AEBaseItem {
-    private static final Set<ResourceLocation> PART_WHITELIST = Set.of(
+    static final Set<ResourceLocation> PART_WHITELIST = Set.of(
         AEParts.INTERFACE.id(),
         AEParts.PATTERN_PROVIDER.id()
     );
-    private static final Set<ResourceLocation> BLOCK_WHITELIST = Set.of(
+    static final Set<ResourceLocation> BLOCK_WHITELIST = Set.of(
         AEBlocks.INTERFACE.id(),
         AEBlocks.PATTERN_PROVIDER.id(),
         AEBlocks.DRIVE.id()

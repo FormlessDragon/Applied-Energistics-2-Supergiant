@@ -8,6 +8,7 @@ import net.minecraft.block.BlockLiquid;
 import net.minecraft.block.material.EnumPushReaction;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -85,7 +86,7 @@ public class BuddingCertusQuartzBlock extends AEBaseBlock {
 
     @Override
     public boolean canSilkHarvest(World world, BlockPos pos, IBlockState state,
-                                  net.minecraft.entity.player.EntityPlayer player) {
+                                  EntityPlayer player) {
         return this != AEBlocks.FLAWLESS_BUDDING_QUARTZ.block();
     }
 

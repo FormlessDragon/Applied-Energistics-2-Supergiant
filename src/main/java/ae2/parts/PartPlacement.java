@@ -22,8 +22,10 @@ import ae2.api.parts.IPart;
 import ae2.api.parts.IPartHost;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.PartHelper;
+import ae2.api.util.ICustomName;
 import ae2.core.PlayerState;
 import ae2.parts.networking.CablePart;
+import ae2.util.CustomNameUtil;
 import ae2.util.Platform;
 import ae2.util.SettingsFrom;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -43,7 +45,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerDestroyItemEvent;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public final class PartPlacement {
 
@@ -119,6 +121,12 @@ public final class PartPlacement {
         NBTTagCompound configData = partStack.getTagCompound();
         if (configData != null) {
             addedPart.importSettings(SettingsFrom.DISMANTLE_ITEM, configData.copy(), player);
+        }
+        String customName = CustomNameUtil.getDisplayName(partStack);
+        if (customName != null && addedPart instanceof ICustomName customNamePart) {
+            customNamePart.setCustomName(customName);
+            host.markForSave();
+            host.markForUpdate();
         }
 
         var state = world.getBlockState(pos);

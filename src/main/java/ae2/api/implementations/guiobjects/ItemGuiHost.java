@@ -112,6 +112,17 @@ public class ItemGuiHost<T extends Item> implements IUpgradeableObject {
         return !currentItem.isEmpty() && currentItem.getItem() == item;
     }
 
+    private static int calculateRemainingEnergyTicks(double actualExtracted, double powerDrainPerTick) {
+        var ticks = Math.ceil(actualExtracted / powerDrainPerTick);
+        if (!Double.isFinite(ticks)) {
+            return ticks > 0 ? Integer.MAX_VALUE : 0;
+        }
+        if (ticks <= 0) {
+            return 0;
+        }
+        return ticks >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) ticks;
+    }
+
     /**
      * Can only be used with a host that implements {@link IEnergySource}.
      */
@@ -133,7 +144,7 @@ public class ItemGuiHost<T extends Item> implements IUpgradeableObject {
         if (powerDrainPerTick > 0 && this instanceof IEnergySource energySource) {
             var amt = BUFFER_ENERGY_TICKS * powerDrainPerTick;
             var actualExtracted = energySource.extractAEPower(amt, action, PowerMultiplier.CONFIG);
-            var remainingEnergyTicks = (int) Math.ceil(actualExtracted / powerDrainPerTick);
+            var remainingEnergyTicks = calculateRemainingEnergyTicks(actualExtracted, powerDrainPerTick);
             if (action == Actionable.MODULATE) {
                 this.remainingEnergyTicks = remainingEnergyTicks;
             }

@@ -1,0 +1,96 @@
+{
+  "$schema": "schema.json",
+  "includes": ["common/common.json"],
+  "text": {
+    "dialog_title": {
+      "position": {
+        "left": 8,
+        "top": 6
+      },
+      "text": {
+        "translate": "gui.ae2.advanced_memory_card.title"
+      }
+    }
+  },
+  "widgets": {
+    "verticalToolbar": {
+      "left": 3,
+      "top": 1
+    },
+    "search": {
+      "left": 128,
+      "top": 5,
+      "width": 105,
+      "height": 12
+    },
+    "entryList": {
+      "left": 8,
+      "top": 19,
+      "width": 229,
+      "height": 41
+    },
+    "emptyMessage": {
+      "left": 32,
+      "top": 22
+    },
+    "entryIcon": {
+      "left": 3,
+      "top": 3
+    },
+    "entryIoIcon": {
+      "left": 0,
+      "top": 4
+    },
+    "entryStatusIcon": {
+      "left": 3,
+      "top": 20
+    },
+    "entryName": {
+      "left": 24,
+      "top": 3
+    },
+    "entryType": {
+      "left": 24,
+      "top": 13
+    },
+    "entryFrequency": {
+      "left": 24,
+      "top": 23
+    },
+    "entryPosition": {
+      "left": 24,
+      "top": 33
+    },
+    "bindButton": {
+      "left": 169,
+      "top": 14,
+      "width": 50,
+      "height": 20
+    },
+    "scrollbar": {
+      "left": 241,
+      "top": 18,
+      "height": 118
+    }
+  },
+  "images": {
+    "backgroundTop": {
+      "texture": "guis/advanced_memory_card.png",
+      "textureWidth": 256,
+      "textureHeight": 256,
+      "srcRect": [0, 0, 256, 60]
+    },
+    "backgroundRow": {
+      "texture": "guis/advanced_memory_card.png",
+      "textureWidth": 256,
+      "textureHeight": 256,
+      "srcRect": [0, 60, 256, 42]
+    },
+    "backgroundBottom": {
+      "texture": "guis/advanced_memory_card.png",
+      "textureWidth": 256,
+      "textureHeight": 256,
+      "srcRect": [0, 102, 256, 98]
+    }
+  }
+}

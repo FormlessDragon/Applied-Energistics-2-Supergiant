@@ -84,6 +84,9 @@ public interface IBasicCellItem extends ICellWorkbenchItem, IStackTooltipDataPro
     static long getAllocatedBytesForRestriction(long amount, int types, int amountPerByte, int bytesPerType) {
         long typeBytes = (long) types * bytesPerType;
         long amountBytes = amount / amountPerByte + (amount % amountPerByte == 0 ? 0 : 1);
+        if (Long.MAX_VALUE - typeBytes < amountBytes) {
+            return Long.MAX_VALUE;
+        }
         return typeBytes + amountBytes;
     }
 

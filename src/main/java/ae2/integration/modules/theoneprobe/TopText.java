@@ -17,6 +17,7 @@ public enum TopText implements LocalizationEnum {
     p2p_input_one_output,
     p2p_me_carried_channels,
     p2p_output,
+    p2p_output_many_inputs,
     p2p_unlinked,
     quantum_link_dimension,
     quantum_link_dimension_id,

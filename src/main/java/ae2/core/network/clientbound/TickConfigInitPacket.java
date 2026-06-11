@@ -1,7 +1,7 @@
 package ae2.core.network.clientbound;
 
-import ae2.core.network.ClientboundPacket;
 import ae2.client.gui.implementations.GuiTickAnalyser;
+import ae2.core.network.ClientboundPacket;
 import ae2.items.tools.TickAnalyserConfig;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
@@ -20,7 +20,15 @@ public class TickConfigInitPacket extends ClientboundPacket {
 
     @Override
     protected void read(ByteBuf buf) {
-        config = TickAnalyserConfig.read(buf);
+        try {
+            config = TickAnalyserConfig.read(buf);
+            if (config == null) {
+                config = TickAnalyserConfig.DEFAULT;
+            }
+        } catch (RuntimeException e) {
+            config = TickAnalyserConfig.DEFAULT;
+            buf.skipBytes(buf.readableBytes());
+        }
     }
 
     @Override

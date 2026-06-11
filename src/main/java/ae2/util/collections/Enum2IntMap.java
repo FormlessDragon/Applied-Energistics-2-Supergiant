@@ -9,7 +9,7 @@ import it.unimi.dsi.fastutil.objects.AbstractReference2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.Reference2IntMap;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
@@ -92,7 +92,7 @@ public class Enum2IntMap<E extends Enum<E>> extends AbstractReference2IntMap<E> 
     public ObjectSet<Reference2IntMap.Entry<E>> reference2IntEntrySet() {
         return new AbstractObjectSet<>() {
             @Override
-            public @NonNull ObjectIterator<Reference2IntMap.Entry<E>> iterator() {
+            public @NotNull ObjectIterator<Reference2IntMap.Entry<E>> iterator() {
                 ObjectIterator<Byte2IntMap.Entry> delegateIterator = delegate.byte2IntEntrySet().iterator();
                 return new AbstractObjectIterator<>() {
                     @Override
@@ -155,7 +155,7 @@ public class Enum2IntMap<E extends Enum<E>> extends AbstractReference2IntMap<E> 
     }
 
     @Override
-    public @NonNull IntCollection values() {
+    public @NotNull IntCollection values() {
         return this.delegate.values();
     }
 
@@ -189,7 +189,7 @@ public class Enum2IntMap<E extends Enum<E>> extends AbstractReference2IntMap<E> 
 
         @Override
         public int hashCode() {
-            return this.delegateEntry.getByteKey() ^ getIntValue();
+            return getKey().hashCode() ^ getIntValue();
         }
 
         @Override
@@ -198,7 +198,7 @@ public class Enum2IntMap<E extends Enum<E>> extends AbstractReference2IntMap<E> 
                 return true;
             }
             if (obj instanceof Enum2IntMap<?>.EntryView other) {
-                return this.delegateEntry.getByteKey() == other.delegateEntry.getByteKey()
+                return getKey() == other.getKey()
                     && getIntValue() == other.getIntValue();
             }
             if (!(obj instanceof Map.Entry<?, ?> other) || !(other.getValue() instanceof Integer otherValue)) {

@@ -40,6 +40,10 @@ public interface ICraftingMachine extends IPatternProviderBatchTarget {
             return null;
         }
 
+        if (blockEntity instanceof ICraftingMachine icm) {
+            return icm;
+        }
+
         return blockEntity.getCapability(AECapabilities.CRAFTING_MACHINE, side);
     }
 

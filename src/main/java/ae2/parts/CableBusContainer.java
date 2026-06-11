@@ -49,6 +49,7 @@ import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -62,8 +63,9 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.Constants.NBT;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
@@ -231,7 +233,7 @@ public class CableBusContainer implements IPartHost, ICableBusContainer {
     }
 
     @Override
-    public net.minecraft.tileentity.TileEntity getTileEntity() {
+    public TileEntity getTileEntity() {
         return this.host.getTileEntity();
     }
 
@@ -578,7 +580,7 @@ public class CableBusContainer implements IPartHost, ICableBusContainer {
             if (includeFacades && side != null && (AppEng.instance().getCableRenderMode().opaqueFacades || !visual)) {
                 IFacadePart facade = this.facadeContainer.getFacade(side);
                 if (facade != null) {
-                    facade.getBoxes(helper, entity instanceof net.minecraft.entity.item.EntityItem);
+                    facade.getBoxes(helper, entity instanceof EntityItem);
                 }
             }
         }
@@ -677,8 +679,12 @@ public class CableBusContainer implements IPartHost, ICableBusContainer {
     public void readFromNBT(NBTTagCompound data) {
         IS_LOADING.set(true);
         try {
-            if (data.hasKey("hasRedstone")) {
-                this.hasRedstone = YesNo.values()[data.getInteger("hasRedstone")];
+            if (data.hasKey("hasRedstone", NBT.TAG_INT)) {
+                int redstoneState = data.getInteger("hasRedstone");
+                YesNo[] states = YesNo.values();
+                this.hasRedstone = redstoneState >= 0 && redstoneState < states.length
+                    ? states[redstoneState]
+                    : YesNo.UNDECIDED;
             }
 
             this.facadeContainer.readFromNBT(data);
@@ -692,7 +698,14 @@ public class CableBusContainer implements IPartHost, ICableBusContainer {
                 }
 
                 NBTTagCompound partData = data.getCompoundTag(key);
-                ResourceLocation itemId = new ResourceLocation(partData.getString("id"));
+                ResourceLocation itemId;
+                try {
+                    itemId = new ResourceLocation(partData.getString("id"));
+                } catch (RuntimeException e) {
+                    AELog.warn("Ignoring persisted part with invalid id {}", partData.getString("id"));
+                    removePartWithoutUpdates(side);
+                    continue;
+                }
                 IPartItem<?> partItem = IPartItem.byId(itemId);
                 if (partItem == null) {
                     AELog.warn("Ignoring persisted part with non-part-item {}", itemId);
@@ -1050,7 +1063,7 @@ public class CableBusContainer implements IPartHost, ICableBusContainer {
         this.hasRedstone = tile.getWorld().getRedstonePowerFromNeighbors(tile.getPos()) > 0 ? YesNo.YES : YesNo.NO;
     }
 
-    private @org.jspecify.annotations.Nullable FacadeRenderState getFacadeRenderState(EnumFacing side) {
+    private @Nullable FacadeRenderState getFacadeRenderState(EnumFacing side) {
         final IFacadePart facade = this.facadeContainer.getFacade(side);
         if (facade != null) {
             IBlockState blockState = facade.getBlockState();

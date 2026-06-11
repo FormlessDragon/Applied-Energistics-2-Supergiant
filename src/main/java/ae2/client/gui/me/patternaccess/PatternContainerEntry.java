@@ -29,6 +29,7 @@ import java.util.Locale;
  * {@link GuiPatternAccessTerm}'s table for {@link ContainerPatternAccessTerm}.
  */
 public class PatternContainerEntry implements Comparable<PatternContainerEntry> {
+    public static final int MAX_INVENTORY_SIZE = 4096;
 
     private final PatternContainerGroup group;
     private final String searchName;
@@ -39,7 +40,7 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
 
     public PatternContainerEntry(long serverId, int slots, long order, boolean editableTerminalName,
                                  PatternContainerGroup group) {
-        this.inventory = new AppEngInternalInventory(slots);
+        this.inventory = new AppEngInternalInventory(Math.clamp(slots, 0, MAX_INVENTORY_SIZE));
         this.group = group;
         this.searchName = group.name().getFormattedText().toLowerCase(Locale.ROOT);
         this.serverId = serverId;

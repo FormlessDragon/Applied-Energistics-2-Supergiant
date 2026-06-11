@@ -12,6 +12,7 @@ import ae2.helpers.externalstorage.GenericStackInv;
 import ae2.me.helpers.BaseActionSource;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -85,7 +86,7 @@ public class ConfigInventory extends GenericStackInv {
     }
 
     public Set<AEKey> keySet() {
-        var result = new it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet<AEKey>();
+        var result = new ObjectLinkedOpenHashSet<AEKey>();
         for (int i = 0; i < stacks.length; i++) {
             var what = getKey(i);
             if (what != null) {

@@ -26,7 +26,7 @@ public final class TileLocator implements GuiHostLocator {
             return hostInterface.cast(tile);
         }
         if (tile != null) {
-            AELog.warn("Cannot locate container host @ %s, %s does not implement %s", pos, tile, hostInterface);
+            AELog.debug("Cannot locate container host @ %s, %s does not implement %s", pos, tile, hostInterface);
         }
         return null;
     }

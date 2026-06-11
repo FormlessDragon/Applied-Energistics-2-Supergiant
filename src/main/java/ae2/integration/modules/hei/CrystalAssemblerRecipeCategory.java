@@ -12,10 +12,11 @@ import mezz.jei.api.gui.IRecipeLayout;
 import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.recipe.IRecipeCategory;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
+import org.jetbrains.annotations.NotNull;
 
-import javax.annotation.Nonnull;
 import java.util.List;
 
 class CrystalAssemblerRecipeCategory implements IRecipeCategory<CrystalAssemblerRecipeWrapper> {
@@ -55,17 +56,17 @@ class CrystalAssemblerRecipeCategory implements IRecipeCategory<CrystalAssembler
     }
 
     @Override
-    public void drawExtras(@Nonnull Minecraft minecraft) {
+    public void drawExtras(@NotNull Minecraft minecraft) {
         minecraft.getTextureManager().bindTexture(new ResourceLocation(AppEng.MOD_ID,
             "textures/guis/crystal_assembler.png"));
-        net.minecraft.client.gui.Gui.drawModalRectWithCustomSizedTexture(PADDING, PADDING, 23, 19, WIDTH, HEIGHT,
+        Gui.drawModalRectWithCustomSizedTexture(PADDING, PADDING, 23, 19, WIDTH, HEIGHT,
             256, 256);
         this.progress.draw(minecraft, PADDING + 129, PADDING + 20);
     }
 
     @Override
-    public void setRecipe(IRecipeLayout recipeLayout, @Nonnull CrystalAssemblerRecipeWrapper recipeWrapper,
-                          @Nonnull IIngredients ingredients) {
+    public void setRecipe(IRecipeLayout recipeLayout, @NotNull CrystalAssemblerRecipeWrapper recipeWrapper,
+                          @NotNull IIngredients ingredients) {
         IGuiItemStackGroup itemStacks = recipeLayout.getItemStacks();
         int slot = 0;
         for (int y = 0; y < 3; y++) {

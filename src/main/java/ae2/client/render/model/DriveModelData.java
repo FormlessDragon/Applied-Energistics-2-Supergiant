@@ -24,6 +24,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Arrays;
 
 public class DriveModelData {
+    private static final int MAX_CELL_SLOTS = 10;
+
     private final Item[] items;
 
     private DriveModelData(Item[] items) {
@@ -31,7 +33,7 @@ public class DriveModelData {
     }
 
     public static DriveModelData fromDrive(IChestOrDrive drive) {
-        Item[] items = new Item[drive.getCellCount()];
+        Item[] items = new Item[sanitizeSlotCount(drive.getCellCount())];
         for (int i = 0; i < items.length; i++) {
             items[i] = drive.getCellItem(i);
         }
@@ -39,7 +41,11 @@ public class DriveModelData {
     }
 
     public static DriveModelData createEmpty(int slotCount) {
-        return new DriveModelData(new Item[slotCount]);
+        return new DriveModelData(new Item[sanitizeSlotCount(slotCount)]);
+    }
+
+    private static int sanitizeSlotCount(int slotCount) {
+        return Math.clamp(slotCount, 0, MAX_CELL_SLOTS);
     }
 
     @Nullable

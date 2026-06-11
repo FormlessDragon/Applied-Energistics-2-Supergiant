@@ -21,7 +21,7 @@ package ae2.integration.modules.bogosorter;
 import com.cleanroommc.bogosorter.common.sort.SortHandler;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.common.Loader;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Comparator;
 

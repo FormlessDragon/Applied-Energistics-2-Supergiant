@@ -99,7 +99,12 @@ public abstract class AbstractTableRenderer<T> {
                     Gui.drawRect(cellX, cellY, cellX + CELL_WIDTH, cellY + CELL_HEIGHT, background);
                 }
 
-                List<ITextComponent> lines = getEntryDescription(entry);
+                var entryStack = getEntryStack(entry);
+                if (entryStack == null) {
+                    continue;
+                }
+
+                List<String> lines = getEntryDescription(entry);
 
                 float textHeight = lines.size() * lineHeight;
                 if (lines.size() > 1) {
@@ -111,17 +116,14 @@ public abstract class AbstractTableRenderer<T> {
 
                 GlStateManager.pushMatrix();
                 GlStateManager.scale(TEXT_SCALE, TEXT_SCALE, 1.0f);
-                for (ITextComponent line : lines) {
-                    final String formattedText = line.getFormattedText();
-                    final int width = fontRenderer.getStringWidth(formattedText);
-                    fontRenderer.drawString(formattedText,
+                for (String line : lines) {
+                    final int width = fontRenderer.getStringWidth(line);
+                    fontRenderer.drawString(line,
                         (itemX - 2 - width * TEXT_SCALE) * INV_TEXT_SCALE,
                         textY * INV_TEXT_SCALE, textColor, false);
                     textY += lineHeight + LINE_SPACING;
                 }
                 GlStateManager.popMatrix();
-
-                var entryStack = getEntryStack(entry);
 
                 int itemY = cellY + (CELL_HEIGHT - 16) / 2;
                 AEKeyRendering.drawInGui(Minecraft.getMinecraft(), itemX, itemY, entryStack);
@@ -177,7 +179,7 @@ public abstract class AbstractTableRenderer<T> {
     /**
      * Implement in subclass to determine the text to show next to an entry.
      */
-    protected abstract List<ITextComponent> getEntryDescription(T entry);
+    protected abstract List<String> getEntryDescription(T entry);
 
     /**
      * Get the item to show for an entry.
@@ -199,7 +201,7 @@ public abstract class AbstractTableRenderer<T> {
     /**
      * Override and return a color to draw a colored rectangle above an entry. Return 0 to not draw a rectangle.
      */
-    protected int getEntryOverlayColor(T entry) {
+    protected int getEntryOverlayColor(@SuppressWarnings("unused") T entry) {
         return 0;
     }
 }

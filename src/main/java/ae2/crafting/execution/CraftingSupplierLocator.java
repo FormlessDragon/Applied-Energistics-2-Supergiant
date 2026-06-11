@@ -4,7 +4,11 @@ import ae2.api.crafting.IPatternDetails;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.crafting.ICraftingProvider;
+import ae2.api.parts.IPart;
+import ae2.api.parts.IPartHost;
 import ae2.api.stacks.AEKey;
+import ae2.parts.AEBasePart;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraft.entity.Entity;
@@ -47,8 +51,26 @@ public final class CraftingSupplierLocator {
     public static List<CraftingSupplierLocation> collectMatchingProviderLocations(IGrid grid, AEKey target,
                                                                                   Iterable<IPatternDetails> patterns,
                                                                                   Function<IPatternDetails, Iterable<ICraftingProvider>> providersForPattern) {
+        var locationsByProvider = indexProviderLocations(grid);
         return collectMatchingProviderLocations(target, patterns, providersForPattern,
-            provider -> resolveLocation(grid, provider));
+            locationsByProvider::get);
+    }
+
+    private static Object2ObjectOpenHashMap<ICraftingProvider, CraftingSupplierLocation> indexProviderLocations(
+        IGrid grid) {
+        var locationsByProvider = new Object2ObjectOpenHashMap<ICraftingProvider, CraftingSupplierLocation>();
+        for (var node : grid.getNodes()) {
+            ICraftingProvider provider = node.getService(ICraftingProvider.class);
+            if (provider == null || locationsByProvider.containsKey(provider)) {
+                continue;
+            }
+
+            CraftingSupplierLocation location = resolveLocation(node);
+            if (location != null) {
+                locationsByProvider.put(provider, location);
+            }
+        }
+        return locationsByProvider;
     }
 
     public static boolean patternProducesTarget(IPatternDetails pattern, AEKey target) {
@@ -66,6 +88,10 @@ public final class CraftingSupplierLocator {
             return null;
         }
 
+        return resolveLocation(node);
+    }
+
+    private static @Nullable CraftingSupplierLocation resolveLocation(IGridNode node) {
         BlockPos pos = resolveBlockPos(node.getOwner());
         if (pos == null) {
             return null;
@@ -87,10 +113,10 @@ public final class CraftingSupplierLocator {
         if (owner instanceof TileEntity tile) {
             return tile.getPos();
         }
-        if (owner instanceof ae2.api.parts.IPartHost partHost) {
+        if (owner instanceof IPartHost partHost) {
             return partHost.getLocation().getPos();
         }
-        if (owner instanceof ae2.api.parts.IPart part && part instanceof ae2.parts.AEBasePart basePart
+        if (owner instanceof IPart part && part instanceof AEBasePart basePart
             && basePart.getHost() != null) {
             return basePart.getHost().getLocation().getPos();
         }

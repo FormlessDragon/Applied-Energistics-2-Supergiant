@@ -9,7 +9,7 @@ import net.minecraft.client.renderer.vertex.VertexFormatElement;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.model.TRSRTransformation;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import javax.vecmath.Vector3f;
 import javax.vecmath.Vector4f;
 import java.util.List;

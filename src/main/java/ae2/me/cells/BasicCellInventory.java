@@ -37,9 +37,11 @@ import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigInteger;
 import java.util.Objects;
 
 public class BasicCellInventory implements StorageCell {
@@ -49,6 +51,7 @@ public class BasicCellInventory implements StorageCell {
     private static final String ITEM_SLOT_KEY_TAG = "k";
     private static final String ITEM_SLOT_AMOUNT_TAG = "a";
     private static final String ITEM_SLOT_TYPE_TAG = "t";
+    private static final BigInteger LONG_MAX_VALUE = BigInteger.valueOf(Long.MAX_VALUE);
 
     private final ItemStack itemStack;
     private final IBasicCellItem cellType;
@@ -101,39 +104,39 @@ public class BasicCellInventory implements StorageCell {
         return new BasicCellInventory(stack, (IBasicCellItem) stack.getItem(), saveProvider);
     }
 
-    private void loadCellItems() {
-        cellItems.clear();
-        storedItemCount = 0;
-        storedItems = 0;
+    private static long saturatedAdd(long left, long right) {
+        if (left < 0 || right < 0) {
+            return Long.MAX_VALUE;
+        }
+        if (right > 0 && left > Long.MAX_VALUE - right) {
+            return Long.MAX_VALUE;
+        }
+        return left + right;
+    }
 
-        NBTTagCompound tag = getOrCreateTag();
-        if (tag.hasKey(STORAGE_CELL_INV_TAG, 9)) {
-            for (GenericStack stack : GenericStack.readList(tag.getTagList(STORAGE_CELL_INV_TAG, 10))) {
-                if (stack != null && stack.amount() > 0) {
-                    cellItems.put(stack.what(), stack.amount());
-                    storedItemCount += stack.amount();
-                    storedItems++;
-                }
-            }
-            return;
+    private static long saturatedMultiply(long left, long right) {
+        if (left <= 0 || right <= 0) {
+            return 0;
+        }
+        if (left > Long.MAX_VALUE / right) {
+            return Long.MAX_VALUE;
+        }
+        return left * right;
+    }
+
+    private static long saturatedCeilDividedMultiply(long value, long multiplier, long divisor) {
+        if (value <= 0 || multiplier <= 0) {
+            return 0;
+        }
+        if (divisor <= 0) {
+            return Long.MAX_VALUE;
         }
 
-        if (!tag.hasKey(ITEM_SLOT_TAG, 9)) {
-            return;
-        }
-
-        NBTTagList list = tag.getTagList(ITEM_SLOT_TAG, 10);
-        for (int i = 0; i < list.tagCount(); i++) {
-            NBTTagCompound entry = list.getCompoundTagAt(i);
-            var keyType = AEKeyTypes.get(new net.minecraft.util.ResourceLocation(entry.getString(ITEM_SLOT_TYPE_TAG)));
-            AEKey key = keyType.loadKeyFromTag(entry.getCompoundTag(ITEM_SLOT_KEY_TAG));
-            long amount = entry.getLong(ITEM_SLOT_AMOUNT_TAG);
-            if (key != null && amount > 0) {
-                cellItems.put(key, amount);
-                storedItemCount += amount;
-                storedItems++;
-            }
-        }
+        BigInteger result = BigInteger.valueOf(value)
+                                      .multiply(BigInteger.valueOf(multiplier))
+                                      .add(BigInteger.valueOf(divisor - 1))
+                                      .divide(BigInteger.valueOf(divisor));
+        return result.compareTo(LONG_MAX_VALUE) > 0 ? Long.MAX_VALUE : result.longValue();
     }
 
     private void saveCellItems() {
@@ -167,45 +170,24 @@ public class BasicCellInventory implements StorageCell {
         return Objects.requireNonNull(itemStack.getTagCompound());
     }
 
-    @Override
-    public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
-        if (amount <= 0 || !cellType.getKeyType().contains(what)) {
+    private static long divideRoundingUp(long value, long divisor) {
+        if (value <= 0) {
             return 0;
         }
-        if (!cellType.isAllowedByCellWorkbench(itemStack, what)) {
-            return 0;
+        if (divisor <= 0) {
+            return Long.MAX_VALUE;
         }
-
-        long currentAmount = cellItems.getLong(what);
-        long remainingItemCount = getRemainingItemCountByBytes();
-        if (currentAmount <= 0) {
-            if (!canHoldNewItem()) {
-                return 0;
-            }
-            remainingItemCount -= (long) getBytesPerType() * this.amountPerByte;
-            if (remainingItemCount <= 0) {
-                return 0;
-            }
-        }
-        remainingItemCount = clampByAmountLimit(remainingItemCount);
-        remainingItemCount = Math.clamp(this.maxItemsPerType - currentAmount, 0, remainingItemCount);
-
-        long inserted = Math.min(amount, remainingItemCount);
-        if (mode == Actionable.MODULATE && inserted > 0) {
-            cellItems.addTo(what, inserted);
-            storedItemCount += inserted;
-            if (currentAmount <= 0) {
-                storedItems++;
-            }
-            saveChanges();
-        }
-        return inserted;
+        return (value - 1) / divisor + 1;
     }
 
     @Override
     public long extract(AEKey what, long amount, Actionable mode, IActionSource source) {
+        if (what == null || amount <= 0) {
+            return 0;
+        }
+
         long currentAmount = cellItems.getLong(what);
-        if (amount <= 0 || currentAmount <= 0) {
+        if (currentAmount <= 0) {
             return 0;
         }
 
@@ -218,7 +200,7 @@ public class BasicCellInventory implements StorageCell {
                 cellItems.removeLong(what);
                 storedItems--;
             }
-            storedItemCount -= extracted;
+            storedItemCount = Math.max(0, storedItemCount - extracted);
             saveChanges();
         }
         return extracted;
@@ -227,7 +209,9 @@ public class BasicCellInventory implements StorageCell {
     @Override
     public void getAvailableStacks(KeyCounter out) {
         for (Object2LongMap.Entry<AEKey> entry : cellItems.object2LongEntrySet()) {
-            out.add(entry.getKey(), entry.getLongValue());
+            if (entry.getKey() != null && entry.getLongValue() > 0) {
+                out.add(entry.getKey(), entry.getLongValue());
+            }
         }
     }
 
@@ -300,14 +284,109 @@ public class BasicCellInventory implements StorageCell {
         }
     }
 
+    private void loadCellItems() {
+        cellItems.clear();
+        storedItemCount = 0;
+        storedItems = 0;
+
+        NBTTagCompound tag = getOrCreateTag();
+        if (tag.hasKey(STORAGE_CELL_INV_TAG, 9)) {
+            for (GenericStack stack : GenericStack.readList(tag.getTagList(STORAGE_CELL_INV_TAG, 10))) {
+                if (stack != null && stack.amount() > 0) {
+                    addLoadedCellItem(stack.what(), stack.amount());
+                }
+            }
+            recalculateStoredAmounts();
+            return;
+        }
+
+        if (!tag.hasKey(ITEM_SLOT_TAG, 9)) {
+            return;
+        }
+
+        NBTTagList list = tag.getTagList(ITEM_SLOT_TAG, 10);
+        for (int i = 0; i < list.tagCount(); i++) {
+            NBTTagCompound entry = list.getCompoundTagAt(i);
+            readLegacyCellItem(entry);
+        }
+        recalculateStoredAmounts();
+    }
+
+    private void readLegacyCellItem(NBTTagCompound entry) {
+        try {
+            if (!entry.hasKey(ITEM_SLOT_TYPE_TAG, 8) || !entry.hasKey(ITEM_SLOT_KEY_TAG, 10)) {
+                return;
+            }
+            var keyType = AEKeyTypes.get(new ResourceLocation(entry.getString(ITEM_SLOT_TYPE_TAG)));
+            AEKey key = keyType.loadKeyFromTag(entry.getCompoundTag(ITEM_SLOT_KEY_TAG));
+            long amount = entry.getLong(ITEM_SLOT_AMOUNT_TAG);
+            if (key != null && amount > 0) {
+                addLoadedCellItem(key, amount);
+            }
+        } catch (RuntimeException ignored) {
+            // Skip malformed legacy entries instead of making the whole cell unreadable.
+        }
+    }
+
+    private void addLoadedCellItem(AEKey key, long amount) {
+        if (key == null || amount <= 0 || !cellType.getKeyType().contains(key)) {
+            return;
+        }
+        if (!cellType.isAllowedByCellWorkbench(itemStack, key)) {
+            return;
+        }
+        long currentAmount = cellItems.getLong(key);
+        long newAmount = saturatedAdd(currentAmount, amount);
+        cellItems.put(key, newAmount);
+    }
+
+    @Override
+    public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
+        if (what == null || amount <= 0 || !cellType.getKeyType().contains(what)) {
+            return 0;
+        }
+        if (!cellType.isAllowedByCellWorkbench(itemStack, what)) {
+            return 0;
+        }
+
+        long currentAmount = cellItems.getLong(what);
+        long remainingItemCount = getRemainingItemCountByBytes();
+        if (currentAmount <= 0) {
+            if (!canHoldNewItem()) {
+                return 0;
+            }
+            remainingItemCount -= saturatedMultiply(getBytesPerType(), this.amountPerByte);
+            if (remainingItemCount <= 0) {
+                return 0;
+            }
+        }
+        remainingItemCount = clampByAmountLimit(remainingItemCount);
+        remainingItemCount = Math.clamp(this.maxItemsPerType - currentAmount, 0, remainingItemCount);
+
+        long inserted = Math.min(amount, remainingItemCount);
+        if (mode == Actionable.MODULATE && inserted > 0) {
+            cellItems.addTo(what, inserted);
+            storedItemCount = saturatedAdd(storedItemCount, inserted);
+            if (currentAmount <= 0) {
+                storedItems++;
+            }
+            saveChanges();
+        }
+        return inserted;
+    }
+
     private void recalculateStoredAmounts() {
         this.storedItemCount = 0;
         this.storedItems = 0;
         ObjectList<AEKey> emptyKeys = new ObjectArrayList<>();
         for (Object2LongMap.Entry<AEKey> entry : cellItems.object2LongEntrySet()) {
+            if (entry.getKey() == null) {
+                emptyKeys.add(entry.getKey());
+                continue;
+            }
             long amount = entry.getLongValue();
             if (amount > 0) {
-                this.storedItemCount += amount;
+                this.storedItemCount = saturatedAdd(this.storedItemCount, amount);
                 this.storedItems++;
             } else {
                 emptyKeys.add(entry.getKey());
@@ -336,9 +415,9 @@ public class BasicCellInventory implements StorageCell {
             return 0;
         }
 
-        long typeBytes = getBytesPerType() * maxTypes;
+        long typeBytes = saturatedMultiply(getBytesPerType(), maxTypes);
         long storageForAmounts = Math.max(getTotalBytes() - typeBytes, 0);
-        return (storageForAmounts * this.amountPerByte + maxTypes - 1) / maxTypes;
+        return saturatedCeilDividedMultiply(storageForAmounts, this.amountPerByte, maxTypes);
     }
 
     public long getTotalBytes() {
@@ -361,13 +440,9 @@ public class BasicCellInventory implements StorageCell {
         return storedItems;
     }
 
-    public long getFreeBytes() {
-        return getTotalBytes() - getUsedBytes();
-    }
-
     public long getUsedBytes() {
-        var bytesForItemCount = (getStoredItemCount() + getUnusedItemCount()) / this.amountPerByte;
-        return getStoredItemTypes() * getBytesPerType() + bytesForItemCount;
+        long bytesForItemCount = divideRoundingUp(getStoredItemCount(), this.amountPerByte);
+        return saturatedAdd(saturatedMultiply(getStoredItemTypes(), getBytesPerType()), bytesForItemCount);
     }
 
     public long getRemainingItemCount() {
@@ -375,7 +450,11 @@ public class BasicCellInventory implements StorageCell {
     }
 
     private long getRemainingItemCountByBytes() {
-        final long remaining = getFreeBytes() * this.amountPerByte + getUnusedItemCount();
+        long freeBytes = getTotalBytes() - getUsedBytes();
+        if (freeBytes <= 0) {
+            return 0;
+        }
+        long remaining = saturatedAdd(saturatedMultiply(freeBytes, this.amountPerByte), getUnusedItemCount());
 // Technically not exactly evenly distributed, but close enough!
         return Math.max(remaining, 0);
     }

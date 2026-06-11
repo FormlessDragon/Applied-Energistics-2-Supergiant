@@ -4,33 +4,19 @@ import ae2.api.config.FuzzyMode;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMaps;
 import it.unimi.dsi.fastutil.objects.Object2LongSortedMap;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.NoSuchElementException;
 
 /**
  * Tallies a negative or positive amount for sub-variants of a {@link AEKey}.
  */
 abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
-    /**
-     * Enable to skip and remove keys that are mapped to zero.
-     */
-    private boolean dropZeros;
     private final boolean saturating;
 
     protected VariantCounter(boolean saturating) {
         this.saturating = saturating;
-    }
-
-    public boolean isDropZeros() {
-        return dropZeros;
-    }
-
-    public void setDropZeros(boolean dropZeros) {
-        this.dropZeros = dropZeros;
     }
 
     public long get(AEKey key) {
@@ -48,22 +34,14 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
             } else {
                 newAmount = result;
             }
-            if (dropZeros && newAmount == 0) {
-                records.removeLong(key);
-            } else {
-                records.put(key, newAmount);
-            }
+            records.put(key, newAmount);
         } else {
             records.addTo(key, amount);
         }
     }
 
     public void set(AEKey key, long amount) {
-        if (dropZeros && amount == 0) {
-            getRecords().removeLong(key);
-        } else {
-            getRecords().put(key, amount);
-        }
+        getRecords().put(key, amount);
     }
 
     public long remove(AEKey key) {
@@ -78,48 +56,28 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
 
     public void removeAll(VariantCounter other) {
         for (var entry : other.getRecords().object2LongEntrySet()) {
-            add(entry.getKey(), -entry.getLongValue());
+            long amount = entry.getLongValue();
+            if (amount == Long.MIN_VALUE) {
+                add(entry.getKey(), Long.MAX_VALUE);
+            } else {
+                add(entry.getKey(), -amount);
+            }
         }
     }
 
     public abstract Collection<Object2LongMap.Entry<AEKey>> findFuzzy(AEKey filter, FuzzyMode fuzzy);
 
     public int size() {
-        if (!dropZeros) {
-            return getRecords().size();
-        }
-
-        var size = 0;
-        for (var value : getRecords().values()) {
-            if (value != 0) {
-                size++;
-            }
-        }
-
-        return size;
+        return getRecords().size();
     }
 
     public boolean isEmpty() {
-        if (!dropZeros) {
-            return getRecords().isEmpty();
-        }
-
-        for (var value : getRecords().values()) {
-            if (value != 0) {
-                return false;
-            }
-        }
-
-        return true;
+        return getRecords().isEmpty();
     }
 
     @Override
-    public @NonNull Iterator<Object2LongMap.Entry<AEKey>> iterator() {
-        if (!dropZeros) {
-            return Object2LongMaps.fastIterator(getRecords());
-        }
-
-        return new NonDefaultIterator();
+    public @NotNull Iterator<Object2LongMap.Entry<AEKey>> iterator() {
+        return Object2LongMaps.fastIterator(getRecords());
     }
 
     abstract AEKey2LongMap getRecords();
@@ -128,10 +86,8 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
      * Sets all amounts to zero.
      */
     public void reset() {
-        if (dropZeros) {
-            getRecords().clear();
-        } else {
-            getRecords().replaceAll((key, value) -> 0L);
+        for (var entry : getRecords().object2LongEntrySet()) {
+            entry.setValue(0L);
         }
     }
 
@@ -143,7 +99,8 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
 
     public void invert() {
         for (var entry : getRecords().object2LongEntrySet()) {
-            entry.setValue(-entry.getLongValue());
+            long amount = entry.getLongValue();
+            entry.setValue(amount == Long.MIN_VALUE ? Long.MAX_VALUE : -amount);
         }
     }
 
@@ -220,46 +177,4 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         }
     }
 
-    /**
-     * Only returns entries that do not have amount 0.
-     */
-    private class NonDefaultIterator implements Iterator<Object2LongMap.Entry<AEKey>> {
-        private final Iterator<Object2LongMap.Entry<AEKey>> parent;
-        private Object2LongMap.Entry<AEKey> next;
-
-        public NonDefaultIterator() {
-            this.parent = Object2LongMaps.fastIterator(getRecords());
-            this.next = seekNext();
-        }
-
-        @Override
-        public boolean hasNext() {
-            return this.next != null;
-        }
-
-        @Override
-        public Object2LongMap.Entry<AEKey> next() {
-            if (this.next == null) {
-                throw new NoSuchElementException();
-            }
-
-            var result = this.next;
-            this.next = this.seekNext();
-            return result;
-        }
-
-        private Object2LongMap.@Nullable Entry<AEKey> seekNext() {
-            while (this.parent.hasNext()) {
-                var entry = this.parent.next();
-
-                if (entry.getLongValue() == 0) {
-                    this.parent.remove();
-                } else {
-                    return entry;
-                }
-            }
-
-            return null;
-        }
-    }
 }

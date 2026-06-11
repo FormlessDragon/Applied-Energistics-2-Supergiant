@@ -24,7 +24,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.wrapper.EmptyHandler;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 import java.util.Iterator;
@@ -77,7 +77,7 @@ final class EmptyUpgradeInventory implements IUpgradeInventory {
     }
 
     @Override
-    public @NonNull Iterator<ItemStack> iterator() {
+    public @NotNull Iterator<ItemStack> iterator() {
         return Collections.emptyIterator();
     }
 

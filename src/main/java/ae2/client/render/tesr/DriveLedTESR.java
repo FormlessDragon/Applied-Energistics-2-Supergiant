@@ -27,6 +27,10 @@ import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer;
 import javax.vecmath.Vector3f;
 
 public class DriveLedTESR extends TileEntitySpecialRenderer<TileDrive> {
+    private static void getSlotOrigin(int slot, Vector3f slotOrigin) {
+        DriveBakedModel.getSlotOrigin(slot / 2, slot % 2, slotOrigin);
+    }
+
     @Override
     public void render(TileDrive te, double x, double y, double z, float partialTicks, int destroyStage,
                        float alpha) {
@@ -47,16 +51,7 @@ public class DriveLedTESR extends TileEntitySpecialRenderer<TileDrive> {
         GlStateManager.enableBlend();
         GlStateManager.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
 
-        Vector3f slotTranslation = new Vector3f();
-        for (int row = 0; row < 5; row++) {
-            for (int col = 0; col < 2; col++) {
-                GlStateManager.pushMatrix();
-                DriveBakedModel.getSlotOrigin(row, col, slotTranslation);
-                GlStateManager.translate(slotTranslation.x, slotTranslation.y, slotTranslation.z);
-                CellLedRenderer.renderLed(te, row * 2 + col);
-                GlStateManager.popMatrix();
-            }
-        }
+        CellLedRenderer.renderLeds(te, 10, DriveLedTESR::getSlotOrigin);
 
         GlStateManager.disableBlend();
         GlStateManager.enableLighting();

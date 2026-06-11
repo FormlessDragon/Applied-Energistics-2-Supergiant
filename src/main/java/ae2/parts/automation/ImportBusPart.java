@@ -53,8 +53,12 @@ public class ImportBusPart extends IOBusPart implements KeyTypeSelectionHost {
     protected boolean doBusWork(IGrid grid) {
         if (importStrategy == null) {
             var self = this.getHost().getTileEntity();
-            var fromPos = self.getPos().offset(this.getSide());
-            var fromSide = getSide().getOpposite();
+            var side = getSide();
+            if (side == null) {
+                return false;
+            }
+            var fromPos = self.getPos().offset(side);
+            var fromSide = side.getOpposite();
             importStrategy = StackWorldBehaviors.createImportFacade((WorldServer) getLevel(), fromPos, fromSide,
                 keyTypeSelection.enabledPredicate());
         }

@@ -2,12 +2,15 @@ package ae2.client.gui.implementations;
 
 import ae2.api.config.SchedulingMode;
 import ae2.api.config.Settings;
+import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.PaletteColor;
+import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.container.implementations.ContainerThresholdExportBus;
 import ae2.core.localization.GuiText;
+import ae2.parts.automation.special.ThresholdMode;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
@@ -50,22 +53,22 @@ public class GuiThresholdExportBus extends GuiSpecialExportBus<ContainerThreshol
         GlStateManager.popMatrix();
     }
 
-    private static final class ThresholdModeButton extends ae2.client.gui.widgets.IconButton {
+    private static final class ThresholdModeButton extends IconButton {
         private final ContainerThresholdExportBus container;
 
         private ThresholdModeButton(ContainerThresholdExportBus container) {
             super(() -> container.setMode(
-                container.mode == ae2.parts.automation.special.ThresholdMode.GREATER
-                    ? ae2.parts.automation.special.ThresholdMode.LOWER
-                    : ae2.parts.automation.special.ThresholdMode.GREATER));
+                container.mode == ThresholdMode.GREATER
+                    ? ThresholdMode.LOWER
+                    : ThresholdMode.GREATER));
             this.container = container;
         }
 
         @Override
-        protected ae2.client.gui.Icon getIcon() {
-            return this.container.mode == ae2.parts.automation.special.ThresholdMode.GREATER
-                ? ae2.client.gui.Icon.ARROW_UP
-                : ae2.client.gui.Icon.ARROW_DOWN;
+        protected Icon getIcon() {
+            return this.container.mode == ThresholdMode.GREATER
+                ? Icon.ARROW_UP
+                : Icon.ARROW_DOWN;
         }
 
         @Override

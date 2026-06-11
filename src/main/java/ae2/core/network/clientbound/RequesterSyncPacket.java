@@ -17,6 +17,10 @@ import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 
 public class RequesterSyncPacket extends ClientboundPacket {
+    private static final int MAX_REQUEST_COUNT = 64;
+    private static final int MAX_ROW_COUNT = 64;
+    private static final int MIN_ROW_BYTES = 2;
+
     private boolean clearAll;
     private boolean fullUpdate;
     private long requesterId;
@@ -91,15 +95,18 @@ public class RequesterSyncPacket extends ClientboundPacket {
 
     @Override
     protected void read(ByteBuf buf) {
+        try {
+            readChecked(buf);
+        } catch (RuntimeException | IOException e) {
+            discard(buf);
+        }
+    }
+
+    private void readChecked(ByteBuf buf) throws IOException {
         var packetBuffer = new PacketBuffer(buf);
         this.clearAll = packetBuffer.readBoolean();
         if (this.clearAll) {
-            this.fullUpdate = false;
-            this.requesterId = 0;
-            this.requestCount = 0;
-            this.sortValue = 0;
-            this.requesterName = null;
-            this.rows = new Int2ObjectOpenHashMap<>();
+            resetToClearAll();
             return;
         }
 
@@ -107,6 +114,9 @@ public class RequesterSyncPacket extends ClientboundPacket {
         this.fullUpdate = packetBuffer.readBoolean();
         if (this.fullUpdate) {
             this.requestCount = packetBuffer.readVarInt();
+            if (this.requestCount < 0 || this.requestCount > MAX_REQUEST_COUNT) {
+                throw new IllegalArgumentException("Invalid requester request count: " + this.requestCount);
+            }
             this.sortValue = packetBuffer.readVarLong();
             this.requesterName = TextComponents.readFromPacket(packetBuffer);
         } else {
@@ -116,16 +126,38 @@ public class RequesterSyncPacket extends ClientboundPacket {
         }
 
         int rowCount = packetBuffer.readVarInt();
+        if (rowCount < 0 || rowCount > MAX_ROW_COUNT || rowCount > packetBuffer.readableBytes() / MIN_ROW_BYTES
+            || this.fullUpdate && rowCount != this.requestCount) {
+            throw new IllegalArgumentException("Invalid requester row count: " + rowCount);
+        }
+
         this.rows = new Int2ObjectOpenHashMap<>(rowCount);
         for (int i = 0; i < rowCount; i++) {
             int row = packetBuffer.readVarInt();
-            try {
-                NBTTagCompound tag = packetBuffer.readCompoundTag();
-                this.rows.put(row, tag == null ? new NBTTagCompound() : tag);
-            } catch (IOException e) {
-                throw new IllegalArgumentException("Could not read requester row", e);
-            }
+            NBTTagCompound tag = packetBuffer.readCompoundTag();
+            this.rows.put(row, tag == null ? new NBTTagCompound() : tag);
         }
+    }
+
+    private void resetToClearAll() {
+        this.clearAll = true;
+        this.fullUpdate = false;
+        this.requesterId = 0;
+        this.requestCount = 0;
+        this.sortValue = 0;
+        this.requesterName = null;
+        this.rows = new Int2ObjectOpenHashMap<>();
+    }
+
+    private void discard(ByteBuf buf) {
+        this.clearAll = false;
+        this.fullUpdate = false;
+        this.requesterId = 0;
+        this.requestCount = 0;
+        this.sortValue = 0;
+        this.requesterName = null;
+        this.rows = new Int2ObjectOpenHashMap<>();
+        buf.skipBytes(buf.readableBytes());
     }
 
     @Override

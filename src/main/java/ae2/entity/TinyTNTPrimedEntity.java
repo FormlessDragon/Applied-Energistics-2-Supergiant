@@ -39,6 +39,7 @@ import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.Explosion;
 import net.minecraft.world.World;
+import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.fml.common.registry.IEntityAdditionalSpawnData;
 import org.jetbrains.annotations.Nullable;
 
@@ -125,7 +126,7 @@ public final class TinyTNTPrimedEntity extends EntityTNTPrimed implements IEntit
             this.posY + 1.5, this.posZ + 1.5);
         final List<Entity> list = this.world.getEntitiesWithinAABBExcludingEntity(this, area);
 
-        net.minecraftforge.event.ForgeEventFactory.onExplosionDetonate(this.world, ex, list, 0.2f * 2d);
+        ForgeEventFactory.onExplosionDetonate(this.world, ex, list, 0.2f * 2d);
 
         for (final Entity e : list) {
             e.attackEntityFrom(DamageSource.causeExplosionDamage(ex), 6);
@@ -175,6 +176,6 @@ public final class TinyTNTPrimedEntity extends EntityTNTPrimed implements IEntit
 
     @Override
     public void readSpawnData(final ByteBuf data) {
-        this.setFuse(data.readByte());
+        this.setFuse(data.readUnsignedByte());
     }
 }

@@ -21,6 +21,7 @@ package ae2.debug;
 import ae2.api.networking.GridHelper;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
+import ae2.api.networking.IInWorldGridNodeHost;
 import ae2.api.networking.spatial.ISpatialService;
 import ae2.core.localization.PlayerMessages;
 import ae2.items.AEBaseItem;
@@ -41,6 +42,7 @@ import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.DimensionManager;
+import net.minecraftforge.common.util.Constants;
 
 public class ReplicatorCardItem extends AEBaseItem {
 
@@ -73,7 +75,7 @@ public class ReplicatorCardItem extends AEBaseItem {
         int z = pos.getZ();
 
         if (InteractionUtil.isInAlternateUseMode(player)) {
-            ae2.api.networking.IInWorldGridNodeHost gridHost = GridHelper.getNodeHost(world, pos);
+            IInWorldGridNodeHost gridHost = GridHelper.getNodeHost(world, pos);
             if (gridHost != null) {
                 NBTTagCompound tag = getOrCreateTag(player.getHeldItem(hand));
                 tag.setInteger("x", x);
@@ -88,13 +90,13 @@ public class ReplicatorCardItem extends AEBaseItem {
             }
         } else {
             NBTTagCompound tag = player.getHeldItem(hand).getTagCompound();
-            if (tag != null && !tag.isEmpty()) {
+            if (tag != null && hasSourceTag(tag)) {
                 int srcX = tag.getInteger("x");
                 int srcY = tag.getInteger("y");
                 int srcZ = tag.getInteger("z");
                 int srcSide = tag.getInteger("side");
                 int dimension = tag.getInteger("dim");
-                int replications = tag.getInteger("r") + 1;
+                int replications = MathHelper.clamp(tag.getInteger("r"), 0, 3) + 1;
 
                 WorldServer srcWorld = DimensionManager.getWorld(dimension);
                 if (srcWorld == null) {
@@ -102,7 +104,7 @@ public class ReplicatorCardItem extends AEBaseItem {
                     return EnumActionResult.SUCCESS;
                 }
 
-                ae2.api.networking.IInWorldGridNodeHost gridHost = GridHelper.getNodeHost(srcWorld,
+                IInWorldGridNodeHost gridHost = GridHelper.getNodeHost(srcWorld,
                     new BlockPos(srcX, srcY, srcZ));
                 if (gridHost != null) {
                     EnumFacing sourceSide = EnumFacing.VALUES[srcSide];
@@ -188,6 +190,17 @@ public class ReplicatorCardItem extends AEBaseItem {
             stack.setTagCompound(tag);
         }
         return tag;
+    }
+
+    private boolean hasSourceTag(NBTTagCompound tag) {
+        return tag.hasKey("x", Constants.NBT.TAG_INT)
+            && tag.hasKey("y", Constants.NBT.TAG_INT)
+            && tag.hasKey("z", Constants.NBT.TAG_INT)
+            && tag.hasKey("side", Constants.NBT.TAG_INT)
+            && tag.hasKey("dim", Constants.NBT.TAG_INT)
+            && tag.hasKey("r", Constants.NBT.TAG_INT)
+            && tag.getInteger("side") >= 0
+            && tag.getInteger("side") < EnumFacing.VALUES.length;
     }
 
     private void outputMsg(Entity player, ITextComponent message) {

@@ -12,6 +12,13 @@ import net.minecraft.world.WorldServer;
 import org.jetbrains.annotations.Nullable;
 
 public class ImportExportBusPart extends ExportBusPart implements KeyTypeSelectionHost {
+    private static final StackImportStrategy NOOP_IMPORT_STRATEGY = context -> {
+        if (context == null) {
+            return false;
+        }
+        return false;
+    };
+
     private final KeyTypeSelection keyTypeSelection;
     @Nullable
     private StackImportStrategy importStrategy;
@@ -28,8 +35,12 @@ public class ImportExportBusPart extends ExportBusPart implements KeyTypeSelecti
     protected StackImportStrategy getImportStrategy() {
         if (this.importStrategy == null) {
             var self = this.getHost().getTileEntity();
-            var fromPos = self.getPos().offset(this.getSide());
-            var fromSide = getSide().getOpposite();
+            var side = getSide();
+            if (side == null) {
+                return NOOP_IMPORT_STRATEGY;
+            }
+            var fromPos = self.getPos().offset(side);
+            var fromSide = side.getOpposite();
             importStrategy = StackWorldBehaviors.createImportFacade((WorldServer) getLevel(), fromPos, fromSide,
                 keyTypeSelection.enabledPredicate());
         }

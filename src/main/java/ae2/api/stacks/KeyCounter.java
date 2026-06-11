@@ -116,7 +116,11 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
      * Subtracts the given amount from the value associated with the given key.
      */
     public void remove(AEKey key, long amount) {
-        add(key, -amount);
+        if (amount == Long.MIN_VALUE) {
+            add(key, Long.MAX_VALUE);
+        } else {
+            add(key, -amount);
+        }
     }
 
     /**
@@ -219,9 +223,7 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     @Nullable
     public <T extends AEKey> Object2LongMap.Entry<AEKey> getFirstEntry(Class<T> keyClass) {
         for (var value : lists.values()) {
-            var it = value.iterator();
-            if (it.hasNext()) {
-                var entry = it.next();
+            for (var entry : value) {
                 if (keyClass.isInstance(entry.getKey())) {
                     return entry;
                 }

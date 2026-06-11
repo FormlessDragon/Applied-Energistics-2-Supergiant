@@ -18,7 +18,7 @@ package ae2.client.render.mesh;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.util.EnumFacing;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import javax.vecmath.Vector3f;
 
@@ -144,7 +144,7 @@ public class QuadViewImpl implements QuadView {
     }
 
     @Override
-    public final @NonNull EnumFacing lightFace() {
+    public final @NotNull EnumFacing lightFace() {
         computeGeometry();
         return EncodingFormat.lightFace(data[baseIndex + HEADER_BITS]);
     }

@@ -2,7 +2,7 @@ package ae2.api.parts;
 
 import net.minecraft.client.renderer.block.model.BakedQuad;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 public interface IPartBakedModel {

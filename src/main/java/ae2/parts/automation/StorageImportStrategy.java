@@ -10,7 +10,7 @@ import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
 import net.minecraftforge.items.CapabilityItemHandler;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Strategy for efficiently importing stacks from external storage into an internal
@@ -119,6 +119,6 @@ public class StorageImportStrategy<T, S> implements StackImportStrategy {
             }
         }
 
-        return false;
+        return context.hasDoneWork();
     }
 }

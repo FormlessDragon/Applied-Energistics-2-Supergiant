@@ -6,9 +6,10 @@ import net.minecraft.client.renderer.block.model.IBakedModel;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.client.model.ModelLoaderRegistry;
 import net.minecraftforge.common.model.IModelState;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 
 import java.util.Collection;
 import java.util.function.Function;
@@ -24,13 +25,13 @@ public class MeteoriteCompassModel implements BasicUnbakedModel {
     }
 
     @Override
-    public IBakedModel bake(@NonNull IModelState state, @NonNull VertexFormat format,
-                            @NonNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
+    public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
+                            @NotNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         try {
-            IBakedModel baseModel = net.minecraftforge.client.model.ModelLoaderRegistry.getModel(MODEL_BASE)
-                                                                                       .bake(state, format, bakedTextureGetter);
-            IBakedModel pointerModel = net.minecraftforge.client.model.ModelLoaderRegistry.getModel(MODEL_POINTER)
-                                                                                          .bake(state, format, bakedTextureGetter);
+            IBakedModel baseModel = ModelLoaderRegistry.getModel(MODEL_BASE)
+                                                       .bake(state, format, bakedTextureGetter);
+            IBakedModel pointerModel = ModelLoaderRegistry.getModel(MODEL_POINTER)
+                                                          .bake(state, format, bakedTextureGetter);
             return new MeteoriteCompassBakedModel(baseModel, pointerModel);
         } catch (Exception e) {
             throw new RuntimeException(e);

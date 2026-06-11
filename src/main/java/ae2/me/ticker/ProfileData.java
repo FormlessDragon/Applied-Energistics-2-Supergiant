@@ -2,6 +2,7 @@ package ae2.me.ticker;
 
 import ae2.core.AppEngBase;
 import ae2.util.ColorData;
+import ae2.util.EmptyArrays;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
@@ -16,7 +17,7 @@ import java.util.zip.GZIPOutputStream;
 
 public final class ProfileData {
     public static final int MAX_PROFILE_TICKS = 262_144;
-    public static final ProfileData EMPTY = new ProfileData(new ATick[0]);
+    public static final ProfileData EMPTY = new ProfileData(EmptyArrays.EMPTY_PROFILE_DATA_ATICK_ARRAY);
 
     public ATick[] ticks;
     private boolean corrupt;
@@ -44,33 +45,44 @@ public final class ProfileData {
                 int dimension = stream.readInt();
                 BlockPos pos = BlockPos.fromLong(stream.readLong());
                 double rate = stream.readDouble();
+                if (!Double.isFinite(rate) || rate < 0) {
+                    throw new IllegalArgumentException("Invalid profile tick rate: " + rate);
+                }
                 data.ticks[i] = new ATick(dimension, pos, rate, getColor(rate));
             }
         } catch (Exception e) {
             AppEngBase.LOGGER.error("Fail to profile ticks. The packet is corrupted!", e);
             data.corrupt = true;
-            data.ticks = new ATick[0];
+            data.ticks = EmptyArrays.EMPTY_PROFILE_DATA_ATICK_ARRAY;
         }
         return data;
     }
 
+    private static double sanitizeRate(double rate) {
+        return Double.isFinite(rate) && rate > 0 ? rate : 0;
+    }
+
+    public static ColorData getColor(double rate) {
+        rate = sanitizeRate(rate);
+        float gradient = (float) Math.clamp(rate / 100.0, 0.0, 1.0);
+        return new ColorData(Math.clamp(gradient, 0.07f, 0.7f), gradient, 1.0f - gradient, 0.0f);
+    }
+
     public void write(ByteBuf buf) {
         try (var stream = new DataOutputStream(new BufferedOutputStream(new GZIPOutputStream(new ByteBufOutputStream(buf))))) {
+            if (ticks.length > MAX_PROFILE_TICKS) {
+                throw new IllegalArgumentException("Invalid profile tick count: " + ticks.length);
+            }
             stream.writeInt(ticks.length);
             for (ATick tick : ticks) {
                 stream.writeInt(tick.dimension());
                 stream.writeLong(tick.pos().toLong());
-                stream.writeDouble(tick.rate());
+                stream.writeDouble(sanitizeRate(tick.rate()));
             }
         } catch (Exception e) {
             AppEngBase.LOGGER.error("Fail to write tick profiler data.", e);
             corrupt = true;
         }
-    }
-
-    public static ColorData getColor(double rate) {
-        float gradient = (float) Math.clamp(rate / 100.0, 0.0, 1.0);
-        return new ColorData(Math.clamp(gradient, 0.07f, 0.7f), gradient, 1.0f - gradient, 0.0f);
     }
 
     public record ATick(int dimension, BlockPos pos, double rate, ColorData color) {

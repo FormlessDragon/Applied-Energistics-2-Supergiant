@@ -155,7 +155,7 @@ public abstract class CraftingSimulationState implements ICraftingSimulationStat
 
         return Iterables.transform(
             Iterables.filter(modifiableCache.findFuzzy(input, FuzzyMode.IGNORE_ALL), entry -> entry.getLongValue() > 0),
-            it.unimi.dsi.fastutil.objects.Object2LongMap.Entry::getKey);
+            Object2LongMap.Entry::getKey);
     }
 
     @Override

@@ -34,7 +34,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class AENetworkedPoweredTile extends AEBasePoweredTile implements IGridConnectedTile {
 
@@ -108,6 +108,9 @@ public class AENetworkedPoweredTile extends AEBasePoweredTile implements IGridCo
 
     @Override
     public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+        if (capability == AECapabilities.IN_WORLD_GRID_NODE_HOST) {
+            return true;
+        }
         if (capability == AECapabilities.CRANKABLE && this.getCrankable(facing) != null) {
             return true;
         }
@@ -117,6 +120,9 @@ public class AENetworkedPoweredTile extends AEBasePoweredTile implements IGridCo
     @SuppressWarnings("unchecked")
     @Override
     public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+        if (capability == AECapabilities.IN_WORLD_GRID_NODE_HOST) {
+            return AECapabilities.IN_WORLD_GRID_NODE_HOST.cast(this);
+        }
         if (capability == AECapabilities.CRANKABLE) {
             return (T) this.getCrankable(facing);
         }

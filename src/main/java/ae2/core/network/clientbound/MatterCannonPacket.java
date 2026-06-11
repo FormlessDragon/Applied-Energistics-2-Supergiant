@@ -28,6 +28,9 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 
 public class MatterCannonPacket extends ClientboundPacket {
 
+    private static final float MAX_PARTICLE_DISTANCE = 64.0F;
+    private static final int MAX_PARTICLE_COUNT = 64;
+
     private double x;
     private double y;
     private double z;
@@ -55,7 +58,14 @@ public class MatterCannonPacket extends ClientboundPacket {
             this.dy = 0;
             this.dz = 0;
         }
-        this.length = Math.max(0, length);
+        this.length = sanitizeLength(length);
+    }
+
+    private static float sanitizeLength(float length) {
+        if (!Float.isFinite(length)) {
+            return 0;
+        }
+        return Math.clamp(length, 0, MAX_PARTICLE_DISTANCE);
     }
 
     @Override
@@ -67,7 +77,7 @@ public class MatterCannonPacket extends ClientboundPacket {
         this.dx = stream.readFloat();
         this.dy = stream.readFloat();
         this.dz = stream.readFloat();
-        this.length = stream.readFloat();
+        this.length = sanitizeLength(stream.readFloat());
     }
 
     @Override
@@ -93,7 +103,7 @@ public class MatterCannonPacket extends ClientboundPacket {
             return;
         }
 
-        var particles = Math.max(1, (int) Math.ceil(this.length));
+        var particles = Math.clamp((int) Math.ceil(this.length), 1, MAX_PARTICLE_COUNT);
         var step = this.length / particles;
         for (int a = 1; a <= particles; a++) {
             var offset = step * a;

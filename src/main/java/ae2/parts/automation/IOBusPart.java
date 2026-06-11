@@ -247,7 +247,11 @@ public abstract class IOBusPart extends UpgradeablePart implements IGridTickable
         }
 
         TileEntity self = this.getHost().getTileEntity();
-        var targetPos = self.getPos().offset(getSide());
+        var side = getSide();
+        if (side == null) {
+            return false;
+        }
+        var targetPos = self.getPos().offset(side);
         return Platform.areBlockEntitiesTicking(self.getWorld(), targetPos);
     }
 

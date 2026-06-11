@@ -33,7 +33,10 @@ import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 
 public class NetworkStorage implements MEStorage {
     private static final IntComparator PRIORITY_SORTER = (first, second) -> Integer.compare(second, first);
@@ -42,6 +45,8 @@ public class NetworkStorage implements MEStorage {
     private boolean mountsInUse;
     @Nullable
     private List<QueuedOperation> queuedOperations;
+    @Nullable
+    private Set<MEStorage> queuedRemovals;
 
     public void mount(int priority, MEStorage inventory) {
         if (this.mountsInUse) {
@@ -61,6 +66,10 @@ public class NetworkStorage implements MEStorage {
                 this.queuedOperations = new ObjectArrayList<>();
             }
             this.queuedOperations.add(new QueuedOperation(false, 0, inventory));
+            if (this.queuedRemovals == null) {
+                this.queuedRemovals = Collections.newSetFromMap(new IdentityHashMap<>());
+            }
+            this.queuedRemovals.add(inventory);
             return;
         }
 
@@ -76,6 +85,9 @@ public class NetworkStorage implements MEStorage {
 
     @Override
     public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
+        if (amount <= 0) {
+            return 0;
+        }
         if (this.mountsInUse) {
             return 0;
         }
@@ -138,6 +150,9 @@ public class NetworkStorage implements MEStorage {
 
     @Override
     public long extract(AEKey what, long amount, Actionable mode, IActionSource source) {
+        if (amount <= 0) {
+            return 0;
+        }
         if (this.mountsInUse) {
             return 0;
         }
@@ -171,6 +186,9 @@ public class NetworkStorage implements MEStorage {
         try {
             for (List<MEStorage> inventories : this.priorityInventory.values()) {
                 for (MEStorage inventory : inventories) {
+                    if (isQueuedForRemoval(inventory)) {
+                        continue;
+                    }
                     inventory.getAvailableStacks(out);
                 }
             }
@@ -200,6 +218,7 @@ public class NetworkStorage implements MEStorage {
 
         List<QueuedOperation> queued = this.queuedOperations;
         this.queuedOperations = null;
+        this.queuedRemovals = null;
         for (QueuedOperation operation : queued) {
             if (operation.mount()) {
                 mount(operation.priority(), operation.inventory());
@@ -210,14 +229,7 @@ public class NetworkStorage implements MEStorage {
     }
 
     private boolean isQueuedForRemoval(MEStorage inventory) {
-        if (this.queuedOperations != null) {
-            for (QueuedOperation operation : this.queuedOperations) {
-                if (!operation.mount() && operation.inventory() == inventory) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return this.queuedRemovals != null && this.queuedRemovals.contains(inventory);
     }
 
     private record QueuedOperation(boolean mount, int priority, MEStorage inventory) {

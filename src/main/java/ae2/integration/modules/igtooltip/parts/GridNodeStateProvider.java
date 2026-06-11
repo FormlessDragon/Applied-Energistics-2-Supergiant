@@ -21,8 +21,10 @@ public final class GridNodeStateProvider implements BodyProvider<IPart>, ServerD
     public void buildTooltip(IPart object, TooltipContext context, TooltipBuilder tooltip) {
         var serverData = context.serverData();
         if (serverData.hasKey(TAG_STATE, Constants.NBT.TAG_BYTE)) {
-            var state = GridNodeState.values()[serverData.getByte(TAG_STATE)];
-            tooltip.addLine(state.text(), TextFormatting.GRAY);
+            var state = GridNodeState.fromOrdinal(serverData.getByte(TAG_STATE));
+            if (state != null) {
+                tooltip.addLine(state.text(), TextFormatting.GRAY);
+            }
         }
     }
 

@@ -29,7 +29,6 @@ final class CraftingScreenBackground {
 
     static void draw(String texture, int offsetX, int offsetY, int rows, int topHeight, int rowSourceY,
                      int bottomSourceY, int bottomHeight, int rightFooterHeight) {
-        int firstRowSourceY = topHeight;
         int lastRowSourceY = bottomSourceY - CraftingScreenLayout.TABLE_ROW_HEIGHT;
 
         Blitter.texture(texture)
@@ -42,7 +41,7 @@ final class CraftingScreenBackground {
         for (int row = 0; row < rows; row++) {
             int currentRowSourceY;
             if (row == 0) {
-                currentRowSourceY = firstRowSourceY;
+                currentRowSourceY = topHeight;
             } else if (row == rows - 1) {
                 currentRowSourceY = lastRowSourceY;
             } else {

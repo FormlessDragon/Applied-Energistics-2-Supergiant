@@ -37,6 +37,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.item.Item;
@@ -75,7 +76,7 @@ public class Repo implements IClientRepo {
     private final ObjectList<GridInventoryEntry> pinnedSlots = new ObjectArrayList<>();
     private final ObjectList<GridInventoryEntry> craftingPinnedEntries = new ObjectArrayList<>();
     private final ObjectList<GridInventoryEntry> playerPinnedEntries = new ObjectArrayList<>();
-    private final Map<AEKey, PinnedKeys.PinReason> pinnedReasons = new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap<>();
+    private final Map<AEKey, PinnedKeys.PinReason> pinnedReasons = new Object2ObjectOpenHashMap<>();
     /**
      * Entries by item ID to speed up ingredient matching.
      */
@@ -278,7 +279,7 @@ public class Repo implements IClientRepo {
         // with craftable=true if they're craftable on this grid.
         for (var pinnedKey : PinnedKeys.getPlayerPinnedKeys()) {
             if (!PinnedKeys.isCraftingPinned(pinnedKey)
-                && playerPinnedEntries.stream().noneMatch(r -> pinnedKey.equals(r.what()))) {
+                && findPinnedEntry(playerPinnedEntries, pinnedKey) == null) {
                 this.playerPinnedEntries.add(new GridInventoryEntry(
                     -1, pinnedKey, 0, 0, false));
             }
@@ -360,7 +361,7 @@ public class Repo implements IClientRepo {
      * Computes free slot indices by AEKey. Used to replace removed items by items that are visually indistinguishable.
      */
     private Map<AEKey, IntList> getFreeSlots(List<GridInventoryEntry> slots) {
-        Map<AEKey, IntList> freeSlots = new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap<>();
+        Map<AEKey, IntList> freeSlots = new Object2ObjectOpenHashMap<>();
 
         for (int i = 0; i < slots.size(); ++i) {
             var entry = slots.get(i);

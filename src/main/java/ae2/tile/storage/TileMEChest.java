@@ -32,9 +32,14 @@ import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.GridFlags;
 import ae2.api.networking.IGridNodeListener;
 import ae2.api.networking.IManagedGridNode;
+import ae2.api.networking.events.GridPowerStorageStateChanged;
+import ae2.api.networking.events.GridPowerStorageStateChanged.PowerEventType;
+import ae2.api.networking.security.IActionSource;
 import ae2.api.orientation.RelativeSide;
 import ae2.api.stacks.AEFluidKey;
 import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.AEKey;
+import ae2.api.stacks.AEKeyType;
 import ae2.api.storage.ILinkStatus;
 import ae2.api.storage.IStorageMounts;
 import ae2.api.storage.IStorageProvider;
@@ -71,14 +76,14 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
 import net.minecraftforge.fluids.capability.FluidTankProperties;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.fluids.capability.IFluidTankProperties;
-
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class TileMEChest extends AENetworkedPoweredTile
     implements IMEChest, ITerminalHost, IPriorityHost, IColorableBlockEntity,
@@ -118,7 +123,7 @@ public class TileMEChest extends AENetworkedPoweredTile
         setInternalPowerFlow(AccessRestriction.WRITE);
     }
 
-    private static boolean isVisibleKeyType(ae2.api.stacks.AEKeyType keyType) {
+    private static boolean isVisibleKeyType(AEKeyType keyType) {
         return true;
     }
 
@@ -137,9 +142,9 @@ public class TileMEChest extends AENetworkedPoweredTile
     }
 
     @Override
-    protected void emitPowerStateEvent(ae2.api.networking.events.GridPowerStorageStateChanged.PowerEventType x) {
-        if (x == ae2.api.networking.events.GridPowerStorageStateChanged.PowerEventType.RECEIVE_POWER) {
-            ifGridPresent(grid -> grid.postEvent(new ae2.api.networking.events.GridPowerStorageStateChanged(this, x)));
+    protected void emitPowerStateEvent(PowerEventType x) {
+        if (x == PowerEventType.RECEIVE_POWER) {
+            ifGridPresent(grid -> grid.postEvent(new GridPowerStorageStateChanged(this, x)));
         } else {
             recalculateDisplay();
         }
@@ -317,13 +322,15 @@ public class TileMEChest extends AENetworkedPoweredTile
         var oldCellItem = clientCellItem;
 
         int stateOrdinal = data.readUnsignedByte();
-        clientCellState = stateOrdinal >= 0 && stateOrdinal < CellState.values().length
-            ? CellState.values()[stateOrdinal]
+        CellState[] cellStates = CellState.values();
+        clientCellState = stateOrdinal >= 0 && stateOrdinal < cellStates.length
+            ? cellStates[stateOrdinal]
             : CellState.ABSENT;
         clientPowered = data.readBoolean();
         int colorOrdinal = data.readUnsignedByte();
-        paintedColor = colorOrdinal >= 0 && colorOrdinal < AEColor.values().length
-            ? AEColor.values()[colorOrdinal]
+        AEColor[] colors = AEColor.values();
+        paintedColor = colorOrdinal >= 0 && colorOrdinal < colors.length
+            ? colors[colorOrdinal]
             : AEColor.TRANSPARENT;
         clientCellItem = Item.getItemById(data.readInt());
         if (clientCellItem == null) {
@@ -347,16 +354,18 @@ public class TileMEChest extends AENetworkedPoweredTile
     protected void loadVisualState(NBTTagCompound data) {
         super.loadVisualState(data);
         int stateOrdinal = data.getByte("cellState") & 0xFF;
-        this.clientCellState = stateOrdinal < CellState.values().length
-            ? CellState.values()[stateOrdinal]
+        CellState[] cellStates = CellState.values();
+        this.clientCellState = stateOrdinal < cellStates.length
+            ? cellStates[stateOrdinal]
             : CellState.ABSENT;
         this.clientPowered = data.getBoolean("powered");
         var item = Item.getItemById(data.getInteger("cellItem"));
         this.clientCellItem = item == null ? Items.AIR : item;
-        if (data.hasKey("paintedColor")) {
+        if (data.hasKey("paintedColor", Constants.NBT.TAG_ANY_NUMERIC)) {
             int colorOrdinal = data.getByte("paintedColor") & 0xFF;
-            this.paintedColor = colorOrdinal < AEColor.values().length
-                ? AEColor.values()[colorOrdinal]
+            AEColor[] colors = AEColor.values();
+            this.paintedColor = colorOrdinal < colors.length
+                ? colors[colorOrdinal]
                 : AEColor.TRANSPARENT;
         }
     }
@@ -370,10 +379,11 @@ public class TileMEChest extends AENetworkedPoweredTile
         cellInventory.readFromNBT(data, "cellInventory");
         viewCellInventory.readFromNBT(data, "viewCellInventory");
         priority = data.getInteger("priority");
-        if (data.hasKey("paintedColor")) {
+        if (data.hasKey("paintedColor", Constants.NBT.TAG_ANY_NUMERIC)) {
             int colorOrdinal = data.getByte("paintedColor") & 0xFF;
-            this.paintedColor = colorOrdinal < AEColor.values().length
-                ? AEColor.values()[colorOrdinal]
+            AEColor[] colors = AEColor.values();
+            this.paintedColor = colorOrdinal < colors.length
+                ? colors[colorOrdinal]
                 : AEColor.TRANSPARENT;
         }
     }
@@ -432,7 +442,7 @@ public class TileMEChest extends AENetworkedPoweredTile
     }
 
     @Override
-    protected InternalInventory getExposedInventoryForSide(net.minecraft.util.EnumFacing side) {
+    protected InternalInventory getExposedInventoryForSide(EnumFacing side) {
         return side == this.getOrientation().getSide(RelativeSide.FRONT) ? this.cellInventory : this.inputInventory;
     }
 
@@ -602,8 +612,7 @@ public class TileMEChest extends AENetworkedPoweredTile
         }
 
         @Override
-        public long insert(ae2.api.stacks.AEKey what, long amount, Actionable mode,
-                           ae2.api.networking.security.IActionSource source) {
+        public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
             var inserted = super.insert(what, amount, mode, source);
             if (inserted > 0 && mode == Actionable.MODULATE) {
                 owner.blinkCell();
@@ -612,8 +621,7 @@ public class TileMEChest extends AENetworkedPoweredTile
         }
 
         @Override
-        public long extract(ae2.api.stacks.AEKey what, long amount, Actionable mode,
-                            ae2.api.networking.security.IActionSource source) {
+        public long extract(AEKey what, long amount, Actionable mode, IActionSource source) {
             var extracted = super.extract(what, amount, mode, source);
             if (extracted > 0 && mode == Actionable.MODULATE) {
                 owner.blinkCell();
@@ -667,12 +675,12 @@ public class TileMEChest extends AENetworkedPoweredTile
         }
 
         @Override
-        public @org.jspecify.annotations.Nullable FluidStack drain(FluidStack resource, boolean doDrain) {
+        public @Nullable FluidStack drain(FluidStack resource, boolean doDrain) {
             return null;
         }
 
         @Override
-        public @org.jspecify.annotations.Nullable FluidStack drain(int maxDrain, boolean doDrain) {
+        public @Nullable FluidStack drain(int maxDrain, boolean doDrain) {
             return null;
         }
     }

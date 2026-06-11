@@ -1,7 +1,7 @@
 package ae2.block.paint;
 
 import net.minecraftforge.common.property.IUnlistedProperty;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 class PaintSplotchesProperty implements IUnlistedProperty<PaintSplotches> {
 

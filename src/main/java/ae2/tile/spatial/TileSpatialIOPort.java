@@ -58,7 +58,9 @@ public class TileSpatialIOPort extends AENetworkedInvTile {
     public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
         if (data.hasKey("lastRedstoneState")) {
-            this.lastRedstoneState = YesNo.values()[data.getInteger("lastRedstoneState")];
+            int state = data.getInteger("lastRedstoneState");
+            YesNo[] values = YesNo.values();
+            this.lastRedstoneState = state >= 0 && state < values.length ? values[state] : YesNo.UNDECIDED;
         }
     }
 

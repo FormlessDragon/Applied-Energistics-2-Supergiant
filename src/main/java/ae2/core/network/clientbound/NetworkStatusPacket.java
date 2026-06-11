@@ -23,9 +23,15 @@ public class NetworkStatusPacket extends ClientboundPacket {
 
     @Override
     protected void read(ByteBuf buf) {
-        PacketBuffer packetBuffer = new PacketBuffer(buf);
-        this.status = NetworkStatus.read(packetBuffer);
-        this.canExportGrid = packetBuffer.readBoolean();
+        try {
+            PacketBuffer packetBuffer = new PacketBuffer(buf);
+            this.status = NetworkStatus.read(packetBuffer);
+            this.canExportGrid = packetBuffer.readBoolean();
+        } catch (RuntimeException e) {
+            this.status = null;
+            this.canExportGrid = false;
+            buf.skipBytes(buf.readableBytes());
+        }
     }
 
     @Override

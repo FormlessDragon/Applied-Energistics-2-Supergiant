@@ -17,9 +17,9 @@ import net.minecraftforge.client.model.IModel;
 import net.minecraftforge.client.model.ModelLoaderRegistry;
 import net.minecraftforge.common.model.IModelState;
 import net.minecraftforge.common.model.TRSRTransformation;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Map;
@@ -62,8 +62,8 @@ public class CableBusModel implements IModel {
     }
 
     @Override
-    public IBakedModel bake(@Nonnull IModelState state, @Nonnull VertexFormat format,
-                            @Nonnull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
+    public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
+                            @NotNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         Map<ResourceLocation, IBakedModel> partModels = this.loadPartModels(state, format, bakedTextureGetter);
         CableBuilder cableBuilder = new CableBuilder(bakedTextureGetter);
         IBakedModel cableAnchorStiltModel = this.loadOptionalModel(state, format, bakedTextureGetter);

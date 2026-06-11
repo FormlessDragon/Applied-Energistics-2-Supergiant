@@ -18,6 +18,10 @@ public final class FluidIngredientConverter implements IngredientConverter<Fluid
     @Nullable
     @Override
     public FluidStack getIngredientFromStack(GenericStack stack) {
+        if (stack == null) {
+            return null;
+        }
+
         if (stack.what() instanceof AEFluidKey fluidKey) {
             return fluidKey.toStack(Math.max(1, Ints.saturatedCast(stack.amount())));
         }
@@ -27,6 +31,10 @@ public final class FluidIngredientConverter implements IngredientConverter<Fluid
     @Nullable
     @Override
     public GenericStack getStackFromIngredient(FluidStack ingredient) {
+        if (ingredient == null) {
+            return null;
+        }
+
         return GenericStack.fromFluidStack(ingredient);
     }
 }

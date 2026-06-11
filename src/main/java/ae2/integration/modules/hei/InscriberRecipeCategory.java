@@ -11,9 +11,9 @@ import mezz.jei.api.gui.IRecipeLayout;
 import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.recipe.IRecipeCategory;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.util.ResourceLocation;
-
-import javax.annotation.Nonnull;
+import org.jetbrains.annotations.NotNull;
 
 class InscriberRecipeCategory implements IRecipeCategory<InscriberRecipeWrapper> {
     static final String UID = "ae2.inscriber";
@@ -52,15 +52,15 @@ class InscriberRecipeCategory implements IRecipeCategory<InscriberRecipeWrapper>
     }
 
     @Override
-    public void drawExtras(@Nonnull Minecraft minecraft) {
+    public void drawExtras(@NotNull Minecraft minecraft) {
         minecraft.getTextureManager().bindTexture(new ResourceLocation(AppEng.MOD_ID, "textures/guis/inscriber.png"));
-        net.minecraft.client.gui.Gui.drawModalRectWithCustomSizedTexture(PADDING, PADDING, 36, 20, WIDTH, HEIGHT, 256, 256);
+        Gui.drawModalRectWithCustomSizedTexture(PADDING, PADDING, 36, 20, WIDTH, HEIGHT, 256, 256);
         this.progress.draw(minecraft, PADDING + 100, PADDING + 19);
     }
 
     @Override
-    public void setRecipe(IRecipeLayout recipeLayout, @Nonnull InscriberRecipeWrapper recipeWrapper,
-                          @Nonnull IIngredients ingredients) {
+    public void setRecipe(IRecipeLayout recipeLayout, @NotNull InscriberRecipeWrapper recipeWrapper,
+                          @NotNull IIngredients ingredients) {
         IGuiItemStackGroup itemStacks = recipeLayout.getItemStacks();
         itemStacks.init(0, true, PADDING + 2, PADDING + 2);
         itemStacks.init(1, true, PADDING + 26, PADDING + 18);

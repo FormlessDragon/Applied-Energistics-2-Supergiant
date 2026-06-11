@@ -15,7 +15,9 @@ public final class PatternImportPriorityOrder {
     }
 
     public static List<String> getOrderedIds() {
-        List<String> configuredIds = List.of(AEConfig.instance().getPatternImportPriorityOrder());
+        List<String> configuredIds = new ObjectArrayList<>();
+        Collections.addAll(configuredIds, AEConfig.instance().getPatternImportPriorityOrder());
+
         List<String> repairedIds = repairIds(configuredIds);
         if (!repairedIds.equals(configuredIds)) {
             AEConfig.instance().setPatternImportPriorityOrder(repairedIds);
@@ -39,7 +41,7 @@ public final class PatternImportPriorityOrder {
         if (!currentOrder.remove(priorityId)) {
             return;
         }
-        currentOrder.add(0, priorityId);
+        currentOrder.addFirst(priorityId);
         AEConfig.instance().setPatternImportPriorityOrder(currentOrder);
     }
 
@@ -52,9 +54,11 @@ public final class PatternImportPriorityOrder {
         Set<String> knownIds = new ObjectLinkedOpenHashSet<>(registeredIds);
         Set<String> seenIds = new ObjectLinkedOpenHashSet<>();
         List<String> repaired = new ObjectArrayList<>();
-        for (String configuredId : configuredIds) {
-            if (knownIds.contains(configuredId) && seenIds.add(configuredId)) {
-                repaired.add(configuredId);
+        if (configuredIds != null) {
+            for (String configuredId : configuredIds) {
+                if (configuredId != null && knownIds.contains(configuredId) && seenIds.add(configuredId)) {
+                    repaired.add(configuredId);
+                }
             }
         }
         for (String registeredId : registeredIds) {

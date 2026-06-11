@@ -28,7 +28,7 @@ import net.minecraftforge.client.model.IModel;
 import net.minecraftforge.client.model.ModelLoaderRegistry;
 import net.minecraftforge.common.model.IModelState;
 import net.minecraftforge.common.model.TRSRTransformation;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -50,8 +50,8 @@ public class FacadeItemModel implements IModel {
     }
 
     @Override
-    public IBakedModel bake(@NonNull IModelState state, @NonNull VertexFormat format,
-                            @NonNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
+    public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
+                            @NotNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         IBakedModel bakedBaseModel = getBaseModel(state, format, bakedTextureGetter);
         FacadeBuilder facadeBuilder = new FacadeBuilder(null);
         return new FacadeDispatcherBakedModel(bakedBaseModel, facadeBuilder);

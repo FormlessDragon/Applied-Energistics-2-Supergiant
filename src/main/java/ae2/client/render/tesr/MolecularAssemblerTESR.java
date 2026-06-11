@@ -39,9 +39,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.model.ModelLoaderRegistry;
 import net.minecraftforge.common.model.TRSRTransformation;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
-
-import javax.annotation.Nullable;
 
 public class MolecularAssemblerTESR extends TileEntitySpecialRenderer<TileMolecularAssembler> {
     private static final ResourceLocation LIGHTS_MODEL = AppEng.makeId("block/molecular_assembler_lights");

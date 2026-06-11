@@ -27,9 +27,9 @@ import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.ICapabilityProvider;
 import net.minecraftforge.energy.CapabilityEnergy;
 import net.minecraftforge.energy.IEnergyStorage;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 class PoweredItemCapabilities implements ICapabilityProvider, IEnergyStorage {
 
@@ -42,13 +42,13 @@ class PoweredItemCapabilities implements ICapabilityProvider, IEnergyStorage {
     }
 
     @Override
-    public boolean hasCapability(@NonNull Capability<?> capability, @Nullable EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, @Nullable EnumFacing facing) {
         return capability == CapabilityEnergy.ENERGY;
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T getCapability(@NonNull Capability<T> capability, @Nullable EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == CapabilityEnergy.ENERGY) {
             return (T) this;
         }
@@ -57,6 +57,9 @@ class PoweredItemCapabilities implements ICapabilityProvider, IEnergyStorage {
 
     @Override
     public int receiveEnergy(int maxReceive, boolean simulate) {
+        if (maxReceive <= 0) {
+            return 0;
+        }
         final double convertedOffer = PowerUnit.FE.convertTo(PowerUnit.AE, maxReceive);
         final double overflow = this.item.injectAEPower(this.is, convertedOffer,
             simulate ? Actionable.SIMULATE : Actionable.MODULATE);

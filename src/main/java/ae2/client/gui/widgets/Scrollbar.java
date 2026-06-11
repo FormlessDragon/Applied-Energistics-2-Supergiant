@@ -182,7 +182,7 @@ public class Scrollbar implements IScrollSource, ICompositeWidget {
 
     public void setCurrentScroll(int currentScroll) {
         this.currentScroll = currentScroll;
-        applyRange();
+        this.applyRange();
     }
 
     @Override
@@ -257,10 +257,6 @@ public class Scrollbar implements IScrollSource, ICompositeWidget {
 
     @Override
     public boolean wantsAllMouseWheelEvents() {
-        return captureMouseWheel;
-    }
-
-    public boolean isCaptureMouseWheel() {
         return captureMouseWheel;
     }
 
@@ -371,14 +367,6 @@ public class Scrollbar implements IScrollSource, ICompositeWidget {
                 handleHeight,
                 textureWidth,
                 textureHeight);
-        }
-
-        public ResourceLocation enabledSprite() {
-            return enabledSprite;
-        }
-
-        public ResourceLocation disabledSprite() {
-            return disabledSprite;
         }
 
         public int handleWidth() {

@@ -62,10 +62,8 @@ public class BasicCellHandler implements ICellHandler {
             if (workbenchItem instanceof IBasicCellItem basicCellItem) {
                 IBasicCellItem.CellRestriction restriction = basicCellItem.getCellRestrictionOrNull(stack);
                 if (restriction != null) {
-                    lines.add(Tooltips.of(GuiText.CellRestrictionAmount.text(
-                        Tooltips.ofUnformattedNumber(restriction.amount()))).getFormattedText());
-                    lines.add(Tooltips.of(GuiText.CellRestrictionTypes.text(
-                        Tooltips.ofUnformattedNumber(restriction.types()))).getFormattedText());
+                    lines.add(GuiText.CellRestrictionAmount.getLocal(restriction.amount()));
+                    lines.add(GuiText.CellRestrictionTypes.getLocal(restriction.types()));
                 }
             }
             addPartitionInformation(stack, workbenchItem, lines);
@@ -115,11 +113,10 @@ public class BasicCellHandler implements ICellHandler {
         var includeMode = upgrades.isInstalled(AEItems.INVERTER_CARD.item()) ? GuiText.Excluded : GuiText.Included;
         var precisionMode = upgrades.isInstalled(AEItems.FUZZY_CARD.item()) ? GuiText.Fuzzy : GuiText.Precise;
 
-        lines.add(GuiText.Partitioned.text()
-                                     .appendText(" - ")
-                                     .appendSibling(includeMode.text())
-                                     .appendText(" ")
-                                     .appendSibling(precisionMode.text())
-                                     .getFormattedText());
+        lines.add(GuiText.Partitioned.getLocal() +
+            " - " +
+            includeMode.getLocal() +
+            " " +
+            precisionMode.getLocal());
     }
 }

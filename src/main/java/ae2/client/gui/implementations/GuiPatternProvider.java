@@ -21,7 +21,10 @@ import ae2.container.SlotSemantics;
 import ae2.container.implementations.ContainerPatternProvider;
 import ae2.container.slot.AppEngSlot;
 import ae2.core.localization.GuiText;
+import ae2.core.network.InitNetwork;
+import ae2.core.network.serverbound.ConfigValueServerPacket;
 import ae2.helpers.patternprovider.PatternProviderCapacity;
+import ae2.util.EnumCycler;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
@@ -122,9 +125,10 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
     }
 
     private void selectPatternProviderMode(boolean ignored) {
-        ae2.core.network.InitNetwork.CHANNEL.sendToServer(new ae2.core.network.bidirectional.ConfigValuePacket(
+        InitNetwork.sendToServer(new ConfigValueServerPacket(
+            this.container.windowId,
             Settings.PATTERN_ACCESS_TERMINAL,
-            ae2.util.EnumCycler.rotateEnum(
+            EnumCycler.rotateEnum(
                 this.container.getShowInAccessTerminal(),
                 isHandlingRightClick(),
                 Settings.PATTERN_ACCESS_TERMINAL.getValues())));

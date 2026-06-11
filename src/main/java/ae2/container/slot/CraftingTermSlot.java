@@ -47,6 +47,7 @@ import net.minecraft.init.Items;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.crafting.CraftingManager;
 import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.util.NonNullList;
 import net.minecraft.util.math.BlockPos;
@@ -639,7 +640,7 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
             }
         }
 
-        return net.minecraft.item.crafting.CraftingManager.findMatchingRecipe(recipeInput, world);
+        return CraftingManager.findMatchingRecipe(recipeInput, world);
     }
 
     private enum CraftSource {

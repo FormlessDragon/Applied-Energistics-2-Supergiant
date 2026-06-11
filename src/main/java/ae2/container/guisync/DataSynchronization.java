@@ -18,14 +18,13 @@
 
 package ae2.container.guisync;
 
-import ae2.core.AELog;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.shorts.Short2ObjectMap;
 import it.unimi.dsi.fastutil.shorts.Short2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.ShortOpenHashSet;
 import it.unimi.dsi.fastutil.shorts.ShortSet;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.lang.reflect.Field;
 
 public class DataSynchronization {
@@ -100,8 +99,7 @@ public class DataSynchronization {
         for (short key = data.readShort(); key != -1; key = data.readShort()) {
             SynchronizedField<?> field = this.fields.get(key);
             if (field == null) {
-                AELog.warn("Server sent update for GUI field %d, which we don't know.", key);
-                continue;
+                throw new IllegalArgumentException("Server sent unknown GUI field " + key);
             }
 
             field.read(data);

@@ -28,15 +28,21 @@ public final class PatternImportPriorityContextImpl implements PatternImportPrio
     private PatternImportPriorityContextImpl(ContainerPatternEncodingTerm container, List<GenericStack> bookmarkedStacks) {
         this.container = Objects.requireNonNull(container, "container");
         this.clientRepo = container.getClientRepo();
-        this.bookmarkedStacks = Collections.unmodifiableList(new ObjectArrayList<>(bookmarkedStacks));
         this.bookmarkedKeys = new ObjectOpenHashSet<>();
-        for (GenericStack bookmarkedStack : bookmarkedStacks) {
-            this.bookmarkedKeys.add(bookmarkedStack.what());
+        List<GenericStack> sanitizedBookmarkedStacks = new ObjectArrayList<>();
+        if (bookmarkedStacks != null) {
+            for (GenericStack bookmarkedStack : bookmarkedStacks) {
+                if (bookmarkedStack != null) {
+                    sanitizedBookmarkedStacks.add(bookmarkedStack);
+                    this.bookmarkedKeys.add(bookmarkedStack.what());
+                }
+            }
         }
+        this.bookmarkedStacks = Collections.unmodifiableList(sanitizedBookmarkedStacks);
         this.repoEntries = new Object2ObjectOpenHashMap<>();
         if (this.clientRepo != null) {
             for (GridInventoryEntry entry : this.clientRepo.getAllEntries()) {
-                if (entry.what() == null) {
+                if (entry == null || entry.what() == null) {
                     continue;
                 }
                 this.repoEntries.merge(entry.what(), entry, PatternImportPriorityContextImpl::mergeEntries);
@@ -78,11 +84,17 @@ public final class PatternImportPriorityContextImpl implements PatternImportPrio
     @Override
     @Nullable
     public GridInventoryEntry getClientRepoEntry(GenericStack candidate) {
+        if (candidate == null) {
+            return null;
+        }
         return this.repoEntries.get(candidate.what());
     }
 
     @Override
     public boolean isBookmarked(GenericStack candidate) {
+        if (candidate == null) {
+            return false;
+        }
         return this.bookmarkedKeys.contains(candidate.what());
     }
 

@@ -4,11 +4,20 @@ import ae2.recipes.AERecipeTypes;
 import ae2.recipes.IAERecipeFactory;
 import ae2.recipes.serializers.JsonRecipeUtils;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import net.minecraft.item.crafting.Ingredient;
 import net.minecraft.util.JsonUtils;
 import net.minecraftforge.common.crafting.JsonContext;
 
 public class InscriberRecipeSerializer implements IAERecipeFactory {
+    private static InscriberProcessType readMode(String mode) {
+        return switch (mode) {
+            case "inscribe" -> InscriberProcessType.INSCRIBE;
+            case "press" -> InscriberProcessType.PRESS;
+            default -> throw new JsonSyntaxException("Unknown inscriber mode: " + mode);
+        };
+    }
+
     @Override
     public void register(JsonObject json, JsonContext ctx) {
         JsonObject ingredients = JsonUtils.getJsonObject(json, "ingredients");
@@ -23,6 +32,6 @@ public class InscriberRecipeSerializer implements IAERecipeFactory {
             JsonRecipeUtils.readItemStack(json, "result", ctx),
             top,
             bottom,
-            "press".equals(mode) ? InscriberProcessType.PRESS : InscriberProcessType.INSCRIBE));
+            readMode(mode)));
     }
 }

@@ -11,8 +11,10 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTTagString;
 import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.common.util.Constants;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 /**
@@ -24,7 +26,7 @@ public class KeyTypeSelection {
     private final Object2BooleanLinkedOpenHashMap<AEKeyType> keyTypes = new Object2BooleanLinkedOpenHashMap<>();
 
     public KeyTypeSelection(Runnable listener, Predicate<AEKeyType> allowKeyType) {
-        this(selection -> listener.run(), allowKeyType);
+        this(ignored -> listener.run(), allowKeyType);
     }
 
     public KeyTypeSelection(Listener listener, Predicate<AEKeyType> allowKeyType) {
@@ -37,6 +39,8 @@ public class KeyTypeSelection {
     }
 
     public static KeyTypeSelection forStack(ItemStack stack, Predicate<AEKeyType> allowKeyType) {
+        Objects.requireNonNull(stack, "stack");
+        Objects.requireNonNull(allowKeyType, "allowKeyType");
         var out = new KeyTypeSelection(selection -> {
             var tag = stack.getTagCompound();
             if (tag == null) {
@@ -114,11 +118,11 @@ public class KeyTypeSelection {
         for (Object2BooleanMap.Entry<AEKeyType> entry : keyTypes.object2BooleanEntrySet()) {
             entry.setValue(false);
         }
-        NBTTagList enabledKeyTypesTag = tag.hasKey(ENABLED_KEY_TYPES_TAG, 9)
-            ? tag.getTagList(ENABLED_KEY_TYPES_TAG, 8)
+        NBTTagList enabledKeyTypesTag = tag.hasKey(ENABLED_KEY_TYPES_TAG, Constants.NBT.TAG_LIST)
+            ? tag.getTagList(ENABLED_KEY_TYPES_TAG, Constants.NBT.TAG_STRING)
             : new NBTTagList();
         if (enabledKeyTypesTag.tagCount() == 0 && tag.hasKey("enabledKeyTypes", 9)) {
-            enabledKeyTypesTag = tag.getTagList("enabledKeyTypes", 8);
+            enabledKeyTypesTag = tag.getTagList("enabledKeyTypes", Constants.NBT.TAG_STRING);
         }
         for (int i = 0; i < enabledKeyTypesTag.tagCount(); i++) {
             try {

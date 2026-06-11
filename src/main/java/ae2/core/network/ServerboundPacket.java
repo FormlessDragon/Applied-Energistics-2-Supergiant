@@ -5,10 +5,15 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 
 public abstract class ServerboundPacket implements IMessage {
+    private boolean invalid;
 
     @Override
     public final void fromBytes(ByteBuf buf) {
-        this.read(buf);
+        try {
+            this.read(buf);
+        } catch (RuntimeException e) {
+            invalidateMalformed(buf, e);
+        }
     }
 
     @Override
@@ -20,6 +25,18 @@ public abstract class ServerboundPacket implements IMessage {
     }
 
     protected void write(ByteBuf buf) {
+    }
+
+    protected final void invalidateMalformed(ByteBuf buf, RuntimeException exception) {
+        this.invalid = true;
+        buf.skipBytes(buf.readableBytes());
+        String packetName = getClass().getSimpleName();
+        NetworkPacketHelper.warnMalformedPacket(exception, packetName,
+            "Ignoring malformed serverbound packet %s", packetName);
+    }
+
+    public final boolean isInvalid() {
+        return this.invalid;
     }
 
     public void handleServer(EntityPlayerMP player) {

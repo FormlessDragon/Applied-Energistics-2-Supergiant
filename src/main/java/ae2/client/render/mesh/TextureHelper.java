@@ -18,6 +18,8 @@ package ae2.client.render.mesh;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.util.EnumFacing;
 
+import java.util.EnumMap;
+
 /**
  * Handles most texture-baking use cases for model loaders and model libraries via
  * {@link #bakeSprite(MutableQuadView, TextureAtlasSprite, int)}. Also used by the API itself to implement automatic
@@ -29,15 +31,15 @@ public class TextureHelper {
         (q, i) -> q.uv(i, q.v(i), 1 - q.u(i)),
         (q, i) -> q.uv(i, 1 - q.u(i), 1 - q.v(i)),
         (q, i) -> q.uv(i, 1 - q.v(i), q.u(i))};
-    private static final VertexModifier[] UVLOCKERS = new VertexModifier[6];
+    private static final EnumMap<EnumFacing, VertexModifier> UVLOCKERS = new EnumMap<>(EnumFacing.class);
 
     static {
-        UVLOCKERS[EnumFacing.EAST.getIndex()] = (q, i) -> q.uv(i, 1 - q.z(i), 1 - q.y(i));
-        UVLOCKERS[EnumFacing.WEST.getIndex()] = (q, i) -> q.uv(i, q.z(i), 1 - q.y(i));
-        UVLOCKERS[EnumFacing.NORTH.getIndex()] = (q, i) -> q.uv(i, 1 - q.x(i), 1 - q.y(i));
-        UVLOCKERS[EnumFacing.SOUTH.getIndex()] = (q, i) -> q.uv(i, q.x(i), 1 - q.y(i));
-        UVLOCKERS[EnumFacing.DOWN.getIndex()] = (q, i) -> q.uv(i, q.x(i), 1 - q.z(i));
-        UVLOCKERS[EnumFacing.UP.getIndex()] = (q, i) -> q.uv(i, q.x(i), q.z(i));
+        UVLOCKERS.put(EnumFacing.EAST, (q, i) -> q.uv(i, 1 - q.z(i), 1 - q.y(i)));
+        UVLOCKERS.put(EnumFacing.WEST, (q, i) -> q.uv(i, q.z(i), 1 - q.y(i)));
+        UVLOCKERS.put(EnumFacing.NORTH, (q, i) -> q.uv(i, 1 - q.x(i), 1 - q.y(i)));
+        UVLOCKERS.put(EnumFacing.SOUTH, (q, i) -> q.uv(i, q.x(i), 1 - q.y(i)));
+        UVLOCKERS.put(EnumFacing.DOWN, (q, i) -> q.uv(i, q.x(i), 1 - q.z(i)));
+        UVLOCKERS.put(EnumFacing.UP, (q, i) -> q.uv(i, q.x(i), q.z(i)));
     }
 
     private TextureHelper() {
@@ -49,7 +51,7 @@ public class TextureHelper {
      */
     public static void bakeSprite(MutableQuadView quad, TextureAtlasSprite sprite, int bakeFlags) {
         if (quad.nominalFace() != null && (MutableQuadView.BAKE_LOCK_UV & bakeFlags) != 0) {
-            applyModifier(quad, UVLOCKERS[quad.nominalFace().getIndex()]);
+            applyModifier(quad, UVLOCKERS.get(quad.nominalFace()));
         } else if ((MutableQuadView.BAKE_NORMALIZED & bakeFlags) == 0) {
             applyModifier(quad, (q, i) -> q.uv(i, q.u(i) * NORMALIZER, q.v(i) * NORMALIZER));
         }

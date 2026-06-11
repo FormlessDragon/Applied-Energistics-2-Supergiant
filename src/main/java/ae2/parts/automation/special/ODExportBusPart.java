@@ -2,6 +2,7 @@ package ae2.parts.automation.special;
 
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
+import ae2.container.GuiIds;
 import ae2.core.AppEng;
 import ae2.items.parts.PartModels;
 import ae2.parts.PartModel;
@@ -67,8 +68,8 @@ public class ODExportBusPart extends SpecialExportBusPart implements ODFilterHos
     }
 
     @Override
-    protected ae2.container.GuiIds.GuiKey getGuiKey() {
-        return ae2.container.GuiIds.GuiKey.OD_EXPORT_BUS;
+    protected GuiIds.GuiKey getGuiKey() {
+        return GuiIds.GuiKey.OD_EXPORT_BUS;
     }
 
     @Override

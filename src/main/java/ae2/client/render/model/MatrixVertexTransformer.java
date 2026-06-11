@@ -23,8 +23,9 @@ import net.minecraft.client.renderer.vertex.VertexFormatElement;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.client.model.pipeline.QuadGatheringTransformer;
 
-import javax.annotation.Nonnull;
+import org.jetbrains.annotations.NotNull;
 import javax.vecmath.Matrix4f;
+import javax.vecmath.Vector3f;
 import javax.vecmath.Vector4f;
 
 final class MatrixVertexTransformer extends QuadGatheringTransformer {
@@ -59,7 +60,7 @@ final class MatrixVertexTransformer extends QuadGatheringTransformer {
     }
 
     @Override
-    public void setQuadOrientation(@Nonnull EnumFacing orientation) {
+    public void setQuadOrientation(@NotNull EnumFacing orientation) {
         this.parent.setQuadOrientation(orientation);
     }
 
@@ -69,14 +70,14 @@ final class MatrixVertexTransformer extends QuadGatheringTransformer {
     }
 
     @Override
-    public void setTexture(@Nonnull TextureAtlasSprite texture) {
+    public void setTexture(@NotNull TextureAtlasSprite texture) {
         this.parent.setTexture(texture);
     }
 
     private float[] transform(float[] fs, int elemCount) {
         switch (fs.length) {
             case 3 -> {
-                javax.vecmath.Vector3f vec = new javax.vecmath.Vector3f(fs[0], fs[1], fs[2]);
+                Vector3f vec = new Vector3f(fs[0], fs[1], fs[2]);
                 vec.x -= 0.5f;
                 vec.y -= 0.5f;
                 vec.z -= 0.5f;

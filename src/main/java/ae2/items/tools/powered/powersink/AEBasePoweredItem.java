@@ -57,8 +57,8 @@ public abstract class AEBasePoweredItem extends AEBaseItem implements IAEItemPow
     protected void addCheckedInformation(final ItemStack stack, final World world, final List<String> lines,
                                          final ITooltipFlag advancedTooltips) {
         super.addCheckedInformation(stack, world, lines, advancedTooltips);
-        lines.add(ItemModText.StoredEnergy.text(
-            (int) this.getAECurrentPower(stack) + " / " + (int) this.getAEMaxPower(stack) + " AE").getFormattedText());
+        lines.add(ItemModText.StoredEnergy.getLocal(
+            (long) this.getAECurrentPower(stack) + " / " + (long) this.getAEMaxPower(stack) + " AE"));
     }
 
     @Override

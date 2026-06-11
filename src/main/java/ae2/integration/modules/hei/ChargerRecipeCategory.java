@@ -76,6 +76,6 @@ class ChargerRecipeCategory implements IRecipeCategory<ChargerRecipeWrapper> {
         itemStacks.setBackground(1, this.slotDrawable);
         itemStacks.setBackground(2, this.slotDrawable);
         itemStacks.set(ingredients);
-        itemStacks.set(2, ae2.core.definitions.AEBlocks.CRANK.stack());
+        itemStacks.set(2, AEBlocks.CRANK.stack());
     }
 }

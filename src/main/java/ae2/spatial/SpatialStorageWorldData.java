@@ -25,7 +25,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.storage.WorldSavedData;
-import net.minecraftforge.common.util.Constants;
+import net.minecraftforge.common.util.Constants.NBT;
 
 import java.util.List;
 
@@ -38,10 +38,6 @@ public class SpatialStorageWorldData extends WorldSavedData {
     private static final String TAG_PLOTS = "plots";
 
     private final Int2ObjectOpenHashMap<SpatialStoragePlot> plots = new Int2ObjectOpenHashMap<>();
-
-    public SpatialStorageWorldData() {
-        this(ID);
-    }
 
     public SpatialStorageWorldData(String name) {
         super(name);
@@ -77,8 +73,8 @@ public class SpatialStorageWorldData extends WorldSavedData {
         SpatialStoragePlot plot = plots.get(plotId);
         if (plot != null) {
             plot.setLastTransition(info);
+            markDirty();
         }
-        markDirty();
     }
 
     void copyFrom(SpatialStorageWorldData other) {
@@ -94,9 +90,13 @@ public class SpatialStorageWorldData extends WorldSavedData {
             throw new IllegalStateException("Invalid AE2 spatial info version: " + version);
         }
 
-        NBTTagList plotTags = nbt.getTagList(TAG_PLOTS, Constants.NBT.TAG_COMPOUND);
+        NBTTagList plotTags = nbt.getTagList(TAG_PLOTS, NBT.TAG_COMPOUND);
         for (int i = 0; i < plotTags.tagCount(); i++) {
             SpatialStoragePlot plot = SpatialStoragePlot.fromTag(plotTags.getCompoundTagAt(i));
+            if (plot == null) {
+                AELog.warn("Skipping invalid spatial storage plot entry %s", i);
+                continue;
+            }
             if (this.plots.containsKey(plot.getId())) {
                 AELog.warn("Overwriting duplicate plot id %s", plot.getId());
             }

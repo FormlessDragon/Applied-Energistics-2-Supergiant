@@ -32,9 +32,14 @@ public class CraftingTreeDataPacket extends ClientboundPacket {
 
     @Override
     protected void read(final ByteBuf buf) {
-        CraftingTreeStackRegistry stackSet = new CraftingTreeStackRegistry();
-        stackSet.read(buf);
-        this.root = LiteCraftTreeNode.fromBuffer(buf, stackSet, null);
+        try {
+            CraftingTreeStackRegistry.DecodeLimits limits = new CraftingTreeStackRegistry.DecodeLimits();
+            CraftingTreeStackRegistry stackSet = new CraftingTreeStackRegistry();
+            stackSet.read(buf, limits);
+            this.root = LiteCraftTreeNode.fromBuffer(buf, stackSet, null, limits, 0);
+        } catch (RuntimeException e) {
+            this.root = null;
+        }
     }
 
     @Override

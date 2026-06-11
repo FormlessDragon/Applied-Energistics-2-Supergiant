@@ -1,6 +1,7 @@
 package ae2.tile.crafting;
 
 import ae2.api.implementations.IPowerChannelState;
+import ae2.api.util.ICustomName;
 import ae2.block.crafting.ICraftingUnitType;
 import ae2.me.cluster.IAEMultiBlock;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
@@ -15,7 +16,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.EnumSet;
 
 public interface ICraftingCPUTileEntity
-    extends IAEMultiBlock<CraftingCPUCluster>, IPowerChannelState, IGridConnectedTile {
+    extends IAEMultiBlock<CraftingCPUCluster>, IPowerChannelState, IGridConnectedTile, ICustomName {
 
     ICraftingUnitType getCraftingUnitType();
 
@@ -52,12 +53,13 @@ public interface ICraftingCPUTileEntity
 
     void cancelJobAndDropContents();
 
-    void setName(String name);
+    void setName(@Nullable String name);
 
-    boolean hasCustomName();
-
-    @Nullable
-    String getCustomName();
+    @Override
+    default void setCustomNameFromRenamer(@Nullable String customName) {
+        setName(customName);
+        onCustomNameChanged();
+    }
 
     World getWorld();
 

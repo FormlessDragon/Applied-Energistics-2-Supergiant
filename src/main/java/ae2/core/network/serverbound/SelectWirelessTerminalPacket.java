@@ -13,6 +13,8 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraftforge.fml.common.network.ByteBufUtils;
 
 public class SelectWirelessTerminalPacket extends ServerboundPacket {
+    private static final int MAX_TERMINAL_ID_LENGTH = 64;
+
     private String terminalId;
     private int windowId;
 
@@ -28,7 +30,11 @@ public class SelectWirelessTerminalPacket extends ServerboundPacket {
     protected void read(ByteBuf buf) {
         PacketBuffer packetBuffer = new PacketBuffer(buf);
         this.windowId = packetBuffer.readVarInt();
-        this.terminalId = ByteBufUtils.readUTF8String(packetBuffer);
+        this.terminalId = packetBuffer.readString(MAX_TERMINAL_ID_LENGTH);
+        if (packetBuffer.isReadable()) {
+            throw new IllegalArgumentException("Trailing wireless terminal selection packet payload bytes: "
+                + packetBuffer.readableBytes());
+        }
     }
 
     @Override

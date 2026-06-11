@@ -11,11 +11,13 @@ import net.minecraftforge.common.crafting.JsonContext;
 import java.util.List;
 
 public class QuartzCuttingRecipeFactory implements IRecipeFactory {
+    private static final Ingredient[] EMPTY_INGREDIENT_ARRAY = new Ingredient[0];
+
     @Override
     public IRecipe parse(JsonContext context, JsonObject json) {
         List<Ingredient> ingredients = JsonRecipeUtils.readIngredients(json, "ingredients", context);
         return new QuartzCuttingRecipe(
             JsonRecipeUtils.readItemStack(json, "result", context),
-            NonNullList.from(Ingredient.EMPTY, ingredients.toArray(new Ingredient[0])));
+            NonNullList.from(Ingredient.EMPTY, ingredients.toArray(EMPTY_INGREDIENT_ARRAY)));
     }
 }

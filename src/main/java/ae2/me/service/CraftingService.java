@@ -20,6 +20,7 @@ package ae2.me.service;
 
 import ae2.api.config.Actionable;
 import ae2.api.crafting.IPatternDetails;
+import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.networking.GridHelper;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
@@ -59,7 +60,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
@@ -143,76 +143,21 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         }
     }
 
-    @Override
-    public void onServerEndTick() {
-        if (this.updateList) {
-            this.updateList = false;
-            this.updateCPUClusters();
-            this.lastProcessedCraftingLogicChangeTick = -1;
+    private static <T> Set<T> copySet(Set<T> source) {
+        return source.isEmpty() ? Set.of() : new ObjectOpenHashSet<>(source);
+    }
+
+    private static int compareCandidateCpu(CraftingCPUCluster first, CraftingCPUCluster second, boolean prioritizePower,
+                                           IActionSource src) {
+        var firstPreferred = first.isPreferredFor(src);
+        var secondPreferred = second.isPreferredFor(src);
+        if (firstPreferred != secondPreferred) {
+            return Boolean.compare(secondPreferred, firstPreferred);
         }
 
-        this.craftingLinks.values().removeIf(nexus -> nexus.isDead(this.grid, this));
-
-        long latestChange = 0;
-        for (var cpu : this.craftingCPUClusters) {
-            cpu.craftingLogic.tickCraftingLogic(this.energyGrid, this);
-            latestChange = Math.max(latestChange, cpu.craftingLogic.getLastModifiedOnTick());
-        }
-
-        if (latestChange != this.lastProcessedCraftingLogicChangeTick) {
-            this.lastProcessedCraftingLogicChangeTick = latestChange;
-
-            Set<AEKey> previouslyCrafting = this.currentlyCrafting.isEmpty()
-                ? Set.of()
-                : new ObjectOpenHashSet<>(this.currentlyCrafting);
-            this.currentlyCrafting.clear();
-
-            for (var cpu : this.craftingCPUClusters) {
-                cpu.craftingLogic.getAllWaitingFor(this.currentlyCrafting);
-            }
-
-            if (!this.interests.isEmpty() && !(previouslyCrafting.isEmpty() && this.currentlyCrafting.isEmpty())) {
-                var changed = new ObjectOpenHashSet<AEKey>();
-                addSetDifference(changed, previouslyCrafting, this.currentlyCrafting);
-                addSetDifference(changed, this.currentlyCrafting, previouslyCrafting);
-                for (var what : changed) {
-                    for (var watcher : this.interestManager.get(what)) {
-                        watcher.getHost().onRequestChange(what);
-                    }
-                    for (var watcher : this.interestManager.getAllStacksWatchers()) {
-                        watcher.getHost().onRequestChange(what);
-                    }
-                }
-            }
-        }
-
-        if (this.lastProcessedCraftableChangeTick != this.craftingProviders.getLastModifiedOnTick()) {
-            this.lastProcessedCraftableChangeTick = this.craftingProviders.getLastModifiedOnTick();
-
-            if (!this.currentlyCraftable.isEmpty() || !this.craftingProviders.getCraftableKeys().isEmpty()
-                || !this.craftingProviders.getEmittableKeys().isEmpty()) {
-                Set<AEKey> previouslyCraftable = this.currentlyCraftable.isEmpty()
-                    ? Set.of()
-                    : new ObjectOpenHashSet<>(this.currentlyCraftable);
-                this.currentlyCraftable.clear();
-                this.currentlyCraftable.addAll(this.craftingProviders.getCraftableKeys());
-                this.currentlyCraftable.addAll(this.craftingProviders.getEmittableKeys());
-
-                if (!this.interests.isEmpty()) {
-                    var changedCraftable = new ObjectOpenHashSet<AEKey>();
-                    addSetDifference(changedCraftable, previouslyCraftable, this.currentlyCraftable);
-                    addSetDifference(changedCraftable, this.currentlyCraftable, previouslyCraftable);
-                    for (var what : changedCraftable) {
-                        for (var watcher : this.interestManager.get(what)) {
-                            watcher.getHost().onCraftableChange(what);
-                        }
-                        for (var watcher : this.interestManager.getAllStacksWatchers()) {
-                            watcher.getHost().onCraftableChange(what);
-                        }
-                    }
-                }
-            }
-        }
+        return prioritizePower
+            ? FAST_FIRST_COMPARATOR.compare(first, second)
+            : FAST_LAST_COMPARATOR.compare(first, second);
     }
 
     @Override
@@ -268,14 +213,8 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         }
     }
 
-    private void restoreRecursiveIngredientReserveAmount(NBTTagCompound savedData) {
-        if (this.recursiveIngredientReserveAmountRestored
-            || !savedData.hasKey(TAG_RECURSIVE_INGREDIENT_RESERVE_AMOUNT, Constants.NBT.TAG_LONG)) {
-            return;
-        }
-
-        this.recursiveIngredientReserveAmount = Math.max(0, savedData.getLong(TAG_RECURSIVE_INGREDIENT_RESERVE_AMOUNT));
-        this.recursiveIngredientReserveAmountRestored = true;
+    private static long clampRecursiveIngredientReserveAmount(long amount) {
+        return Math.clamp(amount, 0, PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT);
     }
 
     @Override
@@ -417,55 +356,89 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         return cpuCluster.submitJob(this.grid, job, src, requestingMachine);
     }
 
-    @Nullable
-    private CraftingCPUCluster findSuitableCraftingCPU(ICraftingPlan job, boolean prioritizePower, IActionSource src,
-                                                       AtomicReference<UnsuitableCpus> unsuitableCpus) {
-        var validCpuClusters = new ObjectArrayList<CraftingCPUCluster>(this.craftingCPUClusters.size());
-        int offline = 0;
-        int busy = 0;
-        int tooSmall = 0;
-        int excluded = 0;
+    @Override
+    public void onServerEndTick() {
+        if (this.updateList) {
+            this.updateList = false;
+            this.updateCPUClusters();
+            this.lastProcessedCraftingLogicChangeTick = -1;
+        }
 
+        this.craftingLinks.values().removeIf(nexus -> nexus.isDead(this.grid, this));
+
+        long latestChange = 0;
         for (var cpu : this.craftingCPUClusters) {
-            if (!cpu.isActive()) {
-                offline++;
-                continue;
-            }
-            if (cpu.isBusy()) {
-                busy++;
-                continue;
-            }
-            if (cpu.getAvailableStorage() < job.bytes()) {
-                tooSmall++;
-                continue;
-            }
-            if (!cpu.canBeAutoSelectedFor(src)) {
-                excluded++;
-                continue;
-            }
-            validCpuClusters.add(cpu);
+            cpu.craftingLogic.tickCraftingLogic(this.energyGrid, this);
+            latestChange = Math.max(latestChange, cpu.craftingLogic.getLastModifiedOnTick());
         }
 
-        if (validCpuClusters.isEmpty()) {
-            if (offline > 0 || busy > 0 || tooSmall > 0 || excluded > 0) {
-                unsuitableCpus.set(new UnsuitableCpus(offline, busy, tooSmall, excluded));
+        if (latestChange != this.lastProcessedCraftingLogicChangeTick) {
+            this.lastProcessedCraftingLogicChangeTick = latestChange;
+
+            boolean hasInterests = !this.interests.isEmpty();
+            Set<AEKey> previouslyCrafting = hasInterests
+                ? copySet(this.currentlyCrafting)
+                : Set.of();
+            this.currentlyCrafting.clear();
+
+            for (var cpu : this.craftingCPUClusters) {
+                cpu.craftingLogic.getAllWaitingFor(this.currentlyCrafting);
             }
-            return null;
+
+            if (hasInterests && !(previouslyCrafting.isEmpty() && this.currentlyCrafting.isEmpty())) {
+                var changed = new ObjectOpenHashSet<AEKey>();
+                addSetDifference(changed, previouslyCrafting, this.currentlyCrafting);
+                addSetDifference(changed, this.currentlyCrafting, previouslyCrafting);
+                for (var what : changed) {
+                    for (var watcher : this.interestManager.get(what)) {
+                        watcher.getHost().onRequestChange(what);
+                    }
+                    for (var watcher : this.interestManager.getAllStacksWatchers()) {
+                        watcher.getHost().onRequestChange(what);
+                    }
+                }
+            }
         }
 
-        validCpuClusters.sort((first, second) -> {
-            var firstPreferred = first.isPreferredFor(src);
-            var secondPreferred = second.isPreferredFor(src);
-            if (firstPreferred != secondPreferred) {
-                return Boolean.compare(secondPreferred, firstPreferred);
+        if (this.lastProcessedCraftableChangeTick != this.craftingProviders.getLastModifiedOnTick()) {
+            this.lastProcessedCraftableChangeTick = this.craftingProviders.getLastModifiedOnTick();
+
+            if (!this.currentlyCraftable.isEmpty() || !this.craftingProviders.getCraftableKeys().isEmpty()
+                || !this.craftingProviders.getEmittableKeys().isEmpty()) {
+                boolean hasInterests = !this.interests.isEmpty();
+                Set<AEKey> previouslyCraftable = hasInterests
+                    ? copySet(this.currentlyCraftable)
+                    : Set.of();
+                this.currentlyCraftable.clear();
+                this.currentlyCraftable.addAll(this.craftingProviders.getCraftableKeys());
+                this.currentlyCraftable.addAll(this.craftingProviders.getEmittableKeys());
+
+                if (hasInterests) {
+                    var changedCraftable = new ObjectOpenHashSet<AEKey>();
+                    addSetDifference(changedCraftable, previouslyCraftable, this.currentlyCraftable);
+                    addSetDifference(changedCraftable, this.currentlyCraftable, previouslyCraftable);
+                    for (var what : changedCraftable) {
+                        for (var watcher : this.interestManager.get(what)) {
+                            watcher.getHost().onCraftableChange(what);
+                        }
+                        for (var watcher : this.interestManager.getAllStacksWatchers()) {
+                            watcher.getHost().onCraftableChange(what);
+                        }
+                    }
+                }
             }
+        }
+    }
 
-            return prioritizePower
-                ? FAST_FIRST_COMPARATOR.compare(first, second)
-                : FAST_LAST_COMPARATOR.compare(first, second);
-        });
+    private void restoreRecursiveIngredientReserveAmount(NBTTagCompound savedData) {
+        if (this.recursiveIngredientReserveAmountRestored
+            || !savedData.hasKey(TAG_RECURSIVE_INGREDIENT_RESERVE_AMOUNT, Constants.NBT.TAG_LONG)) {
+            return;
+        }
 
-        return validCpuClusters.getFirst();
+        this.recursiveIngredientReserveAmount = clampRecursiveIngredientReserveAmount(
+            savedData.getLong(TAG_RECURSIVE_INGREDIENT_RESERVE_AMOUNT));
+        this.recursiveIngredientReserveAmountRestored = true;
     }
 
     @Override
@@ -510,9 +483,50 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         return this.recursiveIngredientReserveAmount;
     }
 
+    @Nullable
+    private CraftingCPUCluster findSuitableCraftingCPU(ICraftingPlan job, boolean prioritizePower, IActionSource src,
+                                                       AtomicReference<UnsuitableCpus> unsuitableCpus) {
+        CraftingCPUCluster bestCpu = null;
+        int offline = 0;
+        int busy = 0;
+        int tooSmall = 0;
+        int excluded = 0;
+
+        for (var cpu : this.craftingCPUClusters) {
+            if (!cpu.isActive()) {
+                offline++;
+                continue;
+            }
+            if (cpu.isBusy()) {
+                busy++;
+                continue;
+            }
+            if (cpu.getAvailableStorage() < job.bytes()) {
+                tooSmall++;
+                continue;
+            }
+            if (!cpu.canBeAutoSelectedFor(src)) {
+                excluded++;
+                continue;
+            }
+            if (bestCpu == null || compareCandidateCpu(cpu, bestCpu, prioritizePower, src) < 0) {
+                bestCpu = cpu;
+            }
+        }
+
+        if (bestCpu == null) {
+            if (offline > 0 || busy > 0 || tooSmall > 0 || excluded > 0) {
+                unsuitableCpus.set(new UnsuitableCpus(offline, busy, tooSmall, excluded));
+            }
+            return null;
+        }
+
+        return bestCpu;
+    }
+
     @Override
     public void setRecursiveIngredientReserveAmount(long amount) {
-        this.recursiveIngredientReserveAmount = Math.max(0, amount);
+        this.recursiveIngredientReserveAmount = clampRecursiveIngredientReserveAmount(amount);
     }
 
     public Iterable<ICraftingProvider> getProviders(IPatternDetails key) {

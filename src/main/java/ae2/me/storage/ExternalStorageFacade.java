@@ -19,17 +19,13 @@ import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.fluids.capability.IFluidTankProperties;
 import net.minecraftforge.items.IItemHandler;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.Set;
 
 /**
  * Adapts external platform storage to behave like an {@link MEStorage}.
  */
 public abstract class ExternalStorageFacade implements MEStorage {
-    /**
-     * Clamp reported values to avoid overflows when amounts get too close to Long.MAX_VALUE.
-     */
-    private static final long MAX_REPORTED_AMOUNT = 1L << 42;
     protected boolean extractableOnly;
     @Nullable
     private Runnable changeListener;
@@ -153,7 +149,7 @@ public abstract class ExternalStorageFacade implements MEStorage {
                 // We're going to silently eat the remainder
                 AELog.warn(
                     "Mod that provided item handler %s is broken. Returned %d items while only requesting %d.",
-                    handler.getClass().getName(), extracted, maxExtract);
+                    handler.getClass().getSimpleName(), extracted, maxExtract);
                 return maxExtract;
             } else {
                 return extracted;

@@ -1,5 +1,6 @@
 package ae2.me.tracker;
 
+import ae2.helpers.WirelessTerminalActions;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.entity.player.EntityPlayer;
@@ -33,6 +34,7 @@ public final class PlayerTracker {
     @SubscribeEvent
     public static void playerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         remove(event.player);
+        WirelessTerminalActions.clear(event.player.getUniqueID());
     }
 
     @SubscribeEvent

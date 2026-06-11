@@ -14,7 +14,12 @@ final class ItemIdSearchPredicate implements Predicate<AEKey> {
 
     @Override
     public boolean test(AEKey what) {
-        var id = what.getId().toString();
+        var keyId = what.getId();
+        if (keyId == null) {
+            return false;
+        }
+
+        var id = keyId.toString();
         return id.toLowerCase(Locale.ROOT).contains(term);
     }
 }

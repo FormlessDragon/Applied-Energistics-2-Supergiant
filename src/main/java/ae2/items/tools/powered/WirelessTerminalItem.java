@@ -41,6 +41,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
@@ -51,6 +52,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 @Optional.Interface(iface = "baubles.api.IBauble", modid = "baubles")
@@ -71,14 +73,14 @@ public class WirelessTerminalItem extends PoweredContainerItem implements IGuiIt
     }
 
     protected WirelessTerminalItem(double powerCapacity, String id, GuiIds.GuiKey guiKey,
-                                   java.util.function.Function<WirelessTerminalItem, ItemStack> iconFactory,
+                                   Function<WirelessTerminalItem, ItemStack> iconFactory,
                                    WirelessTerminalDefinition.HostFactory hostFactory,
                                    String hotkeyName, int upgradeSlots) {
         this(powerCapacity, id, guiKey, iconFactory, hostFactory, hotkeyName, upgradeSlots, true);
     }
 
     protected WirelessTerminalItem(double powerCapacity, String id, GuiIds.GuiKey guiKey,
-                                   java.util.function.Function<WirelessTerminalItem, ItemStack> iconFactory,
+                                   Function<WirelessTerminalItem, ItemStack> iconFactory,
                                    WirelessTerminalDefinition.HostFactory hostFactory,
                                    String hotkeyName, int upgradeSlots, boolean registerTerminal) {
         super(powerCapacity);
@@ -121,7 +123,7 @@ public class WirelessTerminalItem extends PoweredContainerItem implements IGuiIt
             }
         }
         if (this.definition == null) {
-            throw new IllegalStateException("Wireless terminal is not registered: " + getClass().getName());
+            throw new IllegalStateException("Wireless terminal is not registered: " + getClass().getSimpleName());
         }
         return this.definition;
     }
@@ -167,9 +169,9 @@ public class WirelessTerminalItem extends PoweredContainerItem implements IGuiIt
         super.addCheckedInformation(stack, world, lines, advancedTooltips);
 
         if (!isLinkedForTooltip(stack)) {
-            lines.add(Tooltips.of(GuiText.Unlinked, Tooltips.RED).getFormattedText());
+            lines.add(Tooltips.RED + GuiText.Unlinked.getLocal());
         } else {
-            lines.add(Tooltips.of(GuiText.Linked, Tooltips.GREEN).getFormattedText());
+            lines.add(Tooltips.GREEN + GuiText.Linked.getLocal());
         }
     }
 
@@ -316,7 +318,7 @@ public class WirelessTerminalItem extends PoweredContainerItem implements IGuiIt
         }
 
         @Override
-        public void link(ItemStack itemStack, World world, net.minecraft.util.math.BlockPos pos) {
+        public void link(ItemStack itemStack, World world, BlockPos pos) {
             NBTTagCompound link = new NBTTagCompound();
             link.setInteger(WirelessTerminals.TAG_LINK_DIM, world.provider.getDimension());
             link.setInteger(WirelessTerminals.TAG_LINK_X, pos.getX());

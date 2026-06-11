@@ -32,6 +32,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -47,6 +48,7 @@ public interface IConfigManager {
      * Get a builder for a configuration manager that stores its settings in an item stack.
      */
     static IConfigManagerBuilder builder(ItemStack stack) {
+        Objects.requireNonNull(stack, "stack");
         return builder(() -> stack);
     }
 
@@ -54,7 +56,8 @@ public interface IConfigManager {
      * Get a builder for a configuration manager that stores its settings in an item stack.
      */
     static IConfigManagerBuilder builder(Supplier<ItemStack> stack) {
-        var manager = new ConfigManager((mgr, settingName) -> {
+        Objects.requireNonNull(stack, "stack");
+        var manager = new ConfigManager((mgr, ignored) -> {
             NBTTagCompound settings = new NBTTagCompound();
             for (var entry : mgr.exportSettings().entrySet()) {
                 settings.setString(entry.getKey(), entry.getValue());
@@ -91,7 +94,7 @@ public interface IConfigManager {
     }
 
     static IConfigManagerBuilder builder(Runnable changeListener) {
-        return builder((manager, setting) -> changeListener.run());
+        return builder((ignoredManager, ignoredSetting) -> changeListener.run());
     }
 
     static IConfigManagerBuilder builder(IConfigManagerListener changeListener) {

@@ -25,6 +25,7 @@ import ae2.api.config.SortDir;
 import ae2.api.config.SortOrder;
 import ae2.api.config.ViewItems;
 import ae2.api.config.YesNo;
+import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.implementations.blockentities.IViewCellStorage;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGrid;
@@ -85,6 +86,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class ContainerMEStorage extends AEBaseContainer
@@ -183,7 +185,7 @@ public class ContainerMEStorage extends AEBaseContainer
         return ItemStack.areItemsEqual(left, right) && ItemStack.areItemStackTagsEqual(left, right);
     }
 
-    private static <T> void addSetDifference(java.util.function.Consumer<T> consumer, Set<T> left, Set<T> right) {
+    private static <T> void addSetDifference(Consumer<T> consumer, Set<T> left, Set<T> right) {
         for (var element : left) {
             if (!right.contains(element)) {
                 consumer.accept(element);
@@ -357,7 +359,7 @@ public class ContainerMEStorage extends AEBaseContainer
     }
 
     public void setRecursiveIngredientReserveAmount(long amount) {
-        long clampedAmount = Math.max(0, amount);
+        long clampedAmount = Math.clamp(amount, 0, PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT);
         this.recursiveIngredientReserveAmount = clampedAmount;
         if (isServerSide()) {
             this.lastSentRecursiveIngredientReserveAmount = clampedAmount;
@@ -550,7 +552,8 @@ public class ContainerMEStorage extends AEBaseContainer
                     }
                 }
             }
-            default -> AELog.warn("Received unhandled inventory action %s from client in %s", action, getClass());
+            default -> {
+            }
         }
     }
 

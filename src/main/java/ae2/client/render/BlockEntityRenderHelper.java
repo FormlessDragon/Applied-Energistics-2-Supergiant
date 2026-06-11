@@ -40,6 +40,9 @@ import java.nio.FloatBuffer;
  */
 @SideOnly(Side.CLIENT)
 public final class BlockEntityRenderHelper {
+    private static final ThreadLocal<FloatBuffer> GL_MATRIX_BUFFER = ThreadLocal.withInitial(
+        () -> BufferUtils.createFloatBuffer(16));
+
     private BlockEntityRenderHelper() {
     }
 
@@ -109,7 +112,8 @@ public final class BlockEntityRenderHelper {
     }
 
     private static FloatBuffer toGlMatrix(Matrix4f matrix) {
-        FloatBuffer buffer = BufferUtils.createFloatBuffer(16);
+        FloatBuffer buffer = GL_MATRIX_BUFFER.get();
+        buffer.clear();
         buffer.put(matrix.m00).put(matrix.m10).put(matrix.m20).put(matrix.m30);
         buffer.put(matrix.m01).put(matrix.m11).put(matrix.m21).put(matrix.m31);
         buffer.put(matrix.m02).put(matrix.m12).put(matrix.m22).put(matrix.m32);

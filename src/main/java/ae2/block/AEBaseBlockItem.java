@@ -27,6 +27,7 @@ import net.minecraft.util.NonNullList;
 import net.minecraft.world.World;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
@@ -41,13 +42,13 @@ public class AEBaseBlockItem extends ItemBlock {
 
     @Override
     @SideOnly(Side.CLIENT)
-    public final void addInformation(ItemStack itemStack, @org.jetbrains.annotations.Nullable World worldIn,
+    public final void addInformation(ItemStack itemStack, @Nullable World worldIn,
                                      List<String> toolTip, ITooltipFlag advancedTooltips) {
         this.addCheckedInformation(itemStack, worldIn, toolTip, advancedTooltips);
     }
 
     @SideOnly(Side.CLIENT)
-    public void addCheckedInformation(ItemStack itemStack, @org.jetbrains.annotations.Nullable World worldIn,
+    public void addCheckedInformation(ItemStack itemStack, @Nullable World worldIn,
                                       List<String> toolTip, ITooltipFlag advancedTooltips) {
     }
 

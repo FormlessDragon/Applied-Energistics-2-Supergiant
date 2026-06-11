@@ -33,6 +33,8 @@ import java.util.List;
 
 @SideOnly(Side.CLIENT)
 public class RenderBlockOutlineHook {
+    private static final ThreadLocal<ObjectArrayList<AxisAlignedBB>> BOX_BUFFER =
+        ThreadLocal.withInitial(ObjectArrayList::new);
 
     private static boolean replaceBlockOutline(World world, EntityPlayer player, RayTraceResult hitResult,
                                                float partialTicks) {
@@ -101,7 +103,8 @@ public class RenderBlockOutlineHook {
 
     private static void renderPart(BlockPos pos, IPart part, EnumFacing side, boolean preview, boolean insideBlock,
                                    float partialTicks) {
-        List<AxisAlignedBB> boxes = new ObjectArrayList<>();
+        var boxes = BOX_BUFFER.get();
+        boxes.clear();
         BusCollisionHelper helper = new BusCollisionHelper(boxes, side, true);
         part.getBoxes(helper);
         renderBoxes(pos, boxes, preview, insideBlock, partialTicks);
@@ -109,7 +112,8 @@ public class RenderBlockOutlineHook {
 
     private static void renderFacade(BlockPos pos, IFacadePart facade, EnumFacing side, boolean preview,
                                      boolean insideBlock, float partialTicks) {
-        List<AxisAlignedBB> boxes = new ObjectArrayList<>();
+        var boxes = BOX_BUFFER.get();
+        boxes.clear();
         BusCollisionHelper helper = new BusCollisionHelper(boxes, side, true);
         facade.getBoxes(helper, false);
         renderBoxes(pos, boxes, preview, insideBlock, partialTicks);

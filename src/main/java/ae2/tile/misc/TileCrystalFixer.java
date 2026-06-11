@@ -20,7 +20,9 @@ import ae2.tile.grid.AENetworkedPoweredTile;
 import ae2.util.inv.AppEngInternalInventory;
 import ae2.util.inv.InternalInventoryHost;
 import io.netty.buffer.ByteBuf;
+import net.minecraft.block.Block;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.PacketBuffer;
@@ -210,9 +212,9 @@ public class TileCrystalFixer extends AENetworkedPoweredTile implements IGridTic
         return this.pos.offset(this.getOrientation().getSide(RelativeSide.FRONT));
     }
 
-    private net.minecraft.block.Block getFacingBlock() {
+    private Block getFacingBlock() {
         if (this.world == null) {
-            return net.minecraft.init.Blocks.AIR;
+            return Blocks.AIR;
         }
         return this.world.getBlockState(getFacingPos()).getBlock();
     }

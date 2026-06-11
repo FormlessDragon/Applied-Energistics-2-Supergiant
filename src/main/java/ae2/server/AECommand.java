@@ -9,6 +9,7 @@ import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.command.WrongUsageException;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.Collections;
 import java.util.List;
@@ -84,7 +85,7 @@ public final class AECommand extends CommandBase {
 
     @Override
     public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args,
-                                          net.minecraft.util.math.BlockPos targetPos) {
+                                          BlockPos targetPos) {
         if (args.length == 1) {
             ObjectList<String> candidates = new ObjectArrayList<>();
             candidates.add("help");

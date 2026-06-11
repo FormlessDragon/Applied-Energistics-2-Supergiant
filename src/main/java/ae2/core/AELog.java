@@ -233,7 +233,7 @@ public final class AELog {
     public static void blockUpdate(BlockPos pos, IBlockState currentState,
                                    IBlockState newState, AEBaseTile blockEntity) {
         if (AEConfig.instance().isBlockUpdateLogEnabled()) {
-            info(BLOCK_UPDATE, blockEntity.getClass().getName(), pos, currentState, newState);
+            info(BLOCK_UPDATE, blockEntity.getClass().getSimpleName(), pos, currentState, newState);
         }
     }
 

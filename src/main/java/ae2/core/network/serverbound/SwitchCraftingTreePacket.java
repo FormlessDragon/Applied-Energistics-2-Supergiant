@@ -10,13 +10,35 @@ import ae2.core.network.ServerboundPacket;
 import ae2.core.network.clientbound.CraftingTreeDataPacket;
 import ae2.crafting.CraftingPlan;
 import ae2.crafting.CraftingTreeNode;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.network.PacketBuffer;
 
 import java.util.concurrent.FutureTask;
 
 public class SwitchCraftingTreePacket extends ServerboundPacket {
+    private int windowId;
 
     public SwitchCraftingTreePacket() {
+    }
+
+    public SwitchCraftingTreePacket(int windowId) {
+        this.windowId = windowId;
+    }
+
+    @Override
+    protected void read(ByteBuf buf) {
+        PacketBuffer packetBuffer = new PacketBuffer(buf);
+        this.windowId = packetBuffer.readVarInt();
+        if (packetBuffer.isReadable()) {
+            throw new IllegalArgumentException("Trailing crafting tree switch packet payload bytes: "
+                + packetBuffer.readableBytes());
+        }
+    }
+
+    @Override
+    protected void write(ByteBuf buf) {
+        new PacketBuffer(buf).writeVarInt(this.windowId);
     }
 
     private static void processTreeGUI(final ContainerCraftingTree craftingTree, final EntityPlayerMP player) {
@@ -67,8 +89,14 @@ public class SwitchCraftingTreePacket extends ServerboundPacket {
     @Override
     public void handleServer(EntityPlayerMP player) {
         if (player.openContainer instanceof ContainerCraftConfirm confirm) {
+            if (confirm.windowId != this.windowId) {
+                return;
+            }
             processConfirmGUI(confirm, player);
         } else if (player.openContainer instanceof ContainerCraftingTree craftingTree) {
+            if (craftingTree.windowId != this.windowId) {
+                return;
+            }
             processTreeGUI(craftingTree, player);
         }
     }

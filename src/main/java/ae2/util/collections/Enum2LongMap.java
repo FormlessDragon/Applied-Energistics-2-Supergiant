@@ -1,5 +1,6 @@
 package ae2.util.collections;
 
+import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.bytes.Byte2LongMap;
 import it.unimi.dsi.fastutil.bytes.Byte2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongCollection;
@@ -9,7 +10,7 @@ import it.unimi.dsi.fastutil.objects.AbstractReference2LongMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.Reference2LongMap;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
@@ -92,7 +93,7 @@ public class Enum2LongMap<E extends Enum<E>> extends AbstractReference2LongMap<E
     public ObjectSet<Reference2LongMap.Entry<E>> reference2LongEntrySet() {
         return new AbstractObjectSet<>() {
             @Override
-            public @NonNull ObjectIterator<Reference2LongMap.Entry<E>> iterator() {
+            public @NotNull ObjectIterator<Reference2LongMap.Entry<E>> iterator() {
                 ObjectIterator<Byte2LongMap.Entry> delegateIterator = delegate.byte2LongEntrySet().iterator();
                 return new AbstractObjectIterator<>() {
                     @Override
@@ -155,7 +156,7 @@ public class Enum2LongMap<E extends Enum<E>> extends AbstractReference2LongMap<E
     }
 
     @Override
-    public @NonNull LongCollection values() {
+    public @NotNull LongCollection values() {
         return this.delegate.values();
     }
 
@@ -203,7 +204,7 @@ public class Enum2LongMap<E extends Enum<E>> extends AbstractReference2LongMap<E
 
         @Override
         public int hashCode() {
-            return this.delegateEntry.getByteKey() ^ it.unimi.dsi.fastutil.HashCommon.long2int(getLongValue());
+            return getKey().hashCode() ^ HashCommon.long2int(getLongValue());
         }
 
         @Override
@@ -212,7 +213,7 @@ public class Enum2LongMap<E extends Enum<E>> extends AbstractReference2LongMap<E
                 return true;
             }
             if (obj instanceof Enum2LongMap<?>.EntryView other) {
-                return this.delegateEntry.getByteKey() == other.delegateEntry.getByteKey()
+                return getKey() == other.getKey()
                     && getLongValue() == other.getLongValue();
             }
             if (!(obj instanceof Map.Entry<?, ?> other) || !(other.getValue() instanceof Long otherValue)) {

@@ -10,7 +10,7 @@ import net.minecraftforge.client.model.ModelLoaderRegistry;
 import net.minecraftforge.common.model.IModelState;
 import net.minecraftforge.common.model.TRSRTransformation;
 
-import javax.annotation.Nonnull;
+import org.jetbrains.annotations.NotNull;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.function.Function;
@@ -29,8 +29,8 @@ public class EncodedPatternModel implements BasicUnbakedModel {
     }
 
     @Override
-    public IBakedModel bake(@Nonnull IModelState state, @Nonnull VertexFormat format,
-                            @Nonnull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
+    public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
+                            @NotNull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         try {
             IBakedModel base = ModelLoaderRegistry.getModel(this.baseModel).bake(state, format, bakedTextureGetter);
             return new EncodedPatternBakedModel(base);

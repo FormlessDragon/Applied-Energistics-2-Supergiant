@@ -71,8 +71,9 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.common.util.Constants;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.List;
@@ -150,7 +151,9 @@ public class TileInscriber extends AENetworkedPoweredTile
         this.processingTime = data.getInteger("processingTime");
         this.smash = data.getBoolean("smash");
         this.finalStep = data.getInteger("finalStep");
-        decodeOutputSides(data.hasKey("outputSides") ? data.getInteger("outputSides") : 0x3F);
+        decodeOutputSides(data.hasKey("outputSides", Constants.NBT.TAG_ANY_NUMERIC)
+            ? data.getInteger("outputSides")
+            : 0x3F);
         this.cachedTask = null;
         applyInputCapacity();
     }
@@ -252,7 +255,7 @@ public class TileInscriber extends AENetworkedPoweredTile
     protected boolean readFromStream(ByteBuf data) {
         boolean changed = super.readFromStream(data);
         var packetBuffer = new PacketBuffer(data);
-        int slotMask = packetBuffer.readByte();
+        int slotMask = packetBuffer.readUnsignedByte();
         boolean newSmash = (slotMask & 64) != 0;
         if (this.smash != newSmash) {
             this.smash = newSmash;
@@ -536,7 +539,8 @@ public class TileInscriber extends AENetworkedPoweredTile
 
     @Override
     public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
-        if (capability == AECapabilities.CRAFTING_MACHINE) {
+        if (capability == AECapabilities.CRAFTING_MACHINE
+            || capability == AECapabilities.PATTERN_PROVIDER_BATCH_TARGET) {
             return true;
         }
         if (capability == AECapabilities.CRANKABLE && getCrankable(facing) != null) {
@@ -548,7 +552,8 @@ public class TileInscriber extends AENetworkedPoweredTile
     @SuppressWarnings("unchecked")
     @Override
     public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
-        if (capability == AECapabilities.CRAFTING_MACHINE) {
+        if (capability == AECapabilities.CRAFTING_MACHINE
+            || capability == AECapabilities.PATTERN_PROVIDER_BATCH_TARGET) {
             return (T) this;
         }
         if (capability == AECapabilities.CRANKABLE) {

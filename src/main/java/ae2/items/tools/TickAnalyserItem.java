@@ -16,6 +16,7 @@ import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
 public class TickAnalyserItem extends AEBaseItem implements IGuiItem {
@@ -27,7 +28,7 @@ public class TickAnalyserItem extends AEBaseItem implements IGuiItem {
 
     public static TickAnalyserConfig getConfig(ItemStack stack) {
         NBTTagCompound tag = stack.getTagCompound();
-        return tag != null && tag.hasKey(CONFIG_TAG, 10)
+        return tag != null && tag.hasKey(CONFIG_TAG, Constants.NBT.TAG_COMPOUND)
             ? TickAnalyserConfig.fromTag(tag.getCompoundTag(CONFIG_TAG))
             : TickAnalyserConfig.DEFAULT;
     }

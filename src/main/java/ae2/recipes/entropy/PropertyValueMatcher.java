@@ -36,8 +36,10 @@ public abstract class PropertyValueMatcher {
 
         if (json.isJsonArray()) {
             List<String> values = new ObjectArrayList<>();
+            int index = 0;
             for (JsonElement element : json.getAsJsonArray()) {
-                values.add(element.getAsString());
+                values.add(JsonUtils.getString(element, "property value " + index));
+                index++;
             }
             return new MultiValue(values);
         }

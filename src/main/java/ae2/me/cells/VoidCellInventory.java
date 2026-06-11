@@ -33,10 +33,6 @@ public class VoidCellInventory implements StorageCell {
     private double voidEnergy;
     private boolean persisted = true;
 
-    public VoidCellInventory(ItemStack stack) {
-        this(stack, null);
-    }
-
     public VoidCellInventory(ItemStack stack, @Nullable ISaveProvider host) {
         this.stack = stack;
         this.host = host;
@@ -45,6 +41,9 @@ public class VoidCellInventory implements StorageCell {
             : CondenserOutput.TRASH;
         NBTTagCompound tag = stack.getTagCompound();
         this.voidEnergy = tag != null ? tag.getDouble(VoidCellItem.VOID_CELL_ENERGY) : 0;
+        if (!Double.isFinite(this.voidEnergy) || this.voidEnergy < 0) {
+            this.voidEnergy = 0;
+        }
     }
 
     @Override
@@ -54,6 +53,9 @@ public class VoidCellInventory implements StorageCell {
         }
         if (mode == Actionable.MODULATE) {
             this.voidEnergy += (double) amount / what.getAmountPerUnit();
+            if (!Double.isFinite(this.voidEnergy) || this.voidEnergy < 0) {
+                this.voidEnergy = getMaxVoidEnergy();
+            }
             fillOutput();
             saveChanges();
         }
@@ -62,7 +64,7 @@ public class VoidCellInventory implements StorageCell {
 
     @Override
     public long extract(AEKey what, long amount, Actionable mode, IActionSource source) {
-        if (amount <= 0) {
+        if (what == null || amount <= 0) {
             return 0;
         }
 
@@ -157,7 +159,7 @@ public class VoidCellInventory implements StorageCell {
             if (tag != null && tag.hasKey(STORED_STACKS, 9)) {
                 for (var genericStack : GenericStack.readList(tag.getTagList(STORED_STACKS, 10))) {
                     if (genericStack != null && genericStack.amount() > 0) {
-                        this.storedAmounts.addTo(genericStack.what(), genericStack.amount());
+                        addStoredAmount(this.storedAmounts, genericStack.what(), genericStack.amount());
                     }
                 }
             }
@@ -176,11 +178,45 @@ public class VoidCellInventory implements StorageCell {
             return;
         }
 
-        long amount = (long) (this.voidEnergy / this.mode.requiredPower);
+        long amount = this.voidEnergy >= getMaxVoidEnergy()
+            ? Long.MAX_VALUE
+            : (long) (this.voidEnergy / this.mode.requiredPower);
         if (amount > 0) {
-            getCellItems().addTo(output, amount);
-            this.voidEnergy -= amount * this.mode.requiredPower;
+            addStoredAmount(output, amount);
+            this.voidEnergy -= (double) amount * this.mode.requiredPower;
+            if (!Double.isFinite(this.voidEnergy) || this.voidEnergy < 0) {
+                this.voidEnergy = 0;
+            }
         }
+    }
+
+    private double getMaxVoidEnergy() {
+        return this.mode.requiredPower > 0 ? Long.MAX_VALUE * (double) this.mode.requiredPower : 0;
+    }
+
+    private void addStoredAmount(AEKey what, long amount) {
+        if (what == null || amount <= 0) {
+            return;
+        }
+        AEKey2LongMap cellItems = getCellItems();
+        addStoredAmount(cellItems, what, amount);
+    }
+
+    private void addStoredAmount(AEKey2LongMap cellItems, AEKey what, long amount) {
+        if (what == null || amount <= 0) {
+            return;
+        }
+        if (!isValidStoredOutput(what)) {
+            return;
+        }
+        long currentAmount = cellItems.getLong(what);
+        long newAmount = Long.MAX_VALUE - currentAmount < amount ? Long.MAX_VALUE : currentAmount + amount;
+        cellItems.put(what, newAmount);
+    }
+
+    private boolean isValidStoredOutput(AEKey what) {
+        return what.equals(AEItemKey.of(AEItems.MATTER_BALL.item()))
+            || what.equals(AEItemKey.of(AEItems.SINGULARITY.item()));
     }
 
     private void saveChanges() {
@@ -193,6 +229,9 @@ public class VoidCellInventory implements StorageCell {
     }
 
     private boolean matches(AEKey key) {
+        if (key == null) {
+            return false;
+        }
         if (!(stack.getItem() instanceof VoidCellItem voidCellItem)) {
             return false;
         }

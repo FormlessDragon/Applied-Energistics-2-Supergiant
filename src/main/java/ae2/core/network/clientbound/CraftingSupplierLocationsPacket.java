@@ -13,6 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CraftingSupplierLocationsPacket extends ClientboundPacket {
+    private static final int BYTES_PER_LOCATION = Integer.BYTES * 4;
+    private static final int MAX_LOCATIONS = 512;
+
     private List<CraftingSupplierLocation> locations = List.of();
 
     public CraftingSupplierLocationsPacket() {
@@ -26,6 +29,12 @@ public class CraftingSupplierLocationsPacket extends ClientboundPacket {
     protected void read(ByteBuf buf) {
         var data = new PacketBuffer(buf);
         int size = data.readVarInt();
+        if (size < 0 || size > MAX_LOCATIONS || size > data.readableBytes() / BYTES_PER_LOCATION) {
+            this.locations = List.of();
+            buf.skipBytes(buf.readableBytes());
+            return;
+        }
+
         var decoded = new ArrayList<CraftingSupplierLocation>(size);
         for (int i = 0; i < size; i++) {
             decoded.add(CraftingSupplierLocation.read(data));
@@ -36,9 +45,10 @@ public class CraftingSupplierLocationsPacket extends ClientboundPacket {
     @Override
     protected void write(ByteBuf buf) {
         var data = new PacketBuffer(buf);
-        data.writeVarInt(this.locations.size());
-        for (var location : this.locations) {
-            location.write(data);
+        int size = Math.min(this.locations.size(), MAX_LOCATIONS);
+        data.writeVarInt(size);
+        for (int i = 0; i < size; i++) {
+            this.locations.get(i).write(data);
         }
     }
 

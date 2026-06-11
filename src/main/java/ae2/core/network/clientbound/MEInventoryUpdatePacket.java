@@ -23,6 +23,9 @@ import java.util.function.Consumer;
 
 public class MEInventoryUpdatePacket extends ClientboundPacket {
     private static final int UNCOMPRESSED_PACKET_BYTE_LIMIT = 512 * 1024;
+    private static final int MAX_ENCODED_ENTRIES_LENGTH = 1024 * 1024;
+    private static final int MIN_ENCODED_ENTRY_BYTES = 5;
+    private static final int MAX_ENCODED_ENTRY_COUNT = Short.MAX_VALUE;
     private static final int INITIAL_BUFFER_CAPACITY = 2 * 1024;
 
     private boolean fullUpdate;
@@ -68,6 +71,9 @@ public class MEInventoryUpdatePacket extends ClientboundPacket {
         for (int i = 0; i < entryCount; i++) {
             entries.add(readEntry(data));
         }
+        if (data.isReadable()) {
+            throw new IllegalArgumentException("Trailing ME inventory update payload bytes: " + data.readableBytes());
+        }
         return entries;
     }
 
@@ -75,8 +81,19 @@ public class MEInventoryUpdatePacket extends ClientboundPacket {
     protected void read(ByteBuf buf) {
         PacketBuffer data = new PacketBuffer(buf);
         this.fullUpdate = data.readBoolean();
-        this.encodedEntryCount = data.readVarInt();
-        this.encodedEntries = new byte[data.readInt()];
+        int entryCount = data.readVarInt();
+        int payloadLength = data.readInt();
+        if (payloadLength < 0 || payloadLength > MAX_ENCODED_ENTRIES_LENGTH
+            || payloadLength > data.readableBytes()) {
+            throw new IllegalArgumentException("Invalid ME inventory update payload length: " + payloadLength);
+        }
+        if (entryCount < 0 || entryCount > MAX_ENCODED_ENTRY_COUNT
+            || entryCount > payloadLength / MIN_ENCODED_ENTRY_BYTES) {
+            throw new IllegalArgumentException("Invalid ME inventory update entry count: " + entryCount);
+        }
+
+        this.encodedEntryCount = entryCount;
+        this.encodedEntries = new byte[payloadLength];
         data.readBytes(this.encodedEntries);
         this.entries = decodeEntriesPayload(this.encodedEntryCount,
             new PacketBuffer(Unpooled.wrappedBuffer(this.encodedEntries)));

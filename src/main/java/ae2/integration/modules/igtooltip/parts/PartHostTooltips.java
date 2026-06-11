@@ -26,7 +26,7 @@ public final class PartHostTooltips {
                                     TooltipBuilder tooltip) {
         // Pick the part the cursor is on
         var selected = getPart(object, context.hitLocation());
-        if (selected.part != null) {
+        if (selected != null && selected.part != null) {
             // Then pick the data for that particular part
             var partTag = context.serverData().getCompoundTag(getPartDataName(selected.side));
 

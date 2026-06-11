@@ -23,6 +23,7 @@ import ae2.core.DebugCreativeTab;
 import ae2.helpers.Splotch;
 import ae2.tile.misc.TilePaint;
 import ae2.util.Platform;
+import net.minecraft.block.Block;
 import net.minecraft.block.material.MapColor;
 import net.minecraft.block.material.MaterialLiquid;
 import net.minecraft.block.properties.IProperty;
@@ -40,7 +41,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.property.ExtendedBlockState;
 import net.minecraftforge.common.property.IExtendedBlockState;
 import net.minecraftforge.common.property.IUnlistedProperty;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Random;
@@ -108,7 +109,7 @@ public class PaintSplotchesBlock extends AEBaseTileBlock<TilePaint> {
 
     @Override
     @SuppressWarnings("deprecation")
-    public void neighborChanged(IBlockState state, World worldIn, BlockPos pos, net.minecraft.block.Block blockIn,
+    public void neighborChanged(IBlockState state, World worldIn, BlockPos pos, Block blockIn,
                                 BlockPos fromPos) {
         TilePaint tile = this.getTileEntity(worldIn, pos);
         if (tile != null) {

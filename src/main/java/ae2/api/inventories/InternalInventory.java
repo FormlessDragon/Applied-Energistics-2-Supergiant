@@ -36,8 +36,8 @@ import net.minecraftforge.items.CapabilityItemHandler;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemHandlerHelper;
 import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 
 import java.util.Iterator;
 import java.util.function.Predicate;
@@ -114,7 +114,7 @@ public interface InternalInventory extends Iterable<ItemStack>, ItemTransfer {
     }
 
     @Override
-    default @NonNull Iterator<ItemStack> iterator() {
+    default @NotNull Iterator<ItemStack> iterator() {
         return new InternalInventoryIterator(this);
     }
 
@@ -369,6 +369,10 @@ public interface InternalInventory extends Iterable<ItemStack>, ItemTransfer {
     }
 
     default ItemStack extractItem(int slot, int amount, boolean simulate) {
+        if (amount <= 0) {
+            return ItemStack.EMPTY;
+        }
+
         var item = getStackInSlot(slot);
         if (item.isEmpty()) {
             return ItemStack.EMPTY;

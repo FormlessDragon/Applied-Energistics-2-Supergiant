@@ -32,6 +32,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
+import static ae2.api.stacks.GenericStack.AMOUNT_FIELD;
+
 /**
  * Wraps a {@link GenericStack} in an {@link ItemStack}. Even stacks that actually represent vanilla {@link Item items}
  * will be wrapped in this item, to allow items with amount 0 to be represented as itemstacks without becoming the empty
@@ -41,7 +43,6 @@ public class WrappedGenericStack extends AEBaseItem {
     private static final String WRAPPED_STACK = "wrapped_stack";
 
     public WrappedGenericStack() {
-        super();
         setMaxStackSize(1);
     }
 
@@ -60,13 +61,12 @@ public class WrappedGenericStack extends AEBaseItem {
 
     @Nullable
     public AEKey unwrapWhat(ItemStack stack) {
-        var wrapped = unwrap(stack);
-        return wrapped == null ? null : wrapped.what();
+        return AEKey.fromTagGeneric(getWrapped(stack));
     }
 
     public long unwrapAmount(ItemStack stack) {
-        var wrapped = unwrap(stack);
-        return wrapped == null ? 0 : wrapped.amount();
+        var wrapped = getWrapped(stack);
+        return wrapped == null ? 0 : Math.max(0, wrapped.getLong(AMOUNT_FIELD));
     }
 
     @Override
@@ -98,7 +98,7 @@ public class WrappedGenericStack extends AEBaseItem {
     }
 
     @Nullable
-    private GenericStack unwrap(ItemStack stack) {
+    private NBTTagCompound getWrapped(ItemStack stack) {
         if (stack.getItem() != this) {
             return null;
         }
@@ -108,7 +108,16 @@ public class WrappedGenericStack extends AEBaseItem {
             return null;
         }
 
-        NBTTagCompound wrapped = tag.getCompoundTag(WRAPPED_STACK);
-        return GenericStack.readTag(wrapped);
+        return tag.getCompoundTag(WRAPPED_STACK);
+    }
+
+    @Nullable
+    public GenericStack unwrap(ItemStack stack) {
+        NBTTagCompound wrapped = getWrapped(stack);
+        GenericStack result = wrapped == null ? null : GenericStack.readTag(wrapped);
+        if (result == null || result.amount() >= 0) {
+            return result;
+        }
+        return new GenericStack(result.what(), 0);
     }
 }

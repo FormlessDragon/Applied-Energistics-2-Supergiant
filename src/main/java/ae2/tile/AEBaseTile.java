@@ -26,9 +26,11 @@ import ae2.api.orientation.BlockOrientation;
 import ae2.api.orientation.IOrientableBlock;
 import ae2.api.orientation.IOrientationStrategy;
 import ae2.api.orientation.RelativeSide;
+import ae2.api.util.ICustomName;
 import ae2.block.AEBaseTileBlock;
 import ae2.core.AELog;
 import ae2.items.tools.MemoryCardItem;
+import ae2.util.CustomNameUtil;
 import ae2.util.Platform;
 import ae2.util.SettingsFrom;
 import io.netty.buffer.ByteBuf;
@@ -49,9 +51,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-public class AEBaseTile extends TileEntity implements ITickable {
+public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
 
-    private static final String CUSTOM_NAME_TAG = "customName";
     private static final String MEMORY_CARD_CUSTOM_NAME_TAG = "exported_custom_name";
     private static final String FORWARD_TAG = "forward";
     private static final String UP_TAG = "up";
@@ -108,8 +109,8 @@ public class AEBaseTile extends TileEntity implements ITickable {
             this.loadVisualState(data.getCompoundTag("visual"));
         }
 
-        if (data.hasKey(CUSTOM_NAME_TAG)) {
-            this.setCustomName(data.getString(CUSTOM_NAME_TAG));
+        if (data.hasKey(CustomNameUtil.CUSTOM_NAME_TAG, 8)) {
+            this.setCustomName(data.getString(CustomNameUtil.CUSTOM_NAME_TAG));
         } else {
             this.customName = null;
         }
@@ -128,7 +129,7 @@ public class AEBaseTile extends TileEntity implements ITickable {
         }
 
         if (this.customName != null) {
-            data.setString(CUSTOM_NAME_TAG, this.customName);
+            data.setString(CustomNameUtil.CUSTOM_NAME_TAG, this.customName);
         }
     }
 
@@ -185,21 +186,41 @@ public class AEBaseTile extends TileEntity implements ITickable {
     }
 
     protected void writeToStream(ByteBuf data) {
+        CustomNameUtil.writeNullableString(data, this.customName);
         if (this.canBeRotated()) {
             data.writeByte((this.getUp().ordinal() << 3) | this.getForward().ordinal());
         }
     }
 
+    private static EnumFacing readPackedFacing(int ordinal) {
+        if (ordinal > 0 && ordinal < EnumFacing.values().length) {
+            return EnumFacing.VALUES[ordinal];
+        }
+        return null;
+    }
+
     protected boolean readFromStream(ByteBuf data) {
+        String oldCustomName = this.customName;
+        this.customName = CustomNameUtil.readNullableString(data);
+        boolean changed = !java.util.Objects.equals(this.customName, oldCustomName);
+
         if (!this.canBeRotated()) {
-            return false;
+            return changed;
         }
 
+        if (data.readableBytes() < 1) {
+            return changed;
+        }
         byte orientation = data.readByte();
-        EnumFacing newForward = EnumFacing.VALUES[orientation & 0x7];
-        EnumFacing newUp = EnumFacing.VALUES[(orientation >> 3) & 0x7];
+        int forwardOrdinal = orientation & 0x7;
+        int upOrdinal = (orientation >> 3) & 0x7;
+        EnumFacing newForward = readPackedFacing(forwardOrdinal);
+        EnumFacing newUp = readPackedFacing(upOrdinal);
+        if (newForward == null || newUp == null) {
+            return changed;
+        }
         this.orientationResolved = true;
-        return this.setOrientationInternal(newForward, newUp);
+        return changed | this.setOrientationInternal(newForward, newUp);
     }
 
     private boolean readUpdateData(NBTTagCompound tag, String failureMessage) {
@@ -277,13 +298,19 @@ public class AEBaseTile extends TileEntity implements ITickable {
         this.customName = (name == null || name.isEmpty()) ? null : name;
     }
 
+    @Override
+    public void onCustomNameChanged() {
+        saveChanges();
+        markForUpdate();
+    }
+
     public boolean hasCustomName() {
         return this.customName != null;
     }
 
     public void importSettings(SettingsFrom mode, NBTTagCompound input, @Nullable EntityPlayer player) {
-        if (mode == SettingsFrom.DISMANTLE_ITEM && input.hasKey(CUSTOM_NAME_TAG, 8)) {
-            setCustomName(input.getString(CUSTOM_NAME_TAG));
+        if (mode == SettingsFrom.DISMANTLE_ITEM && input.hasKey(CustomNameUtil.CUSTOM_NAME_TAG, 8)) {
+            setCustomName(input.getString(CustomNameUtil.CUSTOM_NAME_TAG));
         } else if (mode == SettingsFrom.MEMORY_CARD && input.hasKey(MEMORY_CARD_CUSTOM_NAME_TAG, 8)) {
             setCustomName(input.getString(MEMORY_CARD_CUSTOM_NAME_TAG));
         }
@@ -294,7 +321,7 @@ public class AEBaseTile extends TileEntity implements ITickable {
     public void exportSettings(SettingsFrom mode, NBTTagCompound output) {
         if (mode == SettingsFrom.DISMANTLE_ITEM) {
             if (this.customName != null) {
-                output.setString(CUSTOM_NAME_TAG, this.customName);
+                output.setString(CustomNameUtil.CUSTOM_NAME_TAG, this.customName);
             }
         } else if (mode == SettingsFrom.MEMORY_CARD) {
             if (this.customName != null) {

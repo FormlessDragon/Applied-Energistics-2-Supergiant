@@ -18,7 +18,6 @@ import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.networking.ticking.TickRateModulation;
 import ae2.api.networking.ticking.TickingRequest;
 import ae2.api.stacks.AEKey;
-import ae2.api.stacks.AEKeyType;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.MEStorage;
 import ae2.api.storage.StorageHelper;
@@ -47,7 +46,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -98,7 +97,6 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
 
         this.getConfig().useRegisteredCapacities();
         this.getStorage().useRegisteredCapacities();
-        this.applyInterfaceSlotCapacities();
     }
 
     public static boolean isForceStartCraftingEnabled(Iterable<ItemStack> upgrades) {
@@ -112,15 +110,6 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
 
     public int getPageCount() {
         return Math.max(1, (this.config.size() + SLOTS_PER_PAGE - 1) / SLOTS_PER_PAGE);
-    }
-
-    private void applyInterfaceSlotCapacities() {
-        long itemCapacity = AEConfig.instance().getInterfaceItemSlotCapacity();
-        long fluidCapacity = AEConfig.instance().getInterfaceFluidSlotCapacity();
-        this.getConfig().setCapacity(AEKeyType.items(), itemCapacity);
-        this.getConfig().setCapacity(AEKeyType.fluids(), fluidCapacity);
-        this.getStorage().setCapacity(AEKeyType.items(), itemCapacity);
-        this.getStorage().setCapacity(AEKeyType.fluids(), fluidCapacity);
     }
 
     private boolean isAllowedInStorageSlot(int slot, AEKey what) {
@@ -242,14 +231,14 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
         for (int x = 0; x < plannedWork.length; x++) {
             var work = plannedWork[x];
             if (work != null) {
-                didSomething = this.usePlan(x, work.what(), (int) work.amount()) || didSomething;
+                didSomething = this.usePlan(x, work.what(), work.amount()) || didSomething;
             }
         }
 
         return didSomething;
     }
 
-    private boolean usePlan(int slot, AEKey what, int amount) {
+    private boolean usePlan(int slot, AEKey what, long amount) {
         boolean changed = tryUsePlan(slot, what, amount);
         if (changed) {
             this.updatePlan(slot);
@@ -332,7 +321,7 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
         return request.equals(stored);
     }
 
-    private boolean tryUsePlan(int slot, AEKey what, int amount) {
+    private boolean tryUsePlan(int slot, AEKey what, long amount) {
         IGrid grid = mainNode.getGrid();
         if (grid == null) {
             return false;
@@ -349,7 +338,7 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
                 return true;
             }
 
-            int inserted = (int) StorageHelper.poweredInsert(energySrc, networkInv, what, amount,
+            long inserted = StorageHelper.poweredInsert(energySrc, networkInv, what, amount,
                 this.interfaceRequestSource);
             if (inserted > 0) {
                 storage.extract(slot, what, inserted, Actionable.MODULATE);

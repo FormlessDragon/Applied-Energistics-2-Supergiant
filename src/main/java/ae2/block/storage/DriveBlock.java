@@ -101,7 +101,7 @@ public class DriveBlock extends AEBaseTileBlock<TileDrive> {
     }
 
     @Override
-    public boolean onBlockActivated(World world, BlockPos pos, net.minecraft.block.state.IBlockState state,
+    public boolean onBlockActivated(World world, BlockPos pos, IBlockState state,
                                     EntityPlayer player, EnumHand hand, EnumFacing facing, float hitX, float hitY, float hitZ) {
         if (super.onBlockActivated(world, pos, state, player, hand, facing, hitX, hitY, hitZ)) {
             return true;

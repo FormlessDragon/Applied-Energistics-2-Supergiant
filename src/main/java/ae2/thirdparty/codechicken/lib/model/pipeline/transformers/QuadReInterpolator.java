@@ -22,6 +22,7 @@ import ae2.client.render.mesh.MutableQuadView;
 import ae2.client.render.mesh.QuadView;
 import ae2.client.render.mesh.RenderContext;
 import ae2.thirdparty.codechicken.lib.math.InterpHelper;
+import net.minecraft.util.EnumFacing;
 
 public class QuadReInterpolator implements RenderContext.QuadTransform {
 
@@ -54,7 +55,12 @@ public class QuadReInterpolator implements RenderContext.QuadTransform {
     }
 
     public void setInputQuad(QuadView quad) {
-        int s = quad.nominalFace().ordinal() >> 1;
+        EnumFacing face = quad.nominalFace();
+        if (face == null) {
+            return;
+        }
+
+        int s = face.ordinal() >> 1;
         int xIdx = dx(s);
         int yIdx = dy(s);
         interpHelper.reset(
@@ -72,7 +78,12 @@ public class QuadReInterpolator implements RenderContext.QuadTransform {
 
     @Override
     public boolean transform(MutableQuadView quad) {
-        int s = quad.nominalFace().ordinal() >> 1;
+        EnumFacing face = quad.nominalFace();
+        if (face == null) {
+            return true;
+        }
+
+        int s = face.ordinal() >> 1;
         int xIdx = dx(s);
         int yIdx = dy(s);
 
@@ -83,7 +94,7 @@ public class QuadReInterpolator implements RenderContext.QuadTransform {
             this.interpHelper.locate(x, y);
             interpColorFrom(quad, i);
             interpUVFrom(quad, i);
-            interpLightMapFrom(quad, i);
+            //interpLightMapFrom(quad, i);
         }
         return true;
     }

@@ -1,5 +1,6 @@
 package ae2.worldgen;
 
+import ae2.util.MeteoriteCompassSearch;
 import ae2.worldgen.meteorite.MeteoriteStructure;
 import ae2.worldgen.meteorite.MeteoritesWorldData;
 import net.minecraft.util.math.ChunkPos;
@@ -11,8 +12,8 @@ import net.minecraftforge.fml.common.IWorldGenerator;
 import java.util.Random;
 
 public final class MeteoriteWorldGen implements IWorldGenerator {
-    private static final int SPACING = 24;
-    private static final int SEPARATION = 8;
+    private static final int GENERATION_SPACING = MeteoriteCompassSearch.REGION_SIZE_CHUNKS;
+    private static final int GENERATION_SEPARATION = 8;
     private static final int COMPLETION_RADIUS = 4;
     private static final long SALT = 124895654L;
     private static final long LARGE_FEATURE_X_MULTIPLIER = 341873128712L;
@@ -49,12 +50,12 @@ public final class MeteoriteWorldGen implements IWorldGenerator {
     }
 
     private static ChunkPos getRegionCandidate(long worldSeed, int chunkX, int chunkZ) {
-        int regionX = Math.floorDiv(chunkX, SPACING);
-        int regionZ = Math.floorDiv(chunkZ, SPACING);
+        int regionX = Math.floorDiv(chunkX, GENERATION_SPACING);
+        int regionZ = Math.floorDiv(chunkZ, GENERATION_SPACING);
         Random random = createPlacementRandom(worldSeed, regionX, regionZ);
-        int spread = SPACING - SEPARATION;
-        int candidateX = regionX * SPACING + random.nextInt(spread);
-        int candidateZ = regionZ * SPACING + random.nextInt(spread);
+        int spread = GENERATION_SPACING - GENERATION_SEPARATION;
+        int candidateX = regionX * GENERATION_SPACING + random.nextInt(spread);
+        int candidateZ = regionZ * GENERATION_SPACING + random.nextInt(spread);
         return new ChunkPos(candidateX, candidateZ);
     }
 

@@ -29,6 +29,7 @@ import ae2.util.ConfigInventory;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.shorts.ShortSet;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.InventoryCrafting;
@@ -64,10 +65,19 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     private static final String ACTION_PROCESSING_DIVIDE_5 = "processingDivide5";
     private static final String ACTION_RENAME_PROCESSING_PATTERN_ITEM = "renameProcessingPatternItem";
     private static final String ACTION_SET_HEI_PROCESSING_RECIPE = "setHeiProcessingRecipe";
+    private static final int MAX_RENAME_PROCESSING_PATTERN_ITEM_PAYLOAD_LENGTH = 512;
+    private static final int MAX_SET_HEI_PROCESSING_RECIPE_PAYLOAD_LENGTH = 16384;
+    private static final int MAX_CUSTOM_NAME_LENGTH = 32;
+    private static final int MAX_HEI_PROCESSING_RECIPE_TYPE_UID_LENGTH = 256;
+    private static final int MAX_HEI_PROCESSING_RECIPE_INPUT_SLOTS = AEProcessingPattern.MAX_INPUT_SLOTS;
+    private static final int MAX_HEI_PROCESSING_RECIPE_CANDIDATES_PER_SLOT = 256;
+    private static final int MAX_HEI_PROCESSING_RECIPE_TOTAL_CANDIDATES =
+        MAX_HEI_PROCESSING_RECIPE_INPUT_SLOTS * MAX_HEI_PROCESSING_RECIPE_CANDIDATES_PER_SLOT;
+    private static final int MAX_HEI_PROCESSING_RECIPE_KEY_TAG_LENGTH = 4096;
 
     private static final Container DUMMY_CONTAINER = new Container() {
         @Override
-        public boolean canInteractWith(net.minecraft.entity.player.EntityPlayer playerIn) {
+        public boolean canInteractWith(EntityPlayer playerIn) {
             return false;
         }
     };
@@ -160,8 +170,10 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         registerClientAction(ACTION_PROCESSING_DIVIDE_5,
             () -> modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation.DIVIDE_5));
         registerClientAction(ACTION_RENAME_PROCESSING_PATTERN_ITEM, RenamePatternItemRequest.class,
+            MAX_RENAME_PROCESSING_PATTERN_ITEM_PAYLOAD_LENGTH,
             this::renameProcessingPatternItem);
         registerClientAction(ACTION_SET_HEI_PROCESSING_RECIPE, HeiProcessingRecipeRequest.class,
+            MAX_SET_HEI_PROCESSING_RECIPE_PAYLOAD_LENGTH,
             this::setHeiProcessingRecipe);
         this.patternModifierPanel = new PatternModifierPanel(this);
         this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
@@ -543,12 +555,45 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         return null;
     }
 
-    @Override
-    public void onContainerClosed(net.minecraft.entity.player.EntityPlayer player) {
-        if (isServerSide() && this.clearOnClose) {
-            clear();
+    @Nullable
+    private static HeiProcessingRecipeSnapshot parseHeiProcessingRecipeSnapshot(@Nullable HeiProcessingRecipeRequest request) {
+        if (request == null || request.recipeTypeUid == null || request.recipeTypeUid.isEmpty()
+            || request.inputCandidateKeyTags == null || request.inputCandidateKeyTags.isEmpty()) {
+            return null;
         }
-        super.onContainerClosed(player);
+        if (request.recipeTypeUid.length() > MAX_HEI_PROCESSING_RECIPE_TYPE_UID_LENGTH
+            || request.inputCandidateKeyTags.size() > MAX_HEI_PROCESSING_RECIPE_INPUT_SLOTS) {
+            return null;
+        }
+
+        List<List<AEKey>> candidatesBySlot = new ArrayList<>(request.inputCandidateKeyTags.size());
+        int totalCandidates = 0;
+        for (List<String> candidateTags : request.inputCandidateKeyTags) {
+            if (candidateTags == null || candidateTags.isEmpty()) {
+                return null;
+            }
+            if (candidateTags.size() > MAX_HEI_PROCESSING_RECIPE_CANDIDATES_PER_SLOT) {
+                return null;
+            }
+            totalCandidates += candidateTags.size();
+            if (totalCandidates > MAX_HEI_PROCESSING_RECIPE_TOTAL_CANDIDATES) {
+                return null;
+            }
+
+            List<AEKey> candidates = new ArrayList<>(candidateTags.size());
+            for (String candidateTag : candidateTags) {
+                AEKey key = parseKey(candidateTag);
+                if (key != null && !candidates.contains(key)) {
+                    candidates.add(key);
+                }
+            }
+            if (candidates.isEmpty()) {
+                return null;
+            }
+            candidatesBySlot.add(candidates);
+        }
+
+        return new HeiProcessingRecipeSnapshot(request.recipeTypeUid, candidatesBySlot);
     }
 
     public void clear() {
@@ -726,45 +771,25 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     }
 
     @Nullable
-    private static HeiProcessingRecipeSnapshot parseHeiProcessingRecipeSnapshot(@Nullable HeiProcessingRecipeRequest request) {
-        if (request == null || request.recipeTypeUid == null || request.recipeTypeUid.isEmpty()
-            || request.inputCandidateKeyTags == null || request.inputCandidateKeyTags.isEmpty()) {
-            return null;
-        }
-
-        List<List<AEKey>> candidatesBySlot = new ArrayList<>(request.inputCandidateKeyTags.size());
-        for (List<String> candidateTags : request.inputCandidateKeyTags) {
-            if (candidateTags == null || candidateTags.isEmpty()) {
-                return null;
-            }
-
-            List<AEKey> candidates = new ArrayList<>(candidateTags.size());
-            for (String candidateTag : candidateTags) {
-                AEKey key = parseKey(candidateTag);
-                if (key != null && !candidates.contains(key)) {
-                    candidates.add(key);
-                }
-            }
-            if (candidates.isEmpty()) {
-                return null;
-            }
-            candidatesBySlot.add(candidates);
-        }
-
-        return new HeiProcessingRecipeSnapshot(request.recipeTypeUid, candidatesBySlot);
-    }
-
-    @Nullable
     private static AEKey parseKey(@Nullable String serializedKey) {
-        if (serializedKey == null || serializedKey.isEmpty()) {
+        if (serializedKey == null || serializedKey.isEmpty()
+            || serializedKey.length() > MAX_HEI_PROCESSING_RECIPE_KEY_TAG_LENGTH) {
             return null;
         }
 
         try {
             return AEKey.fromTagGeneric(JsonToNBT.getTagFromJson(serializedKey));
-        } catch (NBTException ignored) {
+        } catch (NBTException | RuntimeException ignored) {
             return null;
         }
+    }
+
+    @Override
+    public void onContainerClosed(EntityPlayer player) {
+        if (isServerSide() && this.clearOnClose) {
+            clear();
+        }
+        super.onContainerClosed(player);
     }
 
     public void renameProcessingPatternItem(int slotNumber, String name) {
@@ -774,7 +799,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     }
 
     private void renameProcessingPatternItem(RenamePatternItemRequest request) {
-        if (isClientSide()) {
+        if (isClientSide() || request == null) {
             return;
         }
 
@@ -792,6 +817,9 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         }
 
         ItemStack renamed = itemKey.toStack((int) Math.min(stack.amount(), Integer.MAX_VALUE));
+        if (request.name != null && request.name.length() > MAX_CUSTOM_NAME_LENGTH) {
+            return;
+        }
         if (request.name == null || request.name.isEmpty()) {
             renamed.clearCustomName();
         } else {
@@ -951,6 +979,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         return null;
     }
 
+    @SuppressWarnings("ClassCanBeRecord")
     private static final class RenamePatternItemRequest {
         private final int slotNumber;
         private final String name;
@@ -961,6 +990,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         }
     }
 
+    @SuppressWarnings("ClassCanBeRecord")
     private static final class HeiProcessingRecipeRequest {
         private final String recipeTypeUid;
         private final List<List<String>> inputCandidateKeyTags;

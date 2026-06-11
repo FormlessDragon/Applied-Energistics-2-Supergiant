@@ -24,6 +24,9 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
+import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.common.util.Constants;
+import net.minecraftforge.energy.CapabilityEnergy;
 import net.minecraftforge.energy.IEnergyStorage;
 
 public class TileEnergyGenerator extends AEBaseTile implements ServerTickingTile, IEnergyStorage {
@@ -51,9 +54,8 @@ public class TileEnergyGenerator extends AEBaseTile implements ServerTickingTile
 
         for (EnumFacing facing : EnumFacing.VALUES) {
             TileEntity te = level.getTileEntity(this.pos.offset(facing));
-            if (te != null && te.hasCapability(net.minecraftforge.energy.CapabilityEnergy.ENERGY, facing.getOpposite())) {
-                IEnergyStorage consumer = te.getCapability(net.minecraftforge.energy.CapabilityEnergy.ENERGY,
-                    facing.getOpposite());
+            if (te != null && te.hasCapability(CapabilityEnergy.ENERGY, facing.getOpposite())) {
+                IEnergyStorage consumer = te.getCapability(CapabilityEnergy.ENERGY, facing.getOpposite());
                 if (consumer != null && consumer.canReceive()) {
                     consumer.receiveEnergy(energyToInsert, false);
                 }
@@ -74,7 +76,7 @@ public class TileEnergyGenerator extends AEBaseTile implements ServerTickingTile
     @Override
     public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
-        if (data.hasKey("generationRate")) {
+        if (data.hasKey("generationRate", Constants.NBT.TAG_ANY_NUMERIC)) {
             this.generationRate = data.getInteger("generationRate");
         }
     }
@@ -88,6 +90,9 @@ public class TileEnergyGenerator extends AEBaseTile implements ServerTickingTile
     @Override
     protected boolean readFromStream(ByteBuf data) {
         super.readFromStream(data);
+        if (data.readableBytes() < Integer.BYTES) {
+            return false;
+        }
         this.generationRate = data.readInt();
         return true;
     }
@@ -129,9 +134,8 @@ public class TileEnergyGenerator extends AEBaseTile implements ServerTickingTile
     }
 
     @Override
-    public boolean hasCapability(net.minecraftforge.common.capabilities.Capability<?> capability,
-                                 EnumFacing facing) {
-        if (capability == net.minecraftforge.energy.CapabilityEnergy.ENERGY) {
+    public boolean hasCapability(Capability<?> capability, EnumFacing facing) {
+        if (capability == CapabilityEnergy.ENERGY) {
             return true;
         }
         return super.hasCapability(capability, facing);
@@ -139,8 +143,8 @@ public class TileEnergyGenerator extends AEBaseTile implements ServerTickingTile
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T getCapability(net.minecraftforge.common.capabilities.Capability<T> capability, EnumFacing facing) {
-        if (capability == net.minecraftforge.energy.CapabilityEnergy.ENERGY) {
+    public <T> T getCapability(Capability<T> capability, EnumFacing facing) {
+        if (capability == CapabilityEnergy.ENERGY) {
             return (T) this;
         }
         return super.getCapability(capability, facing);

@@ -11,8 +11,8 @@ import net.minecraft.util.JsonUtils;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 
 import java.util.Iterator;
 import java.util.List;
@@ -143,7 +143,7 @@ public class TextComponentItemStack implements ICustomTextComponent {
     }
 
     @Override
-    public @NonNull Iterator<ITextComponent> iterator() {
+    public @NotNull Iterator<ITextComponent> iterator() {
         return resolve().iterator();
     }
 

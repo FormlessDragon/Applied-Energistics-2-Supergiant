@@ -20,7 +20,12 @@ public class MouseWheelPacket extends ServerboundPacket {
 
     @Override
     protected void read(ByteBuf buf) {
-        this.wheelUp = new PacketBuffer(buf).readBoolean();
+        PacketBuffer packetBuffer = new PacketBuffer(buf);
+        this.wheelUp = packetBuffer.readBoolean();
+        if (packetBuffer.isReadable()) {
+            throw new IllegalArgumentException("Trailing mouse wheel packet payload bytes: "
+                + packetBuffer.readableBytes());
+        }
     }
 
     @Override

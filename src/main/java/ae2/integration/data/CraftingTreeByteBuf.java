@@ -43,6 +43,14 @@ final class CraftingTreeByteBuf {
         };
     }
 
+    static long readNonNegativeVarLong(ByteBuf buf, String fieldName) {
+        long value = readVarLong(buf);
+        if (value < 0) {
+            throw new IllegalArgumentException(fieldName + " cannot be negative: " + value);
+        }
+        return value;
+    }
+
     private static void writeUnsignedByte(ByteBuf buf, short value) {
         if (value < 0 || value > 0xFF) {
             throw new IllegalArgumentException("Value out of range for unsigned byte: " + value);
