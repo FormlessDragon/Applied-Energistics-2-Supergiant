@@ -20,11 +20,11 @@ if (propertyBool('publish_to_maven')) {
     assertProperty('maven_license_url')
     assertProperty('maven_scm_url')
     assertProperty('signingInMemoryKey')
-    assertProperty('signingInMemoryKeyPassword')
 
     def publishMainJarTask = propertyBool('enable_shadow') ? 'remapShadowJar' : 'remapJar'
     def scmUrl = propertyString('maven_scm_url')
     def scmConnectionUrl = scmUrl.endsWith('.git') ? scmUrl : "${scmUrl}.git"
+    def signingInMemoryKeyPassword = project.findProperty('signingInMemoryKeyPassword')?.toString() ?: ''
 
     publishing {
         repositories {
@@ -72,7 +72,7 @@ if (propertyBool('publish_to_maven')) {
     signing {
         useInMemoryPgpKeys(
                 propertyString('signingInMemoryKey'),
-                propertyString('signingInMemoryKeyPassword')
+                signingInMemoryKeyPassword
         )
         sign publishing.publications.mavenJava
     }

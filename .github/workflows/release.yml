@@ -39,7 +39,6 @@ jobs:
           : "${CENTRAL_USERNAME:?Missing secret CENTRAL_USERNAME}"
           : "${CENTRAL_PASSWORD:?Missing secret CENTRAL_PASSWORD}"
           : "${GPG_SIGNING_KEY:?Missing secret GPG_SIGNING_KEY}"
-          : "${GPG_SIGNING_PASSWORD:?Missing secret GPG_SIGNING_PASSWORD}"
           : "${CENTRAL_NAMESPACE:?Missing repository variable CENTRAL_NAMESPACE}"
           MAVEN_GROUP="${MAVEN_GROUP:-$CENTRAL_NAMESPACE}"
 
@@ -52,16 +51,15 @@ jobs:
             -Pmod_version="${RELEASE_VERSION}" \
             -Pgenerate_sources_jar=true \
             -Pgenerate_javadocs_jar=true \
+            -PsigningInMemoryKeyPassword="" \
             publish -x test -x spotlessCheck
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
           GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
-          GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
           ORG_GRADLE_PROJECT_centralPortalUsername: ${{ secrets.CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_centralPortalPassword: ${{ secrets.CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_SIGNING_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSWORD }}
 
       - name: Upload staged repository to Central Portal
         run: |
