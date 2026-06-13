@@ -23,8 +23,8 @@ import ae2.api.config.SortOrder;
 import ae2.api.util.AEPartLocation;
 import ae2.api.util.DimensionalBlockPos;
 import ae2.core.AEConfig;
-import ae2.integration.Integrations;
 import ae2.integration.modules.bogosorter.InventoryBogoSortModule;
+import ae2.integration.modules.inventorytweaks.InventoryTweaksModule;
 import ae2.util.helpers.P2PHelper;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.entity.item.EntityItem;
@@ -148,14 +148,6 @@ public final class Platform {
         return level.isBlockLoaded(pos);
     }
 
-    @Nullable
-    public static TileEntity getTickingTile(@Nullable World level, BlockPos pos) {
-        if (!areBlockEntitiesTicking(level, pos)) {
-            return null;
-        }
-        return level.getTileEntity(pos);
-    }
-
     public static boolean hasPermissions(DimensionalBlockPos dc, EntityPlayer player) {
         if (!dc.isInWorld(player.world)) {
             return false;
@@ -241,7 +233,7 @@ public final class Platform {
 
     public static boolean isSortOrderAvailable(SortOrder order) {
         return order != SortOrder.INVTWEAKS
-            || Integrations.invTweaks().isEnabled()
+            || InventoryTweaksModule.isLoaded()
             || InventoryBogoSortModule.isLoaded();
     }
 

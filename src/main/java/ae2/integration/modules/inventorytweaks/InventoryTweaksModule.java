@@ -18,19 +18,19 @@
 
 package ae2.integration.modules.inventorytweaks;
 
-import ae2.integration.abstraction.IInvTweaks;
 import invtweaks.forge.InvTweaksMod;
 import net.minecraft.item.ItemStack;
+import net.minecraftforge.fml.common.Loader;
 
-public class InventoryTweaksModule implements IInvTweaks {
+public final class InventoryTweaksModule {
 
-    @Override
-    public boolean isEnabled() {
-        return InvTweaksMod.instance != null;
+    private static final boolean LOADED = Loader.isModLoaded("inventorytweaks");
+
+    public static boolean isLoaded() {
+        return LOADED;
     }
 
-    @Override
-    public int compareItems(ItemStack first, ItemStack second) {
+    public static int compareItems(ItemStack first, ItemStack second) {
         return InvTweaksMod.instance.compareItems(first, second);
     }
 }

@@ -22,9 +22,8 @@ import ae2.api.config.SortDir;
 import ae2.api.config.SortOrder;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
-import ae2.integration.Integrations;
-import ae2.integration.abstraction.IInvTweaks;
 import ae2.integration.modules.bogosorter.InventoryBogoSortModule;
+import ae2.integration.modules.inventorytweaks.InventoryTweaksModule;
 
 import java.util.Comparator;
 
@@ -63,9 +62,8 @@ final class KeySorters {
             return bogoComparator.compare(leftItem.getReadOnlyStack(), rightItem.getReadOnlyStack());
         }
 
-        IInvTweaks invTweaks = Integrations.invTweaks();
-        if (invTweaks.isEnabled()) {
-            return invTweaks.compareItems(leftItem.getReadOnlyStack(), rightItem.getReadOnlyStack());
+        if (InventoryTweaksModule.isLoaded()) {
+            return InventoryTweaksModule.compareItems(leftItem.getReadOnlyStack(), rightItem.getReadOnlyStack());
         }
 
         return compareByFallback(left, right);
