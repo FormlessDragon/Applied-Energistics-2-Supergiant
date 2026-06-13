@@ -39,7 +39,7 @@ dependencies {
     // Hwyla
     modCompileOnly "curse.maven:Hwyla-253449:2568751"
     // IndustrialCraft 2
-    modImplementation "curse.maven:industrial-craft-242638:2746892"
+    modCompileOnly "curse.maven:industrial-craft-242638:2746892"
     // HEI
     modImplementation "curse.maven:had-enough-items-557549:7938914"
     // The One Probe
@@ -51,14 +51,12 @@ dependencies {
     modCompileOnly "curse.maven:baubles-227083:2518667"
     // CodeChickenLib
     modCompileOnly "curse.maven:codechicken-lib-1-8-242818:2779848"
-    // Forestry
-    modCompileOnly "curse.maven:forestry-59751:2684780"
     // Chisel
     modCompileOnly "curse.maven:chisel-235279:2915375"
     // Inventory Tweaks
-    modCompileOnly "curse.maven:inventory-tweaks-223094:2482482"
+    modImplementation "curse.maven:inventory-tweaks-223094:2923460"
     // Inventory Bogo-Sorter
-    modCompileOnly "curse.maven:inventory-bogo-sorter-632327:4399738"
+    modCompileOnly "curse.maven:inventory-bogosorter-632327:8231600"
     // mouse tweaks
     modImplementation "curse.maven:mouse-tweaks-unofficial-461660:5876158"
     // Connected Textures Mod

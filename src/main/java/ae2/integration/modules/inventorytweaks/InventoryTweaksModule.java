@@ -19,35 +19,18 @@
 package ae2.integration.modules.inventorytweaks;
 
 import ae2.integration.abstraction.IInvTweaks;
-import invtweaks.api.InvTweaksAPI;
+import invtweaks.forge.InvTweaksMod;
 import net.minecraft.item.ItemStack;
-import net.minecraftforge.fml.common.Loader;
 
 public class InventoryTweaksModule implements IInvTweaks {
 
-    private final InvTweaksAPI api;
-
-    public InventoryTweaksModule() {
-        InvTweaksAPI loaded = null;
-        try {
-            loaded = (InvTweaksAPI) Class.forName("invtweaks.forge.InvTweaksMod", true, Loader.instance().getModClassLoader())
-                                         .getField("instance")
-                                         .get(null);
-        } catch (Exception ignored) {
-        }
-        this.api = loaded;
-    }
-
     @Override
     public boolean isEnabled() {
-        return this.api != null;
+        return InvTweaksMod.instance != null;
     }
 
     @Override
     public int compareItems(ItemStack first, ItemStack second) {
-        if (this.api == null) {
-            throw new IllegalStateException();
-        }
-        return this.api.compareItems(first, second);
+        return InvTweaksMod.instance.compareItems(first, second);
     }
 }
