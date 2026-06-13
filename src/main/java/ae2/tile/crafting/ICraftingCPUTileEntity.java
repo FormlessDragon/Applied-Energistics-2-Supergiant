@@ -61,9 +61,9 @@ public interface ICraftingCPUTileEntity
         onCustomNameChanged();
     }
 
-    World getWorld();
+    World getWorldObj();
 
-    BlockPos getPos();
+    BlockPos getLocation();
 
     TileEntity getTileEntity();
 

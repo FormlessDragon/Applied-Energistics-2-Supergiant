@@ -44,6 +44,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
@@ -103,6 +104,16 @@ public class TileCraftingUnit extends AENetworkedTile
                 node.grid().postEvent(new GridCraftingCpuChange(node));
             }
         }
+    }
+
+    @Override
+    public World getWorldObj() {
+        return world;
+    }
+
+    @Override
+    public BlockPos getLocation() {
+        return pos;
     }
 
     public AbstractCraftingUnitBlock<?> getUnitBlock() {
@@ -280,7 +291,7 @@ public class TileCraftingUnit extends AENetworkedTile
                 places.add(this.pos);
             } else {
                 for (EnumFacing facing : EnumFacing.values()) {
-                    BlockPos place = blockEntity.getPos().offset(facing);
+                    BlockPos place = blockEntity.getLocation().offset(facing);
                     if (this.world.isAirBlock(place)) {
                         places.add(place);
                     }

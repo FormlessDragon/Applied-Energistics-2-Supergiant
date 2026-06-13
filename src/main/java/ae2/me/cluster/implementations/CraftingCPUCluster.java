@@ -317,7 +317,7 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
     @Nullable
     public World getLevel() {
         ICraftingCPUTileEntity core = this.getCore();
-        return core == null ? null : core.getWorld();
+        return core == null ? null : core.getWorldObj();
     }
 
     public void breakCluster() {
