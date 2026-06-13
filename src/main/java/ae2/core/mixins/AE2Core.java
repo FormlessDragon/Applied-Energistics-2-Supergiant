@@ -1,6 +1,6 @@
 package ae2.core.mixins;
 
-import ae2.util.EmptyArrays;
+import io.netty.util.internal.EmptyArrays;
 import net.minecraftforge.fml.relauncher.IFMLLoadingPlugin;
 import org.jetbrains.annotations.Nullable;
 import zone.rong.mixinbooter.IEarlyMixinLoader;
@@ -17,7 +17,7 @@ public class AE2Core implements IFMLLoadingPlugin, IEarlyMixinLoader {
 
     @Nullable
     public String[] getASMTransformerClass() {
-        return EmptyArrays.EMPTY_STRING_ARRAY;
+        return EmptyArrays.EMPTY_STRINGS;
     }
 
     @Nullable
