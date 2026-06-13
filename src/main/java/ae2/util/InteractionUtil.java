@@ -18,36 +18,63 @@
 
 package ae2.util;
 
-import ae2.api.ids.AEItemIds;
+import ae2.api.util.IAEWrench;
 import ae2.items.tools.NetworkToolItem;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import net.minecraftforge.fml.common.Loader;
 
 /**
  * Utility functions revolving around using or placing items.
  */
 public final class InteractionUtil {
 
+    private static final boolean loadCofhCore = Loader.isModLoaded("cofhcore");
+
     private InteractionUtil() {
     }
 
-    public static boolean canWrenchDisassemble(ItemStack tool) {
-        return isAeWrench(tool);
+    public static boolean canWrenchRotate(final EntityPlayer player, final ItemStack tool, final BlockPos pos) {
+        return canUseBlockWrench(player, tool, pos);
     }
 
-    public static boolean canWrenchRotate(ItemStack tool) {
+    public static boolean canWrenchDisassemble(final EntityPlayer player, final ItemStack tool, final BlockPos pos) {
+        return canUseBlockWrench(player, tool, pos);
+    }
+
+    private static boolean canUseBlockWrench(final EntityPlayer player, final ItemStack tool, final BlockPos pos) {
         if (tool.isEmpty()) {
             return false;
         }
-
         if (tool.getItem() instanceof NetworkToolItem) {
             return false;
         }
 
-        return isAeWrench(tool);
+        return isWrench(player, tool, pos);
+    }
+
+    public static boolean isWrench(final EntityPlayer player, final ItemStack tool, final BlockPos pos) {
+        if (tool.isEmpty()) {
+            return false;
+        }
+
+        if (tool.getItem() instanceof IAEWrench a) {
+            return a.isUsable(tool, player, pos);
+        }
+
+        if (loadCofhCore) {
+            try {
+                if (tool.getItem() instanceof cofh.api.item.IToolHammer toolHammer) {
+                    return toolHammer.isUsable(tool, player, pos);
+                }
+            } catch (final Throwable ignore) {
+
+            }
+        }
+        return false;
     }
 
     public static boolean isInAlternateUseMode(EntityPlayer player) {
@@ -76,13 +103,4 @@ public final class InteractionUtil {
         return new LookDirection(from, to);
     }
 
-    private static boolean isAeWrench(ItemStack tool) {
-        if (tool.isEmpty()) {
-            return false;
-        }
-
-        ResourceLocation registryName = tool.getItem().getRegistryName();
-        return AEItemIds.CERTUS_QUARTZ_WRENCH.equals(registryName)
-            || AEItemIds.NETHER_QUARTZ_WRENCH.equals(registryName);
-    }
 }

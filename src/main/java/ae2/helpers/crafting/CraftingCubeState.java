@@ -16,7 +16,7 @@
  * along with Applied Energistics 2.  If not, see <http://www.gnu.org/licenses/lgpl>.
  */
 
-package ae2.client.render.crafting;
+package ae2.helpers.crafting;
 
 import net.minecraft.util.EnumFacing;
 

@@ -31,7 +31,9 @@ import ae2.api.parts.SelectedPart;
 import ae2.api.util.AECableType;
 import ae2.api.util.AEColor;
 import ae2.api.util.DimensionalBlockPos;
-import ae2.client.render.cablebus.CableBusRenderState;
+import ae2.helpers.beamformer.BeamFormerEndpoint;
+import ae2.helpers.beamformer.BeamFormerRenderGeometry;
+import ae2.helpers.cablebus.CableBusRenderState;
 import ae2.parts.CableBusContainer;
 import ae2.tile.AEBaseTile;
 import ae2.tile.ClientTickingTile;
@@ -51,8 +53,8 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.minecraftforge.common.capabilities.Capability;
-
 import org.jetbrains.annotations.Nullable;
+
 import java.util.List;
 
 public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridNodeHost, IColorableTile, ClientTickingTile {
@@ -61,6 +63,8 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
     private int oldLightValue = -1;
     private boolean dropItems = true;
     private int pendingClientRenderRefreshTicks;
+    @Nullable
+    private AxisAlignedBB cachedRenderBoundingBox;
 
     @Override
     public void loadTag(NBTTagCompound data) {
@@ -94,6 +98,9 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
             this.oldLightValue = newLightValue;
             this.world.checkLight(this.pos);
             changed = true;
+        }
+        if (changed) {
+            this.invalidateRenderBoundingBox();
         }
 
         return changed;
@@ -145,8 +152,18 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
     }
 
     @Override
-    public double getMaxRenderDistanceSquared() {
-        return 900.0;
+    public AxisAlignedBB getRenderBoundingBox() {
+        if (this.cachedRenderBoundingBox != null) {
+            return this.cachedRenderBoundingBox;
+        }
+
+        AxisAlignedBB boundingBox = super.getRenderBoundingBox();
+        for (EnumFacing facing : EnumFacing.VALUES) {
+            if (this.getPart(facing) instanceof BeamFormerEndpoint beamFormer) {
+                boundingBox = boundingBox.union(BeamFormerRenderGeometry.computeRenderBoundingBox(beamFormer));
+            }
+        }
+        return this.cachedRenderBoundingBox = boundingBox;
     }
 
     @Override
@@ -173,23 +190,29 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
     @Nullable
     @Override
     public <T extends IPart> T addPart(IPartItem<T> partItem, @Nullable EnumFacing side, @Nullable EntityPlayer owner) {
-        return this.cableBus.addPart(partItem, side, owner);
+        T part = this.cableBus.addPart(partItem, side, owner);
+        this.invalidateRenderBoundingBox();
+        return part;
     }
 
     @Nullable
     @Override
     public <T extends IPart> T replacePart(IPartItem<T> partItem, @Nullable EnumFacing side, @Nullable EntityPlayer owner,
                                            @Nullable EnumHand hand) {
-        return this.cableBus.replacePart(partItem, side, owner, hand);
+        T part = this.cableBus.replacePart(partItem, side, owner, hand);
+        this.invalidateRenderBoundingBox();
+        return part;
     }
 
     @Override
     public void removePartFromSide(@Nullable EnumFacing side) {
         this.cableBus.removePartFromSide(side);
+        this.invalidateRenderBoundingBox();
     }
 
     @Override
     public void markForUpdate() {
+        this.invalidateRenderBoundingBox();
         int newLightValue = this.cableBus.getLightValue();
         if (this.world != null && newLightValue != this.oldLightValue) {
             this.oldLightValue = newLightValue;
@@ -217,6 +240,7 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
     @Override
     public void clearContainer() {
         this.cableBus = new CableBusContainer(this);
+        this.invalidateRenderBoundingBox();
     }
 
     @Override
@@ -236,7 +260,11 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
 
     @Override
     public boolean removePart(IPart part) {
-        return this.cableBus.removePart(part);
+        boolean removed = this.cableBus.removePart(part);
+        if (removed) {
+            this.invalidateRenderBoundingBox();
+        }
+        return removed;
     }
 
     @Override
@@ -246,6 +274,7 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
 
     @Override
     public void partChanged() {
+        this.invalidateRenderBoundingBox();
         this.notifyNeighbors();
     }
 
@@ -351,6 +380,7 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
 
     public void onUpdateShape(EnumFacing side) {
         this.cableBus.onUpdateShape(side);
+        this.invalidateRenderBoundingBox();
     }
 
     @Override
@@ -392,6 +422,11 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
     }
 
     private void queueClientRenderRefresh() {
+        this.invalidateRenderBoundingBox();
         this.pendingClientRenderRefreshTicks = Math.max(this.pendingClientRenderRefreshTicks, 3);
+    }
+
+    private void invalidateRenderBoundingBox() {
+        this.cachedRenderBoundingBox = null;
     }
 }

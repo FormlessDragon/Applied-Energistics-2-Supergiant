@@ -23,11 +23,13 @@ import ae2.client.ClientTickHandler;
 import ae2.client.EffectType;
 import ae2.client.Hotkeys;
 import ae2.client.commands.ClientCommands;
+import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.StackTooltipRenderer;
 import ae2.client.gui.me.common.PendingCraftingJobs;
 import ae2.client.gui.me.common.PinnedKeys;
 import ae2.client.render.NetworkRender;
 import ae2.client.render.ProfileRender;
+import ae2.client.render.bloom.BeamFormerBloom;
 import ae2.client.render.crafting.CraftingMonitorTESR;
 import ae2.client.render.effects.EnergyParticleData;
 import ae2.client.render.effects.LightningArcParticleData;
@@ -40,6 +42,7 @@ import ae2.client.render.overlay.OverlayManager;
 import ae2.client.render.tesr.ChargerTESR;
 import ae2.client.render.tesr.CrankRenderer;
 import ae2.client.render.tesr.CrystalFixerTESR;
+import ae2.client.render.tesr.DenseBeamFormerTESR;
 import ae2.client.render.tesr.DriveLedTESR;
 import ae2.client.render.tesr.InscriberTESR;
 import ae2.client.render.tesr.MEChestTESR;
@@ -73,6 +76,7 @@ import ae2.tile.misc.TileCrystalFixer;
 import ae2.tile.misc.TileInscriber;
 import ae2.tile.networking.CableBusTESR;
 import ae2.tile.networking.TileCableBus;
+import ae2.tile.networking.TileDenseBeamFormer;
 import ae2.tile.storage.TileDrive;
 import ae2.tile.storage.TileMEChest;
 import ae2.tile.storage.TileSkyChest;
@@ -81,6 +85,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.client.event.MouseEvent;
 import net.minecraftforge.client.event.TextureStitchEvent;
 import net.minecraftforge.client.model.ModelLoaderRegistry;
@@ -93,6 +98,8 @@ import net.minecraftforge.fml.client.registry.RenderingRegistry;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import net.minecraftforge.fml.common.eventhandler.Event;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.common.network.FMLNetworkEvent;
@@ -125,6 +132,7 @@ public final class AppEngClient extends AppEngServer {
         InitStackRenderHandlers.init();
         RenderingRegistry.registerEntityRenderingHandler(TinyTNTPrimedEntity.class, TinyTNTPrimedRenderer::new);
         ClientRegistry.bindTileEntitySpecialRenderer(TileCableBus.class, new CableBusTESR());
+        ClientRegistry.bindTileEntitySpecialRenderer(TileDenseBeamFormer.class, new DenseBeamFormerTESR());
         ClientRegistry.bindTileEntitySpecialRenderer(TileCraftingMonitor.class, new CraftingMonitorTESR());
         ClientRegistry.bindTileEntitySpecialRenderer(TileDrive.class, new DriveLedTESR());
         ClientRegistry.bindTileEntitySpecialRenderer(TileMEChest.class, new MEChestTESR());
@@ -156,6 +164,18 @@ public final class AppEngClient extends AppEngServer {
         MinecraftForge.EVENT_BUS.register(StackTooltipRenderer.INSTANCE);
         MinecraftForge.EVENT_BUS.register(NetworkRender.INSTANCE);
         MinecraftForge.EVENT_BUS.register(ProfileRender.INSTANCE);
+        MinecraftForge.EVENT_BUS.register(BeamFormerBloom.INSTANCE);
+        MinecraftForge.EVENT_BUS.register(new Object() {
+            @SubscribeEvent(priority = EventPriority.HIGH)
+            public void onMouseInput(GuiScreenEvent.MouseInputEvent.Pre event) {
+                if (event.getGui() instanceof AEBaseGui<?> a) {
+                    if (a.handleAeMouseWheelInput()) {
+                        event.setCanceled(true);
+                        event.setResult(Event.Result.ALLOW);
+                    }
+                }
+            }
+        });
         Integrations.hei().registerClientFeatures();
     }
 

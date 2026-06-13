@@ -363,7 +363,14 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     }
 
     private void renderWidgetTooltip(int mouseX, int mouseY) {
-        if (widgets.hitTest(getMousePoint(mouseX, mouseY))
+        Point mousePos = getMousePoint(mouseX, mouseY);
+        if (this.hoveredSlot != null
+            && !this.hoveredSlot.getStack().isEmpty()
+            && widgets.isInCompositeWidgetBounds(mousePos)) {
+            return;
+        }
+
+        if (widgets.hitTest(mousePos)
             && this.hoveredSlot != null
             && !this.hoveredSlot.getStack().isEmpty()) {
             return;
@@ -1088,21 +1095,19 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         super.mouseClickMove(mouseX, mouseY, clickedMouseButton, timeSinceLastClick);
     }
 
-    @Override
-    public void handleMouseInput() throws IOException {
+    public boolean handleAeMouseWheelInput() {
         int delta = Mouse.getEventDWheel();
-        if (delta != 0) {
-            Point mouse = getMousePoint(Mouse.getEventX() * this.width / this.mc.displayWidth,
-                this.height - Mouse.getEventY() * this.height / this.mc.displayHeight - 1);
-            if (widgets.onMouseWheel(mouse, delta > 0 ? 1 : -1)) {
-                return;
-            }
-            if (handleWirelessUniversalTerminalCycle(delta)) {
-                return;
-            }
+        if (delta == 0) {
+            return false;
         }
 
-        super.handleMouseInput();
+        Point mouse = getMousePoint(Mouse.getEventX() * this.width / this.mc.displayWidth,
+            this.height - Mouse.getEventY() * this.height / this.mc.displayHeight - 1);
+        if (widgets.onMouseWheel(mouse, delta > 0 ? 1 : -1)) {
+            return true;
+        }
+
+        return handleWirelessUniversalTerminalCycle(delta);
     }
 
     private boolean handleWirelessUniversalTerminalCycle(int delta) {

@@ -1,4 +1,4 @@
-package ae2.client.render.cablebus;
+package ae2.helpers.cablebus;
 
 import ae2.api.parts.IPartModel;
 import ae2.api.util.AECableType;
@@ -139,7 +139,7 @@ public class CableBusRenderState {
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.attachmentConnections, this.cableBusAdjacent, this.cableColor, this.cableType,
+        return Objects.hash(this.attachments, this.attachmentConnections, this.cableBusAdjacent, this.cableColor, this.cableType,
             this.channelsOnSide, this.connectionTypes, this.coreType, this.partModelData);
     }
 
@@ -156,6 +156,7 @@ public class CableBusRenderState {
             && this.cableColor == other.cableColor
             && Objects.equals(this.connectionTypes, other.connectionTypes)
             && Objects.equals(this.cableBusAdjacent, other.cableBusAdjacent)
+            && Objects.equals(this.attachments, other.attachments)
             && Objects.equals(this.channelsOnSide, other.channelsOnSide)
             && Objects.equals(this.attachmentConnections, other.attachmentConnections)
             && Objects.equals(this.partModelData, other.partModelData);

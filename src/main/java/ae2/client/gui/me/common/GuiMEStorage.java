@@ -751,7 +751,8 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
         InventoryAction action = null;
         switch (clickType) {
-            case PICKUP -> action = mouseButton == 1 ? InventoryAction.SPLIT_OR_PLACE_SINGLE : InventoryAction.PICKUP_OR_SET_DOWN;
+            case PICKUP ->
+                action = mouseButton == 1 ? InventoryAction.SPLIT_OR_PLACE_SINGLE : InventoryAction.PICKUP_OR_SET_DOWN;
             case QUICK_MOVE -> action = mouseButton == 1 ? InventoryAction.PICKUP_SINGLE : InventoryAction.SHIFT_CLICK;
             case CLONE -> {
                 if (entry.craftable()) {
@@ -852,7 +853,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
     private List<ITextComponent> getGridInventoryEntryTooltip(GridInventoryEntry entry) {
         var what = Objects.requireNonNull(entry.what(), "Repo entry is missing a key");
-        List<ITextComponent> tooltip = new ObjectArrayList<>(AEKeyRendering.getTooltip(what));
+        List<ITextComponent> tooltip = normalizeGridTooltip(AEKeyRendering.getTooltip(what));
 
         if (Tooltips.shouldShowAmountTooltip(what, entry.storedAmount())) {
             tooltip.add(Tooltips.getAmountTooltip(ButtonToolTips.StoredAmount, what, entry.storedAmount()));
@@ -876,6 +877,19 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             tooltip.add(muted(ButtonToolTips.TogglePlayerPin.text()));
         }
 
+        return tooltip;
+    }
+
+    private List<ITextComponent> normalizeGridTooltip(List<ITextComponent> source) {
+        List<ITextComponent> tooltip = new ObjectArrayList<>(source.size());
+        for (int i = 0; i < source.size(); i++) {
+            ITextComponent line = source.get(i).createCopy();
+            Style style = line.getStyle();
+            if (i > 0 && style.getColor() == null) {
+                line.setStyle(style.createShallowCopy().setColor(TextFormatting.GRAY));
+            }
+            tooltip.add(line);
+        }
         return tooltip;
     }
 
@@ -957,8 +971,6 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     }
 
     private final class PlayerPinButton extends IconButton {
-        private boolean handledRightClick;
-
         private PlayerPinButton() {
             super(() -> {
                 if (canInteractWithRepo() && PinnedKeys.getPlayerPinRows() < PinnedKeys.MAX_PLAYER_PIN_ROWS) {
@@ -978,7 +990,6 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
                     && mouseX < this.x + this.width
                     && mouseY < this.y + this.height;
                 if (pressed) {
-                    this.handledRightClick = true;
                     if (canInteractWithRepo()
                         && PinnedKeys.removeEmptyPlayerPinRow(terminalStyle.getSlotsPerRow())) {
                         repo.updateView();
@@ -988,15 +999,6 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
                 return pressed;
             }
             return super.mousePressed(minecraft, mouseX, mouseY);
-        }
-
-        @Override
-        public void mouseReleased(int mouseX, int mouseY) {
-            if (this.handledRightClick) {
-                this.handledRightClick = false;
-                return;
-            }
-            super.mouseReleased(mouseX, mouseY);
         }
 
         @Override

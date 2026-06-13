@@ -42,16 +42,21 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
     private static final int DEFAULT_MAX_ROWS = 5;
     private static final int MIN_SCROLLING_ROWS = 5;
     private static final int PANEL_X_OFFSET = 2;
-    private static final int SCROLLBAR_X_OFFSET = 7;
+    private static final int SLOT_X_OFFSET = 5;
+    private static final int SLOT_Y_OFFSET = PADDING + 1;
+    private static final int SCROLLBAR_X_OFFSET = 23;
+    private static final int SCROLLBAR_Y_OFFSET = 6;
+    private static final int HIDDEN_SLOT_POS = -9999;
 
     private final List<Slot> slots;
     private final List<Slot> leadingSlots;
     private final BooleanSupplier hideLeadingSlots;
     private final Supplier<List<ITextComponent>> tooltipSupplier;
     private final Scrollbar scrollbar;
+    private final List<Slot> panelSlots = new ObjectArrayList<>();
+    private final List<Slot> visiblePanelSlots = new ObjectArrayList<>();
 
     private Point screenOrigin = Point.ZERO;
-    private Point scrollbarBasePosition = Point.ZERO;
     private int x;
     private int y;
     private int maxRows = DEFAULT_MAX_ROWS;
@@ -102,6 +107,7 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
 
     @Override
     public Rectangle getBounds() {
+        rebuildPanelSlots();
         int visibleSlots = getVisibleSlotCount();
         if (visibleSlots <= 0) {
             return new Rectangle(this.x, this.y, 0, 0);
@@ -118,20 +124,22 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
     @Override
     public void populateScreen(Consumer<GuiButton> addWidget, Rectangle bounds, AEBaseGui<?> screen) {
         this.screenOrigin = Point.fromTopLeft(bounds);
-        this.scrollbarBasePosition = Point.fromTopLeft(this.scrollbar.getBounds());
+        rebuildPanelSlots();
         updateScrollbar();
     }
 
     @Override
     public void updateBeforeRender() {
+        rebuildPanelSlots();
         updateScrollbar();
         deactivatePanelSlots();
-        int slotOriginX = this.x + 5;
-        int slotOriginY = this.y + PADDING + 1;
+        this.visiblePanelSlots.clear();
+        int slotOriginX = this.x + SLOT_X_OFFSET;
+        int slotOriginY = this.y + SLOT_Y_OFFSET;
         int firstSlot = this.scrollbar.getCurrentScroll();
         int index = 0;
 
-        for (Slot slot : getPanelSlots()) {
+        for (Slot slot : this.panelSlots) {
             boolean slotVisible = index >= firstSlot && index < firstSlot + getVisibleSlotCount();
             index++;
 
@@ -144,8 +152,14 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
             }
             slot.xPos = slotOriginX;
             slot.yPos = slotOriginY;
+            this.visiblePanelSlots.add(slot);
             slotOriginY += SLOT_SIZE;
         }
+    }
+
+    @Override
+    public void tick() {
+        this.scrollbar.tick();
     }
 
     @Override
@@ -203,13 +217,35 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
         return this.scrollbar.isVisible();
     }
 
-    private List<Slot> getPanelSlots() {
-        var visibleSlots = new ObjectArrayList<Slot>(this.leadingSlots.size() + this.slots.size());
+    @Override
+    public boolean onMouseDown(Point mousePos, int button) {
+        return this.scrollbar.isVisible()
+            && mousePos.isIn(this.scrollbar.getBounds())
+            && this.scrollbar.onMouseDown(mousePos, button);
+    }
+
+    @Override
+    public boolean onMouseUp(Point mousePos, int button) {
+        return this.scrollbar.onMouseUp(mousePos, button);
+    }
+
+    @Override
+    public boolean wantsAllMouseUpEvents() {
+        return true;
+    }
+
+    @Override
+    public boolean onMouseDrag(Point mousePos, int button) {
+        return this.scrollbar.onMouseDrag(mousePos, button);
+    }
+
+    private void rebuildPanelSlots() {
+        this.panelSlots.clear();
         if (!this.hideLeadingSlots.getAsBoolean()) {
             enableSlots(this.leadingSlots);
             for (Slot slot : this.leadingSlots) {
                 if (isSlotEnabled(slot)) {
-                    visibleSlots.add(slot);
+                    this.panelSlots.add(slot);
                 }
             }
         } else {
@@ -217,27 +253,37 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
         }
         for (Slot slot : this.slots) {
             if (isSlotEnabled(slot)) {
-                visibleSlots.add(slot);
+                this.panelSlots.add(slot);
             }
         }
-        return visibleSlots;
+    }
+
+    @Override
+    public void drawForegroundLayer(Rectangle bounds, Point mouse) {
+        if (this.scrollbar.isVisible()) {
+            this.scrollbar.drawForegroundLayer(bounds, mouse);
+        }
     }
 
     private void deactivatePanelSlots() {
         for (Slot slot : this.leadingSlots) {
-            if (slot instanceof AppEngSlot appEngSlot) {
-                appEngSlot.setActive(false);
-            }
+            hideSlot(slot);
         }
         for (Slot slot : this.slots) {
-            if (slot instanceof AppEngSlot appEngSlot) {
-                appEngSlot.setActive(false);
-            }
+            hideSlot(slot);
         }
     }
 
+    private void hideSlot(Slot slot) {
+        if (slot instanceof AppEngSlot appEngSlot) {
+            appEngSlot.setActive(false);
+        }
+        slot.xPos = HIDDEN_SLOT_POS;
+        slot.yPos = HIDDEN_SLOT_POS;
+    }
+
     private int getUpgradeSlotCount() {
-        return getPanelSlots().size();
+        return this.panelSlots.size();
     }
 
     private int getVisibleSlotCount() {
@@ -253,32 +299,7 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
             return true;
         }
 
-        Rectangle scrollbarBounds = this.scrollbar.getBounds();
-        if (mousePos.isIn(scrollbarBounds)) {
-            return true;
-        }
-
-        int firstSlot = this.scrollbar.getCurrentScroll();
-        int index = 0;
-        for (Slot slot : getPanelSlots()) {
-            boolean slotVisible = index >= firstSlot && index < firstSlot + getVisibleSlotCount();
-            index++;
-
-            if (!slotVisible) {
-                continue;
-            }
-
-            if (slot instanceof AppEngSlot appEngSlot && !appEngSlot.isSlotEnabled()) {
-                continue;
-            }
-
-            if (mousePos.x() >= slot.xPos && mousePos.x() < slot.xPos + SLOT_SIZE
-                && mousePos.y() >= slot.yPos && mousePos.y() < slot.yPos + SLOT_SIZE) {
-                return true;
-            }
-        }
-
-        return false;
+        return mousePos.isIn(this.scrollbar.getBounds());
     }
 
     private void updateScrollbar() {
@@ -286,12 +307,12 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
         this.scrollbar.setVisible(scrolling());
         this.scrollbar.setHeight(Math.max(0, getVisibleSlotCount() * SLOT_SIZE - 2));
         this.scrollbar.setPosition(new Point(
-            this.scrollbarBasePosition.x() + SCROLLBAR_X_OFFSET,
-            this.scrollbarBasePosition.y()));
+            this.x + SCROLLBAR_X_OFFSET,
+            this.y + SCROLLBAR_Y_OFFSET));
     }
 
     private boolean isHoveringEmptyUpgradeSlot(int mouseX, int mouseY) {
-        for (Slot slot : getPanelSlots()) {
+        for (Slot slot : this.visiblePanelSlots) {
             if (slot instanceof AppEngSlot appEngSlot && !appEngSlot.isSlotEnabled()) {
                 continue;
             }
@@ -310,7 +331,7 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
     }
 
     private boolean isHoveringPanelSlot(int mouseX, int mouseY) {
-        for (Slot slot : getPanelSlots()) {
+        for (Slot slot : this.visiblePanelSlots) {
             if (slot instanceof AppEngSlot appEngSlot && !appEngSlot.isSlotEnabled()) {
                 continue;
             }

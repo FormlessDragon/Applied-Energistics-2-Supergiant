@@ -4,6 +4,8 @@ import ae2.api.parts.PartHelper;
 import ae2.api.util.AEAxisAlignedBB;
 import ae2.client.render.mesh.ModelHelper;
 import ae2.client.render.mesh.MutableQuadView;
+import ae2.helpers.cablebus.CableBusRenderState;
+import ae2.helpers.cablebus.FacadeRenderState;
 import ae2.thirdparty.codechicken.lib.model.pipeline.transformers.QuadClamper;
 import ae2.thirdparty.codechicken.lib.model.pipeline.transformers.QuadCornerKicker;
 import ae2.thirdparty.codechicken.lib.model.pipeline.transformers.QuadFaceStripper;

@@ -52,6 +52,7 @@ import ae2.parts.misc.CableAnchorPart;
 import ae2.parts.misc.InterfacePart;
 import ae2.parts.misc.InvertedToggleBusPart;
 import ae2.parts.misc.ToggleBusPart;
+import ae2.parts.networking.BeamFormerPart;
 import ae2.parts.networking.CoveredCablePart;
 import ae2.parts.networking.CoveredDenseCablePart;
 import ae2.parts.networking.EnergyAcceptorPart;
@@ -162,6 +163,11 @@ public final class AEParts {
         InterfacePart.class, InterfacePart::new);
     public static final ItemDefinition<PartItem<QuartzFiberPart>> QUARTZ_FIBER = createPart(
         AEPartIds.QUARTZ_FIBER, QuartzFiberPart.class, QuartzFiberPart::new);
+    public static final ItemDefinition<PartItem<BeamFormerPart>> BEAM_FORMER = createTooltipPart(
+        AEPartIds.BEAM_FORMER, BeamFormerPart.class, BeamFormerPart::new,
+        InGameTooltip.BeamFormerRange,
+        InGameTooltip.BeamFormerPartChannels,
+        InGameTooltip.BeamFormerWrenchToggle);
     public static final ItemDefinition<PartItem<ToggleBusPart>> TOGGLE_BUS = createPart(
         AEPartIds.TOGGLE_BUS, ToggleBusPart.class, ToggleBusPart::new);
     public static final ItemDefinition<PartItem<InvertedToggleBusPart>> INVERTED_TOGGLE_BUS = createPart(
@@ -231,6 +237,7 @@ public final class AEParts {
         PATTERN_PROVIDER,
         INTERFACE,
         QUARTZ_FIBER,
+        BEAM_FORMER,
         TOGGLE_BUS,
         INVERTED_TOGGLE_BUS,
         CABLE_ANCHOR,

@@ -1,4 +1,4 @@
-package ae2.client.render.cablebus;
+package ae2.helpers.cablebus;
 
 import net.minecraft.block.state.IBlockState;
 

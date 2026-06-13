@@ -29,6 +29,7 @@ import ae2.api.stacks.GenericStack;
 import ae2.api.storage.cells.IStackTooltipDataProvider;
 import ae2.api.upgrades.Upgrades;
 import ae2.api.util.DimensionalBlockPos;
+import ae2.api.util.IAEWrench;
 import ae2.api.util.INetworkToolAware;
 import ae2.container.GuiIds;
 import ae2.core.gui.GuiOpener;
@@ -42,10 +43,13 @@ import ae2.util.Platform;
 import ae2.util.inv.AppEngInternalInventory;
 import ae2.util.inv.InternalInventoryHost;
 import ae2.util.inv.filter.IAEItemFilter;
+import cofh.api.item.IToolHammer;
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.util.ITooltipFlag;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
@@ -68,7 +72,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
-public class NetworkToolItem extends AEBaseItem implements IGuiItem, IStackTooltipDataProvider {
+@net.minecraftforge.fml.common.Optional.Interface(iface = "cofh.api.item.IToolHammer", modid = "cofhcore")
+public class NetworkToolItem extends AEBaseItem implements IGuiItem, IStackTooltipDataProvider, IAEWrench, IToolHammer {
     private static final String INVENTORY_TAG = "inv";
 
     public NetworkToolItem() {
@@ -251,6 +256,26 @@ public class NetworkToolItem extends AEBaseItem implements IGuiItem, IStackToolt
         return upgrades.isEmpty() ? Optional.empty()
             : Optional.of(new StorageCellTooltipComponent(Collections.emptyList(), upgrades,
             false, true));
+    }
+
+    @Override
+    public boolean isUsable(ItemStack var1, EntityLivingBase var2, BlockPos var3) {
+        return true;
+    }
+
+    @Override
+    public boolean isUsable(ItemStack var1, EntityLivingBase var2, Entity var3) {
+        return true;
+    }
+
+    @Override
+    public void toolUsed(ItemStack itemStack, EntityLivingBase entityLivingBase, BlockPos blockPos) {
+
+    }
+
+    @Override
+    public void toolUsed(ItemStack itemStack, EntityLivingBase entityLivingBase, Entity entity) {
+
     }
 
     private static class NetworkToolInventoryFilter implements IAEItemFilter {

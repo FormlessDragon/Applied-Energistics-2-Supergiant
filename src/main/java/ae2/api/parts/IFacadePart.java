@@ -29,6 +29,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.ApiStatus;
 
@@ -71,7 +72,7 @@ public interface IFacadePart {
      */
     IBlockState getBlockState();
 
-    boolean onUseItemOn(ItemStack heldItem, EntityPlayer player, EnumHand hand, Vec3d pos);
+    boolean onUseItemOn(ItemStack heldItem, EntityPlayer player, EnumHand hand, Vec3d pos, BlockPos worldPos);
 
-    boolean onClicked(EntityPlayer player, Vec3d pos);
+    boolean onClicked(EntityPlayer player, Vec3d pos, BlockPos worldPos);
 }

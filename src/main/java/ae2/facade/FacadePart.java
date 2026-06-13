@@ -32,6 +32,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
@@ -181,8 +182,8 @@ public class FacadePart implements IFacadePart {
     }
 
     @Override
-    public boolean onUseItemOn(ItemStack heldItem, EntityPlayer player, EnumHand hand, Vec3d pos) {
-        if (!InteractionUtil.canWrenchRotate(heldItem)) {
+    public boolean onUseItemOn(ItemStack heldItem, EntityPlayer player, EnumHand hand, Vec3d pos, BlockPos worldPos) {
+        if (!InteractionUtil.canWrenchRotate(player, heldItem, worldPos)) {
             return false;
         }
 
@@ -190,9 +191,9 @@ public class FacadePart implements IFacadePart {
     }
 
     @Override
-    public boolean onClicked(EntityPlayer player, Vec3d pos) {
+    public boolean onClicked(EntityPlayer player, Vec3d pos, BlockPos worldPos) {
         ItemStack heldItem = player.getHeldItemMainhand();
-        if (!InteractionUtil.canWrenchRotate(heldItem)) {
+        if (!InteractionUtil.canWrenchRotate(player, heldItem, worldPos)) {
             return false;
         }
 

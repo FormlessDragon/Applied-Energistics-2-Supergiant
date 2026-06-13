@@ -7,6 +7,9 @@ import ae2.api.parts.IPartModel;
 import ae2.api.util.AECableType;
 import ae2.api.util.AEColor;
 import ae2.block.networking.CableBusBlock;
+import ae2.helpers.cablebus.CableBusRenderState;
+import ae2.helpers.cablebus.CableCoreType;
+import ae2.helpers.cablebus.FacadeRenderState;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -208,9 +211,9 @@ public class CableBusBakedModel implements IBakedModel {
             this.cableBuilder.addCableCore(coreType, cableColor, quadsOut);
         }
 
-        for (Entry<EnumFacing, Integer> attachmentConnection : renderState.getAttachmentConnections().reference2IntEntrySet()) {
+        for (var attachmentConnection : renderState.getAttachmentConnections().reference2IntEntrySet()) {
             EnumFacing facing = attachmentConnection.getKey();
-            int distance = attachmentConnection.getValue();
+            int distance = attachmentConnection.getIntValue();
             int channels = renderState.getChannelsOnSide().getOrDefault(facing, 0);
 
             switch (cableType) {

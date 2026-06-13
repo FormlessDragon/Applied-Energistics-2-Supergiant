@@ -5,6 +5,7 @@ import ae2.api.util.AEColor;
 import ae2.core.AELog;
 import ae2.core.AppEng;
 import ae2.core.definitions.AEParts;
+import ae2.helpers.cablebus.CableCoreType;
 import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;

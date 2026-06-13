@@ -76,6 +76,7 @@ public final class AEBlockIds {
     public static final ResourceLocation INGREDIENT_BUFFER = id("ingredient_buffer");
     public static final ResourceLocation CANER = id("caner");
     public static final ResourceLocation WIRELESS_ACCESS_POINT = id("wireless_access_point");
+    public static final ResourceLocation DENSE_BEAM_FORMER = id("dense_beam_former");
     public static final ResourceLocation CHARGER = id("charger");
     public static final ResourceLocation QUANTUM_RING = id("quantum_ring");
     public static final ResourceLocation QUANTUM_LINK = id("quantum_link");

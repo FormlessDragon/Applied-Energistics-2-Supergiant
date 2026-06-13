@@ -34,12 +34,12 @@ import ae2.api.parts.SelectedPart;
 import ae2.api.util.AECableType;
 import ae2.api.util.AEColor;
 import ae2.api.util.DimensionalBlockPos;
-import ae2.client.render.cablebus.CableBusRenderState;
-import ae2.client.render.cablebus.CableCoreType;
-import ae2.client.render.cablebus.FacadeRenderState;
 import ae2.core.AELog;
 import ae2.core.AppEng;
 import ae2.facade.FacadeContainer;
+import ae2.helpers.cablebus.CableBusRenderState;
+import ae2.helpers.cablebus.CableCoreType;
+import ae2.helpers.cablebus.FacadeRenderState;
 import ae2.me.InWorldGridNode;
 import ae2.parts.networking.CablePart;
 import ae2.tile.networking.TileCableBus;
@@ -422,7 +422,8 @@ public class CableBusContainer implements IPartHost, ICableBusContainer {
             return selectedPart.part.onUseItemOn(heldItem, player, hand, localPos);
         }
 
-        if (selectedPart.facade != null && selectedPart.facade.onUseItemOn(heldItem, player, hand, localPos)) {
+        if (selectedPart.facade != null && selectedPart.facade.onUseItemOn(heldItem, player, hand, localPos,
+            this.host.getTileEntity().getPos())) {
             markForSave();
             markForUpdate();
             return true;
@@ -476,7 +477,7 @@ public class CableBusContainer implements IPartHost, ICableBusContainer {
                 return selectedPart.part.onClicked(player, localPos);
             }
         } else if (selectedPart.facade != null) {
-            return selectedPart.facade.onClicked(player, localPos);
+            return selectedPart.facade.onClicked(player, localPos, this.host.getTileEntity().getPos());
         }
         return false;
     }

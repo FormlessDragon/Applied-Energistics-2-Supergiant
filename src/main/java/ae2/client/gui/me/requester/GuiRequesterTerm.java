@@ -23,6 +23,8 @@ import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.items.tools.powered.WirelessUniversalTerminalItem;
 import ae2.tile.crafting.requester.Request;
 import com.google.common.collect.HashMultimap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.ItemStack;
@@ -36,7 +38,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -47,7 +48,7 @@ import java.util.WeakHashMap;
 public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTerm> implements ITextFieldGui {
     private static final Rectangle FOOTER_BBOX = new Rectangle(0, 133, GUI_WIDTH, GUI_FOOTER_HEIGHT + 2);
 
-    private final HashMap<Long, ClientRequester> byId = new HashMap<>();
+    private final Long2ObjectMap<ClientRequester> byId = new Long2ObjectOpenHashMap<>();
     private final HashMultimap<String, ClientRequester> byName = HashMultimap.create();
     private final List<String> requesterNames = new ArrayList<>();
     private final Map<String, Set<Object>> searchCache = new WeakHashMap<>();

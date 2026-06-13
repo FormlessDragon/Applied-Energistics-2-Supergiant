@@ -10,11 +10,12 @@ import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 
+import it.unimi.dsi.fastutil.objects.Reference2IntMap;
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
 
@@ -333,8 +334,8 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
     }
 
     static final class SortDepthCache {
-        private final IdentityHashMap<LiteCraftTreeNode, Integer> nodeDepths = new IdentityHashMap<>();
-        private final IdentityHashMap<LiteCraftTreeProc, Integer> procDepths = new IdentityHashMap<>();
+        private final Reference2IntMap<LiteCraftTreeNode> nodeDepths = new Reference2IntOpenHashMap<>();
+        private final Reference2IntMap<LiteCraftTreeProc> procDepths = new Reference2IntOpenHashMap<>();
 
         int nodeDepth(LiteCraftTreeNode node) {
             return nodeDepths.computeIfAbsent(node, ignored -> diveToDeep(node, 0, new DepthRecorder()));

@@ -19,11 +19,11 @@
 package ae2.block.crafting;
 
 import ae2.block.AEBaseTileBlock;
-import ae2.client.render.crafting.CraftingCubeState;
 import ae2.container.GuiIds;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.gui.GuiOpener;
 import ae2.core.localization.PlayerMessages;
+import ae2.helpers.crafting.CraftingCubeState;
 import ae2.recipes.game.CraftingUnitTransformRecipe;
 import ae2.tile.AEBaseTile;
 import ae2.tile.crafting.ICraftingCPUTileEntity;
@@ -224,6 +224,17 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
         return false;
     }
 
+    private static void giveOrDrop(EntityPlayer player, ItemStack stack) {
+        if (stack.isEmpty()) {
+            return;
+        }
+
+        ItemStack returnedStack = stack.copy();
+        if (!player.inventory.addItemStackToInventory(returnedStack)) {
+            player.dropItem(returnedStack, false);
+        }
+    }
+
     private boolean upgrade(World world, BlockPos pos, IBlockState state, EntityPlayer player, EnumFacing side,
                             ItemStack heldItem) {
         Block upgradedBlock = CraftingUnitTransformRecipe.getUpgradedBlock(heldItem);
@@ -243,6 +254,7 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
             return true;
         }
 
+        ItemStack removedUpgrade = CraftingUnitTransformRecipe.getRemovedUpgrade(this);
         IBlockState newState = craftingBlock.getDefaultState();
         if (!craftingBlock.getOrientationStrategy().getProperties().isEmpty()) {
             newState = craftingBlock.getOrientationStrategy().setFacing(newState, side);
@@ -250,6 +262,7 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
 
         if (this.transform(world, pos, newState)) {
             heldItem.shrink(1);
+            giveOrDrop(player, removedUpgrade);
             return true;
         }
         return false;
@@ -275,9 +288,7 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
             return EnumActionResult.PASS;
         }
 
-        if (!player.inventory.addItemStackToInventory(removedUpgrade.copy())) {
-            player.dropItem(removedUpgrade.copy(), false);
-        }
+        giveOrDrop(player, removedUpgrade);
 
         return EnumActionResult.SUCCESS;
     }

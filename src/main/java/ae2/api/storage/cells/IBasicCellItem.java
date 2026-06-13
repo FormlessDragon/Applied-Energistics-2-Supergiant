@@ -37,6 +37,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
  * Implement this on any item to register a "basic cell", which is a cell that works similarly to AE2's own item and
@@ -172,9 +173,9 @@ public interface IBasicCellItem extends ICellWorkbenchItem, IStackTooltipDataPro
         return restriction != null ? restriction.types() : getTotalTypes(cellItem);
     }
 
-    default Optional<Long> getEffectiveAmountLimit(ItemStack cellItem) {
+    default OptionalLong getEffectiveAmountLimit(ItemStack cellItem) {
         CellRestriction restriction = getCellRestrictionOrNull(cellItem);
-        return restriction != null ? Optional.of(restriction.amount()) : Optional.empty();
+        return restriction != null ? OptionalLong.of(restriction.amount()) : OptionalLong.empty();
     }
 
     default String getRestrictedDisplayName(ItemStack cellItem, String baseName) {

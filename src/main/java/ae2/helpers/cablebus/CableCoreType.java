@@ -1,4 +1,4 @@
-package ae2.client.render.cablebus;
+package ae2.helpers.cablebus;
 
 import ae2.api.util.AECableType;
 import ae2.api.util.AEColor;

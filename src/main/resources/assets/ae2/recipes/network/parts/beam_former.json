@@ -1,0 +1,30 @@
+{
+  "type": "forge:ore_shaped",
+  "pattern": [
+    "sas",
+    "gbg",
+    " c "
+  ],
+  "key": {
+    "a": {
+      "item": "ae2:wireless_receiver"
+    },
+    "b": {
+      "item": "ae2:calculation_processor"
+    },
+    "c": {
+      "item": "ae2:fluix_glass_cable"
+    },
+    "g": {
+      "item": "ae2:quartz_glass"
+    },
+    "s": {
+      "type": "forge:ore_dict",
+      "ore": "dustGlowstone"
+    }
+  },
+  "result": {
+    "item": "ae2:beam_former",
+    "count": 2
+  }
+}

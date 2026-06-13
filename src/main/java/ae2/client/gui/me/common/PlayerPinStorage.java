@@ -4,6 +4,7 @@ import ae2.api.stacks.AEKey;
 import ae2.core.AELog;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.nbt.CompressedStreamTools;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -19,6 +20,8 @@ final class PlayerPinStorage {
     private static final int VERSION = 1;
     private static final String DATA_DIR = "ae2";
     private static final String DATA_FILE = "player_pins.dat";
+    private static final String SERVER_DATA_DIR = "player_pins/servers";
+    private static final String UNKNOWN_SERVER = "unknown_server";
     private static final String TAG_VERSION = "version";
     private static final String TAG_ROWS = "playerPinRows";
     private static final String TAG_KEYS = "playerPinnedKeys";
@@ -80,7 +83,31 @@ final class PlayerPinStorage {
     }
 
     private static File getFile() {
-        return new File(new File(Minecraft.getMinecraft().gameDir, DATA_DIR), DATA_FILE);
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft.isSingleplayer()) {
+            var integratedServer = minecraft.getIntegratedServer();
+            if (integratedServer != null) {
+                File worldDir = integratedServer.getEntityWorld().getSaveHandler().getWorldDirectory();
+                return new File(new File(worldDir, DATA_DIR), DATA_FILE);
+            }
+        }
+
+        File dataDir = new File(new File(minecraft.gameDir, DATA_DIR), SERVER_DATA_DIR);
+        return new File(new File(dataDir, getServerKey(minecraft.getCurrentServerData())), DATA_FILE);
+    }
+
+    private static String getServerKey(ServerData serverData) {
+        String serverIp = serverData == null ? "" : sanitizePathSegment(serverData.serverIP);
+        return serverIp.isEmpty() ? UNKNOWN_SERVER : serverIp;
+    }
+
+    private static String sanitizePathSegment(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        String sanitized = value.trim().replaceAll("[^A-Za-z0-9._-]", "_");
+        return sanitized.replaceAll("_+", "_");
     }
 
     record Data(int rows, List<AEKey> keys) {

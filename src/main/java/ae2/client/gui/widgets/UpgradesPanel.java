@@ -114,7 +114,7 @@ public class UpgradesPanel implements ICompositeWidget {
             return new UpgradesPanel(slots, leadingSlots, hideLeadingSlots, tooltipSupplier);
         }
 
-        Scrollbar scrollbar = widgets == null ? new Scrollbar(Scrollbar.SMALL) : widgets.addScrollBar("upgradeScrollbar", Scrollbar.SMALL);
+        Scrollbar scrollbar = new Scrollbar(Scrollbar.SMALL);
         return new ScrollingUpgradesPanel(slots, leadingSlots, hideLeadingSlots, tooltipSupplier, scrollbar);
     }
 

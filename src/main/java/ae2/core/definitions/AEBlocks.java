@@ -52,6 +52,8 @@ import ae2.block.networking.CableBusBlock;
 import ae2.block.networking.ControllerBlock;
 import ae2.block.networking.CreativeEnergyCellBlock;
 import ae2.block.networking.CrystalResonanceGeneratorBlock;
+import ae2.block.networking.DenseBeamFormerBlock;
+import ae2.block.networking.DenseBeamFormerBlockItem;
 import ae2.block.networking.EnergyAcceptorBlock;
 import ae2.block.networking.EnergyCellBlock;
 import ae2.block.networking.EnergyCellBlockItem;
@@ -114,6 +116,10 @@ public final class AEBlocks {
     public static final BlockDefinition<WirelessAccessPointBlock> WIRELESS_ACCESS_POINT = new BlockDefinition<>(
         AppEng.makeId("wireless_access_point"),
         new WirelessAccessPointBlock());
+    public static final BlockDefinition<DenseBeamFormerBlock> DENSE_BEAM_FORMER = new BlockDefinition<>(
+        AEBlockIds.DENSE_BEAM_FORMER,
+        new DenseBeamFormerBlock(),
+        DenseBeamFormerBlockItem::new);
     public static final BlockDefinition<CrystalResonanceGeneratorBlock> CRYSTAL_RESONANCE_GENERATOR = new BlockDefinition<>(
         AppEng.makeId("crystal_resonance_generator"),
         new CrystalResonanceGeneratorBlock());
@@ -494,6 +500,7 @@ public final class AEBlocks {
         CREATIVE_ENERGY_CELL,
         ENERGY_ACCEPTOR,
         WIRELESS_ACCESS_POINT,
+        DENSE_BEAM_FORMER,
         CRYSTAL_RESONANCE_GENERATOR,
         ME_CHEST,
         DRIVE,

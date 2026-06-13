@@ -63,6 +63,7 @@ import ae2.items.tools.powered.WirelessUniversalTerminalItem;
 import ae2.util.inv.AppEngInternalInventory;
 import com.google.common.collect.HashMultimap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
@@ -135,12 +136,12 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     private static final Comparator<PatternContainerGroup> GROUP_COMPARATOR = Comparator
         .comparing(group -> group.name().getFormattedText().toLowerCase(Locale.ROOT));
 
-    private final Long2ObjectOpenHashMap<PatternContainerEntry> byId = new Long2ObjectOpenHashMap<>();
+    private final Long2ObjectMap<PatternContainerEntry> byId = new Long2ObjectOpenHashMap<>();
     private final HashMultimap<PatternContainerGroup, PatternContainerEntry> byGroup = HashMultimap.create();
     private final List<PatternContainerGroup> groups = new ObjectArrayList<>();
     private final List<Row> rows = new ObjectArrayList<>();
     private final Map<ItemStack, PatternSearchData> patternSearchText = new Reference2ObjectOpenHashMap<>();
-    private final Map<Long, PatternProviderInfo> providerInfo = new Long2ObjectOpenHashMap<>();
+    private final Long2ObjectMap<PatternProviderInfo> providerInfo = new Long2ObjectOpenHashMap<>();
     private final Set<MatchedPatternSlot> matchedPatternSlots = new HashSet<>();
     private final List<ProviderHighlightButton> providerHighlightButtons = new ObjectArrayList<>();
     private final List<RenameProviderButton> renameButtons = new ObjectArrayList<>();

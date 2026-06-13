@@ -48,6 +48,7 @@ import ae2.tile.networking.TileCableBus;
 import ae2.tile.networking.TileController;
 import ae2.tile.networking.TileCreativeEnergyCell;
 import ae2.tile.networking.TileCrystalResonanceGenerator;
+import ae2.tile.networking.TileDenseBeamFormer;
 import ae2.tile.networking.TileEnergyAcceptor;
 import ae2.tile.networking.TileEnergyCell;
 import ae2.tile.networking.TileWirelessAccessPoint;
@@ -98,6 +99,8 @@ public final class AEBlockEntities {
         AppEng.makeId("energy_cell"), TileEnergyCell.class);
     public static final TileDefinition<TileWirelessAccessPoint> WIRELESS_ACCESS_POINT = new TileDefinition<>(
         AppEng.makeId("wireless_access_point"), TileWirelessAccessPoint.class);
+    public static final TileDefinition<TileDenseBeamFormer> DENSE_BEAM_FORMER = new TileDefinition<>(
+        AEBlockIds.DENSE_BEAM_FORMER, TileDenseBeamFormer.class);
     public static final TileDefinition<TileMEChest> ME_CHEST = new TileDefinition<>(AppEng.makeId("chest"),
         TileMEChest.class);
     public static final TileDefinition<TileDrive> DRIVE = new TileDefinition<>(AppEng.makeId("drive"),
@@ -165,6 +168,7 @@ public final class AEBlockEntities {
         ENERGY_ACCEPTOR.register();
         ENERGY_CELL.register();
         WIRELESS_ACCESS_POINT.register();
+        DENSE_BEAM_FORMER.register();
         ME_CHEST.register();
         DRIVE.register();
         CELL_WORKBENCH.register();

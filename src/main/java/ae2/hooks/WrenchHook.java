@@ -7,6 +7,8 @@ import ae2.api.util.DimensionalBlockPos;
 import ae2.block.AEBaseTileBlock;
 import ae2.block.crafting.PatternProviderBlock;
 import ae2.block.networking.CableBusBlock;
+import ae2.block.networking.DenseBeamFormerBlock;
+import ae2.helpers.beamformer.BeamFormerEndpoint;
 import ae2.tile.AEBaseTile;
 import ae2.tile.networking.TileCableBus;
 import ae2.util.InteractionUtil;
@@ -40,7 +42,8 @@ public final class WrenchHook {
         }
 
         ItemStack itemStack = player.getHeldItem(hand);
-        if (InteractionUtil.isInAlternateUseMode(player) && InteractionUtil.canWrenchDisassemble(itemStack)) {
+        if (InteractionUtil.isInAlternateUseMode(player)
+            && InteractionUtil.canWrenchDisassemble(player, itemStack, pos)) {
             EnumActionResult cableBusResult = disassembleCableBusPart(player, world, pos, localHit);
             if (cableBusResult != EnumActionResult.PASS) {
                 return cableBusResult;
@@ -48,7 +51,11 @@ public final class WrenchHook {
             return disassemble(player, world, pos);
         }
 
-        if (!InteractionUtil.isInAlternateUseMode(player) && InteractionUtil.canWrenchRotate(itemStack)) {
+        if (!InteractionUtil.isInAlternateUseMode(player) && InteractionUtil.canWrenchRotate(player, itemStack, pos)) {
+            EnumActionResult beamFormerResult = toggleBeamRendering(player, world, pos, localHit);
+            if (beamFormerResult != EnumActionResult.PASS) {
+                return beamFormerResult;
+            }
             return rotate(player, world, pos, clickedFace);
         }
 
@@ -123,6 +130,56 @@ public final class WrenchHook {
         }
 
         return EnumActionResult.SUCCESS;
+    }
+
+    private static EnumActionResult toggleBeamRendering(EntityPlayer player, World world, BlockPos pos, Vec3d localHit) {
+        IBlockState state = world.getBlockState(pos);
+        Block block = state.getBlock();
+
+        if (block instanceof CableBusBlock) {
+            if (localHit == null) {
+                return EnumActionResult.SUCCESS;
+            }
+            if (!Platform.hasPermissions(new DimensionalBlockPos(world, pos), player)) {
+                return EnumActionResult.FAIL;
+            }
+            TileEntity tile = world.getTileEntity(pos);
+            if (tile instanceof TileCableBus cableBus) {
+                var part = cableBus.selectPartLocal(localHit);
+                if (part.part instanceof BeamFormerEndpoint beamFormer) {
+                    if (!world.isRemote) {
+                        toggleBeamPairVisibility(beamFormer);
+                    }
+                    return EnumActionResult.SUCCESS;
+                }
+            }
+            return EnumActionResult.PASS;
+        }
+
+        if (block instanceof DenseBeamFormerBlock) {
+            if (!Platform.hasPermissions(new DimensionalBlockPos(world, pos), player)) {
+                return EnumActionResult.FAIL;
+            }
+            TileEntity tile = world.getTileEntity(pos);
+            if (tile instanceof BeamFormerEndpoint beamFormer) {
+                if (!world.isRemote) {
+                    toggleBeamPairVisibility(beamFormer);
+                }
+                return EnumActionResult.SUCCESS;
+            }
+            return EnumActionResult.PASS;
+        }
+
+        return EnumActionResult.PASS;
+    }
+
+    private static void toggleBeamPairVisibility(BeamFormerEndpoint beamFormer) {
+        boolean beamVisible = !beamFormer.isBeamVisible();
+        beamFormer.setBeamVisible(beamVisible);
+        BeamFormerEndpoint linkedEndpoint = beamFormer.getLinkedEndpoint();
+        if (linkedEndpoint != null && linkedEndpoint.isBeamVisible() != beamVisible) {
+            linkedEndpoint.setBeamVisible(beamVisible);
+        }
     }
 
     private static EnumActionResult rotate(EntityPlayer player, World world, BlockPos pos, EnumFacing clickedFace) {

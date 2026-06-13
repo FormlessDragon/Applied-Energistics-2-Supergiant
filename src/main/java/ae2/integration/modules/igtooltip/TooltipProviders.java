@@ -12,6 +12,7 @@ import ae2.block.crafting.PatternProviderBlock;
 import ae2.block.misc.ChargerBlock;
 import ae2.block.networking.CableBusBlock;
 import ae2.block.networking.CrystalResonanceGeneratorBlock;
+import ae2.block.networking.DenseBeamFormerBlock;
 import ae2.core.AppEng;
 import ae2.helpers.patternprovider.PatternProviderLogicHost;
 import ae2.integration.modules.igtooltip.blocks.ChargerDataProvider;
@@ -28,6 +29,7 @@ import ae2.integration.modules.igtooltip.parts.PartHostTooltips;
 import ae2.integration.modules.igtooltip.parts.StorageMonitorDataProvider;
 import ae2.parts.AEBasePart;
 import ae2.parts.automation.AnnihilationPlanePart;
+import ae2.parts.networking.BeamFormerPart;
 import ae2.parts.networking.IUsedChannelProvider;
 import ae2.parts.p2p.P2PTunnelPart;
 import ae2.parts.reporting.AbstractMonitorPart;
@@ -37,6 +39,7 @@ import ae2.tile.crafting.TilePatternProvider;
 import ae2.tile.misc.TileCharger;
 import ae2.tile.networking.TileCableBus;
 import ae2.tile.networking.TileCrystalResonanceGenerator;
+import ae2.tile.networking.TileDenseBeamFormer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +64,8 @@ public final class TooltipProviders implements TooltipProvider {
         PartTooltips.addServerData(P2PTunnelPart.class, new P2PStateDataProvider());
         PartTooltips.addBody(PatternProviderLogicHost.class, new PatternProviderDataProvider());
         PartTooltips.addServerData(PatternProviderLogicHost.class, new PatternProviderDataProvider());
+        PartTooltips.addBody(BeamFormerPart.class, BeamFormerTooltipDataProvider::buildPartTooltip);
+        PartTooltips.addServerData(BeamFormerPart.class, BeamFormerTooltipDataProvider::providePartData);
         PartTooltips.addBody(AEBasePart.class, DebugProvider::providePartBody, DEBUG_PRIORITY);
         PartTooltips.addServerData(AEBasePart.class, DebugProvider::providePartData, DEBUG_PRIORITY);
     }
@@ -136,6 +141,10 @@ public final class TooltipProviders implements TooltipProvider {
             AppEng.makeId("pattern_provider"),
             TilePatternProvider.class,
             new PatternProviderDataProvider());
+        registration.addBlockEntityData(
+            AppEng.makeId("beam_former"),
+            TileDenseBeamFormer.class,
+            BeamFormerTooltipDataProvider::provideTileData);
     }
 
     @Override
@@ -160,6 +169,11 @@ public final class TooltipProviders implements TooltipProvider {
             PatternProviderBlock.class,
             TooltipIds.PATTERN_PROVIDER,
             new PatternProviderDataProvider());
+        registration.addBlockEntityBody(
+            TileDenseBeamFormer.class,
+            DenseBeamFormerBlock.class,
+            TooltipIds.BEAM_FORMER,
+            BeamFormerTooltipDataProvider::buildTileTooltip);
     }
 
     @Override

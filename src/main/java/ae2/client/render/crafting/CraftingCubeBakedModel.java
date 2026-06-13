@@ -20,6 +20,7 @@ package ae2.client.render.crafting;
 
 import ae2.block.crafting.AbstractCraftingUnitBlock;
 import ae2.client.render.cablebus.CubeBuilder;
+import ae2.helpers.crafting.CraftingCubeState;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -52,11 +53,11 @@ abstract class CraftingCubeBakedModel implements IBakedModel {
     }
 
     private static EnumSet<EnumFacing> getConnections(@Nullable IBlockState state) {
-        if (!(state instanceof IExtendedBlockState)) {
+        if (!(state instanceof IExtendedBlockState s)) {
             return EnumSet.noneOf(EnumFacing.class);
         }
 
-        CraftingCubeState cubeState = ((IExtendedBlockState) state).getValue(AbstractCraftingUnitBlock.STATE);
+        CraftingCubeState cubeState = s.getValue(AbstractCraftingUnitBlock.STATE);
         return cubeState == null ? EnumSet.noneOf(EnumFacing.class) : cubeState.connections();
     }
 

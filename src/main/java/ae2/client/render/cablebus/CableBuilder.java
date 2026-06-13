@@ -3,6 +3,7 @@ package ae2.client.render.cablebus;
 import ae2.api.util.AECableType;
 import ae2.api.util.AEColor;
 import ae2.core.AppEng;
+import ae2.helpers.cablebus.CableCoreType;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;

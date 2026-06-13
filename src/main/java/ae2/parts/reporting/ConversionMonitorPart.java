@@ -74,7 +74,7 @@ public class ConversionMonitorPart extends AbstractMonitorPart implements ISubGu
         }
 
         if (this.isLocked() && !InteractionUtil.isInAlternateUseMode(player)) {
-            if (InteractionUtil.canWrenchRotate(heldItem)
+            if (InteractionUtil.canWrenchRotate(player, heldItem, this.getTileEntity().getPos())
                 && (this.getDisplayed() == null || !AEItemKey.matches(this.getDisplayed(), heldItem))) {
                 return super.onUseWithoutItem(player, pos);
             } else if (!heldItem.isEmpty()) {

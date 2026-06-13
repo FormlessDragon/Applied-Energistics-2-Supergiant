@@ -38,10 +38,10 @@ import ae2.me.service.CraftingService;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Reference2LongMap;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Comparator;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -561,6 +561,6 @@ public class CraftingTreeProcess {
                            Set<AEKey> realSeededRecursiveRequests,
                            Set<AEKey> realRecursiveSeeds,
                            Set<AEKey> realSeededRecursiveKeys,
-                           IdentityHashMap<CraftingTreeNode, Long> recursiveDisplayRequestsDelta) {
+                           Reference2LongMap<CraftingTreeNode> recursiveDisplayRequestsDelta) {
     }
 }

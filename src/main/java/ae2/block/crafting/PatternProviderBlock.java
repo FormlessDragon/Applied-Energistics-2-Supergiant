@@ -87,7 +87,7 @@ public class PatternProviderBlock extends AEBaseTileBlock<TilePatternProvider> {
         }
 
         ItemStack heldItem = player.getHeldItem(hand);
-        if (!heldItem.isEmpty() && InteractionUtil.canWrenchRotate(heldItem)) {
+        if (!heldItem.isEmpty() && InteractionUtil.canWrenchRotate(player, heldItem, pos)) {
             if (!world.isRemote) {
                 this.setSide(world, pos, facing);
             }

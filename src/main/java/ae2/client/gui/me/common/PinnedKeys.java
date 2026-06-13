@@ -80,6 +80,9 @@ public final class PinnedKeys {
 
     public static void clearPinnedKeys() {
         craftingPins.clear();
+        playerPins.clear();
+        playerPinRows = 0;
+        playerPinsLoaded = false;
     }
 
     public static void pinKey(AEKey key, PinReason reason) {

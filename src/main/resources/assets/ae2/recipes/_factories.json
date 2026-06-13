@@ -8,6 +8,7 @@
     "charger": "ae2.recipes.serializers.ChargerRecipeFactory",
     "inscriber": "ae2.recipes.serializers.InscriberRecipeFactory",
     "crystal_assembler": "ae2.recipes.serializers.CrystalAssemblerRecipeFactory",
+    "crystal_fixer": "ae2.recipes.serializers.CrystalFixerRecipeFactory",
     "matter_cannon": "ae2.recipes.serializers.MatterCannonAmmoRecipeFactory",
     "storage_cell_disassembly": "ae2.recipes.serializers.StorageCellDisassemblyRecipeFactory",
     "transform": "ae2.recipes.serializers.TransformRecipeFactory",

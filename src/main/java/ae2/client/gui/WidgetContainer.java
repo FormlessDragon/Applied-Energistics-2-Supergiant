@@ -547,6 +547,15 @@ public class WidgetContainer {
         return false;
     }
 
+    public boolean isInCompositeWidgetBounds(Point mousePos) {
+        for (ICompositeWidget widget : compositeWidgets.values()) {
+            if (widget.isVisible() && contains(widget.getBounds(), mousePos.x(), mousePos.y())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public AETextField addTextField(String id) {
         AETextField searchField = new AETextField(requireStyle(), Minecraft.getMinecraft().fontRenderer,
             0, 0, 0, 0);

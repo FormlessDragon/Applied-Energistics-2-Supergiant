@@ -38,17 +38,19 @@ import ae2.crafting.inv.NetworkCraftingSimulationState;
 import ae2.hooks.ticking.TickHandler;
 import com.google.common.base.Stopwatch;
 import com.google.common.math.LongMath;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.Reference2LongMap;
+import it.unimi.dsi.fastutil.objects.Reference2LongOpenHashMap;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public class CraftingCalculation {
@@ -67,14 +69,14 @@ public class CraftingCalculation {
     private final List<AEKey> availabilityStack = new ObjectArrayList<>();
     private final List<CraftingTreeProcess> processStack = new ObjectArrayList<>();
     private final List<TimingFrame> timingStack = new ObjectArrayList<>();
-    private final Map<AEKey, Collection<IPatternDetails>> patternCache = new HashMap<>();
-    private final Map<RecursiveNetKey, RecursiveNet> recursiveNetCache = new HashMap<>();
-    private final HashSet<AEKey> realSeededRecursiveRequests = new HashSet<>();
-    private final HashSet<AEKey> realRecursiveSeeds = new HashSet<>();
-    private final HashSet<AEKey> realSeededRecursiveKeys = new HashSet<>();
-    private final HashSet<AEKey> recursiveFinalOutputInputs = new HashSet<>();
-    private final LinkedHashSet<AEKey> recursiveReserveCandidates = new LinkedHashSet<>();
-    private final IdentityHashMap<CraftingTreeNode, Long> recursiveDisplayRequests = new IdentityHashMap<>();
+    private final Map<AEKey, Collection<IPatternDetails>> patternCache = new Object2ObjectOpenHashMap<>();
+    private final Map<RecursiveNetKey, RecursiveNet> recursiveNetCache = new Object2ObjectOpenHashMap<>();
+    private final Set<AEKey> realSeededRecursiveRequests = new ObjectOpenHashSet<>();
+    private final Set<AEKey> realRecursiveSeeds = new ObjectOpenHashSet<>();
+    private final Set<AEKey> realSeededRecursiveKeys = new ObjectOpenHashSet<>();
+    private final Set<AEKey> recursiveFinalOutputInputs = new ObjectOpenHashSet<>();
+    private final Set<AEKey> recursiveReserveCandidates = new ObjectLinkedOpenHashSet<>();
+    private final Reference2LongMap<CraftingTreeNode> recursiveDisplayRequests = new Reference2LongOpenHashMap<>();
     private final List<ICraftingProvider> temporaryProviders;
     private final long recursiveIngredientReserveAmount;
     // The initially requested amount of "output", may be reduced depending on the strategy used
@@ -619,8 +621,8 @@ public class CraftingCalculation {
     private RecursiveNet computeRecursiveNet(AEKey what, int requestIndex) {
         recordPerformanceCount("recursive-net-analysis", 1);
         var netByKey = new KeyCounter();
-        var inputKeys = new LinkedHashSet<AEKey>();
-        var includedPatterns = new HashSet<IPatternDetails>();
+        var inputKeys = new ObjectOpenHashSet<AEKey>();
+        var includedPatterns = new ObjectOpenHashSet<IPatternDetails>();
         for (int i = requestIndex; i < this.processStack.size(); i++) {
             var process = this.processStack.get(i);
             process.accumulateNet(netByKey);
@@ -648,7 +650,7 @@ public class CraftingCalculation {
         }
 
         var netByKey = new KeyCounter();
-        var includedPatterns = new HashSet<IPatternDetails>();
+        var includedPatterns = new ObjectOpenHashSet<IPatternDetails>();
         includedPatterns.add(pattern);
         accumulatePatternNet(netByKey, pattern);
         expandRecursiveNetClosure(netByKey, null, includedPatterns);
@@ -925,7 +927,7 @@ public class CraftingCalculation {
     }
 
     private void expandRecursiveNetClosure(KeyCounter netByKey, @Nullable Collection<AEKey> inputKeys,
-                                           HashSet<IPatternDetails> includedPatterns) {
+                                           Set<IPatternDetails> includedPatterns) {
         boolean changed;
         do {
             changed = false;
@@ -1028,20 +1030,20 @@ public class CraftingCalculation {
         return this.recursiveDisplayRequests.getOrDefault(node, 0L);
     }
 
-    IdentityHashMap<CraftingTreeNode, Long> getRecursiveDisplayRequestsMarker() {
-        return new IdentityHashMap<>(this.recursiveDisplayRequests);
+    Reference2LongMap<CraftingTreeNode> getRecursiveDisplayRequestsMarker() {
+        return new Reference2LongOpenHashMap<>(this.recursiveDisplayRequests);
     }
 
-    void restoreRecursiveDisplayRequestsMarker(IdentityHashMap<CraftingTreeNode, Long> marker) {
+    void restoreRecursiveDisplayRequestsMarker(Reference2LongMap<CraftingTreeNode> marker) {
         this.recursiveDisplayRequests.clear();
         this.recursiveDisplayRequests.putAll(marker);
     }
 
-    IdentityHashMap<CraftingTreeNode, Long> getRecursiveDisplayRequestsDelta(
-        IdentityHashMap<CraftingTreeNode, Long> marker) {
-        var delta = new IdentityHashMap<CraftingTreeNode, Long>();
-        for (Map.Entry<CraftingTreeNode, Long> entry : this.recursiveDisplayRequests.entrySet()) {
-            long valueDelta = entry.getValue() - marker.getOrDefault(entry.getKey(), 0L);
+    Reference2LongMap<CraftingTreeNode> getRecursiveDisplayRequestsDelta(
+        Reference2LongMap<CraftingTreeNode> marker) {
+        var delta = new Reference2LongOpenHashMap<CraftingTreeNode>();
+        for (var entry : this.recursiveDisplayRequests.reference2LongEntrySet()) {
+            long valueDelta = entry.getLongValue() - marker.getOrDefault(entry.getKey(), 0L);
             if (valueDelta > 0) {
                 delta.put(entry.getKey(), valueDelta);
             }
@@ -1049,9 +1051,9 @@ public class CraftingCalculation {
         return delta;
     }
 
-    void addRecursiveDisplayRequests(IdentityHashMap<CraftingTreeNode, Long> delta) {
-        for (Map.Entry<CraftingTreeNode, Long> entry : delta.entrySet()) {
-            addRecursiveDisplayRequest(entry.getKey(), entry.getValue());
+    void addRecursiveDisplayRequests(Reference2LongMap<CraftingTreeNode> delta) {
+        for (var entry : delta.reference2LongEntrySet()) {
+            addRecursiveDisplayRequest(entry.getKey(), entry.getLongValue());
         }
     }
 
@@ -1084,11 +1086,11 @@ public class CraftingCalculation {
         this.recursiveMissingSeeds.addAll(marker);
     }
 
-    HashSet<AEKey> getRealSeededRecursiveRequestsMarker() {
-        return new HashSet<>(this.realSeededRecursiveRequests);
+    Set<AEKey> getRealSeededRecursiveRequestsMarker() {
+        return new ObjectOpenHashSet<>(this.realSeededRecursiveRequests);
     }
 
-    void restoreRealSeededRecursiveRequestsMarker(HashSet<AEKey> marker) {
+    void restoreRealSeededRecursiveRequestsMarker(Set<AEKey> marker) {
         this.realSeededRecursiveRequests.clear();
         this.realSeededRecursiveRequests.addAll(marker);
     }
@@ -1097,11 +1099,11 @@ public class CraftingCalculation {
         this.realSeededRecursiveRequests.addAll(requests);
     }
 
-    HashSet<AEKey> getRealRecursiveSeedsMarker() {
-        return new HashSet<>(this.realRecursiveSeeds);
+    Set<AEKey> getRealRecursiveSeedsMarker() {
+        return new ObjectOpenHashSet<>(this.realRecursiveSeeds);
     }
 
-    void restoreRealRecursiveSeedsMarker(HashSet<AEKey> marker) {
+    void restoreRealRecursiveSeedsMarker(Set<AEKey> marker) {
         this.realRecursiveSeeds.clear();
         this.realRecursiveSeeds.addAll(marker);
     }
@@ -1114,11 +1116,11 @@ public class CraftingCalculation {
         }
     }
 
-    HashSet<AEKey> getRealSeededRecursiveKeysMarker() {
-        return new HashSet<>(this.realSeededRecursiveKeys);
+    Set<AEKey> getRealSeededRecursiveKeysMarker() {
+        return new ObjectOpenHashSet<>(this.realSeededRecursiveKeys);
     }
 
-    void restoreRealSeededRecursiveKeysMarker(HashSet<AEKey> marker) {
+    void restoreRealSeededRecursiveKeysMarker(Set<AEKey> marker) {
         this.realSeededRecursiveKeys.clear();
         this.realSeededRecursiveKeys.addAll(marker);
     }
@@ -1335,10 +1337,10 @@ public class CraftingCalculation {
 
     private record RecursiveReserveBranchMarker(KeyCounter missingItems,
                                                 KeyCounter recursiveMissingSeeds,
-                                                HashSet<AEKey> realSeededRecursiveRequests,
-                                                HashSet<AEKey> realRecursiveSeeds,
-                                                HashSet<AEKey> realSeededRecursiveKeys,
-                                                IdentityHashMap<CraftingTreeNode, Long> recursiveDisplayRequests,
+                                                Set<AEKey> realSeededRecursiveRequests,
+                                                Set<AEKey> realRecursiveSeeds,
+                                                Set<AEKey> realSeededRecursiveKeys,
+                                                Reference2LongMap<CraftingTreeNode> recursiveDisplayRequests,
                                                 long intermediateFinalOutputAmount) {
     }
 

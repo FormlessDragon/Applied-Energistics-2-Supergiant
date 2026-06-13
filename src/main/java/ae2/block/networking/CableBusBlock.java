@@ -24,9 +24,9 @@ import ae2.api.util.ICustomName;
 import ae2.block.AEBaseTileBlock;
 import ae2.client.render.cablebus.CableBusBakedModel;
 import ae2.client.render.cablebus.CableBusBreakingParticle;
-import ae2.client.render.cablebus.CableBusRenderState;
 import ae2.core.DebugCreativeTab;
 import ae2.helpers.ICustomCollision;
+import ae2.helpers.cablebus.CableBusRenderState;
 import ae2.tile.networking.TileCableBus;
 import ae2.util.Platform;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -64,8 +64,8 @@ import net.minecraftforge.common.property.IExtendedBlockState;
 import net.minecraftforge.common.property.IUnlistedProperty;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
-
 import org.jetbrains.annotations.Nullable;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;

@@ -7,7 +7,8 @@
     },
     [
       {
-        "item": "minecraft:coal"
+        "item": "minecraft:coal",
+        "data": 0
       },
       {
         "item": "minecraft:coal",
@@ -16,7 +17,8 @@
     ],
     [
       {
-        "item": "minecraft:coal"
+        "item": "minecraft:coal",
+        "data": 0
       },
       {
         "item": "minecraft:coal",
