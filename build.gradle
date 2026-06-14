@@ -126,6 +126,7 @@ unimined.minecraft {
             if (extraArgs != null && !extraArgs.trim().isEmpty()) {
                 jvmArgs += extraArgs.split { "\\s+" }.toList()
             }
+            systemProperty('mixin.debug.export', 'true')
             if (propertyBool('enable_foundation_debug')) {
                 systemProperty("foundation.dump", "true")
                 systemProperty("foundation.verbose", "true")

@@ -92,6 +92,7 @@ import yalter.mousetweaks.api.IMTModGuiContainer2;
 
 import java.awt.Rectangle;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -1475,6 +1476,10 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
     protected void onReturnFromSubScreen(AEBaseGui<?> subScreen) {
         Objects.requireNonNull(subScreen, "subScreen");
+    }
+
+    public Collection<? extends Slot> getHEISlots(Object ingredient) {
+        return container.inventorySlots;
     }
 
     private static final class SavedSlotInfo {

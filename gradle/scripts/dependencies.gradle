@@ -41,7 +41,8 @@ dependencies {
     // IndustrialCraft 2
     modCompileOnly "curse.maven:industrial-craft-242638:2746892"
     // HEI
-    modImplementation "curse.maven:had-enough-items-557549:7938914"
+    compileOnly 'mezz:jei:4.31.2'
+    modRuntimeOnly 'mezz:jei:4.31.2'
     // The One Probe
     modImplementation "curse.maven:the-one-probe-245211:2667280"
     //EIO Core

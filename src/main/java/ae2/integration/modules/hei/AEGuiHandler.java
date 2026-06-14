@@ -121,9 +121,9 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         return stack != null ? GenericStack.wrapInItemStack(stack) : ItemStack.EMPTY;
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     @NotNull
     @Override
-    @SuppressWarnings({"unchecked", "rawtypes"})
     public Class<AEBaseGui<?>> getGuiContainerClass() {
         return (Class) AEBaseGui.class;
     }
@@ -152,12 +152,11 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
 
     @NotNull
     @Override
-    @SuppressWarnings("unchecked")
     public <I> List<Target<I>> getTargets(@NotNull AEBaseGui<?> gui, @NotNull I ingredient, boolean doStart) {
         if (doStart) {
             this.currentGhostIngredient = ingredient;
         }
-        return (List<Target<I>>) (List<?>) getTargetsForIngredient(gui, ingredient);
+        return getTargetsForIngredient(gui, ingredient);
     }
 
     @Override
@@ -167,7 +166,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
 
     @Override
     public boolean shouldHighlightTargets() {
-        return true;
+        return IGhostIngredientHandler.super.shouldHighlightTargets();
     }
 
     @Nullable
@@ -175,24 +174,24 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         return this.currentGhostIngredient;
     }
 
-    public List<Target<Object>> getTargetsForIngredient(AEBaseGui<?> gui, Object ingredient) {
-        List<Target<Object>> targets = new ObjectArrayList<>();
+    public <I> List<Target<I>> getTargetsForIngredient(AEBaseGui<?> gui, I ingredient) {
+        List<Target<I>> targets = new ObjectArrayList<>();
 
-        for (var slot : gui.getContainer().inventorySlots) {
+        for (var slot : gui.getHEISlots(ingredient)) {
             if (!(slot instanceof FakeSlot fakeSlot) || !fakeSlot.isEnabled()) {
                 continue;
             }
 
             ItemStack stack = toFilterStack(fakeSlot, ingredient);
             if (!stack.isEmpty()) {
-                targets.add(new FakeSlotTarget(gui, fakeSlot));
+                targets.add(new FakeSlotTarget<>(gui, fakeSlot));
             }
         }
 
         if (gui instanceof ITextFieldGui g) {
             for (var field : g.getTextFields()) {
                 if (field.getVisible()) {
-                    targets.add(new TextFieldTarget(gui, field));
+                    targets.add(new TextFieldTarget<>(gui, field));
                 }
             }
         }
@@ -200,7 +199,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         return targets;
     }
 
-    private record FakeSlotTarget(AEBaseGui<?> gui, FakeSlot slot) implements Target<Object> {
+    private record FakeSlotTarget <T> (AEBaseGui<?> gui, FakeSlot slot) implements Target<T> {
 
         @Override
         public Rectangle getArea() {
@@ -208,7 +207,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         }
 
         @Override
-        public void accept(@NotNull Object ingredient) {
+        public void accept(@NotNull T ingredient) {
             if (!this.slot.isEnabled()) {
                 return;
             }
@@ -228,7 +227,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
 
     }
 
-    private record TextFieldTarget(AEBaseGui<?> gui, GuiTextField field) implements Target<Object> {
+    private record TextFieldTarget <T> (AEBaseGui<?> gui, GuiTextField field) implements Target<T> {
 
         @Override
         public Rectangle getArea() {
