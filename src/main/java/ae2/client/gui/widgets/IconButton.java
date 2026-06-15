@@ -45,6 +45,7 @@ public abstract class IconButton extends GuiButton implements ITooltip {
     private boolean disableClickSound;
     private boolean disableBackground;
     private boolean focused;
+    private float iconScale = 1.0F;
     private ITextComponent message = new TextComponentString("");
 
     public IconButton(Runnable onPress) {
@@ -99,17 +100,17 @@ public abstract class IconButton extends GuiButton implements ITooltip {
         int yOffset = this.hovered ? 1 : 0;
 
         if (this.halfSize) {
+            float contentX = this.disableBackground ? this.x : this.x + 0.25F;
+            float contentY = this.disableBackground ? this.y : this.y + 0.5F;
             if (!disableBackground) {
-                Icon.TOOLBAR_BUTTON_BACKGROUND.getBlitter().dest(this.x, this.y).zOffset(10).blit();
+                Icon backgroundIcon = this.hovered ? Icon.TOOLBAR_BUTTON_BACKGROUND_HOVER
+                    : this.isFocused() ? Icon.TOOLBAR_BUTTON_BACKGROUND_FOCUS : Icon.TOOLBAR_BUTTON_BACKGROUND;
+                renderScaledBackground(backgroundIcon, this.x, this.y, 10);
             }
             if (!item.isEmpty()) {
-                renderItem(minecraft, item, this.x, this.y, 20);
+                renderItem(minecraft, item, contentX, contentY, 20);
             } else if (icon != null) {
-                Blitter blitter = icon.getBlitter().copy();
-                if (!this.enabled) {
-                    blitter.opacity(0.5f);
-                }
-                blitter.dest(this.x, this.y).zOffset(20).blit();
+                renderIcon(icon, contentX, contentY, 20, true);
             }
         } else {
             if (!disableBackground) {
@@ -124,7 +125,7 @@ public abstract class IconButton extends GuiButton implements ITooltip {
             if (!item.isEmpty()) {
                 renderItem(minecraft, item, this.x, this.y + 1 + yOffset, 3);
             } else if (icon != null) {
-                icon.getBlitter().dest(this.x, this.y + 1 + yOffset).zOffset(3).blit();
+                renderIcon(icon, this.x, this.y + 1 + yOffset, 3, false);
             }
         }
     }
@@ -206,13 +207,61 @@ public abstract class IconButton extends GuiButton implements ITooltip {
         this.focused = focused;
     }
 
-    private void renderItem(Minecraft minecraft, ItemStack itemStack, int x, int y, int zOffset) {
+    protected float getIconScale() {
+        return this.iconScale;
+    }
+
+    public void setIconScale(float iconScale) {
+        if (iconScale <= 0.0F) {
+            throw new IllegalArgumentException("iconScale must be positive");
+        }
+        this.iconScale = iconScale;
+    }
+
+    private void renderScaledBackground(Icon icon, int x, int y, int zOffset) {
         GlStateManager.pushMatrix();
-        GlStateManager.translate(0, 0, zOffset);
+        GlStateManager.translate(x, y, zOffset);
+        GlStateManager.scale(0.5F, 0.5F, 1.0F);
+        icon.getBlitter().dest(0, 0).blit();
+        GlStateManager.popMatrix();
+    }
+
+    private void renderIcon(Icon icon, float x, float y, int zOffset, boolean dimWhenDisabled) {
+        if (this.iconScale == 1.0F) {
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(x, y, zOffset);
+            Blitter blitter = icon.getBlitter().copy();
+            if (dimWhenDisabled && !this.enabled) {
+                blitter.opacity(0.5f);
+            }
+            blitter.dest(0, 0).blit();
+            GlStateManager.popMatrix();
+            return;
+        }
+
+        float scaledWidth = icon.width * this.iconScale;
+        float scaledHeight = icon.height * this.iconScale;
+        float translatedX = x + (this.width - scaledWidth) * 0.5F;
+        float translatedY = y + (this.height - scaledHeight) * 0.5F;
+
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(translatedX, translatedY, zOffset);
+        GlStateManager.scale(this.iconScale, this.iconScale, 1.0F);
+        Blitter blitter = icon.getBlitter().copy();
+        if (dimWhenDisabled && !this.enabled) {
+            blitter.opacity(0.5f);
+        }
+        blitter.dest(0, 0).blit();
+        GlStateManager.popMatrix();
+    }
+
+    private void renderItem(Minecraft minecraft, ItemStack itemStack, float x, float y, int zOffset) {
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(x, y, zOffset);
         GlStateManager.enableDepth();
         RenderHelper.enableGUIStandardItemLighting();
-        this.itemRenderer.renderItemAndEffectIntoGUI(itemStack, x, y);
-        this.itemRenderer.renderItemOverlayIntoGUI(minecraft.fontRenderer, itemStack, x, y, null);
+        this.itemRenderer.renderItemAndEffectIntoGUI(itemStack, 0, 0);
+        this.itemRenderer.renderItemOverlayIntoGUI(minecraft.fontRenderer, itemStack, 0, 0, null);
         RenderHelper.disableStandardItemLighting();
         GlStateManager.disableDepth();
         GlStateManager.popMatrix();

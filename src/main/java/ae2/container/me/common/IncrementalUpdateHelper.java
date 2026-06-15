@@ -56,12 +56,12 @@ public class IncrementalUpdateHelper implements Iterable<AEKey> {
         return this.mapping.get(stack);
     }
 
-    public long getOrAssignSerial(AEKey key) {
+    public Long getOrAssignSerial(AEKey key) {
         return this.mapping.computeIfAbsent(key, ignored -> ++this.serial);
     }
 
     @Nullable
-    public AEKey getBySerial(long serial) {
+    public AEKey getBySerial(Long serial) {
         return this.mapping.inverse().get(serial);
     }
 

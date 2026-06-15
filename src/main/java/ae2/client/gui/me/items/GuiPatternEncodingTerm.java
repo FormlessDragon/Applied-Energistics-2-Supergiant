@@ -41,7 +41,9 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodingTerm> {
@@ -49,6 +51,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     private final Map<EncodingMode, TabButton> modeTabButtons = new EnumMap<>(EncodingMode.class);
     private final SettingToggleButton<YesNo> autoFillPatternsButton;
     private final PatternModifierPanelWidget patternModifierPanel;
+    private final IconButton uploadPatternButton;
 
     public GuiPatternEncodingTerm(ContainerPatternEncodingTerm container, InventoryPlayer playerInventory,
                                   @Nullable ITextComponent title, GuiStyle style) {
@@ -57,6 +60,28 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
             new ServerSettingToggleButton<>(Settings.PATTERN_AUTO_FILL, YesNo.NO));
         addMode(EncodingMode.CRAFTING, new CraftingEncodingPanel(this, widgets), 0);
         addMode(EncodingMode.PROCESSING, new ProcessingEncodingPanel(this, widgets), 1);
+        this.uploadPatternButton = new IconButton(this::uploadPattern) {
+            {
+                setHalfSize(true);
+                setIconScale(0.5F);
+                setMessage(ButtonToolTips.PatternUpload.text());
+                setVisibility(false);
+            }
+
+            @Override
+            protected Icon getIcon() {
+                return Icon.PATTERN_UPLOAD;
+            }
+
+            @Override
+            public List<ITextComponent> getTooltipMessage() {
+                return Arrays.asList(
+                    ButtonToolTips.PatternUpload.text(),
+                    ButtonToolTips.PatternUploadHint.text(),
+                    ButtonToolTips.PatternUploadShiftHint.text());
+            }
+        };
+        widgets.add("uploadPattern", this.uploadPatternButton);
         widgets.add("encodePattern", new ActionButton(ActionItems.ENCODE,
             () -> container.encode(Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)
                 || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT))));
@@ -120,6 +145,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
                 panel.setVisible(selected);
             }
         }
+        updateUploadPatternButton();
         this.patternModifierPanel.update();
     }
 
@@ -153,6 +179,19 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     @Override
     public void onGuiClosed() {
         super.onGuiClosed();
+    }
+
+    private void uploadPattern() {
+        if (this.container.getMode() != EncodingMode.CRAFTING) {
+            return;
+        }
+        this.container.uploadPattern(Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)
+            || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT));
+    }
+
+    private void updateUploadPatternButton() {
+        boolean visible = this.container.getMode() == EncodingMode.CRAFTING;
+        this.uploadPatternButton.setVisibility(visible);
     }
 
     @Override

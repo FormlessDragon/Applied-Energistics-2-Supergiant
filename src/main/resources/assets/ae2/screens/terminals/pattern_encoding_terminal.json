@@ -82,6 +82,12 @@
       "left": 147,
       "bottom": 145
     },
+    "uploadPattern": {
+      "left": 165,
+      "bottom": 140,
+      "width": 8,
+      "height": 8
+    },
     "patternModifierPanel": {
       "left": -126,
       "top": 59,

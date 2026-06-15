@@ -444,11 +444,10 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         }
 
         Object ingredient = hei.getCurrentGhostIngredient();
-        if (ingredient == null) {
+        if (!(ingredient instanceof ItemStack displayStack)) {
             return false;
         }
 
-        ItemStack displayStack = hei.getDisplayStack(ingredient);
         if (displayStack.isEmpty()) {
             return false;
         }
@@ -936,16 +935,20 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         }
 
         Object ingredient = hei.getCurrentGhostIngredient();
-        if (ingredient == null) {
-            return null;
+        if (!(ingredient instanceof ItemStack displayStack)) {
+            var g = Integrations.hei().ingredientToStack(ingredient);
+            return g == null ? null : buildTextFieldInsertionTooltip(g);
         }
 
-        ItemStack displayStack = hei.getDisplayStack(ingredient);
         if (displayStack.isEmpty()) {
             return null;
         }
 
         return buildTextFieldInsertionTooltip(displayStack);
+    }
+
+    private List<ITextComponent> buildTextFieldInsertionTooltip(GenericStack stack) {
+        return Collections.singletonList(buildTextFieldInsertionAction(0, stack.what().getDisplayName().getFormattedText()));
     }
 
     private List<ITextComponent> buildTextFieldInsertionTooltip(ItemStack stack) {
@@ -1478,6 +1481,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         Objects.requireNonNull(subScreen, "subScreen");
     }
 
+    @SuppressWarnings("unused")
     public Collection<? extends Slot> getHEISlots(Object ingredient) {
         return container.inventorySlots;
     }

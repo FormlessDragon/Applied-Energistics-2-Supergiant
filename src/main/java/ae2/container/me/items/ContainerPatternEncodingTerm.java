@@ -2,11 +2,15 @@ package ae2.container.me.items;
 
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
+import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.PatternDetailsHelper;
+import ae2.api.inventories.InternalInventory;
+import ae2.api.networking.IGrid;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
+import ae2.api.storage.ILinkStatus;
 import ae2.api.storage.StorageHelper;
 import ae2.container.GuiIds;
 import ae2.container.SlotSemantics;
@@ -18,17 +22,22 @@ import ae2.container.slot.PatternTermSlot;
 import ae2.container.slot.RestrictedInputSlot;
 import ae2.container.slot.SlotBackgroundIcon;
 import ae2.core.definitions.AEItems;
+import ae2.core.localization.PlayerMessages;
 import ae2.crafting.pattern.AECraftingPattern;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.helpers.IPatternTerminalGuiHost;
+import ae2.helpers.patternprovider.PatternContainer;
 import ae2.parts.encoding.EncodingMode;
 import ae2.parts.encoding.PatternEncodingLogic;
 import ae2.parts.encoding.ProcessingPatternAmountHelper;
 import ae2.util.ConfigGuiInventory;
 import ae2.util.ConfigInventory;
+import ae2.util.inv.FilteredInternalInventory;
+import ae2.util.inv.filter.IAEItemFilter;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.shorts.ShortSet;
+import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Container;
@@ -39,10 +48,12 @@ import net.minecraft.item.crafting.CraftingManager;
 import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.nbt.JsonToNBT;
 import net.minecraft.nbt.NBTException;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 public class ContainerPatternEncodingTerm extends ContainerMEStorage implements PatternModifierPanel.Host {
@@ -65,6 +76,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     private static final String ACTION_PROCESSING_DIVIDE_5 = "processingDivide5";
     private static final String ACTION_RENAME_PROCESSING_PATTERN_ITEM = "renameProcessingPatternItem";
     private static final String ACTION_SET_HEI_PROCESSING_RECIPE = "setHeiProcessingRecipe";
+    private static final String ACTION_UPLOAD_PATTERN = "uploadPattern";
     private static final int MAX_RENAME_PROCESSING_PATTERN_ITEM_PAYLOAD_LENGTH = 512;
     private static final int MAX_SET_HEI_PROCESSING_RECIPE_PAYLOAD_LENGTH = 16384;
     private static final int MAX_CUSTOM_NAME_LENGTH = 32;
@@ -175,6 +187,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         registerClientAction(ACTION_SET_HEI_PROCESSING_RECIPE, HeiProcessingRecipeRequest.class,
             MAX_SET_HEI_PROCESSING_RECIPE_PAYLOAD_LENGTH,
             this::setHeiProcessingRecipe);
+        registerClientAction(ACTION_UPLOAD_PATTERN, Boolean.class, this::uploadPattern);
         this.patternModifierPanel = new PatternModifierPanel(this);
         this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
 
@@ -384,6 +397,10 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         insertEncodedPatternIntoOutputSlot(encodedPattern.copy());
     }
 
+    private static boolean isAcceptedByContainer(PatternContainer container, @Nullable IPatternDetails details) {
+        return details != null && (details instanceof IAssemblerPattern) == container.isAssemblerPatternContainer();
+    }
+
     private boolean insertEncodedPatternIntoModifierOrInventory(ItemStack encodedPattern) {
         ItemStack remaining = this.patternModifierPanel.insertPattern(encodedPattern, false);
         if (remaining.isEmpty()) {
@@ -396,6 +413,178 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
 
     private void insertEncodedPatternIntoOutputSlot(ItemStack encodedPattern) {
         this.encodedPatternSlot.putStack(encodedPattern);
+    }
+
+    public void uploadPattern(boolean shiftDown) {
+        if (isClientSide()) {
+            sendClientAction(ACTION_UPLOAD_PATTERN, shiftDown);
+            return;
+        }
+
+        ILinkStatus linkStatus = getLinkStatus();
+        if (!linkStatus.connected()) {
+            if (linkStatus.statusDescription() != null) {
+                getPlayer().sendStatusMessage(linkStatus.statusDescription(), false);
+            }
+            return;
+        }
+
+        ItemStack encodedPattern = this.encodedPatternSlot.getStack();
+        if (!PatternDetailsHelper.isEncodedPattern(encodedPattern)) {
+            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoEncodedPattern.text(), false);
+            return;
+        }
+
+        IPatternDetails details = PatternDetailsHelper.decodePattern(encodedPattern, getPlayer().world);
+        if (!(details instanceof IAssemblerPattern)) {
+            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadAssemblerOnly.text(), false);
+            return;
+        }
+
+        AEItemKey patternKey = AEItemKey.of(encodedPattern);
+        if (patternKey == null) {
+            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoEncodedPattern.text(), false);
+            return;
+        }
+
+        IGrid grid = getGridNode() == null ? null : getGridNode().grid();
+        if (grid == null) {
+            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoTarget.text(), false);
+            return;
+        }
+
+        if (!shiftDown && grid.getCraftingService().isKnownPattern(patternKey)) {
+            handleDuplicateUploadFailure(PlayerMessages.PatternUploadDuplicateInNetwork);
+            return;
+        }
+
+        List<PatternContainer> candidates = collectAssemblerPatternContainers(grid);
+        boolean duplicateInContainer = false;
+        boolean nonDuplicateCandidateFound = false;
+        for (PatternContainer container : candidates) {
+            if (container.containsPattern(patternKey)) {
+                duplicateInContainer = true;
+                continue;
+            }
+
+            nonDuplicateCandidateFound = true;
+            if (movePatternToFirstAvailableSlot(container, encodedPattern.copy())) {
+                this.encodedPatternSlot.putStack(ItemStack.EMPTY);
+                return;
+            }
+        }
+
+        if (duplicateInContainer && !nonDuplicateCandidateFound) {
+            handleDuplicateUploadFailure(PlayerMessages.PatternUploadDuplicateInContainer);
+            return;
+        }
+
+        getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoTarget.text(), false);
+    }
+
+    private List<PatternContainer> collectAssemblerPatternContainers(IGrid grid) {
+        List<PatternContainer> containers = new ArrayList<>();
+        for (Class<?> machineClass : grid.getMachineClasses()) {
+            if (!PatternContainer.class.isAssignableFrom(machineClass)) {
+                continue;
+            }
+
+            Class<? extends PatternContainer> containerClass = machineClass.asSubclass(PatternContainer.class);
+            for (PatternContainer container : grid.getActiveMachines(containerClass)) {
+                if (container.isVisibleInTerminal() && container.isAssemblerPatternContainer()) {
+                    containers.add(container);
+                }
+            }
+        }
+        containers.sort(Comparator.comparingLong(PatternContainer::getTerminalSortOrder));
+        return containers;
+    }
+
+    private boolean movePatternToFirstAvailableSlot(PatternContainer container, ItemStack encodedPattern) {
+        InternalInventory inventory = container.getTerminalPatternInventory();
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            if (!inventory.getStackInSlot(slot).isEmpty()) {
+                continue;
+            }
+
+            InternalInventory targetSlot = new FilteredInternalInventory(inventory.getSlotInv(slot),
+                new PatternSlotFilter(container, getPlayer().world));
+            ItemStack remainder = targetSlot.addItems(encodedPattern.copy());
+            if (remainder.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void handleDuplicateUploadFailure(PlayerMessages message) {
+        ItemStack encodedPattern = this.encodedPatternSlot.getStack();
+        if (encodedPattern.isEmpty()) {
+            getPlayer().sendStatusMessage(message.text(), false);
+            return;
+        }
+
+        ItemStack blankPattern = AEItems.BLANK_PATTERN.stack(encodedPattern.getCount());
+        this.encodedPatternSlot.putStack(ItemStack.EMPTY);
+        blankPattern = insertBlankPatternIntoBlankSlot(blankPattern);
+        blankPattern = insertBlankPatternIntoPlayerInventory(blankPattern);
+        blankPattern = insertBlankPatternIntoNetwork(blankPattern);
+        if (!blankPattern.isEmpty()) {
+            dropBlankPattern(blankPattern);
+        }
+        getPlayer().sendStatusMessage(message.text(), false);
+    }
+
+    private ItemStack insertBlankPatternIntoBlankSlot(ItemStack blankPattern) {
+        return this.blankPatternSlot.getSlotInv().addItems(blankPattern);
+    }
+
+    private ItemStack insertBlankPatternIntoPlayerInventory(ItemStack blankPattern) {
+        if (blankPattern.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+
+        ItemStack remaining = blankPattern.copy();
+        if (getPlayerInventory().addItemStackToInventory(remaining)) {
+            return ItemStack.EMPTY;
+        }
+        return remaining;
+    }
+
+    private ItemStack insertBlankPatternIntoNetwork(ItemStack blankPattern) {
+        if (blankPattern.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+
+        AEItemKey blankPatternKey = AEItemKey.of(blankPattern);
+        if (blankPatternKey == null) {
+            return blankPattern;
+        }
+
+        long inserted = StorageHelper.poweredInsert(this.energySource, this.storage, blankPatternKey,
+            blankPattern.getCount(), getActionSource());
+        if (inserted <= 0) {
+            return blankPattern;
+        }
+
+        ItemStack remaining = blankPattern.copy();
+        remaining.shrink((int) inserted);
+        return remaining;
+    }
+
+    private void dropBlankPattern(ItemStack blankPattern) {
+        if (blankPattern.isEmpty() || getPlayer().world == null) {
+            return;
+        }
+
+        EntityItem drop = getPlayer().dropItem(blankPattern, false);
+        if (drop != null) {
+            drop.setNoPickupDelay();
+        }
+    }
+
+    public ItemStack getEncodedPatternStack() {
+        return this.encodedPatternSlot.getStack();
     }
 
     private boolean consumeBlankPatternForEncoding() {
@@ -683,6 +872,15 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
 
     public long getSyncedNetworkBlankPatternCount() {
         return this.networkBlankPatternCount;
+    }
+
+    private record PatternSlotFilter(PatternContainer container, World level) implements IAEItemFilter {
+
+        @Override
+        public boolean allowInsert(InternalInventory inv, int slot, ItemStack stack) {
+            return !stack.isEmpty()
+                && isAcceptedByContainer(this.container, PatternDetailsHelper.decodePattern(stack, this.level));
+        }
     }
 
     private long computeNetworkBlankPatternCount() {

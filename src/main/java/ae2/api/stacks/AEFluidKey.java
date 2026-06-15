@@ -10,7 +10,7 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
+import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidRegistry;
@@ -148,7 +148,7 @@ public final class AEFluidKey extends AEKey {
 
     @Override
     protected ITextComponent computeDisplayName() {
-        return new TextComponentTranslation(stack.getUnlocalizedName());
+        return new TextComponentString(stack.getLocalizedName());
     }
 
     @Override

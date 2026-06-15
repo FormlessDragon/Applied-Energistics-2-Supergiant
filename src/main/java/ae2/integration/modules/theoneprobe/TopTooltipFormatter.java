@@ -1,7 +1,5 @@
 package ae2.integration.modules.theoneprobe;
 
-import ae2.api.stacks.AEFluidKey;
-import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.core.localization.LocalizationEnum;
 import mcjty.theoneprobe.api.IProbeInfo;
@@ -55,15 +53,7 @@ public final class TopTooltipFormatter {
     }
 
     public static String displayName(AEKey key) {
-        if (key instanceof AEItemKey itemKey) {
-            return displayName(itemKey.toStack());
-        }
-
-        if (key instanceof AEFluidKey fluidKey) {
-            return fluidKey.toStack(1).getLocalizedName();
-        }
-
-        return key.toString();
+        return key.getDisplayName().getFormattedText();
     }
 
     public static String p2pFrequency(short frequency) {

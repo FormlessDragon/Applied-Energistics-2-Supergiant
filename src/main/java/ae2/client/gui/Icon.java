@@ -71,6 +71,7 @@ public final class Icon {
     public static final Icon TAB_PROCESSING = registerBuiltin("tab_processing", 16, 16);
 
     public static final Icon ARROW_UP = registerBuiltin("arrow_up", 16, 16);
+    public static final Icon PATTERN_UPLOAD = registerBuiltin("pattern_upload", 16, 16);
     public static final Icon ARROW_DOWN = registerBuiltin("arrow_down", 16, 16);
     public static final Icon ARROW_RIGHT = registerBuiltin("arrow_right", 16, 16);
     public static final Icon ARROW_LEFT = registerBuiltin("arrow_left", 16, 16);
