@@ -30,10 +30,6 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
     @Nullable
     private Object currentGhostIngredient;
 
-    private static Rectangle toRectangle(Rectangle rect) {
-        return new Rectangle(rect.x, rect.y, rect.width, rect.height);
-    }
-
     static ItemStack toFilterStack(FakeSlot slot, Object ingredient) {
         ItemStack directStack = toPacketFilterStack(ingredient);
         if (!directStack.isEmpty()) {
@@ -130,10 +126,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
 
     @Override
     public List<Rectangle> getGuiExtraAreas(@NotNull AEBaseGui<?> guiContainer) {
-        return guiContainer.getExclusionZones()
-                           .stream()
-                           .map(AEGuiHandler::toRectangle)
-                           .toList();
+        return guiContainer.getExclusionZones();
     }
 
     @Override

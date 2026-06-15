@@ -49,7 +49,9 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.capabilities.Capability;
 import org.jetbrains.annotations.Nullable;
 
+
 import java.util.List;
+import java.util.Objects;
 
 public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
 
@@ -69,6 +71,7 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     private BlockOrientation lastOrientation = BlockOrientation.NORTH_UP;
     private boolean orientationInitialized = false;
     private boolean pendingVisualStateUpdate = false;
+    private boolean init = false;
 
     @Override
     public final void readFromNBT(NBTTagCompound compound) {
@@ -200,9 +203,11 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     }
 
     protected boolean readFromStream(ByteBuf data) {
+        boolean init = this.init;
+        this.init = false;
         String oldCustomName = this.customName;
         this.customName = CustomNameUtil.readNullableString(data);
-        boolean changed = !java.util.Objects.equals(this.customName, oldCustomName);
+        boolean changed = !Objects.equals(this.customName, oldCustomName);
 
         if (!this.canBeRotated()) {
             return changed;
@@ -220,7 +225,7 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
             return changed;
         }
         this.orientationResolved = true;
-        return changed | this.setOrientationInternal(newForward, newUp);
+        return !init || (changed | this.setOrientationInternal(newForward, newUp));
     }
 
     private boolean readUpdateData(NBTTagCompound tag, String failureMessage) {

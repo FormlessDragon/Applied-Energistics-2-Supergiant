@@ -5,11 +5,14 @@ import ae2.me.ticker.ProfileData;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumFacing;
 
+import java.awt.Rectangle;
+
 public final class EmptyArrays {
 
     public static final byte[] EMPTY_BYTE_ARRAY = {};
     public static final long[] EMPTY_LONG_ARRAY = {};
     public static final String[] EMPTY_STRING_ARRAY = {};
+    public static final Rectangle[] EMPTY_RECTANGLE_ARRAY = {};
     public static final EnumFacing[] EMPTY_FACING_ARRAY = {};
     public static final Object[] EMPTY_OBJECT_ARRAY = {};
     public static final ItemStack[] EMPTY_ITEM_STACK_ARRAY = {};

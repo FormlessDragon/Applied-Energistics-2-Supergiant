@@ -81,6 +81,7 @@ import ae2.tile.storage.TileDrive;
 import ae2.tile.storage.TileMEChest;
 import ae2.tile.storage.TileSkyChest;
 import ae2.tile.storage.TileSkyStoneTank;
+import ae2.util.MouseHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.util.math.BlockPos;
@@ -108,6 +109,7 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
+import java.awt.Rectangle;
 import java.util.Random;
 
 @SideOnly(Side.CLIENT)
@@ -165,15 +167,28 @@ public final class AppEngClient extends AppEngServer {
         MinecraftForge.EVENT_BUS.register(NetworkRender.INSTANCE);
         MinecraftForge.EVENT_BUS.register(ProfileRender.INSTANCE);
         MinecraftForge.EVENT_BUS.register(BeamFormerBloom.INSTANCE);
+        MinecraftForge.EVENT_BUS.register(MouseHelper.INSTANCE);
         MinecraftForge.EVENT_BUS.register(new Object() {
             @SubscribeEvent(priority = EventPriority.HIGH)
             public void onMouseInput(GuiScreenEvent.MouseInputEvent.Pre event) {
                 if (event.getGui() instanceof AEBaseGui<?> a) {
-                    if (a.handleAeMouseWheelInput()) {
+                    if (inGui(a, MouseHelper.getMouseX(), MouseHelper.getMouseY()) && a.handleAeMouseWheelInput()) {
                         event.setCanceled(true);
                         event.setResult(Event.Result.ALLOW);
                     }
                 }
+            }
+
+            private boolean inGui(AEBaseGui<?> gui, int x, int y) {
+                if (gui.getBounds(true).contains(x, y)) {
+                    return true;
+                }
+                for (Rectangle rectangle : gui.getArrayExclusionZones()) {
+                    if (rectangle.contains(x, y)) {
+                        return true;
+                    }
+                }
+                return false;
             }
         });
         Integrations.hei().registerClientFeatures();

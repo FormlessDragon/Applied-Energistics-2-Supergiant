@@ -63,6 +63,7 @@ import ae2.core.network.serverbound.SwapSlotsPacket;
 import ae2.helpers.InventoryAction;
 import ae2.integration.Integrations;
 import ae2.items.tools.powered.WirelessUniversalTerminalItem;
+import ae2.util.EmptyArrays;
 import com.google.common.base.Stopwatch;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -92,6 +93,7 @@ import yalter.mousetweaks.api.IMTModGuiContainer2;
 
 import java.awt.Rectangle;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -119,12 +121,20 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     private final Map<String, TextOverride> textOverrides = new Object2ObjectOpenHashMap<>();
     private final Set<SlotSemantic> hiddenSlots = new ObjectOpenHashSet<>();
     private final List<SavedSlotInfo> savedSlotInfos = new ObjectArrayList<>();
+    private List<Rectangle> cachedExclusionZones = new ObjectArrayList<>();
+    private Rectangle[] arrayExclusionZones = EmptyArrays.EMPTY_RECTANGLE_ARRAY;
     private boolean disableShiftClick;
     private Stopwatch dbl_clickTimer = Stopwatch.createStarted();
     private ItemStack dbl_whichItem = ItemStack.EMPTY;
     private Slot bl_clicked;
     private boolean handlingRightClick;
     private boolean suppressVanillaSlotHover;
+    private final Rectangle rectangle = new Rectangle(guiLeft, guiTop, xSize, ySize);
+    private final Rectangle rectangle2 = new Rectangle(0, 0, xSize, ySize);
+    private int cachedGuiLeft;
+    private int cachedGuiTop;
+    private int cachedXSize;
+    private int cachedYSize;
 
     protected AEBaseGui(T container, InventoryPlayer playerInventory) {
         this(container, playerInventory, null);
@@ -214,13 +224,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     private GuiStyle requireStyle() {
         return Objects.requireNonNull(style, "GUI style has not been initialized");
     }
-
-    @Override
-    public void initGui() {
-        super.initGui();
-        positionSlots();
-        widgets.populateScreen(this::addButton, getBounds(true), this);
-    }
+    private long cachedWidgetLayoutVersion = -1;
 
     protected final <B extends GuiButton> B addToLeftToolbar(B button) {
         this.verticalToolbar.add(button);
@@ -342,12 +346,23 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         renderWidgetTooltip(mouseX, mouseY);
         renderDebugGuiOverlays();
     }
+    private boolean exclusionZonesDirty = true;
 
-    private Rectangle getBounds(boolean absolute) {
+    @Override
+    public void initGui() {
+        super.initGui();
+        positionSlots();
+        widgets.populateScreen(this::addButton, getBounds(true), this);
+        invalidateExclusionZonesCache();
+    }
+
+    public final Rectangle getBounds(boolean absolute) {
         if (absolute) {
-            return new Rectangle(guiLeft, guiTop, xSize, ySize);
+            rectangle.setBounds(guiLeft, guiTop, xSize, ySize);
+            return rectangle;
         } else {
-            return new Rectangle(0, 0, xSize, ySize);
+            rectangle2.setBounds(0, 0, xSize, ySize);
+            return rectangle2;
         }
     }
 
@@ -397,8 +412,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return;
         }
 
-        for (Rectangle rect : getExclusionZones()) {
-
+        for (Rectangle rect : getArrayExclusionZones()) {
             drawGradientRect(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height,
                 0x7f00ff00, 0x7f00ff00);
         }
@@ -1332,9 +1346,38 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     }
 
     public List<Rectangle> getExclusionZones() {
-        List<Rectangle> result = new ObjectArrayList<>(2);
-        widgets.addExclusionZones(result, getBounds(true));
-        return result;
+        updateExclusionZones();
+        return this.cachedExclusionZones;
+    }
+
+    public Rectangle[] getArrayExclusionZones() {
+        updateExclusionZones();
+        return this.arrayExclusionZones;
+    }
+
+    protected void updateExclusionZones() {
+        long layoutVersion = this.widgets.getLayoutVersion();
+        if (this.exclusionZonesDirty
+            || this.cachedGuiLeft != this.guiLeft
+            || this.cachedGuiTop != this.guiTop
+            || this.cachedXSize != this.xSize
+            || this.cachedYSize != this.ySize
+            || this.cachedWidgetLayoutVersion != layoutVersion) {
+            var l = new ObjectArrayList<Rectangle>();
+            this.widgets.addExclusionZones(l, getBounds(true));
+            this.cachedGuiLeft = this.guiLeft;
+            this.cachedGuiTop = this.guiTop;
+            this.cachedXSize = this.xSize;
+            this.cachedYSize = this.ySize;
+            this.cachedWidgetLayoutVersion = layoutVersion;
+            this.exclusionZonesDirty = false;
+            this.arrayExclusionZones = l.toArray(EmptyArrays.EMPTY_RECTANGLE_ARRAY);
+            this.cachedExclusionZones = Arrays.asList(this.arrayExclusionZones);
+        }
+    }
+
+    protected final void invalidateExclusionZonesCache() {
+        this.exclusionZonesDirty = true;
     }
 
     private TextOverride getOrCreateTextOverride(String id) {

@@ -6,13 +6,12 @@ import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.container.implementations.ContainerRenamer;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
-
-import java.io.IOException;
-import java.util.Collection;
-
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
+
+import java.io.IOException;
+import java.util.Collection;
 
 public class GuiRenamer extends AEBaseGui<ContainerRenamer> implements ITextFieldGui {
 
@@ -42,8 +41,7 @@ public class GuiRenamer extends AEBaseGui<ContainerRenamer> implements ITextFiel
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
-        if (keyCode == 1 || keyCode == 28 || keyCode == 156
-            || this.mc.gameSettings.keyBindInventory.isActiveAndMatches(keyCode)) {
+        if (keyCode == 28 || keyCode == 156) {
             submitName();
             this.mc.player.closeScreen();
             return;

@@ -388,10 +388,12 @@ public class CubeBuilder {
                 case UV -> {
                     if (element.getIndex() == 0) {
                         builder.put(i, u, v);
-                    } else {
+                    } else if (this.renderFullBright) {
                         final float lightMapU = (float) (15 * 0x20) / 0xFFFF;
                         final float lightMapV = (float) (15 * 0x20) / 0xFFFF;
                         builder.put(i, lightMapU, lightMapV);
+                    } else {
+                        builder.put(i);
                     }
                 }
                 default -> builder.put(i);

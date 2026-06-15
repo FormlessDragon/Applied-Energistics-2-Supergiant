@@ -190,6 +190,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         if (AEConfig.instance().isAutoFocusSearch()) {
             setInitialFocus(this.searchField);
         }
+        invalidateExclusionZonesCache();
     }
 
     @Override

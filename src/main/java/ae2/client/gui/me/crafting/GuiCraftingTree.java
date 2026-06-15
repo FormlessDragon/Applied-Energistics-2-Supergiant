@@ -153,6 +153,7 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
         this.ySize = background.height();
         super.initGui();
         layoutWidgets();
+        invalidateExclusionZonesCache();
     }
 
     @Override

@@ -302,6 +302,7 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
         this.table.setRows(rows);
         this.xSize = CraftingScreenLayout.WIDTH;
         this.ySize = CraftingScreenLayout.getHeight(rows, FIXED_HEADER_HEIGHT, FIXED_FOOTER_HEIGHT);
+        invalidateExclusionZonesCache();
     }
 
     private void updateScrollbar(int entryCount) {

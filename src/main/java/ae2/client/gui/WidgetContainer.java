@@ -67,6 +67,7 @@ public class WidgetContainer {
     private final Object2ObjectLinkedOpenHashMap<String, ICompositeWidget> compositeWidgets = new Object2ObjectLinkedOpenHashMap<>();
     private final Object2ObjectLinkedOpenHashMap<String, ResolvedTooltipArea> tooltips = new Object2ObjectLinkedOpenHashMap<>();
     private Rectangle currentBounds = Rects.ZERO;
+    private long layoutVersion;
 
     @SuppressWarnings("unused")
     public WidgetContainer() {
@@ -109,6 +110,7 @@ public class WidgetContainer {
         if (widgets.put(id, widget) != null) {
             throw new IllegalStateException("Duplicate id: " + id);
         }
+        this.layoutVersion++;
     }
 
     public void add(String id, AETextField widget) {
@@ -133,6 +135,7 @@ public class WidgetContainer {
         if (textFields.put(id, widget) != null) {
             throw new IllegalStateException("Duplicate id: " + id);
         }
+        this.layoutVersion++;
     }
 
     public void add(String id, ICompositeWidget widget) {
@@ -147,6 +150,11 @@ public class WidgetContainer {
         if (compositeWidgets.put(id, widget) != null) {
             throw new IllegalStateException("Duplicate id: " + id);
         }
+        this.layoutVersion++;
+    }
+
+    public long getLayoutVersion() {
+        return this.layoutVersion;
     }
 
     public GuiButton get(String id) {
