@@ -18,6 +18,7 @@
 
 package ae2.client.gui.widgets;
 
+import ae2.api.config.PinDisplayMode;
 import ae2.api.config.SortDir;
 import ae2.api.config.SortOrder;
 import ae2.api.config.ViewItems;
@@ -33,5 +34,8 @@ public interface ISortSource {
     ViewItems getSortDisplay();
 
     Set<AEKeyType> getSortKeyTypes();
-}
 
+    default PinDisplayMode getPinDisplayMode() {
+        return PinDisplayMode.SORT_TOP;
+    }
+}

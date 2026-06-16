@@ -44,6 +44,18 @@ public class RepoSlot extends ClientReadOnlySlot {
         return null;
     }
 
+    public boolean isUserPinSlot() {
+        return this.repo.isEnabled() && this.repo.isUserPinSlot(this.offset);
+    }
+
+    public boolean isEmptyUserPinSlot() {
+        return this.repo.isEnabled() && this.repo.isEmptyUserPinSlot(this.offset);
+    }
+
+    public int getUserPinSlotIndex() {
+        return this.repo.isEnabled() ? this.repo.getUserPinSlotIndex(this.offset) : -1;
+    }
+
     public long getStoredAmount() {
         GridInventoryEntry entry = getEntry();
         return entry != null ? entry.storedAmount() : 0;

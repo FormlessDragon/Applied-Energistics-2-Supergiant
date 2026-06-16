@@ -1,10 +1,13 @@
 package ae2.integration.modules.hei;
 
+import ae2.api.behaviors.ContainerItemStrategies;
 import ae2.api.stacks.AEFluidKey;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.GenericStack;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.StackWithBounds;
+import ae2.client.gui.me.common.GuiMEStorage;
+import ae2.client.gui.me.common.RepoSlot;
 import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.container.slot.FakeSlot;
@@ -29,6 +32,7 @@ import java.util.List;
 public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IGhostIngredientHandler<AEBaseGui<?>> {
     @Nullable
     private Object currentGhostIngredient;
+    private int currentGhostMouseButton = -1;
 
     static ItemStack toFilterStack(FakeSlot slot, Object ingredient) {
         ItemStack directStack = toPacketFilterStack(ingredient);
@@ -117,6 +121,69 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         return stack != null ? GenericStack.wrapInItemStack(stack) : ItemStack.EMPTY;
     }
 
+    @Nullable
+    private static GenericStack toManualPinStack(Object ingredient, int mouseButton) {
+        if (ingredient instanceof BookmarkItem<?> bookmarkItem) {
+            GenericStack stack = toManualPinStack(bookmarkItem.ingredient, mouseButton);
+            if (stack != null && bookmarkItem.amount > 0) {
+                return new GenericStack(stack.what(), bookmarkItem.amount);
+            }
+            return stack;
+        }
+
+        ItemStack itemStack = toPacketFilterStack(ingredient);
+        if (!itemStack.isEmpty()) {
+            if (mouseButton == 1) {
+                GenericStack contained = ContainerItemStrategies.getContainedStack(itemStack);
+                if (contained != null) {
+                    return contained;
+                }
+            }
+
+            GenericStack wrapped = GenericStack.unwrapItemStack(itemStack);
+            if (wrapped != null) {
+                return wrapped;
+            }
+        }
+
+        GenericStack stack = GenericIngredientHelper.ingredientToStack(ingredient);
+        if (stack != null) {
+            return stack;
+        }
+
+        if (!itemStack.isEmpty()) {
+            GenericStack contained = ContainerItemStrategies.getContainedStack(itemStack);
+            if (contained != null && mouseButton == 1) {
+                return contained;
+            }
+
+            return GenericStack.fromItemStack(itemStack);
+        }
+
+        return null;
+    }
+
+    private static int getActiveMouseButton() {
+        int mouseButton = Mouse.getEventButton();
+        if (mouseButton >= 0) {
+            return mouseButton;
+        }
+        if (Mouse.isButtonDown(1)) {
+            return 1;
+        }
+        if (Mouse.isButtonDown(0)) {
+            return 0;
+        }
+        return -1;
+    }
+
+    private void updateCurrentGhostMouseButton() {
+        int mouseButton = getActiveMouseButton();
+        if (mouseButton >= 0) {
+            this.currentGhostMouseButton = mouseButton;
+        }
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     @NotNull
     @Override
@@ -148,6 +215,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
     public <I> List<Target<I>> getTargets(@NotNull AEBaseGui<?> gui, @NotNull I ingredient, boolean doStart) {
         if (doStart) {
             this.currentGhostIngredient = ingredient;
+            updateCurrentGhostMouseButton();
         }
         return getTargetsForIngredient(gui, ingredient);
     }
@@ -155,6 +223,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
     @Override
     public void onComplete() {
         this.currentGhostIngredient = null;
+        this.currentGhostMouseButton = -1;
     }
 
     @Override
@@ -189,7 +258,57 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
             }
         }
 
+        if (gui instanceof GuiMEStorage<?> terminalGui) {
+            updateCurrentGhostMouseButton();
+            GenericStack leftClickStack = toManualPinStack(ingredient, 0);
+            GenericStack rightClickStack = toManualPinStack(ingredient, 1);
+            if (leftClickStack != null || rightClickStack != null) {
+                for (var slot : terminalGui.getContainer().inventorySlots) {
+                    if (slot instanceof RepoSlot repoSlot && repoSlot.isEmptyUserPinSlot()) {
+                        targets.add(new ManualPinTarget<>(terminalGui, repoSlot, this.currentGhostMouseButton,
+                            leftClickStack, rightClickStack));
+                    }
+                }
+            }
+        }
+
         return targets;
+    }
+
+    private record ManualPinTarget<T>(GuiMEStorage<?> gui, RepoSlot slot, int fallbackMouseButton,
+                                      @Nullable GenericStack leftClickStack,
+                                      @Nullable GenericStack rightClickStack) implements Target<T> {
+
+        @Override
+        public Rectangle getArea() {
+            return new Rectangle(this.gui.getGuiLeft() + this.slot.xPos, this.gui.getGuiTop() + this.slot.yPos, 16, 16);
+        }
+
+        @Override
+        public void accept(@NotNull T ingredient) {
+            int mouseButton = getActiveMouseButton();
+            if (mouseButton < 0) {
+                mouseButton = this.fallbackMouseButton;
+            }
+            GenericStack stack = stackForMouseButton(mouseButton);
+            if (stack == null && mouseButton >= 0) {
+                stack = toManualPinStack(ingredient, mouseButton);
+            }
+            if (stack != null) {
+                this.gui.acceptManualPinGhost(stack.what(), this.slot);
+            }
+        }
+
+        @Nullable
+        private GenericStack stackForMouseButton(int mouseButton) {
+            if (mouseButton == 1) {
+                return this.rightClickStack;
+            }
+            if (mouseButton == 0) {
+                return this.leftClickStack;
+            }
+            return this.leftClickStack != null ? this.leftClickStack : this.rightClickStack;
+        }
     }
 
     private record FakeSlotTarget <T> (AEBaseGui<?> gui, FakeSlot slot) implements Target<T> {

@@ -19,6 +19,7 @@
 package ae2.client.gui.me.common;
 
 import ae2.api.config.ActionItems;
+import ae2.api.config.PinDisplayMode;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyleManager;
@@ -60,6 +61,8 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     private final Runnable beforeReturn;
     private final boolean wirelessOnly;
     private final AECheckbox pinAutoCraftedItemsCheckbox;
+    private final AECheckbox pinDisplaySortTopRadio;
+    private final AECheckbox pinDisplayLockedGridRadio;
     private final AECheckbox notifyForFinishedCraftingJobsCheckbox;
     private final AECheckbox clearGridOnCloseCheckbox;
     private final AECheckbox useInternalSearchRadio;
@@ -121,6 +124,15 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
 
         this.pinAutoCraftedItemsCheckbox = widgets.addCheckbox("pinAutoCraftedItemsCheckbox",
             GuiText.TerminalSettingsPinAutoCraftedItems.text(), this::save);
+        this.pinDisplaySortTopRadio = widgets.addCheckbox("pinDisplaySortTopRadio",
+            GuiText.TerminalSettingsPinDisplaySortTop.text(), this::switchToSortTopPins);
+        this.pinDisplaySortTopRadio.setRadio(true);
+        this.pinDisplaySortTopRadio.setTooltipMessage(List.of(GuiText.TerminalSettingsPinDisplaySortTopTooltip.text()));
+        this.pinDisplayLockedGridRadio = widgets.addCheckbox("pinDisplayLockedGridRadio",
+            GuiText.TerminalSettingsPinDisplayLockedGrid.text(), this::switchToLockedGridPins);
+        this.pinDisplayLockedGridRadio.setRadio(true);
+        this.pinDisplayLockedGridRadio.setTooltipMessage(List.of(
+            GuiText.TerminalSettingsPinDisplayLockedGridTooltip.text()));
         this.notifyForFinishedCraftingJobsCheckbox = widgets.addCheckbox("notifyForFinishedCraftingJobsCheckbox",
             GuiText.TerminalSettingsNotifyForFinishedJobs.text(), this::save);
         this.clearGridOnCloseCheckbox = widgets.addCheckbox("clearGridOnCloseCheckbox",
@@ -230,6 +242,18 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         save();
     }
 
+    private void switchToSortTopPins() {
+        this.pinDisplaySortTopRadio.setSelected(true);
+        this.pinDisplayLockedGridRadio.setSelected(false);
+        save();
+    }
+
+    private void switchToLockedGridPins() {
+        this.pinDisplaySortTopRadio.setSelected(false);
+        this.pinDisplayLockedGridRadio.setSelected(true);
+        save();
+    }
+
     private void openMagnetSettings() {
         InitNetwork.sendToServer(SwitchGuisPacket.openSubGui(GuiIds.GuiKey.WIRELESS_MAGNET));
     }
@@ -237,6 +261,9 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     private void save() {
         AEConfig config = AEConfig.instance();
         config.setPinAutoCraftedItems(pinAutoCraftedItemsCheckbox.isSelected());
+        config.setPinDisplayMode(this.pinDisplayLockedGridRadio.isSelected()
+            ? PinDisplayMode.LOCKED_GRID
+            : PinDisplayMode.SORT_TOP);
         config.setNotifyForFinishedCraftingJobs(notifyForFinishedCraftingJobsCheckbox.isSelected());
         config.setClearGridOnClose(clearGridOnCloseCheckbox.isSelected());
         syncClearGridOnClose();
@@ -284,6 +311,9 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         AEConfig config = AEConfig.instance();
         updateRecursiveReserveFromContainer();
         pinAutoCraftedItemsCheckbox.setSelected(config.isPinAutoCraftedItems());
+        PinDisplayMode pinDisplayMode = config.getPinDisplayMode();
+        pinDisplaySortTopRadio.setSelected(pinDisplayMode == PinDisplayMode.SORT_TOP);
+        pinDisplayLockedGridRadio.setSelected(pinDisplayMode == PinDisplayMode.LOCKED_GRID);
         notifyForFinishedCraftingJobsCheckbox.setSelected(config.isNotifyForFinishedCraftingJobs());
         clearGridOnCloseCheckbox.setSelected(config.isClearGridOnClose());
         boolean hasExternalSearch = hasExternalSearch();
@@ -410,6 +440,8 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         setTextHidden("search_settings_title", !general);
         setTextHidden("wireless_settings_title", true);
         this.pinAutoCraftedItemsCheckbox.visible = general;
+        this.pinDisplaySortTopRadio.visible = general;
+        this.pinDisplayLockedGridRadio.visible = general;
         this.notifyForFinishedCraftingJobsCheckbox.visible = general;
         this.clearGridOnCloseCheckbox.visible = general;
         this.useInternalSearchRadio.visible = general;

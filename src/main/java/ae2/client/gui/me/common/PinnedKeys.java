@@ -2,6 +2,8 @@ package ae2.client.gui.me.common;
 
 import ae2.api.stacks.AEKey;
 import com.google.common.collect.ImmutableSet;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
@@ -15,6 +17,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @SideOnly(Side.CLIENT)
@@ -28,7 +31,9 @@ public final class PinnedKeys {
         .comparing(e -> e.getValue().since);
 
     private static final Map<AEKey, PinInfo> craftingPins = new Object2ObjectOpenHashMap<>(MAX_PINNED);
-    private static final ObjectList<AEKey> playerPins = new ObjectArrayList<>();
+    private static final ObjectList<PlayerPin> playerPins = new ObjectArrayList<>();
+    private static final Map<AEKey, PlayerPin> playerPinsByKey = new Object2ObjectOpenHashMap<>();
+    private static final Int2ObjectMap<PlayerPin> playerPinsBySlot = new Int2ObjectOpenHashMap<>();
     private static int playerPinRows;
     private static boolean playerPinsLoaded;
 
@@ -44,7 +49,9 @@ public final class PinnedKeys {
         ensurePlayerPinsLoaded();
         ObjectLinkedOpenHashSet<AEKey> keys = new ObjectLinkedOpenHashSet<>();
         keys.addAll(craftingPins.keySet());
-        keys.addAll(playerPins);
+        for (var pin : playerPins) {
+            keys.add(pin.key());
+        }
         return ImmutableSet.copyOf(keys);
     }
 
@@ -60,7 +67,29 @@ public final class PinnedKeys {
 
     public static List<AEKey> getPlayerPinnedKeys() {
         ensurePlayerPinsLoaded();
+        ObjectArrayList<AEKey> keys = new ObjectArrayList<>(playerPins.size());
+        for (var pin : playerPins) {
+            keys.add(pin.key());
+        }
+        return Collections.unmodifiableList(keys);
+    }
+
+    public static List<PlayerPin> getPlayerPins() {
+        ensurePlayerPinsLoaded();
         return Collections.unmodifiableList(playerPins);
+    }
+
+    @Nullable
+    public static PlayerPin getPlayerPinSlot(int slotIndex) {
+        ensurePlayerPinsLoaded();
+        checkPlayerPinSlotIndex(slotIndex);
+        return playerPinsBySlot.get(slotIndex);
+    }
+
+    public static int getPlayerPinSlotIndex(AEKey key) {
+        ensurePlayerPinsLoaded();
+        PlayerPin pin = playerPinsByKey.get(key);
+        return pin != null ? pin.slotIndex() : -1;
     }
 
     @Nullable
@@ -70,7 +99,7 @@ public final class PinnedKeys {
         if (info != null) {
             return info;
         }
-        return playerPins.contains(key) ? new PinInfo(PinReason.PLAYER) : null;
+        return playerPinsByKey.containsKey(key) ? new PinInfo(PinReason.PLAYER) : null;
     }
 
     @Nullable
@@ -87,11 +116,7 @@ public final class PinnedKeys {
 
     public static void pinKey(AEKey key, PinReason reason) {
         if (reason == PinReason.PLAYER) {
-            ensurePlayerPinsLoaded();
-            if (!playerPins.contains(key)) {
-                playerPins.add(key);
-                savePlayerPins();
-            }
+            autoPin(key, MAX_PLAYER_PIN_ROWS * MAX_PINNED);
             return;
         }
 
@@ -124,7 +149,7 @@ public final class PinnedKeys {
 
     public static boolean isPinned(AEKey what) {
         ensurePlayerPinsLoaded();
-        return craftingPins.containsKey(what) || playerPins.contains(what);
+        return craftingPins.containsKey(what) || playerPinsByKey.containsKey(what);
     }
 
     public static boolean isCraftingPinned(AEKey what) {
@@ -133,7 +158,7 @@ public final class PinnedKeys {
 
     public static boolean isPlayerPinned(AEKey what) {
         ensurePlayerPinsLoaded();
-        return playerPins.contains(what);
+        return playerPinsByKey.containsKey(what);
     }
 
     public static boolean togglePlayerPin(AEKey what, int capacity) {
@@ -142,12 +167,46 @@ public final class PinnedKeys {
             savePlayerPins();
             return true;
         }
-        if (playerPins.size() >= capacity) {
+        return autoPin(what, capacity);
+    }
+
+    public static boolean autoPin(AEKey what, int capacity) {
+        ensurePlayerPinsLoaded();
+        if (playerPinsByKey.containsKey(what)) {
+            return true;
+        }
+        int slotIndex = findFirstEmptySlot(capacity);
+        if (slotIndex < 0) {
             return false;
         }
-        playerPins.add(what);
+        addPlayerPin(new PlayerPin(slotIndex, what, PinKind.AUTO));
+        playerPinRows = Math.max(playerPinRows, getRequiredRows());
         savePlayerPins();
         return true;
+    }
+
+    public static boolean manualPin(AEKey what, int slotIndex) {
+        ensurePlayerPinsLoaded();
+        checkPlayerPinSlotIndex(slotIndex);
+        if (playerPinsByKey.containsKey(what) || playerPinsBySlot.containsKey(slotIndex)) {
+            return false;
+        }
+        addPlayerPin(new PlayerPin(slotIndex, what, PinKind.MANUAL));
+        playerPinRows = Math.max(playerPinRows, getRequiredRows());
+        savePlayerPins();
+        return true;
+    }
+
+    public static boolean removePlayerPinSlot(int slotIndex) {
+        ensurePlayerPinsLoaded();
+        checkPlayerPinSlotIndex(slotIndex);
+        PlayerPin pin = playerPinsBySlot.get(slotIndex);
+        if (pin != null) {
+            removePlayerPin(pin);
+            savePlayerPins();
+            return true;
+        }
+        return false;
     }
 
     public static int getPlayerPinRows() {
@@ -165,12 +224,17 @@ public final class PinnedKeys {
 
     public static boolean removeEmptyPlayerPinRow(int rowSize) {
         ensurePlayerPinsLoaded();
-        if (playerPinRows <= 0 || playerPins.size() > Math.max(0, playerPinRows - 1) * rowSize) {
+        if (!canRemoveEmptyPlayerPinRow(rowSize)) {
             return false;
         }
         playerPinRows--;
         savePlayerPins();
         return true;
+    }
+
+    public static boolean canRemoveEmptyPlayerPinRow(int rowSize) {
+        ensurePlayerPinsLoaded();
+        return playerPinRows > 0 && getHighestOccupiedSlotIndex() < Math.max(0, playerPinRows - 1) * rowSize;
     }
 
     public static void prune() {
@@ -179,7 +243,12 @@ public final class PinnedKeys {
 
     private static boolean removePlayerPin(AEKey what) {
         ensurePlayerPinsLoaded();
-        return playerPins.remove(what);
+        PlayerPin pin = playerPinsByKey.get(what);
+        if (pin != null) {
+            removePlayerPin(pin);
+            return true;
+        }
+        return false;
     }
 
     private static void ensurePlayerPinsLoaded() {
@@ -190,21 +259,89 @@ public final class PinnedKeys {
         PlayerPinStorage.Data data = PlayerPinStorage.load();
         playerPinRows = Math.clamp(data.rows(), 0, MAX_PLAYER_PIN_ROWS);
         playerPins.clear();
-        for (AEKey key : data.keys()) {
-            if (!playerPins.contains(key)) {
-                playerPins.add(key);
-            }
+        playerPinsByKey.clear();
+        playerPinsBySlot.clear();
+        for (var slot : data.slots()) {
+            addPlayerPin(new PlayerPin(slot.slotIndex(), slot.key(), slot.kind()));
         }
     }
 
     private static void savePlayerPins() {
         ensurePlayerPinsLoaded();
-        PlayerPinStorage.save(playerPinRows, playerPins);
+        ObjectArrayList<PlayerPinStorage.PinSlot> slots = new ObjectArrayList<>(playerPins.size());
+        for (var pin : playerPins) {
+            slots.add(new PlayerPinStorage.PinSlot(pin.slotIndex(), pin.key(), pin.kind()));
+        }
+        PlayerPinStorage.save(playerPinRows, slots);
+    }
+
+    private static int findFirstEmptySlot(int capacity) {
+        int maxSlots = Math.min(capacity, MAX_PLAYER_PIN_ROWS * MAX_PINNED);
+        for (int slotIndex = 0; slotIndex < maxSlots; slotIndex++) {
+            if (!playerPinsBySlot.containsKey(slotIndex)) {
+                return slotIndex;
+            }
+        }
+        return -1;
+    }
+
+    private static void addPlayerPin(PlayerPin pin) {
+        playerPins.add(pin);
+        playerPins.sort(PlayerPin.SLOT_INDEX_COMPARATOR);
+        playerPinsByKey.put(pin.key(), pin);
+        playerPinsBySlot.put(pin.slotIndex(), pin);
+    }
+
+    private static void removePlayerPin(PlayerPin pin) {
+        playerPins.remove(pin);
+        playerPinsByKey.remove(pin.key());
+        playerPinsBySlot.remove(pin.slotIndex());
+    }
+
+    private static int getRequiredRows() {
+        int rows = 0;
+        for (var pin : playerPins) {
+            rows = Math.max(rows, pin.slotIndex() / MAX_PINNED + 1);
+        }
+        return Math.min(rows, MAX_PLAYER_PIN_ROWS);
+    }
+
+    private static int getHighestOccupiedSlotIndex() {
+        int slotIndex = -1;
+        for (var pin : playerPins) {
+            slotIndex = Math.max(slotIndex, pin.slotIndex());
+        }
+        return slotIndex;
+    }
+
+    private static void checkPlayerPinSlotIndex(int slotIndex) {
+        int maxSlots = MAX_PLAYER_PIN_ROWS * MAX_PINNED;
+        if (slotIndex < 0 || slotIndex >= maxSlots) {
+            throw new IllegalArgumentException("Invalid player pin slot index: " + slotIndex);
+        }
     }
 
     public enum PinReason {
         CRAFTING,
         PLAYER
+    }
+
+    public enum PinKind {
+        AUTO,
+        MANUAL
+    }
+
+    public record PlayerPin(int slotIndex, AEKey key, PinKind kind) {
+        private static final Comparator<PlayerPin> SLOT_INDEX_COMPARATOR =
+            Comparator.comparingInt(PlayerPin::slotIndex);
+
+        public PlayerPin {
+            if (slotIndex < 0 || slotIndex >= MAX_PLAYER_PIN_ROWS * MAX_PINNED) {
+                throw new IllegalArgumentException("Invalid player pin slot index: " + slotIndex);
+            }
+            Objects.requireNonNull(key, "key");
+            Objects.requireNonNull(kind, "kind");
+        }
     }
 
     public static class PinInfo {

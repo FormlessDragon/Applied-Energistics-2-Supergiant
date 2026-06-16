@@ -26,9 +26,11 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.util.text.ITextComponent;
 
+import java.awt.Rectangle;
+import java.util.Collections;
 import java.util.List;
 
-public class AECheckbox extends GuiButton {
+public class AECheckbox extends GuiButton implements ITooltip {
     public static final int SIZE = 14;
 
     private static final Blitter BLITTER = Blitter.texture("guis/checkbox.png", 64, 64);
@@ -47,6 +49,7 @@ public class AECheckbox extends GuiButton {
     private Runnable changeListener;
     private boolean radio;
     private boolean focused;
+    private List<ITextComponent> tooltipMessage = Collections.emptyList();
 
     public AECheckbox(int x, int y, int width, int height, GuiStyle style, ITextComponent component) {
         super(0, x, y, width, height, component.getFormattedText());
@@ -102,6 +105,25 @@ public class AECheckbox extends GuiButton {
 
     public void setFocused(boolean focused) {
         this.focused = focused;
+    }
+
+    @Override
+    public List<ITextComponent> getTooltipMessage() {
+        return this.tooltipMessage;
+    }
+
+    public void setTooltipMessage(List<ITextComponent> tooltipMessage) {
+        this.tooltipMessage = List.copyOf(tooltipMessage);
+    }
+
+    @Override
+    public Rectangle getTooltipArea() {
+        return new Rectangle(this.x, this.y, this.width, this.height);
+    }
+
+    @Override
+    public boolean isTooltipAreaVisible() {
+        return this.visible && !this.tooltipMessage.isEmpty();
     }
 
     @Override

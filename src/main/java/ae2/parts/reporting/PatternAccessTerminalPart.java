@@ -22,22 +22,17 @@ import ae2.api.config.Settings;
 import ae2.api.config.ShowPatternProviders;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
-import ae2.api.storage.ILinkStatus;
 import ae2.api.storage.IPatternAccessTermContainerHost;
 import ae2.api.util.IConfigManager;
 import ae2.container.GuiIds;
 import ae2.core.AppEng;
-import ae2.core.gui.GuiOpener;
 import ae2.items.parts.PartModels;
 import ae2.parts.PartModel;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.Vec3d;
 
-public class PatternAccessTerminalPart extends AbstractDisplayPart implements IPatternAccessTermContainerHost {
+public class PatternAccessTerminalPart extends AbstractTerminalPart implements IPatternAccessTermContainerHost {
 
     @PartModels
     public static final ResourceLocation MODEL_OFF = AppEng.makeId("part/pattern_access_terminal_off");
@@ -53,23 +48,12 @@ public class PatternAccessTerminalPart extends AbstractDisplayPart implements IP
                                                                .build();
 
     public PatternAccessTerminalPart(IPartItem<?> partItem) {
-        super(partItem, true);
+        super(partItem);
     }
 
     @Override
-    public boolean onUseWithoutItem(EntityPlayer player, Vec3d pos) {
-        if (!super.onUseWithoutItem(player, pos) && !isClientSide()) {
-            GuiOpener.openPartGui(player, GuiIds.GuiKey.PATTERN_ACCESS_TERMINAL, this);
-        }
-        return true;
-    }
-
-    @Override
-    public boolean onUseItemOn(ItemStack heldItem, EntityPlayer player, EnumHand hand, Vec3d pos) {
-        if (super.onUseItemOn(heldItem, player, hand, pos)) {
-            return true;
-        }
-        return this.onUseWithoutItem(player, pos);
+    public GuiIds.GuiKey getGuiKey(EntityPlayer player) {
+        return GuiIds.GuiKey.PATTERN_ACCESS_TERMINAL;
     }
 
     @Override
@@ -92,10 +76,5 @@ public class PatternAccessTerminalPart extends AbstractDisplayPart implements IP
     public void readFromNBT(NBTTagCompound data) {
         super.readFromNBT(data);
         this.configManager.readFromNBT(data);
-    }
-
-    @Override
-    public ILinkStatus getLinkStatus() {
-        return ILinkStatus.ofManagedNode(getMainNode());
     }
 }

@@ -62,6 +62,11 @@ public abstract class AbstractTerminalPart extends AbstractDisplayPart
         this.cm = builder.build();
     }
 
+    @Override
+    public boolean isLightSource() {
+        return true;
+    }
+
     @MustBeInvokedByOverriders
     protected void registerSettings(IConfigManagerBuilder builder) {
         builder.registerSetting(Settings.SORT_BY, SortOrder.NAME);

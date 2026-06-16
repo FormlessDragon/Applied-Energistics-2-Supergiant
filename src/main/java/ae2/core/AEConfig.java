@@ -21,6 +21,7 @@ package ae2.core;
 import ae2.api.behaviors.GenericSlotCapacities;
 import ae2.api.config.CondenserOutput;
 import ae2.api.config.CraftingPlanSortMode;
+import ae2.api.config.PinDisplayMode;
 import ae2.api.config.PowerUnit;
 import ae2.api.config.SortDir;
 import ae2.api.config.TerminalStyle;
@@ -362,6 +363,18 @@ public class AEConfig {
     public void setTerminalStyle(TerminalStyle terminalStyle) {
         TERMINALS.terminalStyle = terminalStyle == null ? TerminalStyle.SMALL : terminalStyle;
         this.save();
+    }
+
+    public PinDisplayMode getPinDisplayMode() {
+        return TERMINALS.pinDisplayMode == null ? PinDisplayMode.SORT_TOP : TERMINALS.pinDisplayMode;
+    }
+
+    public void setPinDisplayMode(PinDisplayMode pinDisplayMode) {
+        PinDisplayMode mode = pinDisplayMode == null ? PinDisplayMode.SORT_TOP : pinDisplayMode;
+        if (getPinDisplayMode() != mode) {
+            TERMINALS.pinDisplayMode = mode;
+            this.save();
+        }
     }
 
     public CraftingPlanSortMode getCraftingPlanSortMode() {
@@ -786,6 +799,9 @@ public class AEConfig {
         @Config.Name("terminalStyle")
         @Config.Comment("Size of ME terminal GUIs.")
         public TerminalStyle terminalStyle = TerminalStyle.SMALL;
+        @Config.Name("pinDisplayMode")
+        @Config.Comment("How player pins are displayed in ME terminals.")
+        public PinDisplayMode pinDisplayMode = PinDisplayMode.SORT_TOP;
         @Config.Name("craftingPlanSortMode")
         @Config.Comment("Sort mode used by the crafting plan GUI.")
         public CraftingPlanSortMode craftingPlanSortMode = CraftingPlanSortMode.AVAILABILITY;

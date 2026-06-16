@@ -22,14 +22,17 @@ import ae2.api.behaviors.ContainerItemStrategies;
 import ae2.api.behaviors.EmptyingAction;
 import ae2.api.client.AEKeyRendering;
 import ae2.api.config.ActionItems;
+import ae2.api.config.PinDisplayMode;
 import ae2.api.config.Settings;
 import ae2.api.config.SortDir;
 import ae2.api.config.SortOrder;
 import ae2.api.config.ViewItems;
+import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKeyType;
 import ae2.api.stacks.AEKeyTypes;
 import ae2.api.stacks.AmountFormat;
+import ae2.api.stacks.GenericStack;
 import ae2.api.storage.AEKeyFilter;
 import ae2.api.storage.ILinkStatus;
 import ae2.api.util.IConfigManager;
@@ -67,6 +70,7 @@ import ae2.core.network.serverbound.ConfigValueServerPacket;
 import ae2.core.network.serverbound.SwitchGuisPacket;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
+import ae2.integration.Integrations;
 import ae2.integration.abstraction.ItemListMod;
 import ae2.items.storage.ViewCellItem;
 import ae2.items.tools.powered.WirelessUniversalTerminalItem;
@@ -115,6 +119,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
     protected final Repo repo;
     private final List<ItemStack> currentViewCells = new ObjectArrayList<>();
+    private final List<RepoSlot> repoSlots = new ObjectArrayList<>();
     private final IConfigManager configSrc;
     private final boolean supportsViewCells;
     private final TerminalStyle terminalStyle;
@@ -461,12 +466,15 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         for (int i = existingSlots.size() - 1; i >= 0; i--) {
             this.container.removeClientSideSlot(existingSlots.get(i));
         }
+        this.repoSlots.clear();
 
         int repoIndex = 0;
         for (int row = 0; row < this.rows; row++) {
             for (int col = 0; col < this.terminalStyle.getSlotsPerRow(); col++) {
                 Point pos = this.terminalStyle.getSlotPos(row, col);
-                this.container.addClientSideSlot(new RepoSlot(this.repo, repoIndex++, pos.x(), pos.y()), null);
+                RepoSlot slot = new RepoSlot(this.repo, repoIndex++, pos.x(), pos.y());
+                this.repoSlots.add(slot);
+                this.container.addClientSideSlot(slot, null);
             }
         }
     }
@@ -526,6 +534,22 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
                    .src(0, 204, 162, 18)
                    .dest(offsetX + 7, offsetY + this.terminalStyle.getHeader().getSrcHeight() + row * 18)
                    .blit();
+        }
+
+        if (getPinDisplayMode() == PinDisplayMode.SORT_TOP) {
+            renderScrollableUserPinSlotBackgrounds(offsetX, offsetY);
+        }
+    }
+
+    private void renderScrollableUserPinSlotBackgrounds(int offsetX, int offsetY) {
+        for (RepoSlot slot : this.repoSlots) {
+            if (slot.isUserPinSlot()) {
+                int column = slot.getRepoViewIndex() % this.terminalStyle.getSlotsPerRow();
+                Blitter.texture("guis/terminal.png")
+                       .src(column * 18, 204, 18, 18)
+                       .dest(offsetX + slot.xPos - 1, offsetY + slot.yPos - 1)
+                       .blit();
+            }
         }
     }
 
@@ -682,12 +706,53 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, ClickType clickType) {
         if (slot instanceof RepoSlot repoSlot) {
             if (canInteractWithRepo()) {
-                handleGridInventoryEntryMouseClick(repoSlot.getEntry(), mouseButton, clickType);
+                handleRepoSlotMouseClick(repoSlot, mouseButton, clickType);
             }
             return;
         }
 
+        if (handlePlayerInventoryPinShortcut(slot, mouseButton, clickType)) {
+            return;
+        }
+
         super.handleMouseClick(slot, slotId, mouseButton, clickType);
+    }
+
+    private void handleRepoSlotMouseClick(RepoSlot repoSlot, int mouseButton, ClickType clickType) {
+        if (clickType == ClickType.PICKUP && repoSlot.isEmptyUserPinSlot()) {
+            if (manualPinCarriedStack(repoSlot.getUserPinSlotIndex(), mouseButton)) {
+                return;
+            }
+        }
+
+        handleGridInventoryEntryMouseClick(repoSlot.getEntry(), mouseButton, clickType);
+    }
+
+    private boolean handlePlayerInventoryPinShortcut(@Nullable Slot slot, int mouseButton, ClickType clickType) {
+        if (!canInteractWithRepo()
+            || slot == null
+            || mouseButton != 0
+            || !isCtrlKeyDown()
+            || !isPlayerSideSlot(slot)
+            || !slot.getHasStack()) {
+            return false;
+        }
+
+        AEKey key = keyFromItemStack(slot.getStack());
+        if (key == null) {
+            return false;
+        }
+
+        boolean quickMove = clickType == ClickType.QUICK_MOVE || isShiftKeyDown();
+        if (quickMove) {
+            super.handleMouseClick(slot, slot.slotNumber, mouseButton, ClickType.QUICK_MOVE);
+            autoPin(key);
+        } else if (clickType == ClickType.PICKUP) {
+            autoPin(key);
+        } else {
+            return false;
+        }
+        return true;
     }
 
     private void handleGridInventoryEntryMouseClick(@Nullable GridInventoryEntry entry, int mouseButton,
@@ -696,15 +761,14 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             return;
         }
 
+        boolean autoPinAfterAction = shouldAutoPinAfterGridAction(entry, mouseButton, clickType);
         if (mouseButton == 0
             && clickType == ClickType.PICKUP
             && entry != null
             && entry.what() != null
-            && isCtrlKeyDown()) {
-            if (PinnedKeys.togglePlayerPin(entry.what(), this.repo.getPlayerPinCapacity())) {
-                this.repo.updateView();
-                updateScrollbar();
-            }
+            && isCtrlKeyDown()
+            && !autoPinAfterAction) {
+            toggleAutoPin(entry.what());
             return;
         }
 
@@ -714,6 +778,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             && shouldCraftOnClick(entry)
             && this.playerInventory.getItemStack().isEmpty()) {
             this.container.handleInteraction(entry.serial(), InventoryAction.AUTO_CRAFT);
+            autoPinAfterGridAction(entry, autoPinAfterAction);
             return;
         }
 
@@ -723,6 +788,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
                 : this.playerInventory.getItemStack().isEmpty() ? InventoryAction.FILL_ENTIRE_ITEM_MOVE_TO_PLAYER
                   : InventoryAction.FILL_ENTIRE_ITEM;
             this.container.handleInteraction(entry.serial(), action);
+            autoPinAfterGridAction(entry, autoPinAfterAction);
             return;
         }
 
@@ -746,6 +812,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
         if (Keyboard.isKeyDown(Keyboard.KEY_SPACE)) {
             this.container.handleInteraction(entry.serial(), InventoryAction.MOVE_REGION);
+            autoPinAfterGridAction(entry, autoPinAfterAction);
             return;
         }
 
@@ -757,6 +824,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             case CLONE -> {
                 if (entry.craftable()) {
                     this.container.handleInteraction(entry.serial(), InventoryAction.AUTO_CRAFT);
+                    autoPinAfterGridAction(entry, autoPinAfterAction);
                     return;
                 }
                 if (this.mc.player.capabilities.isCreativeMode) {
@@ -769,7 +837,101 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
         if (action != null) {
             this.container.handleInteraction(entry.serial(), action);
+            autoPinAfterGridAction(entry, autoPinAfterAction);
         }
+    }
+
+    private boolean shouldAutoPinAfterGridAction(@Nullable GridInventoryEntry entry, int mouseButton,
+                                                 ClickType clickType) {
+        return mouseButton == 0
+            && entry != null
+            && entry.what() != null
+            && isCtrlKeyDown()
+            && (isShiftKeyDown() || clickType == ClickType.QUICK_MOVE);
+    }
+
+    private void autoPinAfterGridAction(GridInventoryEntry entry, boolean autoPinAfterAction) {
+        if (autoPinAfterAction) {
+            autoPin(entry.what());
+        }
+    }
+
+    private boolean manualPinCarriedStack(int slotIndex, int mouseButton) {
+        AEKey key = keyFromCarriedStackForManualPin(this.playerInventory.getItemStack(), mouseButton);
+        return key != null && manualPin(key, slotIndex);
+    }
+
+    public boolean acceptManualPinGhost(AEKey key, RepoSlot repoSlot) {
+        if (!canInteractWithRepo() || !repoSlot.isEmptyUserPinSlot()) {
+            return false;
+        }
+        return manualPin(key, repoSlot.getUserPinSlotIndex());
+    }
+
+    public void acceptAutoPin(AEKey key) {
+        if (canInteractWithRepo()) {
+            autoPin(key);
+        }
+    }
+
+    private boolean manualPin(AEKey key, int slotIndex) {
+        if (slotIndex < 0 || slotIndex >= this.repo.getPlayerPinCapacity()) {
+            return false;
+        }
+        if (PinnedKeys.manualPin(key, slotIndex)) {
+            this.repo.updateView();
+            updateScrollbar();
+            return true;
+        }
+        return false;
+    }
+
+    private void toggleAutoPin(AEKey key) {
+        if (PinnedKeys.togglePlayerPin(key, getMaxPlayerPinCapacity())) {
+            this.repo.updateView();
+            updateScrollbar();
+        }
+    }
+
+    private void autoPin(AEKey key) {
+        if (PinnedKeys.autoPin(key, getMaxPlayerPinCapacity())) {
+            this.repo.updateView();
+            updateScrollbar();
+        }
+    }
+
+    private int getMaxPlayerPinCapacity() {
+        return PinnedKeys.MAX_PLAYER_PIN_ROWS * this.terminalStyle.getSlotsPerRow();
+    }
+
+    @Nullable
+    private AEKey keyFromItemStack(ItemStack stack) {
+        GenericStack genericStack = GenericStack.unwrapItemStack(stack);
+        if (genericStack != null) {
+            return genericStack.what();
+        }
+        return AEItemKey.of(stack);
+    }
+
+    @Nullable
+    private AEKey keyFromCarriedStackForManualPin(ItemStack carried, int mouseButton) {
+        if (carried.isEmpty()) {
+            return null;
+        }
+
+        if (mouseButton == 1) {
+            EmptyingAction emptyingAction = ContainerItemStrategies.getEmptyingAction(carried);
+            if (emptyingAction != null && this.container.isKeyVisible(emptyingAction.what())) {
+                return emptyingAction.what();
+            }
+            return null;
+        }
+
+        if (mouseButton == 0) {
+            return keyFromItemStack(carried);
+        }
+
+        return null;
     }
 
     private boolean shouldCraftOnClick(GridInventoryEntry entry) {
@@ -817,6 +979,21 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         Slot hoveredSlot = getSlotUnderMouse();
         if (hoveredSlot instanceof RepoSlot repoSlot) {
             ItemStack carried = this.playerInventory.getItemStack();
+            if (repoSlot.isEmptyUserPinSlot()) {
+                if (!carried.isEmpty()) {
+                    EmptyingAction emptyingAction = ContainerItemStrategies.getEmptyingAction(carried);
+                    if (emptyingAction != null && this.container.isKeyVisible(emptyingAction.what())) {
+                        drawTooltipWithHeader(mouseX, mouseY,
+                            Tooltips.getEmptyingTooltip(ButtonToolTips.SetAction, carried, emptyingAction));
+                    }
+                    return;
+                }
+                if (renderEmptyUserPinSlotHeiGhostTooltip(mouseX, mouseY)) {
+                    return;
+                }
+                drawTooltipWithHeader(mouseX, mouseY, List.of(muted(ButtonToolTips.PlayerPinEmptySlot.text())));
+                return;
+            }
             if (!carried.isEmpty()) {
                 EmptyingAction emptyingAction = ContainerItemStrategies.getEmptyingAction(carried);
                 if (emptyingAction != null && this.container.isKeyVisible(emptyingAction.what())) {
@@ -836,13 +1013,56 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             if (carried.isEmpty() || this.terminalStyle.isShowTooltipsWithItemInHand()) {
                 GridInventoryEntry entry = repoSlot.getEntry();
                 if (entry != null && entry.what() != null) {
-                    drawKeyTooltipWithImages(mouseX, mouseY, entry.what(), getGridInventoryEntryTooltip(entry));
+                    drawKeyTooltipWithImages(mouseX, mouseY, entry.what(),
+                        getGridInventoryEntryTooltip(entry, repoSlot.isUserPinSlot()));
                     return;
                 }
             }
         }
 
+        if (hoveredSlot != null && isPlayerSideSlot(hoveredSlot) && hoveredSlot.getHasStack()) {
+            ItemStack stack = hoveredSlot.getStack();
+            List<String> tooltip = new ObjectArrayList<>(getItemToolTip(stack));
+            tooltip.add(muted(ButtonToolTips.PlayerPinPinShortcut.text()).getFormattedText());
+            tooltip.add(muted(ButtonToolTips.PlayerPinInsertAndPinShortcut.text()).getFormattedText());
+            drawItemTooltipWithImages(mouseX, mouseY, stack, tooltip);
+            return;
+        }
+
         super.renderHoveredToolTip(mouseX, mouseY);
+    }
+
+    private boolean renderEmptyUserPinSlotHeiGhostTooltip(int mouseX, int mouseY) {
+        var hei = Integrations.hei();
+        if (!hei.isEnabled()) {
+            return false;
+        }
+
+        Object ingredient = hei.getCurrentGhostIngredient();
+        if (ingredient == null) {
+            return false;
+        }
+
+        ItemStack displayStack = hei.getDisplayStack(ingredient);
+        if (displayStack.isEmpty()) {
+            return false;
+        }
+
+        EmptyingAction emptyingAction = ContainerItemStrategies.getEmptyingAction(displayStack);
+        if (emptyingAction != null && this.container.isKeyVisible(emptyingAction.what())) {
+            drawTooltipWithHeader(mouseX, mouseY,
+                Tooltips.getEmptyingTooltip(ButtonToolTips.SetAction, displayStack, emptyingAction));
+            return true;
+        }
+
+        GenericStack stack = hei.ingredientToStack(ingredient);
+        if (stack != null && stack.what() != null) {
+            drawKeyTooltipWithImages(mouseX, mouseY, stack.what(), normalizeGridTooltip(AEKeyRendering.getTooltip(stack.what())));
+            return true;
+        }
+
+        drawItemTooltipWithImages(mouseX, mouseY, displayStack, getItemToolTip(displayStack));
+        return true;
     }
 
     private boolean canFillCarriedItem(@Nullable AEKey what, ItemStack carried) {
@@ -851,7 +1071,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             && ContainerItemStrategies.findCarriedContextForKey(what, this.mc.player, this.container) != null;
     }
 
-    private List<ITextComponent> getGridInventoryEntryTooltip(GridInventoryEntry entry) {
+    private List<ITextComponent> getGridInventoryEntryTooltip(GridInventoryEntry entry, boolean inUserPinBar) {
         var what = Objects.requireNonNull(entry.what(), "Repo entry is missing a key");
         List<ITextComponent> tooltip = normalizeGridTooltip(AEKeyRendering.getTooltip(what));
 
@@ -874,7 +1094,11 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         }
 
         if (canInteractWithRepo()) {
-            tooltip.add(muted(ButtonToolTips.TogglePlayerPin.text()));
+            if (inUserPinBar) {
+                tooltip.add(muted(ButtonToolTips.PlayerPinUnpinShortcut.text()));
+            } else {
+                tooltip.add(muted(ButtonToolTips.PlayerPinPinShortcut.text()));
+            }
         }
 
         return tooltip;
@@ -894,7 +1118,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     }
 
     private ITextComponent muted(ITextComponent text) {
-        return text.createCopy().setStyle(new Style().setColor(TextFormatting.DARK_GRAY));
+        return text.setStyle(new Style().setColor(TextFormatting.DARK_GRAY));
     }
 
     private boolean isViewOnlyCraftable() {
@@ -940,6 +1164,11 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     @Override
     public ViewItems getSortDisplay() {
         return this.configSrc.getSetting(Settings.VIEW_MODE);
+    }
+
+    @Override
+    public PinDisplayMode getPinDisplayMode() {
+        return AEConfig.instance().getPinDisplayMode();
     }
 
     @Override

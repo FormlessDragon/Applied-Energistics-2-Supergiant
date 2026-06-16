@@ -204,6 +204,11 @@ public class BeamFormerPart extends AEBasePart implements BeamFormerEndpoint, IG
     }
 
     @Override
+    public int getLightLevel() {
+        return this.isBeamLinked() ? 15 : 9;
+    }
+
+    @Override
     public void setBeamColor(AEColor color) {
         AEColor oldColor = this.clientBeamColor;
         this.clientBeamColor = color;

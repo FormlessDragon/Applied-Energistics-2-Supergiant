@@ -18,6 +18,7 @@
 
 package ae2.client.gui.me.common;
 
+import ae2.api.config.PinDisplayMode;
 import ae2.api.config.SortDir;
 import ae2.api.config.SortOrder;
 import ae2.api.config.ViewItems;
@@ -58,6 +59,7 @@ import java.util.Set;
  * server-side storage, which is continuously synchronized to the client while it is open.
  */
 public class Repo implements IClientRepo {
+    private static final int NO_USER_PIN_SLOT = -1;
 
     public static final Comparator<GridInventoryEntry> AMOUNT_ASC = Comparator
         .comparingDouble((GridInventoryEntry entry) -> {
@@ -74,6 +76,9 @@ public class Repo implements IClientRepo {
     private final BiMap<Long, GridInventoryEntry> entries = HashBiMap.create();
     private final ObjectList<GridInventoryEntry> view = new ObjectArrayList<>();
     private final ObjectList<GridInventoryEntry> pinnedSlots = new ObjectArrayList<>();
+    private final IntList pinnedSlotUserSlotIndexes = new IntArrayList();
+    private final ObjectList<GridInventoryEntry> scrollableUserPinSlots = new ObjectArrayList<>();
+    private final IntList scrollableUserPinSlotIndexes = new IntArrayList();
     private final ObjectList<GridInventoryEntry> craftingPinnedEntries = new ObjectArrayList<>();
     private final ObjectList<GridInventoryEntry> playerPinnedEntries = new ObjectArrayList<>();
     private final Map<AEKey, PinnedKeys.PinReason> pinnedReasons = new Object2ObjectOpenHashMap<>();
@@ -88,6 +93,7 @@ public class Repo implements IClientRepo {
     private int terminalRows = 1;
     private int pinnedRowCount;
     private int visiblePlayerPinRows;
+    private int configuredPlayerPinRows;
     private boolean enabled = false;
     private boolean entriesByItemIdNeedsUpdate = true;
     private IPartitionList partitionList;
@@ -238,62 +244,61 @@ public class Repo implements IClientRepo {
     }
 
     private void addEntriesToView(Collection<GridInventoryEntry> entries) {
-        var viewMode = this.sortSrc.getSortDisplay();
-        var typeFilter = this.sortSrc.getSortKeyTypes();
-
         for (var entry : entries) {
-            // Pinned keys ignore all filters & search
             if (PinnedKeys.isCraftingPinned(entry.what())) {
                 craftingPinnedEntries.add(entry);
                 continue;
             }
             if (PinnedKeys.isPlayerPinned(entry.what())) {
-                playerPinnedEntries.add(entry);
+                if (passesViewFilters(entry)) {
+                    playerPinnedEntries.add(entry);
+                }
                 continue;
             }
 
-            if (this.partitionList != null && !this.partitionList.isListed(entry.what())) {
-                continue;
-            }
-
-            if (viewMode == ViewItems.CRAFTABLE && !entry.craftable()) {
-                continue;
-            }
-
-            if (viewMode == ViewItems.STORED && entry.storedAmount() == 0) {
-                continue;
-            }
-
-            var what = Objects.requireNonNull(entry.what());
-            if (!typeFilter.contains(what.getType())) {
-                continue;
-            }
-
-            if (search.matches(entry)) {
+            if (passesViewFilters(entry)) {
                 this.view.add(entry);
-            }
-        }
-
-        // Any pinned entry that has not yet been added to the pinned row will be represented by a fake
-        // entry. Pinned crafting jobs are excluded from this because they *should* have a grid-entry
-        // with craftable=true if they're craftable on this grid.
-        for (var pinnedKey : PinnedKeys.getPlayerPinnedKeys()) {
-            if (!PinnedKeys.isCraftingPinned(pinnedKey)
-                && findPinnedEntry(playerPinnedEntries, pinnedKey) == null) {
-                this.playerPinnedEntries.add(new GridInventoryEntry(
-                    -1, pinnedKey, 0, 0, false));
             }
         }
     }
 
+    private boolean passesViewFilters(GridInventoryEntry entry) {
+        AEKey what = Objects.requireNonNull(entry.what());
+
+        if (this.partitionList != null && !this.partitionList.isListed(what)) {
+            return false;
+        }
+
+        var viewMode = this.sortSrc.getSortDisplay();
+        if (viewMode == ViewItems.CRAFTABLE && !entry.craftable()) {
+            return false;
+        }
+
+        if (viewMode == ViewItems.STORED && entry.storedAmount() == 0) {
+            return false;
+        }
+
+        if (!this.sortSrc.getSortKeyTypes().contains(what.getType())) {
+            return false;
+        }
+
+        return search.matches(entry);
+    }
+
     private void rebuildPinnedSlots() {
         this.pinnedSlots.clear();
+        this.pinnedSlotUserSlotIndexes.clear();
+        this.scrollableUserPinSlots.clear();
+        this.scrollableUserPinSlotIndexes.clear();
         this.pinnedReasons.clear();
 
         int craftingRows = getRowsFor(craftingPinnedEntries.size());
-        int maxPlayerRows = Math.max(0, this.terminalRows - 1 - craftingRows);
-        this.visiblePlayerPinRows = Math.min(PinnedKeys.getPlayerPinRows(),
-            Math.min(PinnedKeys.MAX_PLAYER_PIN_ROWS, maxPlayerRows));
+        this.configuredPlayerPinRows = PinnedKeys.getPlayerPinRows();
+        boolean lockedGridPins = this.sortSrc.getPinDisplayMode() == PinDisplayMode.LOCKED_GRID;
+        int maxPlayerRows = lockedGridPins ? Math.max(0, this.terminalRows - 1 - craftingRows) : 0;
+        this.visiblePlayerPinRows = lockedGridPins
+            ? Math.min(this.configuredPlayerPinRows, Math.min(PinnedKeys.MAX_PLAYER_PIN_ROWS, maxPlayerRows))
+            : 0;
         this.pinnedRowCount = craftingRows + this.visiblePlayerPinRows;
 
         for (GridInventoryEntry entry : craftingPinnedEntries) {
@@ -301,29 +306,62 @@ public class Repo implements IClientRepo {
                 break;
             }
             pinnedSlots.add(entry);
+            pinnedSlotUserSlotIndexes.add(NO_USER_PIN_SLOT);
             pinnedReasons.put(entry.what(), PinnedKeys.PinReason.CRAFTING);
         }
         while (pinnedSlots.size() < craftingRows * rowSize) {
             pinnedSlots.add(null);
+            pinnedSlotUserSlotIndexes.add(NO_USER_PIN_SLOT);
         }
 
-        int playerCapacity = getPlayerPinCapacity();
-        int playerAdded = 0;
-        for (AEKey key : PinnedKeys.getPlayerPinnedKeys()) {
-            if (PinnedKeys.isCraftingPinned(key) || playerAdded >= playerCapacity) {
-                continue;
+        int playerSlotCount = this.configuredPlayerPinRows * this.rowSize;
+        if (lockedGridPins) {
+            int visiblePlayerSlotCount = this.visiblePlayerPinRows * this.rowSize;
+            for (int slotIndex = 0; slotIndex < visiblePlayerSlotCount; slotIndex++) {
+                addFixedUserPinSlot(slotIndex);
             }
-            GridInventoryEntry entry = findPinnedEntry(playerPinnedEntries, key);
-            if (entry == null) {
-                entry = new GridInventoryEntry(-1, key, 0, 0, false);
+        } else {
+            for (int slotIndex = 0; slotIndex < playerSlotCount; slotIndex++) {
+                addScrollableUserPinSlot(slotIndex);
             }
-            pinnedSlots.add(entry);
-            pinnedReasons.put(key, PinnedKeys.PinReason.PLAYER);
-            playerAdded++;
         }
+
         while (pinnedSlots.size() < this.pinnedRowCount * rowSize) {
             pinnedSlots.add(null);
+            pinnedSlotUserSlotIndexes.add(NO_USER_PIN_SLOT);
         }
+    }
+
+    private void addFixedUserPinSlot(int slotIndex) {
+        GridInventoryEntry entry = getVisibleUserPinEntry(slotIndex);
+        pinnedSlots.add(entry);
+        pinnedSlotUserSlotIndexes.add(slotIndex);
+    }
+
+    private void addScrollableUserPinSlot(int slotIndex) {
+        scrollableUserPinSlots.add(getVisibleUserPinEntry(slotIndex));
+        scrollableUserPinSlotIndexes.add(slotIndex);
+    }
+
+    @Nullable
+    private GridInventoryEntry getVisibleUserPinEntry(int slotIndex) {
+        PinnedKeys.PlayerPin pin = PinnedKeys.getPlayerPinSlot(slotIndex);
+        if (pin == null || PinnedKeys.isCraftingPinned(pin.key())) {
+            return null;
+        }
+
+        GridInventoryEntry entry = findPinnedEntry(playerPinnedEntries, pin.key());
+        if (entry != null) {
+            pinnedReasons.put(pin.key(), PinnedKeys.PinReason.PLAYER);
+            return entry;
+        }
+
+        GridInventoryEntry fakeEntry = new GridInventoryEntry(-1, pin.key(), 0, 0, false);
+        if (passesViewFilters(fakeEntry)) {
+            pinnedReasons.put(pin.key(), PinnedKeys.PinReason.PLAYER);
+            return fakeEntry;
+        }
+        return null;
     }
 
     private int getRowsFor(int entryCount) {
@@ -365,6 +403,9 @@ public class Repo implements IClientRepo {
 
         for (int i = 0; i < slots.size(); ++i) {
             var entry = slots.get(i);
+            if (entry == null) {
+                continue;
+            }
             if (!entries.containsKey(entry.serial())) {
                 freeSlots.computeIfAbsent(entry.what(), ignored -> new IntArrayList()).add(i);
             }
@@ -408,31 +449,43 @@ public class Repo implements IClientRepo {
         }
         idx -= pinnedSlots;
 
-        idx += this.src.getCurrentScroll() * this.rowSize;
+        idx = getScrollableIndex(idx);
 
+        if (idx < this.scrollableUserPinSlots.size()) {
+            return this.scrollableUserPinSlots.get(idx);
+        }
+        idx -= this.scrollableUserPinSlots.size();
         if (idx >= this.view.size()) {
             return null;
         }
         return this.view.get(idx);
     }
 
+    private int getScrollableIndex(int visibleOffset) {
+        return visibleOffset + this.src.getCurrentScroll() * this.rowSize;
+    }
+
     public final int size() {
-        return this.view.size() + this.pinnedRowCount * this.rowSize;
+        return this.view.size() + this.scrollableUserPinSlots.size() + this.pinnedRowCount * this.rowSize;
     }
 
     public final int getScrollableSize() {
-        return this.view.size();
+        return this.view.size() + this.scrollableUserPinSlots.size();
     }
 
     public final void clear() {
         this.entries.clear();
         this.view.clear();
         this.pinnedSlots.clear();
+        this.pinnedSlotUserSlotIndexes.clear();
+        this.scrollableUserPinSlots.clear();
+        this.scrollableUserPinSlotIndexes.clear();
         this.craftingPinnedEntries.clear();
         this.playerPinnedEntries.clear();
         this.pinnedReasons.clear();
         this.pinnedRowCount = 0;
         this.visiblePlayerPinRows = 0;
+        this.configuredPlayerPinRows = 0;
         this.entriesByItemId.clear();
         this.entriesByItemIdNeedsUpdate = true;
     }
@@ -446,17 +499,41 @@ public class Repo implements IClientRepo {
     }
 
     public final int getPlayerPinCapacity() {
-        return this.visiblePlayerPinRows * this.rowSize;
+        return PinnedKeys.getPlayerPinRows() * this.rowSize;
     }
 
     public final boolean canRemoveEmptyPlayerPinRow() {
-        return PinnedKeys.getPlayerPinRows() > 0
-            && PinnedKeys.getPlayerPinnedKeys().size() <= Math.max(0, PinnedKeys.getPlayerPinRows() - 1) * this.rowSize;
+        return PinnedKeys.canRemoveEmptyPlayerPinRow(this.rowSize);
     }
 
     @Nullable
     public final PinnedKeys.PinReason getPinReason(GridInventoryEntry entry) {
         return entry != null && entry.what() != null ? this.pinnedReasons.get(entry.what()) : null;
+    }
+
+    public final boolean isUserPinSlot(int idx) {
+        return getUserPinSlotIndex(idx) >= 0;
+    }
+
+    public final boolean isEmptyUserPinSlot(int idx) {
+        int slotIndex = getUserPinSlotIndex(idx);
+        return slotIndex >= 0 && PinnedKeys.getPlayerPinSlot(slotIndex) == null;
+    }
+
+    public final int getUserPinSlotIndex(int idx) {
+        int fixedSlots = this.pinnedRowCount * this.rowSize;
+        if (idx < fixedSlots) {
+            if (idx >= 0 && idx < this.pinnedSlotUserSlotIndexes.size()) {
+                return this.pinnedSlotUserSlotIndexes.getInt(idx);
+            }
+            return NO_USER_PIN_SLOT;
+        }
+
+        int scrollableIndex = getScrollableIndex(idx - fixedSlots);
+        if (scrollableIndex >= 0 && scrollableIndex < this.scrollableUserPinSlotIndexes.size()) {
+            return this.scrollableUserPinSlotIndexes.getInt(scrollableIndex);
+        }
+        return NO_USER_PIN_SLOT;
     }
 
     public boolean isEnabled() {
