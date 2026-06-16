@@ -30,6 +30,7 @@ import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.fluids.capability.IFluidTankProperties;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -141,7 +142,7 @@ public class FluidP2PTunnelPart extends CapabilityP2PTunnelPart<FluidP2PTunnelPa
     private class OutputFluidHandler implements IFluidHandler {
         @Override
         public IFluidTankProperties[] getTankProperties() {
-            List<IFluidTankProperties> properties = new java.util.ArrayList<>();
+            List<IFluidTankProperties> properties = new ArrayList<>();
             for (FluidP2PTunnelPart input : getInputs()) {
                 try (CapabilityGuard capabilityGuard = input.getAdjacentCapability()) {
                     Collections.addAll(properties, capabilityGuard.get().getTankProperties());

@@ -14,6 +14,7 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -207,8 +208,8 @@ final class PlayerPinStorage {
     }
 
     record PinSlot(int slotIndex, AEKey key, PinnedKeys.PinKind kind) {
-        private static final java.util.Comparator<PinSlot> SLOT_INDEX_COMPARATOR =
-            java.util.Comparator.comparingInt(PinSlot::slotIndex);
+        private static final Comparator<PinSlot> SLOT_INDEX_COMPARATOR =
+            Comparator.comparingInt(PinSlot::slotIndex);
 
         PinSlot {
             Objects.requireNonNull(key, "key");

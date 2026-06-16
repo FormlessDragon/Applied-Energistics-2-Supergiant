@@ -1,5 +1,6 @@
 package ae2.parts.p2p;
 
+import ae2.api.AECapabilities;
 import ae2.api.behaviors.GenericInternalInventory;
 import ae2.api.config.Actionable;
 import ae2.api.crafting.IPatternDetails;
@@ -23,6 +24,7 @@ import ae2.helpers.patternprovider.PatternProviderLogicHost;
 import ae2.helpers.patternprovider.PatternProviderReturnInventory;
 import ae2.helpers.patternprovider.PatternProviderTarget;
 import ae2.items.parts.PartModels;
+import ae2.util.Platform;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.nbt.NBTTagCompound;
@@ -177,9 +179,9 @@ public class PatternProviderP2PTunnelPart extends P2PTunnelPart<PatternProviderP
 
         IPatternProviderBatchTarget batchTarget = machine;
         TileEntity blockEntity = target.tileEntity();
-        if (blockEntity.hasCapability(ae2.api.AECapabilities.PATTERN_PROVIDER_BATCH_TARGET, target.side())) {
+        if (blockEntity.hasCapability(AECapabilities.PATTERN_PROVIDER_BATCH_TARGET, target.side())) {
             IPatternProviderBatchTarget capabilityTarget = blockEntity.getCapability(
-                ae2.api.AECapabilities.PATTERN_PROVIDER_BATCH_TARGET, target.side());
+                AECapabilities.PATTERN_PROVIDER_BATCH_TARGET, target.side());
             if (capabilityTarget != null) {
                 batchTarget = capabilityTarget;
             }
@@ -319,7 +321,7 @@ public class PatternProviderP2PTunnelPart extends P2PTunnelPart<PatternProviderP
 
     private void notifyAdjacent() {
         if (getTileEntity() != null && getLevel() != null) {
-            ae2.util.Platform.notifyBlocksOfNeighbors(getLevel(), getTileEntity().getPos());
+            Platform.notifyBlocksOfNeighbors(getLevel(), getTileEntity().getPos());
             getHost().markForUpdate();
         }
     }

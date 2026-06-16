@@ -9,8 +9,10 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
+import java.util.List;
+
 public class AdvancedMemoryCardP2PSnapshotPacket extends ClientboundPacket {
-    private AdvancedMemoryCardP2PSnapshot snapshot = new AdvancedMemoryCardP2PSnapshot(java.util.List.of());
+    private AdvancedMemoryCardP2PSnapshot snapshot = new AdvancedMemoryCardP2PSnapshot(List.of());
 
     public AdvancedMemoryCardP2PSnapshotPacket() {
     }

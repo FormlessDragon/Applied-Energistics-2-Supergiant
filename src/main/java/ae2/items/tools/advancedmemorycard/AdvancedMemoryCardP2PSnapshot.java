@@ -2,6 +2,7 @@ package ae2.items.tools.advancedmemorycard;
 
 import net.minecraft.network.PacketBuffer;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -43,7 +44,7 @@ public record AdvancedMemoryCardP2PSnapshot(List<AdvancedMemoryCardP2PEntry> ent
             throw new IllegalArgumentException("Invalid advanced memory card P2P entry count: " + count);
         }
 
-        var entries = new java.util.ArrayList<AdvancedMemoryCardP2PEntry>(count);
+        var entries = new ArrayList<AdvancedMemoryCardP2PEntry>(count);
         for (int i = 0; i < count; i++) {
             entries.add(AdvancedMemoryCardP2PEntry.read(data));
         }

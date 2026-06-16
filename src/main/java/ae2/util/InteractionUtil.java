@@ -20,6 +20,7 @@ package ae2.util;
 
 import ae2.api.util.IAEWrench;
 import ae2.items.tools.NetworkToolItem;
+import cofh.api.item.IToolHammer;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
@@ -67,7 +68,7 @@ public final class InteractionUtil {
 
         if (loadCofhCore) {
             try {
-                if (tool.getItem() instanceof cofh.api.item.IToolHammer toolHammer) {
+                if (tool.getItem() instanceof IToolHammer toolHammer) {
                     return toolHammer.isUsable(tool, player, pos);
                 }
             } catch (final Throwable ignore) {

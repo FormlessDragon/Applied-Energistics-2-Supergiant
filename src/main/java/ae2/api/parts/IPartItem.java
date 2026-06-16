@@ -30,7 +30,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * When implementing a custom part, you must create an item to both represent the part in NBT and Packet data, and to
- * actually place the part onto the bus. Implement this interface on your part {@link net.minecraft.item.Item}.
+ * actually place the part onto the bus. Implement this interface on your part {@link Item}.
  * <p/>
  * To help with placing parts onto buses, use the appropriate part-placement entry point for your item's
  * interaction method.

@@ -1,4 +1,24 @@
+import groovy.util.Node
+import groovy.xml.XmlSlurper
+
 apply from: 'gradle/scripts/helpers.gradle'
+
+private static boolean isPomNodeNamed(Object node, String localName) {
+    if (!(node instanceof Node)) {
+        return false
+    }
+
+    def nodeName = node.name().toString()
+    return nodeName == localName
+            || nodeName.endsWith("}" + localName)
+            || nodeName.endsWith(":" + localName)
+}
+
+private static void removePomChildren(Node pomNode, String localName) {
+    pomNode.children().removeAll { child ->
+        isPomNodeNamed(child, localName)
+    }
+}
 
 setDefaultProperty('publish_to_maven', true, false)
 setDefaultProperty('maven_group', false, propertyString('root_package'))
@@ -70,11 +90,41 @@ if (propertyBool('publish_to_maven')) {
                     }
                 }
                 pom.withXml {
-                    def pomNode = asNode()
-                    pomNode.children().removeIf { it.name().toString() == 'dependencies' }
+                    Node pomNode = asNode()
+                    removePomChildren(pomNode, 'dependencies')
                 }
             }
         }
+    }
+
+    def verifyMavenPomHasNoDependencies = tasks.register('verifyMavenPomHasNoDependencies') {
+        def generatedPom = layout.buildDirectory.file('publications/mavenJava/pom-default.xml')
+
+        dependsOn tasks.named('generatePomFileForMavenJavaPublication')
+        inputs.file(generatedPom)
+
+        doLast {
+            def pomFile = generatedPom.get().asFile
+            def pom = new XmlSlurper(false, false).parse(pomFile)
+            def dependenciesNode = pom.dependencies
+            if (dependenciesNode.size() > 0) {
+                def dependencies = dependenciesNode.dependency
+                def dependencyNames = dependencies.collect { dependency ->
+                    "${dependency.groupId.text()}:${dependency.artifactId.text()}:${dependency.version.text()}"
+                }.join(', ')
+                if (dependencyNames.isEmpty()) {
+                    throw new GradleException('Maven publication POM must not contain a dependencies section.')
+                }
+                throw new GradleException("Maven publication POM must not contain a dependencies section, but found: ${dependencyNames}")
+            }
+        }
+    }
+
+    tasks.matching { task ->
+        task.name == 'publishMavenJavaPublicationToMavenLocal'
+                || task.name.startsWith('publishMavenJavaPublicationTo')
+    }.configureEach {
+        dependsOn verifyMavenPomHasNoDependencies
     }
 
     signing {

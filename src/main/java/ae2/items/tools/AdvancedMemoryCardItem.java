@@ -10,6 +10,7 @@ import ae2.api.parts.IPart;
 import ae2.api.parts.IPartHost;
 import ae2.api.parts.SelectedPart;
 import ae2.api.util.DimensionalBlockPos;
+import ae2.client.render.overlay.AdvancedMemoryCardHighlightHandler;
 import ae2.container.GuiIds;
 import ae2.core.gui.GuiOpener;
 import ae2.core.gui.locator.GuiHostLocators;
@@ -135,7 +136,7 @@ public class AdvancedMemoryCardItem extends AEBaseItem implements IGuiItem {
 
     @SideOnly(Side.CLIENT)
     private static void clearClientHighlight() {
-        ae2.client.render.overlay.AdvancedMemoryCardHighlightHandler.INSTANCE.clear();
+        AdvancedMemoryCardHighlightHandler.INSTANCE.clear();
     }
 
     @SideOnly(Side.CLIENT)
