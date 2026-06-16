@@ -47,6 +47,7 @@ import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.Rectangle;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -448,7 +449,9 @@ public class WidgetContainer {
             }
         }
 
-        for (ICompositeWidget widget : compositeWidgets.values()) {
+        var mouseWheelCaptureWidgets = new ArrayList<>(compositeWidgets.values());
+        for (int i = mouseWheelCaptureWidgets.size() - 1; i >= 0; i--) {
+            var widget = mouseWheelCaptureWidgets.get(i);
             if (widget.isVisible()
                 && widget.wantsAllMouseWheelEvents()
                 && widget.onMouseWheel(mousePos, wheelDelta)) {
