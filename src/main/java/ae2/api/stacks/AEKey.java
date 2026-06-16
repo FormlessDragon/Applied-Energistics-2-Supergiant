@@ -3,6 +3,7 @@ package ae2.api.stacks;
 import ae2.api.config.FuzzyMode;
 import ae2.core.AELog;
 import ae2.core.definitions.AEItems;
+import ae2.items.misc.GenericResourcePackageItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
@@ -290,7 +291,9 @@ public abstract class AEKey {
      * @param level  World where the stacks were being held
      * @param pos    Position where the stacks were being held
      */
-    public abstract void addDrops(long amount, List<ItemStack> drops, World level, BlockPos pos);
+    public void addDrops(long amount, List<ItemStack> drops, World level, BlockPos pos) {
+        GenericResourcePackageItem.addDrop(this, amount, drops);
+    }
 
     public abstract boolean isTagged(String tag);
 

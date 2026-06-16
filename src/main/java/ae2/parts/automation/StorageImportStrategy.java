@@ -64,10 +64,6 @@ public class StorageImportStrategy<T, S> implements StackImportStrategy {
 
     @Override
     public boolean transfer(StackTransferContext context) {
-        if (!context.isKeyTypeEnabled(conversion.getKeyType())) {
-            return false;
-        }
-
         var adjacentHandler = getAdjacentHandler();
         if (adjacentHandler == null) {
             return false;
@@ -84,6 +80,7 @@ public class StorageImportStrategy<T, S> implements StackImportStrategy {
         for (int i = 0; i < adjacentStorage.getSlots() && remainingTransferAmount > 0; i++) {
             var resource = adjacentStorage.getStackInSlot(i);
             if (resource == null
+                || !context.isKeyTypeEnabled(resource.what().getType())
                 // Regard a filter that is set on the bus
                 || context.isInFilter(resource.what()) == context.isInverted()) {
                 continue;

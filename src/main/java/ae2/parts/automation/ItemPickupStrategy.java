@@ -9,6 +9,7 @@ import ae2.api.stacks.AEItemKey;
 import ae2.core.AppEng;
 import ae2.core.network.clientbound.BlockTransitionEffectPacket;
 import ae2.core.network.clientbound.ItemTransitionEffectPacket;
+import ae2.items.misc.GenericResourcePackageItem;
 import ae2.util.Platform;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import net.minecraft.block.Block;
@@ -151,6 +152,20 @@ public class ItemPickupStrategy implements PickupStrategy {
             return 0;
         }
 
+        if (GenericResourcePackageItem.isPackage(item)) {
+            var resource = GenericResourcePackageItem.unwrap(item);
+            if (resource == null) {
+                return 0;
+            }
+            long inserted = sink.insert(resource.what(), resource.amount(), Actionable.MODULATE);
+            ItemStack remainder = inserted >= resource.amount()
+                ? ItemStack.EMPTY
+                : GenericResourcePackageItem.wrap(resource.what(), resource.amount() - inserted);
+            item.setTagCompound(remainder.isEmpty() ? null : remainder.getTagCompound());
+            this.isAccepting = remainder.isEmpty();
+            return remainder.isEmpty() ? item.getCount() : 0;
+        }
+
         var what = AEItemKey.of(item);
         long inserted = sink.insert(what, item.getCount(), Actionable.MODULATE);
         this.isAccepting = inserted >= item.getCount();
@@ -169,6 +184,7 @@ public class ItemPickupStrategy implements PickupStrategy {
         entityItem.getItem().setCount(newStackSize);
         return changed;
     }
+
 
     private boolean canHandleBlock(WorldServer level, BlockPos pos, IBlockState state) {
         Material material = state.getMaterial();

@@ -2,8 +2,11 @@ package ae2.hooks;
 
 import ae2.api.client.AEKeyRendering;
 import ae2.api.stacks.AEKey;
-import ae2.items.misc.WrappedGenericStack;
+import ae2.api.stacks.GenericStack;
+import ae2.client.gui.Icon;
+import ae2.items.misc.GenericResourcePackageItem;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.item.ItemStack;
 
 import java.util.WeakHashMap;
@@ -20,10 +23,7 @@ public final class RenderItemHooks {
             return false;
         }
 
-        if (!(stack.getItem() instanceof WrappedGenericStack item)) {
-            return false;
-        }
-        AEKey aeKey = OVERRIDING.computeIfAbsent(stack, item::unwrapWhat);
+        AEKey aeKey = OVERRIDING.computeIfAbsent(stack, RenderItemHooks::unwrapWhat);
         if (aeKey == null) {
             return false;
         }
@@ -31,6 +31,9 @@ public final class RenderItemHooks {
         OVERRIDING_FOR.set(stack);
         try {
             AEKeyRendering.drawInGui(Minecraft.getMinecraft(), x, y, aeKey);
+            if (stack.getItem() instanceof GenericResourcePackageItem) {
+                drawPackageOverlay(x, y);
+            }
         } finally {
             OVERRIDING_FOR.remove();
         }
@@ -39,6 +42,18 @@ public final class RenderItemHooks {
     }
 
     public static boolean onRenderItemOverlayIntoGui(ItemStack stack) {
-        return stack.getItem() instanceof WrappedGenericStack item && item.unwrapWhat(stack) != null;
+        return unwrapWhat(stack) != null;
+    }
+
+    private static AEKey unwrapWhat(ItemStack stack) {
+        GenericStack genericStack = GenericStack.unwrapItemStack(stack);
+        return genericStack != null ? genericStack.what() : null;
+    }
+
+    private static void drawPackageOverlay(int x, int y) {
+        GlStateManager.disableLighting();
+        GlStateManager.enableBlend();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        Icon.GENERIC_RESOURCE_PACKAGE_FRAME.getBlitter().dest(x, y).blit();
     }
 }

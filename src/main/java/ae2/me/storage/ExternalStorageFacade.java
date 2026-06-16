@@ -11,6 +11,7 @@ import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.MEStorage;
 import ae2.core.AELog;
 import ae2.core.localization.GuiText;
+import ae2.items.misc.GenericResourcePackageItem;
 import com.google.common.primitives.Ints;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
@@ -164,7 +165,9 @@ public abstract class ExternalStorageFacade implements MEStorage {
         @Nullable
         @Override
         public GenericStack getStackInSlot(int slot) {
-            return GenericStack.fromItemStack(handler.getStackInSlot(slot));
+            ItemStack stack = handler.getStackInSlot(slot);
+            GenericStack packaged = GenericResourcePackageItem.unwrap(stack);
+            return packaged != null ? packaged : GenericStack.fromItemStack(stack);
         }
 
         @Override
@@ -200,6 +203,11 @@ public abstract class ExternalStorageFacade implements MEStorage {
 
         @Override
         public int extractExternal(AEKey what, int amount, Actionable mode) {
+            int packagedExtracted = extractPackagedResource(what, amount, mode);
+            if (packagedExtracted > 0) {
+                return packagedExtracted;
+            }
+
             if (!(what instanceof AEItemKey itemKey)) {
                 return 0;
             }
@@ -219,10 +227,64 @@ public abstract class ExternalStorageFacade implements MEStorage {
             return totalExtracted;
         }
 
+        private int extractPackagedResource(AEKey what, int amount, Actionable mode) {
+            int totalExtracted = 0;
+            for (int i = 0; i < handler.getSlots() && totalExtracted < amount; i++) {
+                ItemStack stack = handler.getStackInSlot(i);
+                GenericStack packaged = GenericResourcePackageItem.unwrap(stack);
+                if (packaged == null || !packaged.what().equals(what)) {
+                    continue;
+                }
+
+                int extracted = Math.min(Ints.saturatedCast(packaged.amount()), amount - totalExtracted);
+                if (mode == Actionable.MODULATE) {
+                    long simulatedLeftover = packaged.amount() - extracted;
+                    if (simulatedLeftover > 0 && !canReturnLeftoverPackage(what, simulatedLeftover)) {
+                        AELog.warn("Cannot extract %d of %s from generic resource package: leftover package cannot be returned",
+                            extracted, what);
+                        continue;
+                    }
+
+                    ItemStack removed = handler.extractItem(i, 1, false);
+                    GenericStack removedPackaged = GenericResourcePackageItem.unwrap(removed);
+                    if (removedPackaged == null || !removedPackaged.what().equals(what)) {
+                        AELog.warn("Item handler changed generic resource package while extracting %s", what);
+                        continue;
+                    }
+
+                    int removedAmount = Math.min(Ints.saturatedCast(removedPackaged.amount()),
+                        amount - totalExtracted);
+                    long leftover = removedPackaged.amount() - removedAmount;
+                    if (leftover > 0) {
+                        ItemStack leftoverPackage = GenericResourcePackageItem.wrap(what, leftover);
+                        for (int slot = 0; slot < handler.getSlots() && !leftoverPackage.isEmpty(); slot++) {
+                            leftoverPackage = handler.insertItem(slot, leftoverPackage, false);
+                        }
+                        if (!leftoverPackage.isEmpty()) {
+                            AELog.warn("Voided %s of %s because leftover generic resource package could not be returned",
+                                leftover, what);
+                        }
+                    }
+                    extracted = removedAmount;
+                }
+                totalExtracted += extracted;
+            }
+            return totalExtracted;
+        }
+
+        private boolean canReturnLeftoverPackage(AEKey what, long amount) {
+            ItemStack leftoverPackage = GenericResourcePackageItem.wrap(what, amount);
+            for (int slot = 0; slot < handler.getSlots() && !leftoverPackage.isEmpty(); slot++) {
+                leftoverPackage = handler.insertItem(slot, leftoverPackage, true);
+            }
+            return leftoverPackage.isEmpty();
+        }
+
         @Override
         public boolean containsAnyFuzzy(Set<AEKey> keys) {
             for (int i = 0; i < handler.getSlots(); i++) {
-                var what = AEItemKey.of(handler.getStackInSlot(i));
+                GenericStack packaged = GenericResourcePackageItem.unwrap(handler.getStackInSlot(i));
+                var what = packaged != null ? packaged.what() : AEItemKey.of(handler.getStackInSlot(i));
                 if (what != null) {
                     if (keys.contains(what.dropSecondary())) {
                         return true;
@@ -249,7 +311,12 @@ public abstract class ExternalStorageFacade implements MEStorage {
                     }
                 }
 
-                out.add(AEItemKey.of(stack), stack.getCount());
+                GenericStack packaged = GenericResourcePackageItem.unwrap(stack);
+                if (packaged != null) {
+                    out.add(packaged.what(), packaged.amount());
+                } else {
+                    out.add(AEItemKey.of(stack), stack.getCount());
+                }
             }
         }
     }

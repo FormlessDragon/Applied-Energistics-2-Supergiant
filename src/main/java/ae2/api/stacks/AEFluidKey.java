@@ -3,21 +3,17 @@ package ae2.api.stacks;
 import ae2.api.storage.AEKeyFilter;
 import ae2.core.AELog;
 import com.google.common.base.Preconditions;
-import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.world.World;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidRegistry;
 import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
 import java.util.Objects;
 
 public final class AEFluidKey extends AEKey {
@@ -139,11 +135,6 @@ public final class AEFluidKey extends AEKey {
     public ResourceLocation getId() {
         String fluidName = FluidRegistry.getFluidName(stack);
         return fluidName != null ? new ResourceLocation(fluidName) : null;
-    }
-
-    @Override
-    public void addDrops(long amount, List<ItemStack> drops, World level, BlockPos pos) {
-        // Fluids are voided
     }
 
     @Override

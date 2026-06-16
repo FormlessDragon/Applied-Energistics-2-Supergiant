@@ -49,6 +49,7 @@ public final class Icon {
     public static final Icon BACKGROUND_PRIMARY_OUTPUT = registerBuiltin("background_primary_output", 16, 16);
     public static final Icon BACKGROUND_STORAGE_CELL = registerBuiltin("background_storage_cell", 16, 16);
     public static final Icon CELL_RESTRICTION = registerBuiltin("cell_restriction", 16, 16);
+    public static final Icon GENERIC_RESOURCE_PACKAGE_FRAME = registerBuiltin("generic_resource_package_frame", 16, 16);
 
     public static final Icon VIEW_MODE_STORED = registerBuiltin("view_mode_stored", 16, 16);
     public static final Icon VIEW_MODE_ALL = registerBuiltin("view_mode_all", 16, 16);

@@ -28,6 +28,7 @@ public enum Tooltips implements LocalizationEnum {
     FluidSubstitutions,
     FluidSubstitutionsDescEnabled,
     FluidSubstitutionsDescDisabled,
+    DoesntDespawn,
     MatterBalls,
     Singularity,
     QuantumKey;

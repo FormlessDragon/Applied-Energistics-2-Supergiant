@@ -61,6 +61,8 @@ import ae2.core.gui.GuiOpener;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.PlayerMessages;
 import ae2.helpers.IPriorityHost;
+import ae2.items.misc.GenericResourcePackageItem;
+import ae2.items.misc.PackageInsertResult;
 import ae2.me.helpers.MachineSource;
 import ae2.me.storage.DelegatingMEInventory;
 import ae2.tile.ServerTickingTile;
@@ -471,6 +473,13 @@ public class TileMEChest extends AENetworkedPoweredTile
                     return;
                 }
 
+                if (GenericResourcePackageItem.isPackage(stack)) {
+                    PackageInsertResult result = GenericResourcePackageItem.tryInsertPackage(stack, this,
+                        this.cellHandler, this.mySrc, Actionable.MODULATE);
+                    this.inputInventory.setItemDirect(0, result.remainder());
+                    return;
+                }
+
                 var what = AEItemKey.of(stack);
                 if (what == null) {
                     return;
@@ -700,11 +709,12 @@ public class TileMEChest extends AENetworkedPoweredTile
                 }
 
                 var what = AEItemKey.of(stack);
-                if (what == null) {
-                    return false;
+                if (what != null && cellHandler.insert(what, stack.getCount(), Actionable.SIMULATE, mySrc) > 0) {
+                    return true;
                 }
 
-                return cellHandler.insert(what, stack.getCount(), Actionable.SIMULATE, mySrc) > 0;
+                return GenericResourcePackageItem.tryInsertPackage(stack, TileMEChest.this, cellHandler, mySrc,
+                    Actionable.SIMULATE).changed();
             }
             return false;
         }

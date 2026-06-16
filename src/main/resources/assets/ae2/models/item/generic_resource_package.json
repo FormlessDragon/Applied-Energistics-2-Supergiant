@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "ae2:item/generic_resource_package_overlay"
+  }
+}

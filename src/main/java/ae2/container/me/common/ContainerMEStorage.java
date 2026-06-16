@@ -66,6 +66,8 @@ import ae2.core.network.clientbound.SetLinkStatusPacket;
 import ae2.core.network.serverbound.MEInteractionPacket;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
+import ae2.items.misc.GenericResourcePackageItem;
+import ae2.items.misc.PackageInsertResult;
 import ae2.me.helpers.ActionHostEnergySource;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
@@ -628,6 +630,13 @@ public class ContainerMEStorage extends AEBaseContainer
     protected void putCarriedItemIntoNetwork(boolean singleItem) {
         ItemStack heldStack = getCarried();
 
+        if (!singleItem && GenericResourcePackageItem.isPackage(heldStack)) {
+            PackageInsertResult result = GenericResourcePackageItem.tryInsertPackage(heldStack, energySource, storage,
+                this.getActionSource(), Actionable.MODULATE);
+            setCarried(result.remainder());
+            return;
+        }
+
         AEItemKey what = AEItemKey.of(heldStack);
         if (what == null) {
             return;
@@ -719,6 +728,21 @@ public class ContainerMEStorage extends AEBaseContainer
     /**
      * Try to transfer an item stack into the grid.
      */
+    @Override
+    protected ItemStack transferStackToContainerWithRemainder(ItemStack input) {
+        if (!canInteractWithGrid()) {
+            return super.transferStackToContainerWithRemainder(input);
+        }
+
+        if (GenericResourcePackageItem.isPackage(input)) {
+            PackageInsertResult result = GenericResourcePackageItem.tryInsertPackage(input, energySource, storage,
+                this.getActionSource(), Actionable.MODULATE);
+            return result.remainder();
+        }
+
+        return super.transferStackToContainerWithRemainder(input);
+    }
+
     @Override
     protected int transferStackToContainer(ItemStack input) {
         if (!canInteractWithGrid()) {

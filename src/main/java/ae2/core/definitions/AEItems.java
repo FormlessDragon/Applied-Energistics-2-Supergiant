@@ -40,6 +40,7 @@ import ae2.items.materials.NamePressItem;
 import ae2.items.materials.QuantumEntangledSingularityItem;
 import ae2.items.materials.StorageComponentItem;
 import ae2.items.misc.EntroSeedItem;
+import ae2.items.misc.GenericResourcePackageItem;
 import ae2.items.misc.MeteoriteCompassItem;
 import ae2.items.misc.MissingContentItem;
 import ae2.items.misc.PaintBallItem;
@@ -98,6 +99,8 @@ import java.util.function.IntSupplier;
 public final class AEItems {
     public static final ItemDefinition<WrappedGenericStack> WRAPPED_GENERIC_STACK = new ItemDefinition<>(
         AEItemIds.WRAPPED_GENERIC_STACK, new WrappedGenericStack(), DebugCreativeTab.INSTANCE);
+    public static final ItemDefinition<GenericResourcePackageItem> GENERIC_RESOURCE_PACKAGE = new ItemDefinition<>(
+        AEItemIds.GENERIC_RESOURCE_PACKAGE, new GenericResourcePackageItem(), DebugCreativeTab.INSTANCE);
     public static final ItemDefinition<FacadeItem> FACADE = new ItemDefinition<>(AEItemIds.FACADE, new FacadeItem(),
         FacadeCreativeTab.INSTANCE);
     public static final ItemDefinition<MaterialItem> BLANK_PATTERN = new ItemDefinition<>(AEItemIds.BLANK_PATTERN,
@@ -411,6 +414,7 @@ public final class AEItems {
 
     private static final ItemDefinition<?>[] ITEMS = {
         WRAPPED_GENERIC_STACK,
+        GENERIC_RESOURCE_PACKAGE,
         FACADE,
         BLANK_PATTERN,
         CRAFTING_PATTERN,

@@ -424,9 +424,10 @@ public abstract class AEBaseContainer extends Container {
         }
 
         if (fromPlayerSide) {
-            int transferred = transferStackToContainer(stackToMove.copy());
-            if (transferred > 0) {
-                clickSlot.decrStackSize(transferred);
+            ItemStack remainder = transferStackToContainerWithRemainder(stackToMove.copy());
+            if (!ItemStack.areItemStacksEqual(stackToMove, remainder)
+                || !ItemStack.areItemStackTagsEqual(stackToMove, remainder)) {
+                clickSlot.putStack(remainder);
                 changed = true;
             }
 
@@ -553,6 +554,17 @@ public abstract class AEBaseContainer extends Container {
 
     protected int transferStackToContainer(ItemStack input) {
         return 0;
+    }
+
+    protected ItemStack transferStackToContainerWithRemainder(ItemStack input) {
+        int transferred = transferStackToContainer(input.copy());
+        if (transferred <= 0) {
+            return input;
+        }
+
+        ItemStack remainder = input.copy();
+        remainder.shrink(transferred);
+        return remainder;
     }
 
     public boolean isValidForSlot(Slot slot, ItemStack stack) {

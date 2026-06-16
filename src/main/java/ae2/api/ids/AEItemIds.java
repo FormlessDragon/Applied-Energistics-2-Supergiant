@@ -66,6 +66,7 @@ public final class AEItemIds {
     public static final ResourceLocation QUANTUM_BRIDGE_CARD = id("quantum_bridge_card");
     public static final ResourceLocation MAGNET_CARD = id("magnet_card");
     public static final ResourceLocation WRAPPED_GENERIC_STACK = id("wrapped_generic_stack");
+    public static final ResourceLocation GENERIC_RESOURCE_PACKAGE = id("generic_resource_package");
     public static final ResourceLocation FACADE = id("facade");
 
     ///

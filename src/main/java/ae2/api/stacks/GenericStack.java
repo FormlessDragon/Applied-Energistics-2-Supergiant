@@ -1,6 +1,7 @@
 package ae2.api.stacks;
 
 import ae2.core.definitions.AEItems;
+import ae2.items.misc.GenericStackHolderItem;
 import ae2.items.misc.WrappedGenericStack;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTBase;
@@ -151,12 +152,12 @@ public record GenericStack(AEKey what, long amount) {
     }
 
     public static boolean isWrapped(ItemStack stack) {
-        return stack.getItem() instanceof WrappedGenericStack;
+        return stack.getItem() instanceof GenericStackHolderItem;
     }
 
     public static @Nullable GenericStack unwrapItemStack(ItemStack stack) {
-        if (!stack.isEmpty() && stack.getItem() instanceof WrappedGenericStack item) {
-            return item.unwrap(stack);
+        if (!stack.isEmpty() && stack.getItem() instanceof GenericStackHolderItem item) {
+            return item.getGenericStack(stack);
         }
 
         return null;

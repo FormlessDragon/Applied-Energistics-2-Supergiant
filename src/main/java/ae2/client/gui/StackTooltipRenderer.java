@@ -7,6 +7,7 @@ import ae2.api.storage.cells.IStackTooltipDataProvider;
 import ae2.client.gui.me.common.StackSizeRenderer;
 import ae2.core.localization.GuiText;
 import ae2.integration.Integrations;
+import ae2.items.misc.GenericResourcePackageItem;
 import ae2.items.storage.StorageCellTooltipComponent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -163,7 +164,7 @@ public class StackTooltipRenderer {
         this.lastReservedLineStart = -1;
 
         var unwrapped = GenericStack.unwrapItemStack(stack);
-        if (unwrapped != null) {
+        if (unwrapped != null && !(stack.getItem() instanceof GenericResourcePackageItem)) {
             event.getToolTip().clear();
             for (var line : AEKeyRendering.getTooltip(unwrapped.what())) {
                 event.getToolTip().add(line.getFormattedText());

@@ -39,7 +39,7 @@ import static ae2.api.stacks.GenericStack.AMOUNT_FIELD;
  * will be wrapped in this item, to allow items with amount 0 to be represented as itemstacks without becoming the empty
  * item.
  */
-public class WrappedGenericStack extends AEBaseItem {
+public class WrappedGenericStack extends AEBaseItem implements GenericStackHolderItem {
     private static final String WRAPPED_STACK = "wrapped_stack";
 
     public WrappedGenericStack() {
@@ -119,5 +119,11 @@ public class WrappedGenericStack extends AEBaseItem {
             return result;
         }
         return new GenericStack(result.what(), 0);
+    }
+
+    @Nullable
+    @Override
+    public GenericStack getGenericStack(ItemStack stack) {
+        return unwrap(stack);
     }
 }
