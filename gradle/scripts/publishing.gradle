@@ -26,6 +26,10 @@ if (propertyBool('publish_to_maven')) {
     def scmConnectionUrl = scmUrl.endsWith('.git') ? scmUrl : "${scmUrl}.git"
     def signingInMemoryKeyPassword = project.findProperty('signingInMemoryKeyPassword')?.toString() ?: ''
 
+    tasks.withType(GenerateModuleMetadata).configureEach {
+        enabled = false
+    }
+
     publishing {
         repositories {
             maven {
@@ -64,6 +68,10 @@ if (propertyBool('publish_to_maven')) {
                         connection = "scm:git:${scmConnectionUrl}"
                         developerConnection = "scm:git:${scmConnectionUrl}"
                     }
+                }
+                pom.withXml {
+                    def pomNode = asNode()
+                    pomNode.children().removeIf { it.name().toString() == 'dependencies' }
                 }
             }
         }

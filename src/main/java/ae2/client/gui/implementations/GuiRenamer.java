@@ -8,7 +8,6 @@ import ae2.container.implementations.ContainerRenamer;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.util.text.ITextComponent;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -19,7 +18,7 @@ public class GuiRenamer extends AEBaseGui<ContainerRenamer> implements ITextFiel
     private boolean nameInitialized;
     private boolean submitted;
 
-    public GuiRenamer(ContainerRenamer container, InventoryPlayer playerInventory, ITextComponent title,
+    public GuiRenamer(ContainerRenamer container, InventoryPlayer playerInventory,
                       GuiStyle style) {
         super(container, playerInventory, style);
         this.name = widgets.addTextField("name");

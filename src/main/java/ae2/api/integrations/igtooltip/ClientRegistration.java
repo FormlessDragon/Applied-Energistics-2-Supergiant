@@ -4,10 +4,7 @@ import ae2.api.integrations.igtooltip.providers.BodyProvider;
 import net.minecraft.block.Block;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ResourceLocation;
-import org.jetbrains.annotations.ApiStatus;
 
-@ApiStatus.Experimental
-@ApiStatus.NonExtendable
 public interface ClientRegistration {
     default <T extends TileEntity> void addBlockEntityBody(Class<T> blockEntityClass,
                                                            Class<? extends Block> blockClass,

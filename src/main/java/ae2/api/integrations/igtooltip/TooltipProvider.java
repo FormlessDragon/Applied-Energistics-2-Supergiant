@@ -23,8 +23,6 @@
 
 package ae2.api.integrations.igtooltip;
 
-import org.jetbrains.annotations.ApiStatus;
-
 /**
  * Implement this in your addon to register additional tile entity tooltips using AE2's in-game tooltip abstraction.
  * <p/>
@@ -33,8 +31,6 @@ import org.jetbrains.annotations.ApiStatus;
  * In Short: Name a text-file <code>META-INF/services/ae2.api.integrations.igtooltip.TooltipProvider</code> and place
  * a line in it that has the fully qualified name of your implementation class.
  */
-@ApiStatus.Experimental
-@ApiStatus.OverrideOnly
 public interface TooltipProvider {
     int DEFAULT_PRIORITY = 1000;
     int DEBUG_PRIORITY = 5000;

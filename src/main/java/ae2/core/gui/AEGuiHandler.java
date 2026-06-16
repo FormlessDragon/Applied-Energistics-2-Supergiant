@@ -899,7 +899,7 @@ public class AEGuiHandler implements IGuiHandler {
                 if (renamer == null && te instanceof ICustomName customName) {
                     renamer = initTileContainer(new ContainerRenamer(player.inventory, customName), te, ID);
                 }
-                return renamer == null ? null : new GuiRenamer(renamer, player.inventory, null,
+                return renamer == null ? null : new GuiRenamer(renamer, player.inventory,
                     GuiStyleManager.loadStyleDoc("/screens/renamer.json"));
             }
             case IMPORT_BUS -> {

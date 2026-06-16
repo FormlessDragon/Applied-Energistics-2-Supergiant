@@ -25,12 +25,10 @@ package ae2.api.integrations.igtooltip;
 
 import ae2.core.localization.LocalizationEnum;
 import net.minecraft.util.text.TextFormatting;
-import org.jetbrains.annotations.ApiStatus;
 
 /**
  * Abstraction for building an in-game tooltip for supported integrations.
  */
-@ApiStatus.Experimental
 public interface TooltipBuilder {
     String localize(LocalizationEnum text);
 
