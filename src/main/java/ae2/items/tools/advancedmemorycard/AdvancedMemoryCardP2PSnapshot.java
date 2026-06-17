@@ -13,7 +13,7 @@ public record AdvancedMemoryCardP2PSnapshot(List<AdvancedMemoryCardP2PEntry> ent
         Comparator.comparing(AdvancedMemoryCardP2PEntry::input)
                   .reversed()
                   .thenComparingInt(entry -> Short.toUnsignedInt(entry.frequency()))
-                  .thenComparing(AdvancedMemoryCardP2PEntry::displayName)
+                  .thenComparing(AdvancedMemoryCardP2PEntry::displayNameKey)
                   .thenComparingInt(AdvancedMemoryCardP2PEntry::entryId);
 
     public AdvancedMemoryCardP2PSnapshot(List<AdvancedMemoryCardP2PEntry> entries) {

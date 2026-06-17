@@ -25,6 +25,7 @@ import ae2.api.parts.PartModels;
 import ae2.api.util.AEColor;
 import ae2.core.localization.InGameTooltip;
 import ae2.items.parts.ColoredPartItem;
+import ae2.items.parts.P2PPartItem;
 import ae2.items.parts.PartItem;
 import ae2.items.parts.PartModelsHelper;
 import ae2.items.parts.TooltipPartItem;
@@ -66,6 +67,7 @@ import ae2.parts.p2p.IC2P2PTunnelPart;
 import ae2.parts.p2p.ItemP2PTunnelPart;
 import ae2.parts.p2p.LightP2PTunnelPart;
 import ae2.parts.p2p.MEP2PTunnelPart;
+import ae2.parts.p2p.P2PTunnelPart;
 import ae2.parts.p2p.PatternProviderP2PTunnelPart;
 import ae2.parts.p2p.RedstoneP2PTunnelPart;
 import ae2.parts.reporting.ConversionMonitorPart;
@@ -196,21 +198,21 @@ public final class AEParts {
         AEPartIds.PATTERN_ACCESS_TERMINAL, PatternAccessTerminalPart.class, PatternAccessTerminalPart::new);
     public static final ItemDefinition<PartItem<RequesterTerminalPart>> REQUESTER_TERMINAL = createPart(
         AEPartIds.REQUESTER_TERMINAL, RequesterTerminalPart.class, RequesterTerminalPart::new);
-    public static final ItemDefinition<PartItem<MEP2PTunnelPart>> ME_P2P_TUNNEL = createPart(
+    public static final ItemDefinition<P2PPartItem<MEP2PTunnelPart>> ME_P2P_TUNNEL = createP2PPart(
         AEPartIds.ME_P2P_TUNNEL, MEP2PTunnelPart.class, MEP2PTunnelPart::new);
-    public static final ItemDefinition<PartItem<RedstoneP2PTunnelPart>> REDSTONE_P2P_TUNNEL = createPart(
+    public static final ItemDefinition<P2PPartItem<RedstoneP2PTunnelPart>> REDSTONE_P2P_TUNNEL = createP2PPart(
         AEPartIds.REDSTONE_P2P_TUNNEL, RedstoneP2PTunnelPart.class, RedstoneP2PTunnelPart::new);
-    public static final ItemDefinition<PartItem<ItemP2PTunnelPart>> ITEM_P2P_TUNNEL = createPart(
+    public static final ItemDefinition<P2PPartItem<ItemP2PTunnelPart>> ITEM_P2P_TUNNEL = createP2PPart(
         AEPartIds.ITEM_P2P_TUNNEL, ItemP2PTunnelPart.class, ItemP2PTunnelPart::new);
-    public static final ItemDefinition<PartItem<FluidP2PTunnelPart>> FLUID_P2P_TUNNEL = createPart(
+    public static final ItemDefinition<P2PPartItem<FluidP2PTunnelPart>> FLUID_P2P_TUNNEL = createP2PPart(
         AEPartIds.FLUID_P2P_TUNNEL, FluidP2PTunnelPart.class, FluidP2PTunnelPart::new);
-    public static final ItemDefinition<PartItem<FEP2PTunnelPart>> FE_P2P_TUNNEL = createPart(
+    public static final ItemDefinition<P2PPartItem<FEP2PTunnelPart>> FE_P2P_TUNNEL = createP2PPart(
         AEPartIds.FE_P2P_TUNNEL, FEP2PTunnelPart.class, FEP2PTunnelPart::new);
-    public static final ItemDefinition<PartItem<IC2P2PTunnelPart>> IC2_P2P_TUNNEL = createPart(
+    public static final ItemDefinition<P2PPartItem<IC2P2PTunnelPart>> IC2_P2P_TUNNEL = createP2PPart(
         AEPartIds.IC2_P2P_TUNNEL, IC2P2PTunnelPart.class, IC2P2PTunnelPart::new);
-    public static final ItemDefinition<PartItem<LightP2PTunnelPart>> LIGHT_P2P_TUNNEL = createPart(
+    public static final ItemDefinition<P2PPartItem<LightP2PTunnelPart>> LIGHT_P2P_TUNNEL = createP2PPart(
         AEPartIds.LIGHT_P2P_TUNNEL, LightP2PTunnelPart.class, LightP2PTunnelPart::new);
-    public static final ItemDefinition<PartItem<PatternProviderP2PTunnelPart>> PATTERN_PROVIDER_P2P_TUNNEL = createPart(
+    public static final ItemDefinition<P2PPartItem<PatternProviderP2PTunnelPart>> PATTERN_PROVIDER_P2P_TUNNEL = createP2PPart(
         AEPartIds.PATTERN_PROVIDER_P2P_TUNNEL, PatternProviderP2PTunnelPart.class,
         PatternProviderP2PTunnelPart::new);
 
@@ -288,6 +290,12 @@ public final class AEParts {
                                                                             Function<IPartItem<T>, T> factory) {
         PartModels.registerModels(PartModelsHelper.createModels(partClass));
         return new ItemDefinition<>(id, new PartItem<>(partClass, factory));
+    }
+
+    private static <T extends P2PTunnelPart<?>> ItemDefinition<P2PPartItem<T>> createP2PPart(
+        ResourceLocation id, Class<T> partClass, Function<IPartItem<T>, T> factory) {
+        PartModels.registerModels(PartModelsHelper.createModels(partClass));
+        return new ItemDefinition<>(id, new P2PPartItem<>(partClass, factory));
     }
 
     private static <T extends IPart> ItemDefinition<PartItem<T>> createTooltipPart(ResourceLocation id,

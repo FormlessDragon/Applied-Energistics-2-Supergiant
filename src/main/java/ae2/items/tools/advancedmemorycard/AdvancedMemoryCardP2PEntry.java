@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
 public record AdvancedMemoryCardP2PEntry(
     int entryId,
     ResourceLocation tunnelType,
-    String displayName,
+    String displayNameKey,
     @Nullable String customName,
     boolean input,
     short frequency,
@@ -19,14 +19,14 @@ public record AdvancedMemoryCardP2PEntry(
     BlockPos pos,
     @Nullable EnumFacing side) {
 
-    private static final int MAX_DISPLAY_NAME_LENGTH = 128;
+    private static final int MAX_DISPLAY_NAME_KEY_LENGTH = 128;
     private static final int MAX_CUSTOM_NAME_LENGTH = 32;
 
     public static AdvancedMemoryCardP2PEntry read(PacketBuffer data) {
         return new AdvancedMemoryCardP2PEntry(
             data.readVarInt(),
             data.readResourceLocation(),
-            data.readString(MAX_DISPLAY_NAME_LENGTH),
+            data.readString(MAX_DISPLAY_NAME_KEY_LENGTH),
             readCustomName(data),
             data.readBoolean(),
             data.readShort(),
@@ -54,7 +54,7 @@ public record AdvancedMemoryCardP2PEntry(
     public void write(PacketBuffer data) {
         data.writeVarInt(entryId);
         data.writeResourceLocation(tunnelType);
-        data.writeString(clamp(displayName, MAX_DISPLAY_NAME_LENGTH));
+        data.writeString(clamp(displayNameKey, MAX_DISPLAY_NAME_KEY_LENGTH));
         data.writeString(customName == null ? "" : clamp(customName, MAX_CUSTOM_NAME_LENGTH));
         data.writeBoolean(input);
         data.writeShort(frequency);
@@ -63,10 +63,6 @@ public record AdvancedMemoryCardP2PEntry(
         data.writeVarInt(dimension);
         data.writeLong(pos.toLong());
         data.writeByte(side == null ? -1 : side.ordinal());
-    }
-
-    public String visibleName() {
-        return customName == null ? displayName : customName;
     }
 
     public String customNameOrEmpty() {

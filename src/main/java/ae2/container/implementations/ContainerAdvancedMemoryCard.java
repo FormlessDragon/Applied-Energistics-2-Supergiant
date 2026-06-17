@@ -9,6 +9,7 @@ import ae2.api.parts.IPartItem;
 import ae2.container.AEBaseContainer;
 import ae2.core.network.clientbound.AdvancedMemoryCardP2PSnapshotPacket;
 import ae2.items.contents.AdvancedMemoryCardGuiHost;
+import ae2.items.parts.P2PPartItem;
 import ae2.items.tools.AdvancedMemoryCardItem;
 import ae2.items.tools.advancedmemorycard.AdvancedMemoryCardAction;
 import ae2.items.tools.advancedmemorycard.AdvancedMemoryCardP2PEntry;
@@ -368,7 +369,7 @@ public class ContainerAdvancedMemoryCard extends AEBaseContainer {
         return new AdvancedMemoryCardP2PEntry(
             entryId,
             tunnelType,
-            tunnel.getPartItem().asItemStack().getDisplayName(),
+            getTunnelTypeDisplayNameKey(tunnel),
             tunnel.getCustomName(),
             !tunnel.isOutput(),
             tunnel.getFrequency(),
@@ -377,6 +378,14 @@ public class ContainerAdvancedMemoryCard extends AEBaseContainer {
             node.getLevel().provider.getDimension(),
             tunnel.getHost().getLocation().getPos(),
             tunnel.getSide());
+    }
+
+    private String getTunnelTypeDisplayNameKey(P2PTunnelPart<?> tunnel) {
+        Item item = tunnel.getPartItem().asItem();
+        if (item instanceof P2PPartItem<?> p2pPartItem) {
+            return p2pPartItem.getP2PTypeTranslationKey(tunnel.getPartItem().asItemStack());
+        }
+        return tunnel.getPartItem().asItemStack().getTranslationKey() + ".name";
     }
 
     private AdvancedMemoryCardP2PEntry findEntry(int entryId) {

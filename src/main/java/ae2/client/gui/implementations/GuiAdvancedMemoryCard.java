@@ -20,6 +20,8 @@ import ae2.client.render.overlay.AdvancedMemoryCardHighlightHandler;
 import ae2.container.implementations.ContainerAdvancedMemoryCard;
 import ae2.core.AEConfig;
 import ae2.core.localization.GuiText;
+import ae2.core.localization.P2PText;
+import ae2.items.parts.P2PPartItem;
 import ae2.items.tools.AdvancedMemoryCardItem;
 import ae2.items.tools.advancedmemorycard.AdvancedMemoryCardAction;
 import ae2.items.tools.advancedmemorycard.AdvancedMemoryCardP2PEntry;
@@ -29,6 +31,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.client.resources.I18n;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.init.Items;
@@ -352,9 +355,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
             }
 
             List<String> lines = new ObjectArrayList<>();
-            lines.add(GuiText.AdvancedMemoryCardType.getLocal(hovered.displayName(),
-                hovered.input() ? GuiText.AdvancedMemoryCardInput.getLocal()
-                    : GuiText.AdvancedMemoryCardOutput.getLocal()));
+            lines.add(GuiText.AdvancedMemoryCardType.getLocal(localizedTypeName(hovered)));
             lines.add(GuiText.AdvancedMemoryCardPos.getLocal(hovered.pos().getX(), hovered.pos().getY(),
                 hovered.pos().getZ()));
             lines.add(GuiText.AdvancedMemoryCardSide.getLocal(
@@ -399,13 +400,11 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         statusIcon.getBlitter().dest(x + statusIconPos.x(), y + statusIconPos.y()).blit();
 
         Point namePos = widgetPos(this.entryNameStyle);
-        this.fontRenderer.drawString(GuiText.AdvancedMemoryCardName.getLocal(entry.visibleName()),
+        this.fontRenderer.drawString(GuiText.AdvancedMemoryCardName.getLocal(visibleEntryName(entry)),
             x + namePos.x(), y + namePos.y(), 0);
         Point typePos = widgetPos(this.entryTypeStyle);
         this.fontRenderer.drawString(
-            GuiText.AdvancedMemoryCardType.getLocal(entry.displayName(),
-                entry.input() ? GuiText.AdvancedMemoryCardInput.getLocal()
-                    : GuiText.AdvancedMemoryCardOutput.getLocal()),
+            GuiText.AdvancedMemoryCardType.getLocal(localizedTypeName(entry)),
             x + typePos.x(), y + typePos.y(), 0);
         Point frequencyPos = widgetPos(this.entryFrequencyStyle);
         this.fontRenderer.drawString(GuiText.AdvancedMemoryCardFrequency.getLocal(frequencyText(entry)),
@@ -520,7 +519,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         Point namePos = widgetPos(this.entryNameStyle);
         int nameX = entryX() + namePos.x();
         int nameY = entryY(row) + namePos.y();
-        int nameWidth = this.fontRenderer.getStringWidth(GuiText.AdvancedMemoryCardName.getLocal(entry.visibleName()));
+        int nameWidth = this.fontRenderer.getStringWidth(GuiText.AdvancedMemoryCardName.getLocal(visibleEntryName(entry)));
         return localX >= nameX
             && localX < nameX + nameWidth
             && localY >= nameY
@@ -777,7 +776,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
             return true;
         }
 
-        String visibleName = entry.visibleName().toLowerCase(Locale.ROOT);
+        String visibleName = visibleEntryName(entry).toLowerCase(Locale.ROOT);
         if (visibleName.contains(searchText)) {
             return true;
         }
@@ -829,9 +828,20 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     private String displayNameForType(ResourceLocation type) {
         ItemStack stack = stackForType(type);
         if (!stack.isEmpty()) {
+            if (stack.getItem() instanceof P2PPartItem<?> p2pPartItem) {
+                return I18n.format(p2pPartItem.getP2PTypeTranslationKey(stack));
+            }
             return stack.getDisplayName();
         }
         return type.toString();
+    }
+
+    private String localizedTypeName(AdvancedMemoryCardP2PEntry entry) {
+        return I18n.format(entry.displayNameKey());
+    }
+
+    private String visibleEntryName(AdvancedMemoryCardP2PEntry entry) {
+        return entry.customName() == null ? P2PText.NamePrefix.getLocal(localizedTypeName(entry)) : entry.customName();
     }
 
     private ItemStack stackForType(ResourceLocation type) {

@@ -54,6 +54,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.Vec3d;
 
 import org.jetbrains.annotations.Nullable;
+
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
@@ -220,7 +221,7 @@ public abstract class P2PTunnelPart<T extends P2PTunnelPart<T>> extends AEBasePa
 
                 MemoryCardItem.clearCard(heldItem);
                 NBTTagCompound cardTag = Platform.openNbtData(heldItem);
-                cardTag.setString(EXPORTED_SETTINGS_SOURCE_TAG, getPartItem().asItemStack().getTranslationKey() + ".name");
+                cardTag.setString(EXPORTED_SETTINGS_SOURCE_TAG, getPartItem().asItemStack().getDisplayName());
                 cardTag.merge(exportSettings(SettingsFrom.MEMORY_CARD));
 
                 memoryCard.notifyUser(player,
