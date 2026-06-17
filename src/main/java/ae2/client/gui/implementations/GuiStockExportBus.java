@@ -38,10 +38,9 @@ public class GuiStockExportBus<T extends ContainerStockExportBus> extends GuiUpg
     public GuiStockExportBus(T container, InventoryPlayer playerInventory, ITextComponent title, GuiStyle style) {
         super(container, playerInventory, title, style);
         this.stockContainer = container;
-        this.redstoneMode = addToLeftToolbar(
-            new ServerSettingToggleButton<>(Settings.REDSTONE_CONTROLLED, RedstoneMode.IGNORE));
+        this.redstoneMode = new ServerSettingToggleButton<>(Settings.REDSTONE_CONTROLLED, RedstoneMode.IGNORE);
         if (container.getHost().getConfigManager().hasSetting(Settings.CRAFT_ONLY)) {
-            this.craftMode = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.CRAFT_ONLY, YesNo.NO));
+            this.craftMode = new ServerSettingToggleButton<>(Settings.CRAFT_ONLY, YesNo.NO);
         } else {
             this.craftMode = null;
         }
@@ -50,6 +49,10 @@ public class GuiStockExportBus<T extends ContainerStockExportBus> extends GuiUpg
                 new ServerSettingToggleButton<>(Settings.SCHEDULING_MODE, SchedulingMode.DEFAULT));
         } else {
             this.schedulingMode = null;
+        }
+        addToLeftToolbar(this.redstoneMode);
+        if (this.craftMode != null) {
+            addToLeftToolbar(this.craftMode);
         }
     }
 

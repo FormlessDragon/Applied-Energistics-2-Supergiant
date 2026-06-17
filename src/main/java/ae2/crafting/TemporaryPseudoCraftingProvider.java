@@ -60,4 +60,5 @@ public record TemporaryPseudoCraftingProvider(IPatternDetails pattern) implement
     public boolean isBusy() {
         return false;
     }
+
 }

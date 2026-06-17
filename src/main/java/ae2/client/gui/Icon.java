@@ -230,7 +230,6 @@ public final class Icon {
     public static final Icon ADVANCED_MEMORY_CARD_OUTPUT = registerBuiltin("advanced_memory_card_output", 16, 16);
     public static final Icon ADVANCED_MEMORY_CARD_BOUND = registerBuiltin("advanced_memory_card_bound", 16, 16);
     public static final Icon ADVANCED_MEMORY_CARD_UNBOUND = registerBuiltin("advanced_memory_card_unbound", 16, 16);
-    public static final Icon PATTERN_PROVIDER_HIGHLIGHT = registerBuiltin("pattern_provider_highlight", 6, 11);
     public static final Icon PATTERN_PROVIDER_RENAME = registerBuiltin("pattern_provider_rename", 6, 11);
 
     public final int width;

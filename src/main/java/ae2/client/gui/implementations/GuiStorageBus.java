@@ -39,8 +39,8 @@ public class GuiStorageBus extends GuiUpgradeable<ContainerStorageBus> {
 
         this.addToLeftToolbar(this.storageFilter);
         this.addToLeftToolbar(this.filterOnExtract);
-        this.addToLeftToolbar(this.fuzzyMode);
         this.addToLeftToolbar(this.rwMode);
+        this.addToLeftToolbar(this.fuzzyMode);
     }
 
     @Override

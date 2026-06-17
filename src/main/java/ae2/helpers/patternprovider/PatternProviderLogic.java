@@ -48,6 +48,8 @@ import ae2.api.networking.security.IActionSource;
 import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.networking.ticking.TickRateModulation;
 import ae2.api.networking.ticking.TickingRequest;
+import ae2.api.parts.IPart;
+import ae2.api.parts.IPartHost;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKeyType;
@@ -1205,7 +1207,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         World level = blockEntity.getWorld();
         if (level != null) {
             for (EnumFacing side : sides) {
-                PatternContainerGroup group = PatternContainerGroup.fromMachine(level, blockEntity.getPos().offset(side),
+                PatternContainerGroup group = getAdjacentTerminalGroup(level, blockEntity.getPos().offset(side),
                     side.getOpposite());
                 if (group != null) {
                     groups.add(group);
@@ -1232,6 +1234,19 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
         AEItemKey hostIcon = this.host.getTerminalIcon();
         return new PatternContainerGroup(hostIcon, hostIcon.getDisplayName(), tooltip);
+    }
+
+    @Nullable
+    private static PatternContainerGroup getAdjacentTerminalGroup(World level, BlockPos pos, EnumFacing side) {
+        TileEntity adjacent = level.getTileEntity(pos);
+        if (adjacent instanceof IPartHost partHost) {
+            IPart part = partHost.getPart(side);
+            if (part instanceof PatternProviderP2PTunnelPart tunnel && !tunnel.isOutput()) {
+                return tunnel.getCraftingMachineInfo();
+            }
+        }
+
+        return PatternContainerGroup.fromMachine(level, pos, side);
     }
 
     public long getSortValue() {

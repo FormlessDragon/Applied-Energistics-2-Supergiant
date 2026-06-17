@@ -48,12 +48,11 @@ public class GuiIOBus extends GuiUpgradeable<ContainerIOBus> {
             addToLeftToolbar(KeyTypeSelectionButton.create(this, container.getHost(), GuiText.ConfigureImportedTypes.text()));
         }
 
-        this.redstoneMode = addToLeftToolbar(
-            new ServerSettingToggleButton<>(Settings.REDSTONE_CONTROLLED, RedstoneMode.IGNORE));
-        this.fuzzyMode = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.FUZZY_MODE, FuzzyMode.IGNORE_ALL));
+        this.redstoneMode = new ServerSettingToggleButton<>(Settings.REDSTONE_CONTROLLED, RedstoneMode.IGNORE);
+        this.fuzzyMode = new ServerSettingToggleButton<>(Settings.FUZZY_MODE, FuzzyMode.IGNORE_ALL);
 
         if (container.getHost().getConfigManager().hasSetting(Settings.CRAFT_ONLY)) {
-            this.craftMode = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.CRAFT_ONLY, YesNo.NO));
+            this.craftMode = new ServerSettingToggleButton<>(Settings.CRAFT_ONLY, YesNo.NO);
         } else {
             this.craftMode = null;
         }
@@ -63,6 +62,11 @@ public class GuiIOBus extends GuiUpgradeable<ContainerIOBus> {
                 new ServerSettingToggleButton<>(Settings.SCHEDULING_MODE, SchedulingMode.DEFAULT));
         } else {
             this.schedulingMode = null;
+        }
+        addToLeftToolbar(this.redstoneMode);
+        addToLeftToolbar(this.fuzzyMode);
+        if (this.craftMode != null) {
+            addToLeftToolbar(this.craftMode);
         }
     }
 

@@ -31,8 +31,6 @@ import ae2.crafting.execution.CraftingSupplierLocator;
 import ae2.crafting.inv.ChildCraftingSimulationState;
 import ae2.crafting.inv.CraftingSimulationState;
 import ae2.crafting.pattern.AEProcessingPattern;
-import ae2.helpers.patternprovider.PatternContainer;
-import ae2.helpers.patternprovider.PatternProviderLogic;
 import ae2.helpers.patternprovider.PseudoPatternDetails;
 import ae2.me.service.CraftingService;
 import com.google.common.math.LongMath;
@@ -129,11 +127,9 @@ public class CraftingTreeProcess {
         if (provider instanceof TemporaryPseudoCraftingProvider) {
             return null;
         }
-        if (provider instanceof PatternProviderLogic logic) {
-            return logic.getTerminalGroup();
-        }
-        if (provider instanceof PatternContainer container) {
-            return container.getTerminalGroup();
+        var g = provider.getTerminalGroup();
+        if (g != null) {
+            return g;
         }
         return PatternContainerGroup.nothing();
     }

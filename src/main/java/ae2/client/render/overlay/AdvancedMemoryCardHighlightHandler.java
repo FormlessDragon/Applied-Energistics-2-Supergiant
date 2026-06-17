@@ -11,7 +11,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.util.math.AxisAlignedBB;
-import net.minecraft.util.math.BlockPos;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.lwjgl.opengl.GL11;
@@ -21,8 +20,10 @@ import java.util.List;
 public class AdvancedMemoryCardHighlightHandler {
     public static final AdvancedMemoryCardHighlightHandler INSTANCE = new AdvancedMemoryCardHighlightHandler();
     private static final MemoryCardColors UNHIGHLIGHTED_COLORS = MemoryCardColors.DEFAULT;
+    private static final HighlightColor INPUT_COLOR = new HighlightColor(0.0F, 0.85F, 1.0F, 0.85F);
+    private static final HighlightColor OUTPUT_COLOR = new HighlightColor(1.0F, 0.55F, 0.0F, 0.85F);
 
-    private final ObjectSet<BlockPos> currentDimensionPositions = new ObjectLinkedOpenHashSet<>();
+    private final ObjectSet<P2PHighlight> currentDimensionHighlights = new ObjectLinkedOpenHashSet<>();
     private int highlightedDimension = Integer.MIN_VALUE;
     private short highlightedFrequency;
 
@@ -43,24 +44,30 @@ public class AdvancedMemoryCardHighlightHandler {
         int currentDimension = minecraft.world.provider.getDimension();
         this.highlightedDimension = currentDimension;
         this.highlightedFrequency = frequency;
-        this.currentDimensionPositions.clear();
+        this.currentDimensionHighlights.clear();
 
         for (AdvancedMemoryCardP2PEntry entry : entries) {
             if (entry.frequency() == frequency && entry.dimension() == currentDimension) {
-                this.currentDimensionPositions.add(entry.pos());
+                this.currentDimensionHighlights.add(new P2PHighlight(
+                    new OverlayHighlightLocation(
+                        entry.dimension(),
+                        entry.pos(),
+                        entry.side(),
+                        OverlayHighlightShape.P2P_TUNNEL),
+                    entry.input() ? INPUT_COLOR : OUTPUT_COLOR));
             }
         }
     }
 
     public void clear() {
-        this.currentDimensionPositions.clear();
+        this.currentDimensionHighlights.clear();
         this.highlightedDimension = Integer.MIN_VALUE;
         this.highlightedFrequency = 0;
     }
 
     public MemoryCardColors getMemoryCardColors() {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft.world == null || this.highlightedFrequency == 0 || this.currentDimensionPositions.isEmpty()
+        if (minecraft.world == null || this.highlightedFrequency == 0 || this.currentDimensionHighlights.isEmpty()
             || minecraft.world.provider.getDimension() != this.highlightedDimension) {
             return UNHIGHLIGHTED_COLORS;
         }
@@ -76,7 +83,7 @@ public class AdvancedMemoryCardHighlightHandler {
             clear();
             return;
         }
-        if (this.currentDimensionPositions.isEmpty()) {
+        if (this.currentDimensionHighlights.isEmpty()) {
             return;
         }
         if (minecraft.world.provider.getDimension() != this.highlightedDimension || this.highlightedFrequency == 0) {
@@ -102,9 +109,13 @@ public class AdvancedMemoryCardHighlightHandler {
         GlStateManager.disableDepth();
         GlStateManager.depthMask(false);
 
-        for (BlockPos pos : this.currentDimensionPositions) {
-            AxisAlignedBB box = new AxisAlignedBB(pos).grow(0.01D);
-            RenderGlobal.drawSelectionBoundingBox(box, 0.0F, 0.85F, 1.0F, 0.85F);
+        for (P2PHighlight highlight : this.currentDimensionHighlights) {
+            OverlayHighlightLocation location = highlight.location();
+            HighlightColor color = highlight.color();
+            for (AxisAlignedBB box : OverlayHighlightBoxes.create(location.shape(), location.pos(), location.side())) {
+                RenderGlobal.drawSelectionBoundingBox(box.grow(0.01D), color.red(), color.green(), color.blue(),
+                    color.alpha());
+            }
         }
 
         GlStateManager.glLineWidth(1.0F);
@@ -114,5 +125,11 @@ public class AdvancedMemoryCardHighlightHandler {
         GlStateManager.enableTexture2D();
         GlStateManager.disableBlend();
         GlStateManager.popMatrix();
+    }
+
+    private record P2PHighlight(OverlayHighlightLocation location, HighlightColor color) {
+    }
+
+    private record HighlightColor(float red, float green, float blue, float alpha) {
     }
 }

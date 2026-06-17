@@ -56,6 +56,8 @@ public class GuiInscriber extends GuiUpgradeable<ContainerInscriber> {
         this.separateSidesBtn = addToLeftToolbar(
             new ServerSettingToggleButton<>(Settings.INSCRIBER_SEPARATE_SIDES, YesNo.NO));
         this.autoExportBtn = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.AUTO_EXPORT, YesNo.NO));
+        this.bufferSizeBtn = addToLeftToolbar(
+            new ServerSettingToggleButton<>(Settings.INSCRIBER_INPUT_CAPACITY, InscriberInputCapacity.SIXTY_FOUR));
         this.outputSidesBtn = addToLeftToolbar(new IconButton(this::openOutputSides) {
             {
                 setMessage(ButtonToolTips.OutputSideConfig.text());
@@ -73,8 +75,6 @@ public class GuiInscriber extends GuiUpgradeable<ContainerInscriber> {
                     ButtonToolTips.OutputSideConfigHint.text());
             }
         });
-        this.bufferSizeBtn = addToLeftToolbar(
-            new ServerSettingToggleButton<>(Settings.INSCRIBER_INPUT_CAPACITY, InscriberInputCapacity.SIXTY_FOUR));
     }
 
     @Override

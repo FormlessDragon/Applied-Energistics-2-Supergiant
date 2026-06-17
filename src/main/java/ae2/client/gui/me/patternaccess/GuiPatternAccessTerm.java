@@ -46,6 +46,8 @@ import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.UpgradesPanel;
 import ae2.client.render.overlay.CraftingSupplierHighlightHandler;
+import ae2.client.render.overlay.OverlayHighlightLocation;
+import ae2.client.render.overlay.OverlayHighlightShape;
 import ae2.container.SlotSemantics;
 import ae2.container.implementations.ContainerPatternAccessTerm;
 import ae2.core.AEConfig;
@@ -55,7 +57,6 @@ import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.core.network.serverbound.QuickMovePatternPacket;
-import ae2.crafting.execution.CraftingSupplierLocation;
 import ae2.crafting.execution.CraftingSupplierLocator;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
@@ -115,9 +116,10 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     private static final int MIN_VISIBLE_ROWS = 2;
     private static final int PATTERN_PROVIDER_NAME_MARGIN_X = 2;
     private static final int TEXT_MAX_WIDTH = 155;
-    private static final int ROW_ACTION_BUTTON_WIDTH = 6;
-    private static final int ROW_ACTION_BUTTON_HEIGHT = 11;
-    private static final int ROW_ACTION_BUTTON_Y_OFFSET = 3;
+    private static final int ROW_ACTION_BUTTON_WIDTH = 16;
+    private static final int ROW_ACTION_BUTTON_HEIGHT = 16;
+    private static final int ROW_ACTION_BUTTON_Y_OFFSET = 1;
+    private static final int ROW_CONTENT_X = GUI_PADDING_X + ROW_ACTION_BUTTON_WIDTH + 1;
     private static final int RENAME_FIELD_X_OFFSET = 10;
     private static final int RENAME_FIELD_Y_OFFSET = 3;
     private static final int RENAME_FIELD_HEIGHT = 12;
@@ -143,8 +145,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     private final Map<ItemStack, PatternSearchData> patternSearchText = new Reference2ObjectOpenHashMap<>();
     private final Long2ObjectMap<PatternProviderInfo> providerInfo = new Long2ObjectOpenHashMap<>();
     private final Set<MatchedPatternSlot> matchedPatternSlots = new HashSet<>();
-    private final List<ProviderHighlightButton> providerHighlightButtons = new ObjectArrayList<>();
-    private final List<RenameProviderButton> renameButtons = new ObjectArrayList<>();
+    private final List<ProviderActionButton> providerActionButtons = new ObjectArrayList<>();
 
     private final ITextComponent title;
     private final Scrollbar scrollbar;
@@ -245,9 +246,12 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     }
 
     private static void highlightProvider(PatternProviderInfo info) {
-        CraftingSupplierHighlightHandler.INSTANCE.showLocations(Minecraft.getMinecraft(), List.of(
-            new CraftingSupplierLocation(info.dimensionId(), info.pos().getX(), info.pos().getY(),
-                info.pos().getZ())));
+        CraftingSupplierHighlightHandler.INSTANCE.showHighlightLocations(Minecraft.getMinecraft(), List.of(
+            new OverlayHighlightLocation(
+                info.dimensionId(),
+                info.pos(),
+                info.face(),
+                OverlayHighlightShape.PATTERN_PROVIDER)));
     }
 
     private static void highlightProviderAndClose(PatternProviderInfo info) {
@@ -322,7 +326,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
                 Row row = this.rows.get(scrollLevel + i);
                 if (row instanceof SlotsRow slotsRow) {
                     Rectangle invRow = selectRowBackgroundBox(true, firstLine, lastLine);
-                    int width = GUI_PADDING_X + SLOT_SIZE * slotsRow.slots() - 1;
+                    int width = ROW_CONTENT_X + SLOT_SIZE * slotsRow.slots() - 1;
 
                     blit(offsetX, currentY, invRow.x, invRow.y, width, invRow.height);
                 }
@@ -336,7 +340,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     private void drawGroupHeader(PatternContainerGroup group, int rowIndex) {
         if (group.icon() != null) {
             AEKeyRendering.drawInGui(this.mc,
-                GUI_PADDING_X + PATTERN_PROVIDER_NAME_MARGIN_X,
+                ROW_CONTENT_X + PATTERN_PROVIDER_NAME_MARGIN_X,
                 GUI_HEADER_HEIGHT + rowIndex * ROW_HEIGHT + 1,
                 group.icon());
             restoreGuiStateAfterHeaderIcon();
@@ -347,7 +351,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             && Objects.equals(this.activeRenameGroup, group);
         String displayName = editingThisGroup ? "" : group.name().getFormattedText();
         String countText = entries > 1 ? " (" + entries + ")" : "";
-        int textX = GUI_PADDING_X + PATTERN_PROVIDER_NAME_MARGIN_X + 18;
+        int textX = ROW_CONTENT_X + PATTERN_PROVIDER_NAME_MARGIN_X + 18;
         int textY = GUI_HEADER_HEIGHT + GUI_PADDING_Y + rowIndex * ROW_HEIGHT;
         int countWidth = this.fontRenderer.getStringWidth(countText);
         int availableNameWidth = Math.max(0, TEXT_MAX_WIDTH - 18 - countWidth);
@@ -371,7 +375,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             return;
         }
 
-        int left = GUI_PADDING_X - 1;
+        int left = ROW_CONTENT_X - 1;
         int top = GUI_HEADER_HEIGHT;
         int right = left + COLUMNS * SLOT_SIZE;
         int bottom = top + this.visibleRows * ROW_HEIGHT;
@@ -434,13 +438,13 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     }
 
     private int getHoveredLineIndex(int mouseX, int mouseY) {
-        int x = mouseX - this.guiLeft - GUI_PADDING_X;
+        int x = mouseX - this.guiLeft - ROW_CONTENT_X;
         int y = mouseY - this.guiTop - GUI_HEADER_HEIGHT;
 
         if (x < 0 || y < 0) {
             return -1;
         }
-        if (x >= GUI_WIDTH - GUI_PADDING_X || y >= this.visibleRows * ROW_HEIGHT) {
+        if (x >= GUI_WIDTH - ROW_CONTENT_X || y >= this.visibleRows * ROW_HEIGHT) {
             return -1;
         }
 
@@ -674,8 +678,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     @Override
     public void initGui() {
         clearPatternSlots();
-        clearProviderHighlightButtons();
-        clearRenameButtons();
+        clearProviderActionButtons();
 
         this.visibleRows = getConfiguredRows();
         this.xSize = GUI_WIDTH;
@@ -720,7 +723,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         for (int col = 0; col < slotsRow.slots(); col++) {
             int slotIndex = slotsRow.offset() + col;
             ItemStack pattern = slotsRow.container().getInventory().getStackInSlot(slotIndex);
-            int x = GUI_PADDING_X + col * SLOT_SIZE;
+            int x = ROW_CONTENT_X + col * SLOT_SIZE;
             int y = GUI_HEADER_HEIGHT + rowIndex * ROW_HEIGHT + 1;
             if (hasActivePatternFilter()) {
                 if (this.matchedPatternSlots.contains(new MatchedPatternSlot(
@@ -745,15 +748,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             return;
         }
 
-        for (RenameProviderButton button : this.renameButtons) {
-            if (button.visible && button.getTooltipArea().contains(mouseX, mouseY)) {
-                drawTooltipLines(mouseX, mouseY,
-                    button.getTooltipMessage().stream().map(ITextComponent::getFormattedText).toList());
-                return;
-            }
-        }
-
-        for (ProviderHighlightButton button : this.providerHighlightButtons) {
+        for (ProviderActionButton button : this.providerActionButtons) {
             if (button.visible && button.getTooltipArea().contains(mouseX, mouseY)) {
                 drawTooltipLines(mouseX, mouseY,
                     button.getTooltipMessage().stream().map(ITextComponent::getFormattedText).toList());
@@ -932,8 +927,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
     private void refreshVisiblePatternSlots() {
         clearPatternSlots();
-        clearProviderHighlightButtons();
-        clearRenameButtons();
+        clearProviderActionButtons();
 
         int scroll = this.scrollbar.getCurrentScroll();
         boolean renameFieldVisible = false;
@@ -953,20 +947,12 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             }
             if (row instanceof SlotsRow(PatternContainerEntry patternContainer, int offset, int slots)) {
                 if (offset == 0) {
-                    if (isEditable(patternContainer)) {
-                        RenameProviderButton renameButton = new RenameProviderButton(patternContainer);
-                        renameButton.x = this.guiLeft + GUI_PADDING_X - ROW_ACTION_BUTTON_WIDTH;
-                        renameButton.y = this.guiTop + GUI_HEADER_HEIGHT + i * ROW_HEIGHT + ROW_ACTION_BUTTON_Y_OFFSET;
-                        this.renameButtons.add(renameButton);
-                        this.buttonList.add(renameButton);
-                    }
                     PatternProviderInfo info = this.providerInfo.get(patternContainer.getServerId());
-                    if (info != null) {
-                        ProviderHighlightButton button = new ProviderHighlightButton(patternContainer.getServerId(),
-                            info);
-                        button.x = this.guiLeft + GUI_PADDING_X + SLOT_SIZE * COLUMNS - 1;
+                    if (info != null || isEditable(patternContainer)) {
+                        ProviderActionButton button = new ProviderActionButton(patternContainer, info);
+                        button.x = this.guiLeft + GUI_PADDING_X;
                         button.y = this.guiTop + GUI_HEADER_HEIGHT + i * ROW_HEIGHT + ROW_ACTION_BUTTON_Y_OFFSET;
-                        this.providerHighlightButtons.add(button);
+                        this.providerActionButtons.add(button);
                         this.buttonList.add(button);
                     }
 
@@ -979,7 +965,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
                     GuiPatternSlot slot = new GuiPatternSlot(
                         patternContainer,
                         offset + col,
-                        GUI_PADDING_X + col * SLOT_SIZE,
+                        ROW_CONTENT_X + col * SLOT_SIZE,
                         GUI_HEADER_HEIGHT + i * ROW_HEIGHT + 1);
                     this.container.addClientSideSlot(slot, null);
                 }
@@ -997,11 +983,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     }
 
     private void updateRowActionButtons() {
-        for (RenameProviderButton button : this.renameButtons) {
-            button.visible = true;
-            button.enabled = true;
-        }
-        for (ProviderHighlightButton button : this.providerHighlightButtons) {
+        for (ProviderActionButton button : this.providerActionButtons) {
             button.visible = true;
             button.enabled = true;
         }
@@ -1012,7 +994,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             return false;
         }
 
-        int x = slot.xPos - GUI_PADDING_X;
+        int x = slot.xPos - ROW_CONTENT_X;
         int y = slot.yPos - GUI_HEADER_HEIGHT - 1;
         if (x < 0 || y < 0 || x % SLOT_SIZE != 0 || y % ROW_HEIGHT != 0) {
             return false;
@@ -1048,20 +1030,12 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         }
     }
 
-    private void clearProviderHighlightButtons() {
-        if (this.providerHighlightButtons.isEmpty()) {
+    private void clearProviderActionButtons() {
+        if (this.providerActionButtons.isEmpty()) {
             return;
         }
-        this.buttonList.removeAll(this.providerHighlightButtons);
-        this.providerHighlightButtons.clear();
-    }
-
-    private void clearRenameButtons() {
-        if (this.renameButtons.isEmpty()) {
-            return;
-        }
-        this.buttonList.removeAll(this.renameButtons);
-        this.renameButtons.clear();
+        this.buttonList.removeAll(this.providerActionButtons);
+        this.providerActionButtons.clear();
     }
 
     private void toggleTerminalStyle(SettingToggleButton<TerminalStyle> button, boolean backwards) {
@@ -1230,7 +1204,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         int entries = this.byGroup.get(group).size();
         String countText = entries > 1 ? " (" + entries + ")" : "";
         int countWidth = this.fontRenderer.getStringWidth(countText);
-        int x = GUI_PADDING_X + PATTERN_PROVIDER_NAME_MARGIN_X + GROUP_RENAME_FIELD_X_OFFSET;
+        int x = ROW_CONTENT_X + PATTERN_PROVIDER_NAME_MARGIN_X + GROUP_RENAME_FIELD_X_OFFSET;
         int y = GUI_HEADER_HEIGHT + visibleRow * ROW_HEIGHT + GROUP_RENAME_FIELD_Y_OFFSET;
         if (absolute) {
             x += this.guiLeft;
@@ -1299,7 +1273,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
         int width = SLOT_SIZE * COLUMNS - 2 * RENAME_FIELD_X_OFFSET;
         this.activeRenameField.move(
-            this.guiLeft + GUI_PADDING_X + RENAME_FIELD_X_OFFSET,
+            this.guiLeft + ROW_CONTENT_X + RENAME_FIELD_X_OFFSET,
             this.guiTop + GUI_HEADER_HEIGHT + visibleRow * ROW_HEIGHT + RENAME_FIELD_Y_OFFSET);
         this.activeRenameField.resize(width, RENAME_FIELD_HEIGHT);
         this.activeRenameField.setVisible(true);
@@ -1354,81 +1328,31 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     private record GroupRenameFieldLayout(int x, int y, int width) {
     }
 
-    private final class ProviderHighlightButton extends GuiButton implements ITooltip {
-        private final long inventoryId;
+    private final class ProviderActionButton extends GuiButton implements ITooltip {
+        private final PatternContainerEntry entry;
+        @Nullable
         private final PatternProviderInfo info;
 
-        ProviderHighlightButton(long inventoryId, PatternProviderInfo info) {
-            super(0, 0, 0, 6, 11, "");
-            this.inventoryId = inventoryId;
+        ProviderActionButton(PatternContainerEntry entry, @Nullable PatternProviderInfo info) {
+            super(0, 0, 0, ROW_ACTION_BUTTON_WIDTH, ROW_ACTION_BUTTON_HEIGHT, "");
+            this.entry = entry;
             this.info = info;
         }
 
         @Override
         public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
             if (super.mousePressed(minecraft, mouseX, mouseY)) {
-                if (GuiScreen.isShiftKeyDown()) {
-                    GuiPatternAccessTerm.this.container.openPatternProvider(this.inventoryId);
+                if (GuiScreen.isCtrlKeyDown() && isEditable(this.entry)) {
+                    openRenameField(this.entry);
                     return true;
                 }
-                highlightProviderAndClose(this.info);
-                return true;
-            }
-            return false;
-        }
-
-        @Override
-        public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
-            if (!this.visible) {
-                return;
-            }
-
-            this.hovered = mouseX >= this.x && mouseY >= this.y && mouseX < this.x + this.width
-                && mouseY < this.y + this.height;
-
-            var blitter = Icon.PATTERN_PROVIDER_HIGHLIGHT.getBlitter().copy();
-            if (!this.enabled) {
-                blitter.opacity(0.5f);
-            }
-            blitter.dest(this.x, this.y).blit();
-        }
-
-        @Override
-        public List<ITextComponent> getTooltipMessage() {
-            String dimensionName = CraftingSupplierLocator.getDimensionName(this.info.dimensionId());
-            return List.of(
-                GuiText.PatternAccessTerminalHighlightProvider.text(),
-                GuiText.PatternAccessTerminalOpenProvider.text(),
-                GuiText.CraftingTreeLocationInDimension.text(
-                    this.info.pos().getX(),
-                    this.info.pos().getY(),
-                    this.info.pos().getZ(),
-                    dimensionName));
-        }
-
-        @Override
-        public Rectangle getTooltipArea() {
-            return new Rectangle(this.x, this.y, this.width, this.height);
-        }
-
-        @Override
-        public boolean isTooltipAreaVisible() {
-            return this.visible;
-        }
-    }
-
-    private final class RenameProviderButton extends GuiButton implements ITooltip {
-        private final PatternContainerEntry entry;
-
-        RenameProviderButton(PatternContainerEntry entry) {
-            super(0, 0, 0, ROW_ACTION_BUTTON_WIDTH, ROW_ACTION_BUTTON_HEIGHT, "");
-            this.entry = entry;
-        }
-
-        @Override
-        public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
-            if (super.mousePressed(minecraft, mouseX, mouseY)) {
-                openRenameField(this.entry);
+                if (GuiScreen.isShiftKeyDown()) {
+                    GuiPatternAccessTerm.this.container.openPatternProvider(this.entry.getServerId());
+                    return true;
+                }
+                if (this.info != null) {
+                    highlightProviderAndClose(this.info);
+                }
                 return true;
             }
             return false;
@@ -1452,9 +1376,21 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
         @Override
         public List<ITextComponent> getTooltipMessage() {
-            return List.of(
-                GuiText.PatternAccessTerminalRenameProvider.text(),
-                GuiText.PatternAccessTerminalRenameProviderHint.text());
+            ObjectList<ITextComponent> tooltip = new ObjectArrayList<>();
+            tooltip.add(GuiText.PatternAccessTerminalOpenProvider.text());
+            if (isEditable(this.entry)) {
+                tooltip.add(GuiText.PatternAccessTerminalRenameProvider.text());
+            }
+            if (this.info != null) {
+                tooltip.addFirst(GuiText.PatternAccessTerminalHighlightProvider.text());
+                String dimensionName = CraftingSupplierLocator.getDimensionName(this.info.dimensionId());
+                tooltip.add(GuiText.CraftingTreeLocationInDimension.text(
+                    this.info.pos().getX(),
+                    this.info.pos().getY(),
+                    this.info.pos().getZ(),
+                    dimensionName));
+            }
+            return tooltip;
         }
 
         @Override

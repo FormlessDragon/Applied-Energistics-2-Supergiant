@@ -59,13 +59,14 @@ public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
                             GuiStyle style) {
         super(container, playerInventory, title, style);
 
-        this.fuzzyMode = addToLeftToolbar(
-            new SettingToggleButton<>(Settings.FUZZY_MODE, FuzzyMode.IGNORE_ALL, this::toggleFuzzyMode));
+        this.fuzzyMode = new SettingToggleButton<>(Settings.FUZZY_MODE, FuzzyMode.IGNORE_ALL, this::toggleFuzzyMode);
         this.addToLeftToolbar(new ActionButton(ActionItems.COG, container::partition));
         this.addToLeftToolbar(new ActionButton(ActionItems.CLOSE, container::clear));
-        this.cellRestrictionButton = this.addToLeftToolbar(new CellRestrictionButton(this::openCellRestriction));
+        this.cellRestrictionButton = new CellRestrictionButton(this::openCellRestriction);
         this.copyMode = this.addToLeftToolbar(new ToggleButton(Icon.COPY_MODE_ON, Icon.COPY_MODE_OFF,
             GuiText.CopyMode.text(), GuiText.CopyModeDesc.text(), act -> container.nextWorkBenchCopyMode()));
+        this.addToLeftToolbar(this.fuzzyMode);
+        this.addToLeftToolbar(this.cellRestrictionButton);
         this.previousPageButton = new PageButton(Icon.ARROW_LEFT, () -> container.setPage(container.getCurrentPage() - 1));
         this.nextPageButton = new PageButton(Icon.ARROW_RIGHT, () -> container.setPage(container.getCurrentPage() + 1));
         this.widgets.add("previousPage", this.previousPageButton);

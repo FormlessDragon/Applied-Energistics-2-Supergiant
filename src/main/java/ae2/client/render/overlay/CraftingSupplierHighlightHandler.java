@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -19,7 +20,7 @@ public class CraftingSupplierHighlightHandler {
     public static final CraftingSupplierHighlightHandler INSTANCE = new CraftingSupplierHighlightHandler();
     private static final long DURATION_MS = 20_000L;
 
-    private final List<CraftingSupplierLocation> currentDimensionLocations = new ObjectArrayList<>();
+    private final List<OverlayHighlightLocation> currentDimensionLocations = new ObjectArrayList<>();
     private long expiresAt;
     private int highlightedDimension = Integer.MIN_VALUE;
 
@@ -27,6 +28,18 @@ public class CraftingSupplierHighlightHandler {
     }
 
     public void showLocations(Minecraft minecraft, List<CraftingSupplierLocation> locations) {
+        List<OverlayHighlightLocation> highlightLocations = new ObjectArrayList<>(locations.size());
+        for (CraftingSupplierLocation location : locations) {
+            highlightLocations.add(new OverlayHighlightLocation(
+                location.dimensionId(),
+                location.toBlockPos(),
+                null,
+                OverlayHighlightShape.WHOLE_BLOCK));
+        }
+        showHighlightLocations(minecraft, highlightLocations);
+    }
+
+    public void showHighlightLocations(Minecraft minecraft, List<OverlayHighlightLocation> locations) {
         if (minecraft.player == null || minecraft.world == null) {
             return;
         }
@@ -37,8 +50,9 @@ public class CraftingSupplierHighlightHandler {
         this.expiresAt = System.currentTimeMillis() + DURATION_MS;
 
         for (var location : locations) {
+            BlockPos pos = location.pos();
             ITextComponent base = PlayerMessages.CraftingSupplierLocation.text(
-                location.x(), location.y(), location.z());
+                pos.getX(), pos.getY(), pos.getZ());
             if (location.dimensionId() == currentDimension) {
                 minecraft.player.sendStatusMessage(base.createCopy(), true);
                 minecraft.player.sendMessage(base);
@@ -46,7 +60,7 @@ public class CraftingSupplierHighlightHandler {
             } else {
                 String dimensionName = CraftingSupplierLocator.getDimensionName(location.dimensionId());
                 ITextComponent otherDim = PlayerMessages.CraftingSupplierLocationInDimension.text(
-                    location.x(), location.y(), location.z(), location.dimensionId(), dimensionName);
+                    pos.getX(), pos.getY(), pos.getZ(), location.dimensionId(), dimensionName);
                 minecraft.player.sendStatusMessage(otherDim.createCopy(), true);
                 minecraft.player.sendMessage(otherDim);
             }
@@ -87,8 +101,9 @@ public class CraftingSupplierHighlightHandler {
         GlStateManager.depthMask(false);
 
         for (var location : this.currentDimensionLocations) {
-            AxisAlignedBB box = new AxisAlignedBB(location.toBlockPos()).grow(0.01D);
-            RenderGlobal.drawSelectionBoundingBox(box, 1.0F, 0.0F, 0.0F, 0.85F);
+            for (AxisAlignedBB box : OverlayHighlightBoxes.create(location.shape(), location.pos(), location.side())) {
+                RenderGlobal.drawSelectionBoundingBox(box.grow(0.01D), 1.0F, 0.0F, 0.0F, 0.85F);
+            }
         }
 
         GlStateManager.glLineWidth(1.0F);

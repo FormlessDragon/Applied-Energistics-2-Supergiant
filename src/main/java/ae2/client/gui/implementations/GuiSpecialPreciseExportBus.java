@@ -36,7 +36,7 @@ public class GuiSpecialPreciseExportBus extends GuiSpecialExportBus<ContainerIOB
                                       GuiStyle style) {
         super(container, playerInventory, title, style);
         if (container.getHost().getConfigManager().hasSetting(Settings.CRAFT_ONLY)) {
-            this.craftMode = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.CRAFT_ONLY, YesNo.NO));
+            this.craftMode = new ServerSettingToggleButton<>(Settings.CRAFT_ONLY, YesNo.NO);
         } else {
             this.craftMode = null;
         }
@@ -45,6 +45,9 @@ public class GuiSpecialPreciseExportBus extends GuiSpecialExportBus<ContainerIOB
                 new ServerSettingToggleButton<>(Settings.SCHEDULING_MODE, SchedulingMode.DEFAULT));
         } else {
             this.schedulingMode = null;
+        }
+        if (this.craftMode != null) {
+            addToLeftToolbar(this.craftMode);
         }
     }
 

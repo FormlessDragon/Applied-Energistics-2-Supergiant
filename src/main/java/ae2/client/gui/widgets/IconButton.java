@@ -18,6 +18,7 @@
 
 package ae2.client.gui.widgets;
 
+import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.Blitter;
 import net.minecraft.client.Minecraft;
@@ -45,6 +46,7 @@ public abstract class IconButton extends GuiButton implements ITooltip {
     private boolean disableClickSound;
     private boolean disableBackground;
     private boolean focused;
+    private boolean focusedByMousePress;
     private float iconScale = 1.0F;
     private ITextComponent message = new TextComponentString("");
 
@@ -69,8 +71,18 @@ public abstract class IconButton extends GuiButton implements ITooltip {
 
     @Override
     public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
+        boolean wasFocused = this.focused;
         boolean pressed = super.mousePressed(minecraft, mouseX, mouseY);
-        this.focused = pressed;
+        if (pressed) {
+            this.focused = true;
+            this.focusedByMousePress = !wasFocused;
+            if (isImmediateRightClickDispatch()) {
+                clearMousePressFocus();
+            }
+        } else {
+            this.focused = false;
+            this.focusedByMousePress = false;
+        }
         return pressed;
     }
 
@@ -82,6 +94,7 @@ public abstract class IconButton extends GuiButton implements ITooltip {
             && mouseX < this.x + this.width
             && mouseY < this.y + this.height;
         super.mouseReleased(mouseX, mouseY);
+        clearMousePressFocus();
         if (releasedInside && this.onPress != null) {
             this.onPress.run();
         }
@@ -205,6 +218,19 @@ public abstract class IconButton extends GuiButton implements ITooltip {
 
     public void setFocused(boolean focused) {
         this.focused = focused;
+        this.focusedByMousePress = false;
+    }
+
+    private void clearMousePressFocus() {
+        if (this.focusedByMousePress) {
+            this.focused = false;
+        }
+        this.focusedByMousePress = false;
+    }
+
+    private static boolean isImmediateRightClickDispatch() {
+        var currentScreen = Minecraft.getMinecraft().currentScreen;
+        return currentScreen instanceof AEBaseGui<?> baseGui && baseGui.isHandlingRightClick();
     }
 
     protected float getIconScale() {

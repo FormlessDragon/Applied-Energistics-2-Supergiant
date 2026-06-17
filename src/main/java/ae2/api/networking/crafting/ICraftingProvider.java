@@ -24,6 +24,7 @@
 package ae2.api.networking.crafting;
 
 import ae2.api.crafting.IPatternDetails;
+import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.networking.IGridNodeService;
 import ae2.api.networking.IManagedGridNode;
 import ae2.api.stacks.AEKey;
@@ -96,5 +97,15 @@ public interface ICraftingProvider extends IGridNodeService {
      */
     default Set<AEKey> getEmitableItems() {
         return Set.of();
+    }
+
+    /**
+     * Provides the machine group used by {@link ae2.crafting.CraftingTreeProcess#getMachineGroup}
+     * for patterns handled by this crafting provider.
+     *
+     * @return the machine group displayed in crafting tree
+     */
+    default PatternContainerGroup getTerminalGroup() {
+        return PatternContainerGroup.nothing();
     }
 }
