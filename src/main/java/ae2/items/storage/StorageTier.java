@@ -1,8 +1,10 @@
 package ae2.items.storage;
 
 import ae2.core.definitions.AEItems;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.item.Item;
 
+import java.util.List;
 import java.util.function.Supplier;
 
 public record StorageTier(int index, String namePrefix, int bytes, double idleDrain, Supplier<Item> componentSupplier) {
@@ -12,4 +14,14 @@ public record StorageTier(int index, String namePrefix, int bytes, double idleDr
     public static final StorageTier SIZE_64K = new StorageTier(4, "64k", 65536, 2.0, AEItems.CELL_COMPONENT_64K::item);
     public static final StorageTier SIZE_256K = new StorageTier(5, "256k", 262144, 2.5, AEItems.CELL_COMPONENT_256K::item);
 
+    public static final List<StorageTier> VALUES = new ObjectArrayList<>();
+
+    public StorageTier(int index,String namePrefix,int bytes,double idleDrain, Supplier<Item> componentSupplier) {
+        this.index = index;
+        this.namePrefix = namePrefix;
+        this.bytes = bytes;
+        this.idleDrain = idleDrain;
+        this.componentSupplier = componentSupplier;
+        VALUES.add(this);
+    }
 }
