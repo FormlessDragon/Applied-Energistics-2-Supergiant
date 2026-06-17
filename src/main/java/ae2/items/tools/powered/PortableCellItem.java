@@ -31,6 +31,11 @@ public class PortableCellItem extends AbstractPortableCell implements IBasicCell
     private final AEKeyType keyType;
     private final int totalTypes;
 
+    public PortableCellItem(AEKeyType keyType, GuiIds.GuiKey guiKey, StorageTier tier,
+                            double powerCapacity, int defaultColor) {
+        this(keyType, getTotalTypes(keyType, tier), guiKey, tier, powerCapacity, defaultColor);
+    }
+
     public PortableCellItem(AEKeyType keyType, int totalTypes, GuiIds.GuiKey guiKey, StorageTier tier,
                             double powerCapacity, int defaultColor) {
         super(guiKey, powerCapacity, defaultColor);
@@ -38,6 +43,13 @@ public class PortableCellItem extends AbstractPortableCell implements IBasicCell
         this.tier = tier;
         this.keyType = keyType;
         this.totalTypes = totalTypes;
+    }
+
+    private static int getTotalTypes(AEKeyType keyType, StorageTier tier) {
+        if (keyType == AEKeyType.items()) {
+            return 63 - tier.index() * 9;
+        }
+        return 18;
     }
 
     @Override

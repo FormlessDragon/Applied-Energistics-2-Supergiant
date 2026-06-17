@@ -270,25 +270,25 @@ public final class AEItems {
     public static final ItemDefinition<VoidCellItem> VOID_CELL = new ItemDefinition<>(AEItemIds.VOID_CELL,
         new VoidCellItem());
     public static final ItemDefinition<BasicStorageCell> ITEM_CELL_1K = new ItemDefinition<>(AEItemIds.ITEM_CELL_1K,
-        new BasicStorageCell(0.5f, 1, 8, 63, AEKeyType.items()));
+        new BasicStorageCell(StorageTier.SIZE_1K, 63, AEKeyType.items()));
     public static final ItemDefinition<BasicStorageCell> ITEM_CELL_4K = new ItemDefinition<>(AEItemIds.ITEM_CELL_4K,
-        new BasicStorageCell(1.0f, 4, 32, 63, AEKeyType.items()));
+        new BasicStorageCell(StorageTier.SIZE_4K, 63, AEKeyType.items()));
     public static final ItemDefinition<BasicStorageCell> ITEM_CELL_16K = new ItemDefinition<>(AEItemIds.ITEM_CELL_16K,
-        new BasicStorageCell(1.5f, 16, 128, 63, AEKeyType.items()));
+        new BasicStorageCell(StorageTier.SIZE_16K, 63, AEKeyType.items()));
     public static final ItemDefinition<BasicStorageCell> ITEM_CELL_64K = new ItemDefinition<>(AEItemIds.ITEM_CELL_64K,
-        new BasicStorageCell(2.0f, 64, 512, 63, AEKeyType.items()));
+        new BasicStorageCell(StorageTier.SIZE_64K, 63, AEKeyType.items()));
     public static final ItemDefinition<BasicStorageCell> ITEM_CELL_256K = new ItemDefinition<>(AEItemIds.ITEM_CELL_256K,
-        new BasicStorageCell(2.5f, 256, 2048, 63, AEKeyType.items()));
+        new BasicStorageCell(StorageTier.SIZE_256K, 63, AEKeyType.items()));
     public static final ItemDefinition<BasicStorageCell> FLUID_CELL_1K = new ItemDefinition<>(AEItemIds.FLUID_CELL_1K,
-        new BasicStorageCell(0.5f, 1, 8, 18, AEKeyType.fluids()));
+        new BasicStorageCell(StorageTier.SIZE_1K, 18, AEKeyType.fluids()));
     public static final ItemDefinition<BasicStorageCell> FLUID_CELL_4K = new ItemDefinition<>(AEItemIds.FLUID_CELL_4K,
-        new BasicStorageCell(1.0f, 4, 32, 18, AEKeyType.fluids()));
+        new BasicStorageCell(StorageTier.SIZE_4K, 18, AEKeyType.fluids()));
     public static final ItemDefinition<BasicStorageCell> FLUID_CELL_16K = new ItemDefinition<>(AEItemIds.FLUID_CELL_16K,
-        new BasicStorageCell(1.5f, 16, 128, 18, AEKeyType.fluids()));
+        new BasicStorageCell(StorageTier.SIZE_16K, 18, AEKeyType.fluids()));
     public static final ItemDefinition<BasicStorageCell> FLUID_CELL_64K = new ItemDefinition<>(AEItemIds.FLUID_CELL_64K,
-        new BasicStorageCell(2.0f, 64, 512, 18, AEKeyType.fluids()));
+        new BasicStorageCell(StorageTier.SIZE_64K, 18, AEKeyType.fluids()));
     public static final ItemDefinition<BasicStorageCell> FLUID_CELL_256K = new ItemDefinition<>(AEItemIds.FLUID_CELL_256K,
-        new BasicStorageCell(2.5f, 256, 2048, 18, AEKeyType.fluids()));
+        new BasicStorageCell(StorageTier.SIZE_256K, 18, AEKeyType.fluids()));
     public static final ItemDefinition<MaterialItem> ITEM_CELL_HOUSING = new ItemDefinition<>(
         AEItemIds.ITEM_CELL_HOUSING, new MaterialItem());
     public static final ItemDefinition<MaterialItem> FLUID_CELL_HOUSING = new ItemDefinition<>(
@@ -318,44 +318,44 @@ public final class AEItems {
     public static final ItemDefinition<MeteoriteCompassItem> METEORITE_COMPASS = new ItemDefinition<>(
         AEItemIds.METEORITE_COMPASS, new MeteoriteCompassItem());
     public static final ItemDefinition<PortableCellItem> PORTABLE_ITEM_CELL1K = new ItemDefinition<>(
-        AEItemIds.PORTABLE_ITEM_CELL1K,
-        new PortableCellItem(AEKeyType.items(), 54, GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_1K,
+        "1k Portable Item Cell", AEItemIds.PORTABLE_ITEM_CELL1K,
+        new PortableCellItem(AEKeyType.items(), GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_1K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_ITEM_CELL4K = new ItemDefinition<>(
-        AEItemIds.PORTABLE_ITEM_CELL4K,
-        new PortableCellItem(AEKeyType.items(), 45, GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_4K,
+        "4k Portable Item Cell", AEItemIds.PORTABLE_ITEM_CELL4K,
+        new PortableCellItem(AEKeyType.items(), GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_4K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_ITEM_CELL16K = new ItemDefinition<>(
-        AEItemIds.PORTABLE_ITEM_CELL16K,
-        new PortableCellItem(AEKeyType.items(), 36, GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_16K,
+        "16k Portable Item Cell", AEItemIds.PORTABLE_ITEM_CELL16K,
+        new PortableCellItem(AEKeyType.items(), GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_16K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_ITEM_CELL64K = new ItemDefinition<>(
-        AEItemIds.PORTABLE_ITEM_CELL64K,
-        new PortableCellItem(AEKeyType.items(), 27, GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_64K,
+        "64k Portable Item Cell", AEItemIds.PORTABLE_ITEM_CELL64K,
+        new PortableCellItem(AEKeyType.items(), GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_64K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_ITEM_CELL256K = new ItemDefinition<>(
-        AEItemIds.PORTABLE_ITEM_CELL256K,
-        new PortableCellItem(AEKeyType.items(), 18, GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_256K,
+        "256k Portable Item Cell", AEItemIds.PORTABLE_ITEM_CELL256K,
+        new PortableCellItem(AEKeyType.items(), GuiIds.GuiKey.PORTABLE_ITEM_CELL, StorageTier.SIZE_256K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_FLUID_CELL1K = new ItemDefinition<>(
-        AEItemIds.PORTABLE_FLUID_CELL1K,
-        new PortableCellItem(AEKeyType.fluids(), 18, GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_1K,
+        "1k Portable Fluid Cell", AEItemIds.PORTABLE_FLUID_CELL1K,
+        new PortableCellItem(AEKeyType.fluids(), GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_1K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_FLUID_CELL4K = new ItemDefinition<>(
-        AEItemIds.PORTABLE_FLUID_CELL4K,
-        new PortableCellItem(AEKeyType.fluids(), 18, GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_4K,
+        "4k Portable Fluid Cell", AEItemIds.PORTABLE_FLUID_CELL4K,
+        new PortableCellItem(AEKeyType.fluids(), GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_4K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_FLUID_CELL16K = new ItemDefinition<>(
-        AEItemIds.PORTABLE_FLUID_CELL16K,
-        new PortableCellItem(AEKeyType.fluids(), 18, GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_16K,
+        "16k Portable Fluid Cell", AEItemIds.PORTABLE_FLUID_CELL16K,
+        new PortableCellItem(AEKeyType.fluids(), GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_16K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_FLUID_CELL64K = new ItemDefinition<>(
-        AEItemIds.PORTABLE_FLUID_CELL64K,
-        new PortableCellItem(AEKeyType.fluids(), 18, GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_64K,
+        "64k Portable Fluid Cell", AEItemIds.PORTABLE_FLUID_CELL64K,
+        new PortableCellItem(AEKeyType.fluids(), GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_64K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<PortableCellItem> PORTABLE_FLUID_CELL256K = new ItemDefinition<>(
-        AEItemIds.PORTABLE_FLUID_CELL256K,
-        new PortableCellItem(AEKeyType.fluids(), 18, GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_256K,
+        "256k Portable Fluid Cell", AEItemIds.PORTABLE_FLUID_CELL256K,
+        new PortableCellItem(AEKeyType.fluids(), GuiIds.GuiKey.PORTABLE_FLUID_CELL, StorageTier.SIZE_256K,
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<WirelessTerminalItem> WIRELESS_TERMINAL = new ItemDefinition<>(
         AEItemIds.WIRELESS_TERMINAL, new WirelessTerminalItem(getWirelessTerminalBattery()));

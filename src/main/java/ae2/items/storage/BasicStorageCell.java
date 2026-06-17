@@ -54,6 +54,10 @@ public class BasicStorageCell extends AEBaseItem implements IBasicCellItem {
     protected final int totalTypes;
     private final AEKeyType keyType;
 
+    public BasicStorageCell(StorageTier tier, int totalTypes, AEKeyType keyType) {
+        this(tier.idleDrain(), tier.bytes() / 1024, tier.bytes() / 128, totalTypes, keyType);
+    }
+
     public BasicStorageCell(double idleDrain, int kilobytes, int bytesPerType, int totalTypes, AEKeyType keyType) {
         this.setMaxStackSize(1);
         this.idleDrain = idleDrain;

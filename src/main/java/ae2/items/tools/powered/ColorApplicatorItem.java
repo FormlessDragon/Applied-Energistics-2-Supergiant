@@ -38,6 +38,7 @@ import ae2.core.definitions.AEItems;
 import ae2.helpers.IMouseWheelItem;
 import ae2.hooks.IBlockTool;
 import ae2.items.contents.CellConfig;
+import ae2.items.storage.StorageTier;
 import ae2.items.tools.powered.powersink.AEBasePoweredItem;
 import ae2.me.helpers.BaseActionSource;
 import ae2.util.ConfigInventory;
@@ -346,12 +347,12 @@ public class ColorApplicatorItem extends AEBasePoweredItem implements IBasicCell
 
     @Override
     public int getBytes(final ItemStack cellItem) {
-        return 512;
+        return StorageTier.SIZE_4K.bytes() / 2;
     }
 
     @Override
     public int getBytesPerType(final ItemStack cellItem) {
-        return 8;
+        return StorageTier.SIZE_4K.bytes() / 128;
     }
 
     @Override
