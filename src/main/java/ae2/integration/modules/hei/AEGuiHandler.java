@@ -184,6 +184,23 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
         }
     }
 
+    private boolean isCurrentGhostDragActive() {
+        if (this.currentGhostIngredient == null) {
+            return false;
+        }
+
+        if (this.currentGhostMouseButton >= 0) {
+            return Mouse.isButtonDown(this.currentGhostMouseButton);
+        }
+
+        return Mouse.isButtonDown(0) || Mouse.isButtonDown(1);
+    }
+
+    private void clearCurrentGhostIngredient() {
+        this.currentGhostIngredient = null;
+        this.currentGhostMouseButton = -1;
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     @NotNull
     @Override
@@ -215,6 +232,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
     public <I> List<Target<I>> getTargets(@NotNull AEBaseGui<?> gui, @NotNull I ingredient, boolean doStart) {
         if (doStart) {
             this.currentGhostIngredient = ingredient;
+            this.currentGhostMouseButton = -1;
             updateCurrentGhostMouseButton();
         }
         return getTargetsForIngredient(gui, ingredient);
@@ -222,8 +240,7 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
 
     @Override
     public void onComplete() {
-        this.currentGhostIngredient = null;
-        this.currentGhostMouseButton = -1;
+        clearCurrentGhostIngredient();
     }
 
     @Override
@@ -233,6 +250,9 @@ public final class AEGuiHandler implements IAdvancedGuiHandler<AEBaseGui<?>>, IG
 
     @Nullable
     public Object getCurrentGhostIngredient() {
+        if (!isCurrentGhostDragActive()) {
+            clearCurrentGhostIngredient();
+        }
         return this.currentGhostIngredient;
     }
 

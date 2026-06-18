@@ -247,13 +247,19 @@ public class Repo implements IClientRepo {
         for (var entry : entries) {
             if (PinnedKeys.isCraftingPinned(entry.what())) {
                 craftingPinnedEntries.add(entry);
+            }
+        }
+
+        for (var entry : entries) {
+            if (PinnedKeys.isCraftingPinned(entry.what())) {
                 continue;
             }
+
             if (PinnedKeys.isPlayerPinned(entry.what())) {
-                if (passesViewFilters(entry)) {
+                if (shouldUsePlayerPinForCurrentView(entry)) {
                     playerPinnedEntries.add(entry);
+                    continue;
                 }
-                continue;
             }
 
             if (passesViewFilters(entry)) {
@@ -285,6 +291,30 @@ public class Repo implements IClientRepo {
         return search.matches(entry);
     }
 
+    private boolean shouldUsePlayerPinForCurrentView(GridInventoryEntry entry) {
+        if (!passesViewFilters(entry)) {
+            return false;
+        }
+
+        if (this.sortSrc.getPinDisplayMode() != PinDisplayMode.LOCKED_GRID) {
+            return true;
+        }
+
+        AEKey what = Objects.requireNonNull(entry.what());
+        int slotIndex = PinnedKeys.getPlayerPinSlotIndex(what);
+        if (slotIndex < 0) {
+            return false;
+        }
+
+        return slotIndex / this.rowSize < getVisiblePlayerPinRowsForCurrentView();
+    }
+
+    private int getVisiblePlayerPinRowsForCurrentView() {
+        int craftingRows = getRowsFor(craftingPinnedEntries.size());
+        int maxPlayerRows = Math.max(0, this.terminalRows - 1 - craftingRows);
+        return Math.min(PinnedKeys.getPlayerPinRows(), Math.min(PinnedKeys.MAX_PLAYER_PIN_ROWS, maxPlayerRows));
+    }
+
     private void rebuildPinnedSlots() {
         this.pinnedSlots.clear();
         this.pinnedSlotUserSlotIndexes.clear();
@@ -295,10 +325,7 @@ public class Repo implements IClientRepo {
         int craftingRows = getRowsFor(craftingPinnedEntries.size());
         this.configuredPlayerPinRows = PinnedKeys.getPlayerPinRows();
         boolean lockedGridPins = this.sortSrc.getPinDisplayMode() == PinDisplayMode.LOCKED_GRID;
-        int maxPlayerRows = lockedGridPins ? Math.max(0, this.terminalRows - 1 - craftingRows) : 0;
-        this.visiblePlayerPinRows = lockedGridPins
-            ? Math.min(this.configuredPlayerPinRows, Math.min(PinnedKeys.MAX_PLAYER_PIN_ROWS, maxPlayerRows))
-            : 0;
+        this.visiblePlayerPinRows = lockedGridPins ? getVisiblePlayerPinRowsForCurrentView() : 0;
         this.pinnedRowCount = craftingRows + this.visiblePlayerPinRows;
 
         for (GridInventoryEntry entry : craftingPinnedEntries) {
