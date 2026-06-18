@@ -22,8 +22,12 @@ import ae2.api.config.SortDir;
 import ae2.api.config.SortOrder;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
+import ae2.integration.Integrations;
+import ae2.integration.abstraction.HeiAdapter;
 import ae2.integration.modules.bogosorter.InventoryBogoSortModule;
 import ae2.integration.modules.inventorytweaks.InventoryTweaksModule;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 
 import java.util.Comparator;
 
@@ -48,6 +52,12 @@ final class KeySorters {
             case NAME -> dir == SortDir.ASCENDING ? NAME_ASC : NAME_DESC;
             case MOD -> dir == SortDir.ASCENDING ? MOD_ASC : MOD_DESC;
             case INVTWEAKS -> dir == SortDir.ASCENDING ? INVTWEAKS_ASC : INVTWEAKS_DESC;
+            case HEI -> {
+                HeiAdapter hei = Integrations.hei();
+                var componentWeights = new Object2IntOpenHashMap<AEKey>();
+                componentWeights.defaultReturnValue(-1);
+                yield (left, right) -> compareHei(left, right, hei, componentWeights, dir);
+            }
             case AMOUNT -> throw new UnsupportedOperationException();
         };
     }
@@ -67,6 +77,54 @@ final class KeySorters {
         }
 
         return compareByFallback(left, right);
+    }
+
+    private static int compareHei(AEKey left, AEKey right, HeiAdapter hei, Object2IntMap<AEKey> componentWeights,
+                                  SortDir dir) {
+        int leftRank = hei.getIngredientSortRank(left);
+        int rightRank = hei.getIngredientSortRank(right);
+
+        if (leftRank != -1 && rightRank != -1) {
+            int rankCompare = Integer.compare(leftRank, rightRank);
+            if (dir == SortDir.DESCENDING) {
+                rankCompare = -rankCompare;
+            }
+            if (rankCompare != 0) {
+                return rankCompare;
+            }
+
+            if (left.getPrimaryKey() == right.getPrimaryKey()) {
+                int componentCompare = Integer.compare(
+                    getComponentWeight(left, componentWeights),
+                    getComponentWeight(right, componentWeights));
+                if (componentCompare != 0) {
+                    return componentCompare;
+                }
+            }
+            return compareByFallback(left, right);
+        }
+
+        if (leftRank != -1) {
+            return dir == SortDir.ASCENDING ? -1 : 1;
+        }
+        if (rightRank != -1) {
+            return dir == SortDir.ASCENDING ? 1 : -1;
+        }
+
+        return compareByFallback(left, right);
+    }
+
+    private static int getComponentWeight(AEKey key, Object2IntMap<AEKey> componentWeights) {
+        if (componentWeights.containsKey(key)) {
+            return componentWeights.getInt(key);
+        }
+
+        int weight = 0;
+        if (key.hasTagCompound()) {
+            weight = key.getTagCompoundSize();
+        }
+        componentWeights.put(key, weight);
+        return weight;
     }
 
     private static int compareByFallback(AEKey left, AEKey right) {

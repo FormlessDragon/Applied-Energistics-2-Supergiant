@@ -10,6 +10,7 @@ import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.recipe.IRecipeCategory;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 
@@ -52,7 +53,9 @@ class CrystalFixerRecipeCategory implements IRecipeCategory<CrystalFixerRecipeWr
     @Override
     public void drawExtras(@NotNull Minecraft minecraft) {
         GlStateManager.color(1, 1, 1, 1);
+        RenderHelper.enableGUIStandardItemLighting();
         minecraft.getRenderItem().renderItemAndEffectIntoGUI(AEBlocks.CRYSTAL_FIXER.stack(), 49, 32);
+        RenderHelper.disableStandardItemLighting();
     }
 
     @Override

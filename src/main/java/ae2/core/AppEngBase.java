@@ -48,7 +48,6 @@ import ae2.integration.Integrations;
 import ae2.items.tools.NetworkAnalyserItem;
 import ae2.me.ticker.RequestBox;
 import ae2.me.tracker.PlayerTracker;
-import ae2.recipes.AERecipeLoader;
 import ae2.server.AECommand;
 import ae2.server.services.ChunkLoadingService;
 import ae2.server.services.compass.ServerCompassService;
@@ -124,7 +123,6 @@ public final class AppEngBase implements AppEng {
         LOGGER.info("{} postInit", Tags.MOD_NAME);
         postRegistrationInitialization();
         runtime().postInit(event);
-        AERecipeLoader.loadRecipes();
         AEConfig.instance().save();
     }
 

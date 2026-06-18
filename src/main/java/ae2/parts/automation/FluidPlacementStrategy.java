@@ -49,7 +49,7 @@ public class FluidPlacementStrategy implements PlacementStrategy {
             return 0;
         }
 
-        if (amount < AEFluidKey.AMOUNT_BLOCK || fluidKey.hasComponents()) {
+        if (amount < AEFluidKey.AMOUNT_BLOCK || fluidKey.hasTagCompound()) {
             return 0;
         }
 

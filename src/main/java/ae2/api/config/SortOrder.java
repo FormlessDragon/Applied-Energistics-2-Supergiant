@@ -24,5 +24,5 @@
 package ae2.api.config;
 
 public enum SortOrder {
-    NAME, AMOUNT, INVTWEAKS, MOD
+    NAME, AMOUNT, MOD, INVTWEAKS, HEI
 }

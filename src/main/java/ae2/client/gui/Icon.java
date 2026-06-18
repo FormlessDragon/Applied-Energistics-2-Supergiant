@@ -95,6 +95,7 @@ public final class Icon {
     public static final Icon COG_DISABLED = registerBuiltin("cog_disabled", 16, 16);
     public static final Icon SORT_BY_INVENTORY_TWEAKS = registerBuiltin("sort_by_inventory_tweaks", 16, 16);
     public static final Icon SORT_BY_MOD = registerBuiltin("sort_by_mod", 16, 16);
+    public static final Icon SORT_BY_HEI = registerBuiltin("sort_by_hei", 16, 16);
     public static final Icon PRIORITY = registerBuiltin("priority", 16, 16);
     public static final Icon PLAYER_PIN = registerBuiltin("player_pin", 16, 16);
     public static final Icon BACKGROUND_VIEW_CELL = registerBuiltin("background_view_cell", 16, 16);

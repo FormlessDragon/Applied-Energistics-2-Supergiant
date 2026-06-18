@@ -44,7 +44,7 @@ final class OreDictSearchPredicate implements Predicate<AEKey> {
         List<String> oreDictNames = oreDictCache.computeIfAbsent(what.getType(), this::getOreDictEntriesMatchingTerm);
 
         for (String oreDictName : oreDictNames) {
-            if (what.isTagged(oreDictName)) {
+            if (what.isOD(oreDictName)) {
                 return true;
             }
         }

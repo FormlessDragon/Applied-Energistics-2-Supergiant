@@ -143,14 +143,9 @@ public final class AEFluidKey extends AEKey {
     }
 
     @Override
-    public boolean hasComponents() {
+    public boolean hasTagCompound() {
         var tag = stack.tag;
         return tag != null && !tag.isEmpty();
-    }
-
-    @Override
-    public boolean isTagged(String tag) {
-        return false;
     }
 
     @Override
@@ -159,6 +154,18 @@ public final class AEFluidKey extends AEKey {
         var tag = stack.tag;
         var value = tag == null ? null : tag.getTag(componentId);
         return value == null ? null : value.copy();
+    }
+
+    @Override
+    public @Nullable NBTTagCompound getTagCompound() {
+        var tag = stack.tag;
+        return tag == null || tag.isEmpty() ? null : tag.copy();
+    }
+
+    @Override
+    public int getTagCompoundSize() {
+        var tag = stack.tag;
+        return tag == null ? 0 : tag.getSize();
     }
 
     @Override
@@ -186,6 +193,6 @@ public final class AEFluidKey extends AEKey {
     public String toString() {
         var id = getId();
         String idString = id != null ? id.toString() : getFluid().getClass().getSimpleName() + "(unregistered)";
-        return hasComponents() ? idString + " (+components)" : idString;
+        return hasTagCompound() ? idString + " (+components)" : idString;
     }
 }

@@ -89,6 +89,7 @@ public enum ButtonToolTips implements LocalizationEnum {
     InterfaceSetStockAmount,
     InterfaceTerminalDisplayMode,
     HighlightSupplier,
+    HEI,
     HeiAutoPin,
     LeftClick,
     LockCraftingMode,

@@ -210,13 +210,13 @@ public final class AEItemKey extends AEKey {
     }
 
     @Override
-    public boolean hasComponents() {
+    public boolean hasTagCompound() {
         var tag = stack.getTagCompound();
         return tag != null && !tag.isEmpty();
     }
 
     @Override
-    public boolean isTagged(String tag) {
+    public boolean isOD(String tag) {
         if (tag == null || tag.isEmpty()) {
             return false;
         }
@@ -235,6 +235,18 @@ public final class AEItemKey extends AEKey {
         var tag = stack.getTagCompound();
         var value = tag == null ? null : tag.getTag(componentId);
         return value == null ? null : value.copy();
+    }
+
+    @Override
+    public @Nullable NBTTagCompound getTagCompound() {
+        var tag = stack.getTagCompound();
+        return tag == null || tag.isEmpty() ? null : tag.copy();
+    }
+
+    @Override
+    public int getTagCompoundSize() {
+        var tag = stack.getTagCompound();
+        return tag == null ? 0 : tag.getSize();
     }
 
     public boolean isDamaged() {

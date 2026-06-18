@@ -958,6 +958,7 @@ gui.tooltips.ae2.InterfaceCraftingMode=合成模式
 gui.tooltips.ae2.InterfaceSetStockAmount=设置库存量
 gui.tooltips.ae2.InterfaceTerminalDisplayMode=显示模式
 gui.tooltips.ae2.HighlightSupplier=定位供应器
+gui.tooltips.ae2.HEI=HEI
 gui.tooltips.ae2.HeiAutoPin=%s：点击自动将该原料置顶
 gui.tooltips.ae2.InventoryTweaks=InventoryTweak（R键整理）
 gui.tooltips.ae2.IOMode=输入/输出模式

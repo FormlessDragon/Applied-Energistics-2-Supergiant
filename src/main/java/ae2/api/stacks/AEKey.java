@@ -31,6 +31,7 @@ import java.util.Objects;
  * between memory usage and lookup speed.</li>
  * </ul>
  */
+@SuppressWarnings({"unused"})
 public abstract class AEKey {
     public static final String TYPE_FIELD = "#t";
     private static final String MISSING_CONTENT_AEKEY_DATA = "missing_content_aekey_data";
@@ -295,13 +296,47 @@ public abstract class AEKey {
         GenericResourcePackageItem.addDrop(this, amount, drops);
     }
 
-    public abstract boolean isTagged(String tag);
+    /**
+     * @deprecated use @{@link #isOD(String)}
+     */
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @Deprecated
+    public boolean isTagged(String tag)  {
+        return false;
+    }
+
+    public boolean isOD(String tag) {
+        return isTagged(tag);
+    }
 
     @Nullable
     public abstract NBTBase get(String componentId);
 
     /**
+     * @return all secondary component data for this key, or null when this key has no components.
+     */
+    @Nullable
+    public NBTTagCompound getTagCompound() {
+        return null;
+    }
+
+    /**
+     * @deprecated use @{@link #hasTagCompound()}
+     */
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @Deprecated
+    public boolean hasComponents() {
+        return false;
+    }
+
+    /**
      * @return true if this key has *any* components attached.
      */
-    public abstract boolean hasComponents();
+    public boolean hasTagCompound() {
+        return hasComponents();
+    }
+
+    public int getTagCompoundSize() {
+        return 0;
+    }
 }

@@ -419,6 +419,7 @@ public final class AppEngClient extends AppEngServer {
         AdvancedMemoryCardHighlightHandler.INSTANCE.clear();
         PendingCraftingJobs.clearPendingJobs();
         PinnedKeys.clearPinnedKeys();
+        Integrations.hei().clearIngredientSortRanks();
     }
 
 }

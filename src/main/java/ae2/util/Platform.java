@@ -23,6 +23,7 @@ import ae2.api.config.SortOrder;
 import ae2.api.util.AEPartLocation;
 import ae2.api.util.DimensionalBlockPos;
 import ae2.core.AEConfig;
+import ae2.integration.Integrations;
 import ae2.integration.modules.bogosorter.InventoryBogoSortModule;
 import ae2.integration.modules.inventorytweaks.InventoryTweaksModule;
 import ae2.util.helpers.P2PHelper;
@@ -232,9 +233,13 @@ public final class Platform {
     }
 
     public static boolean isSortOrderAvailable(SortOrder order) {
-        return order != SortOrder.INVTWEAKS
-            || InventoryTweaksModule.isLoaded()
-            || InventoryBogoSortModule.isLoaded();
+        if (order == SortOrder.INVTWEAKS) {
+            return InventoryTweaksModule.isLoaded() || InventoryBogoSortModule.isLoaded();
+        }
+        if (order == SortOrder.HEI) {
+            return Integrations.hei().isEnabled();
+        }
+        return true;
     }
 
     public static void sendImmediateTileEntityUpdate(EntityPlayer player, BlockPos pos) {

@@ -151,10 +151,12 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
                 ButtonToolTips.SortBy, ButtonToolTips.ItemName);
             registerApp(Icon.SORT_BY_AMOUNT, Settings.SORT_BY, SortOrder.AMOUNT,
                 ButtonToolTips.SortBy, ButtonToolTips.NumberOfItems);
-            registerApp(Icon.SORT_BY_INVENTORY_TWEAKS, Settings.SORT_BY, SortOrder.INVTWEAKS,
-                ButtonToolTips.SortBy, ButtonToolTips.InventoryTweaks);
             registerApp(Icon.SORT_BY_MOD, Settings.SORT_BY, SortOrder.MOD,
                 ButtonToolTips.SortBy, ButtonToolTips.Mod);
+            registerApp(Icon.SORT_BY_INVENTORY_TWEAKS, Settings.SORT_BY, SortOrder.INVTWEAKS,
+                ButtonToolTips.SortBy, ButtonToolTips.InventoryTweaks);
+            registerApp(Icon.SORT_BY_HEI, Settings.SORT_BY, SortOrder.HEI,
+                ButtonToolTips.SortBy, ButtonToolTips.HEI);
 
             registerAppWithoutTitle(Icon.CRAFTING_PLAN_SORT_AVAILABILITY, Settings.CRAFTING_PLAN_SORT_MODE,
                 CraftingPlanSortMode.AVAILABILITY,

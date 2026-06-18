@@ -1,5 +1,6 @@
 package ae2.integration.modules.hei;
 
+import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.integration.abstraction.HeiAdapter;
 import net.minecraft.item.ItemStack;
@@ -28,6 +29,16 @@ public class HeiModule implements HeiAdapter {
     @Override
     public ItemStack getDisplayStack(Object ingredient) {
         return AEGuiHandler.toGhostDisplayStack(ingredient);
+    }
+
+    @Override
+    public int getIngredientSortRank(AEKey key) {
+        return HeiPlugin.getIngredientSortRank(key);
+    }
+
+    @Override
+    public void clearIngredientSortRanks() {
+        HeiPlugin.clearIngredientSortRanks();
     }
 
     @Override

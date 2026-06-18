@@ -958,6 +958,7 @@ gui.tooltips.ae2.InterfaceCraftingMode=Crafting Mode
 gui.tooltips.ae2.InterfaceSetStockAmount=Set amount to stock
 gui.tooltips.ae2.InterfaceTerminalDisplayMode=Display Mode
 gui.tooltips.ae2.HighlightSupplier=Highlight Supplier
+gui.tooltips.ae2.HEI=HEI
 gui.tooltips.ae2.HeiAutoPin=%s: Click to auto-pin this ingredient
 gui.tooltips.ae2.InventoryTweaks=Inventory Tweaks
 gui.tooltips.ae2.IOMode=Input/Output Mode

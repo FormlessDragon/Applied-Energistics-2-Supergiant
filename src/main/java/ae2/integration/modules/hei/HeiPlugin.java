@@ -4,12 +4,15 @@ import ae2.api.config.Actionable;
 import ae2.api.config.CondenserOutput;
 import ae2.api.features.P2PTunnelAttunementInternal;
 import ae2.api.integrations.hei.IngredientConverters;
+import ae2.api.stacks.AEKey;
+import ae2.api.stacks.GenericStack;
 import ae2.api.upgrades.IUpgradeableItem;
 import ae2.api.upgrades.Upgrades;
 import ae2.client.gui.Icon;
 import ae2.container.me.items.ContainerCraftingTerm;
 import ae2.container.me.items.ContainerWirelessCraftingTerm;
 import ae2.core.AEConfig;
+import ae2.core.AELog;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.definitions.AEItems;
 import ae2.core.definitions.AEParts;
@@ -23,6 +26,8 @@ import ae2.recipes.AERecipeTypes;
 import ae2.recipes.game.StorageCellUpgradeRecipe;
 import ae2.recipes.quartzcutting.QuartzCuttingRecipe;
 import ae2.tile.misc.TileCondenser;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import mezz.jei.api.IJeiRuntime;
 import mezz.jei.api.IModPlugin;
@@ -33,11 +38,14 @@ import mezz.jei.api.ingredients.IIngredientBlacklist;
 import mezz.jei.api.ingredients.VanillaTypes;
 import mezz.jei.api.recipe.IRecipeCategoryRegistration;
 import mezz.jei.api.recipe.VanillaRecipeCategoryUid;
+import mezz.jei.gui.ingredients.IIngredientListElement;
+import mezz.jei.ingredients.IngredientFilter;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.oredict.OreDictionary;
 
 import javax.annotation.ParametersAreNonnullByDefault;
+import java.util.Collection;
 import java.util.List;
 
 @JEIPlugin
@@ -45,9 +53,20 @@ import java.util.List;
 public class HeiPlugin implements IModPlugin {
     public static final AEGuiHandler GUI_HANDLER = new AEGuiHandler();
     private static volatile IJeiRuntime runtime;
+    private static volatile Object2IntMap<Object> ingredientSortRanks;
 
     static IJeiRuntime getRuntime() {
         return runtime;
+    }
+
+    static int getIngredientSortRank(AEKey key) {
+        var ranks = getOrBuildIngredientSortRanks();
+        Object primaryKey = key.getPrimaryKey();
+        return ranks.containsKey(primaryKey) ? ranks.getInt(primaryKey) : -1;
+    }
+
+    static void clearIngredientSortRanks() {
+        ingredientSortRanks = null;
     }
 
     private static void registerInscriberRecipes(IModRegistry registry) {
@@ -212,6 +231,66 @@ public class HeiPlugin implements IModPlugin {
             stack.setItemDamage(OreDictionary.WILDCARD_VALUE);
             blacklist.addIngredientToBlacklist(stack);
         }
+    }
+
+    private static Object2IntMap<Object> getOrBuildIngredientSortRanks() {
+        var ranks = ingredientSortRanks;
+        if (ranks != null) {
+            return ranks;
+        }
+
+        synchronized (HeiPlugin.class) {
+            ranks = ingredientSortRanks;
+            if (ranks != null) {
+                return ranks;
+            }
+
+            ranks = buildIngredientSortRanks();
+            ingredientSortRanks = ranks;
+            return ranks;
+        }
+    }
+
+    private static Object2IntMap<Object> buildIngredientSortRanks() {
+        var currentRuntime = runtime;
+        if (currentRuntime == null) {
+            return emptyIngredientSortRanks();
+        }
+
+        try {
+            if (!(currentRuntime.getIngredientFilter() instanceof IngredientFilter ingredientFilter)) {
+                AELog.warn("Failed to build HEI ingredient sort ranks: unexpected ingredient filter %s",
+                    currentRuntime.getIngredientFilter().getClass().getName());
+                return emptyIngredientSortRanks();
+            }
+
+            Collection<IIngredientListElement<?>> ingredients = ingredientFilter.getRawIngredients("");
+            var ranks = new Object2IntOpenHashMap<>();
+            ranks.defaultReturnValue(-1);
+
+            int rank = 0;
+            for (IIngredientListElement<?> ingredient : ingredients) {
+                GenericStack stack = GenericIngredientHelper.ingredientToStack(ingredient.getIngredient());
+                if (stack != null) {
+                    Object primaryKey = stack.what().getPrimaryKey();
+                    if (!ranks.containsKey(primaryKey)) {
+                        ranks.put(primaryKey, rank);
+                    }
+                }
+                rank++;
+            }
+
+            return ranks;
+        } catch (RuntimeException | LinkageError e) {
+            AELog.warn(e, "Failed to build HEI ingredient sort ranks");
+            return emptyIngredientSortRanks();
+        }
+    }
+
+    private static Object2IntMap<Object> emptyIngredientSortRanks() {
+        var ranks = new Object2IntOpenHashMap<>();
+        ranks.defaultReturnValue(-1);
+        return ranks;
     }
 
     private static void registerEntropyRecipes(IModRegistry registry) {
