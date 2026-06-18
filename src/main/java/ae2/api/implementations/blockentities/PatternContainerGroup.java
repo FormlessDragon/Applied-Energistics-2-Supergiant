@@ -3,30 +3,35 @@ package ae2.api.implementations.blockentities;
 import ae2.api.parts.IPart;
 import ae2.api.parts.IPartHost;
 import ae2.api.stacks.AEItemKey;
+import ae2.core.AELog;
 import ae2.core.localization.GuiText;
+import ae2.helpers.patternprovider.PatternProviderTargets;
 import ae2.parts.AEBasePart;
 import ae2.text.TextComponentItemStack;
 import ae2.text.TextComponents;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import net.minecraft.block.Block;
+import net.minecraft.block.state.IBlockState;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.IWorldNameable;
 import net.minecraft.world.World;
-import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
-import net.minecraftforge.fluids.capability.IFluidHandler;
-import net.minecraftforge.items.CapabilityItemHandler;
-import net.minecraftforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public record PatternContainerGroup(
     @Nullable AEItemKey icon,
@@ -36,6 +41,7 @@ public record PatternContainerGroup(
     private static final PatternContainerGroup NOTHING = new PatternContainerGroup(null,
         GuiText.Nothing.text(), Collections.emptyList());
     private static final int MAX_TOOLTIP_LINES = 256;
+    private static final Set<Block> PICK_BLOCK_FAILURES = Collections.newSetFromMap(new IdentityHashMap<>());
 
     public static PatternContainerGroup nothing() {
         return NOTHING;
@@ -67,12 +73,8 @@ public record PatternContainerGroup(
             return null;
         }
 
-        IItemHandler itemHandler = target.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY, side);
-        if (itemHandler == null || itemHandler.getSlots() <= 0) {
-            IFluidHandler fluidHandler = target.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, side);
-            if (fluidHandler == null || fluidHandler.getTankProperties().length == 0) {
-                return null;
-            }
+        if (!PatternProviderTargets.hasTarget(level, pos, side)) {
+            return null;
         }
 
         AEItemKey icon;
@@ -91,27 +93,69 @@ public record PatternContainerGroup(
             }
 
             if (part instanceof AEBasePart aePart) {
-                name = new TextComponentString(aePart.getDisplayName());
+                name = TextComponentItemStack.of(aePart.getPartItem().asItemStack());
             } else if (part instanceof IWorldNameable nameable) {
                 name = nameable.getDisplayName();
             } else {
                 name = icon.getDisplayName();
             }
         } else {
-            ItemStack targetItem = new ItemStack(target.getBlockType());
+            ItemStack targetItem = getTargetDisplayStack(level, pos, side);
             icon = AEItemKey.of(targetItem);
 
             if (target instanceof IWorldNameable nameable && nameable.hasCustomName()) {
                 name = nameable.getDisplayName();
             } else {
-                if (targetItem.isEmpty()) {
-                    return null;
+                if (!targetItem.isEmpty()) {
+                    name = TextComponentItemStack.of(targetItem);
+                } else {
+                    name = new TextComponentTranslation(target.getBlockType().getTranslationKey() + ".name");
                 }
-                name = TextComponentItemStack.of(targetItem);
             }
         }
 
         return new PatternContainerGroup(icon, name, tooltip);
+    }
+
+    private static ItemStack getTargetDisplayStack(World level, BlockPos pos, EnumFacing side) {
+        IBlockState state = level.getBlockState(pos);
+        Block block = state.getBlock();
+        try {
+            RayTraceResult hit = getTargetHit(level, pos, side);
+            if (hit != null && pos.equals(hit.getBlockPos())) {
+                ItemStack picked = block.getPickBlock(state, hit, level, pos, null);
+                if (!picked.isEmpty()) {
+                    return picked;
+                }
+            }
+        } catch (Throwable e) {
+            if (e instanceof VirtualMachineError fatal) {
+                throw fatal;
+            }
+            if (PICK_BLOCK_FAILURES.add(block)) {
+                AELog.warn(e, "Failed to get pick block stack for pattern provider target %s at %s", block, pos);
+            }
+        }
+        Item item = Item.getItemFromBlock(block);
+        int i = 0;
+        if (item.getHasSubtypes()) {
+            i = block.getMetaFromState(state);
+        }
+        return new ItemStack(item, 1, i);
+    }
+
+    @Nullable
+    private static RayTraceResult getTargetHit(World level, BlockPos pos, EnumFacing targetSide) {
+        EnumFacing providerToTarget = targetSide.getOpposite();
+        Vec3d from = new Vec3d(
+            pos.getX() + 0.5D - providerToTarget.getXOffset() * 0.499D,
+            pos.getY() + 0.5D - providerToTarget.getYOffset() * 0.499D,
+            pos.getZ() + 0.5D - providerToTarget.getZOffset() * 0.499D);
+        Vec3d to = from.add(
+            providerToTarget.getXOffset(),
+            providerToTarget.getYOffset(),
+            providerToTarget.getZOffset());
+        return level.rayTraceBlocks(from, to, true);
     }
 
     private static String componentKey(ITextComponent component) {

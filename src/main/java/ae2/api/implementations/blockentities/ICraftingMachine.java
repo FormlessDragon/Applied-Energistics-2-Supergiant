@@ -52,6 +52,7 @@ public interface ICraftingMachine extends IPatternProviderBatchTarget {
         return of(level.getTileEntity(pos), side);
     }
 
+    @Nullable
     PatternContainerGroup getCraftingMachineInfo();
 
     boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputs, int multiplier, EnumFacing ejectionDirection);

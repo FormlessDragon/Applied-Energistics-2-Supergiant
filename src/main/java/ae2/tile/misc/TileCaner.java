@@ -27,6 +27,7 @@ import ae2.core.definitions.AEBlocks;
 import ae2.core.settings.TickRates;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.helpers.externalstorage.GenericStackInv;
+import ae2.text.TextComponentItemStack;
 import ae2.tile.grid.AENetworkedPoweredTile;
 import ae2.util.Platform;
 import ae2.util.inv.AppEngInternalInventory;
@@ -389,7 +390,7 @@ public class TileCaner extends AENetworkedPoweredTile
     @Override
     public PatternContainerGroup getCraftingMachineInfo() {
         return new PatternContainerGroup(AEItemKey.of(AEBlocks.CANER.stack()),
-            AEBlocks.CANER.stack().getTextComponent(), List.of());
+            TextComponentItemStack.of(AEBlocks.CANER.stack()), List.of());
     }
 
     @Override

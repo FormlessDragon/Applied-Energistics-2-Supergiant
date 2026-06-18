@@ -20,6 +20,7 @@ import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.helpers.InventoryAction;
+import ae2.text.TextComponentItemStack;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -88,6 +89,7 @@ public class GuiStockExportBus<T extends ContainerStockExportBus> extends GuiUpg
         if (mouseButton == 2) {
             Slot slot = findSlot(mouseX, mouseY);
             if (canModifyAmount(slot)) {
+                assert slot != null;
                 GenericStack currentStack = GenericStack.fromItemStack(slot.getStack());
                 if (currentStack != null) {
                     switchToScreen(new GuiSetProcessingPatternAmount(this, currentStack,
@@ -96,7 +98,7 @@ public class GuiStockExportBus<T extends ContainerStockExportBus> extends GuiUpg
                             InventoryAction.SET_FILTER,
                             slot.slotNumber,
                             GenericStack.wrapInItemStack(newStack))),
-                        AEParts.STOCK_EXPORT_BUS.stack().getTextComponent()));
+                        TextComponentItemStack.of(AEParts.STOCK_EXPORT_BUS.stack())));
                     return;
                 }
             }
@@ -116,6 +118,7 @@ public class GuiStockExportBus<T extends ContainerStockExportBus> extends GuiUpg
     protected void renderHoveredToolTip(int mouseX, int mouseY) {
         Slot slot = getSlotUnderMouse();
         if (this.playerInventory.getItemStack().isEmpty() && canModifyAmount(slot)) {
+            assert slot != null;
             var itemTooltip = new ObjectArrayList<>(getItemToolTip(slot.getStack()));
             GenericStack unwrapped = GenericStack.fromItemStack(slot.getStack());
             if (unwrapped != null) {

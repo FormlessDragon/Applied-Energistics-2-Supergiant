@@ -19,24 +19,31 @@ import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.MEStorage;
 import ae2.core.AppEng;
+import ae2.core.localization.GuiText;
 import ae2.helpers.patternprovider.PatternProviderLogic;
 import ae2.helpers.patternprovider.PatternProviderLogicHost;
 import ae2.helpers.patternprovider.PatternProviderReturnInventory;
 import ae2.helpers.patternprovider.PatternProviderTarget;
 import ae2.items.parts.PartModels;
+import ae2.text.TextComponentItemStack;
 import ae2.util.Platform;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.common.DimensionManager;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Set;
 
 public class PatternProviderP2PTunnelPart extends P2PTunnelPart<PatternProviderP2PTunnelPart>
     implements ICraftingMachine {
@@ -203,7 +210,9 @@ public class PatternProviderP2PTunnelPart extends P2PTunnelPart<PatternProviderP
     }
 
     @Override
+    @Nullable
     public PatternContainerGroup getCraftingMachineInfo() {
+        Set<PatternContainerGroup> groups = new ObjectLinkedOpenHashSet<>();
         for (PatternProviderP2PTunnelPart output : getOutputsInAttemptOrder()) {
             TargetSide target = output.getTargetSide();
             if (target == null) {
@@ -212,10 +221,32 @@ public class PatternProviderP2PTunnelPart extends P2PTunnelPart<PatternProviderP
             PatternContainerGroup group = PatternContainerGroup.fromMachine(output.getLevel(), target.pos(),
                 target.side());
             if (group != null) {
-                return group;
+                groups.add(group);
             }
         }
-        return PatternContainerGroup.nothing();
+        return switch (groups.size()) {
+            case 0 -> null;
+            case 1 -> groups.iterator().next();
+            default -> getMergedCraftingMachineInfo(groups);
+        };
+    }
+
+    private PatternContainerGroup getMergedCraftingMachineInfo(Set<PatternContainerGroup> groups) {
+        ObjectList<ITextComponent> tooltip = new ObjectArrayList<>();
+        tooltip.add(GuiText.AdjacentToDifferentMachines.text()
+                                                       .setStyle(new Style().setBold(true).setColor(TextFormatting.WHITE)));
+        for (PatternContainerGroup group : groups) {
+            tooltip.add(group.name().createCopy());
+            for (ITextComponent line : group.tooltip()) {
+                tooltip.add(new TextComponentString("  ").appendSibling(line.createCopy()));
+            }
+        }
+
+        AEItemKey icon = AEItemKey.of(this.getPartItem().asItem());
+        ITextComponent name = icon == null
+            ? TextComponentItemStack.of(this.getPartItem().asItemStack())
+            : icon.getDisplayName();
+        return new PatternContainerGroup(icon, name, ObjectLists.unmodifiable(tooltip));
     }
 
     @Override

@@ -57,6 +57,7 @@ import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.helpers.IOutputSideConfigHost;
 import ae2.recipes.handlers.InscriberProcessType;
 import ae2.recipes.handlers.InscriberRecipe;
+import ae2.text.TextComponentItemStack;
 import ae2.tile.grid.AENetworkedPoweredTile;
 import ae2.util.ConfigManager;
 import ae2.util.inv.AppEngInternalInventory;
@@ -422,7 +423,7 @@ public class TileInscriber extends AENetworkedPoweredTile
     @Override
     public PatternContainerGroup getCraftingMachineInfo() {
         return new PatternContainerGroup(AEItemKey.of(AEBlocks.INSCRIBER.stack()),
-            AEBlocks.INSCRIBER.stack().getTextComponent(), List.of());
+            TextComponentItemStack.of(AEBlocks.INSCRIBER.stack()), List.of());
     }
 
     @Override

@@ -19,6 +19,7 @@ import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.helpers.InventoryAction;
+import ae2.text.TextComponentItemStack;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -89,7 +90,7 @@ public class GuiSpecialPreciseExportBus extends GuiSpecialExportBus<ContainerIOB
                             InventoryAction.SET_FILTER,
                             slot.slotNumber,
                             GenericStack.wrapInItemStack(newStack))),
-                        AEParts.PRECISE_EXPORT_BUS.stack().getTextComponent()));
+                        TextComponentItemStack.of(AEParts.PRECISE_EXPORT_BUS.stack())));
                     return;
                 }
             }
