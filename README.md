@@ -27,7 +27,8 @@ repositories {
 }
 
 dependencies {
-    implementation "com.github.FormlessDragon:Applied-Energistics-2:${mod_version}:dev"
+    var mod_version = "v1.0.5"
+    implementation "com.github.FormlessDragon:Applied-Energistics-2-Supergiant:${mod_version}:dev"
 }
 ```
 
