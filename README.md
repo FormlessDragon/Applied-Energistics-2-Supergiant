@@ -23,11 +23,11 @@ The upstream repository remains the original AE2 project and the primary referen
 
 ```groovy
 repositories {
-    mavenCentral()
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
-    implementation "io.github.formlessdragon:AppliedEnergistics2-Supergiant:${mod_version}:dev"
+    implementation "com.github.FormlessDragon:Applied-Energistics-2:${mod_version}:dev"
 }
 ```
 

@@ -41,8 +41,7 @@ dependencies {
     // IndustrialCraft 2
     modCompileOnly "curse.maven:industrial-craft-242638:2746892"
     // HEI
-    compileOnly 'mezz:jei:4.31.2'
-    modRuntimeOnly 'mezz:jei:4.31.2'
+    modImplementation 'mezz:jei:4.31.2'
     // The One Probe
     modImplementation "curse.maven:the-one-probe-245211:2667280"
     //EIO Core
@@ -57,7 +56,9 @@ dependencies {
     // Inventory Tweaks
     modImplementation "curse.maven:inventory-tweaks-223094:2923460"
     // Inventory Bogo-Sorter
-    modCompileOnly "curse.maven:inventory-bogosorter-632327:8231600"
+    modImplementation "curse.maven:inventory-bogosorter-632327:8231600"
+    modRuntimeOnly("com.cleanroommc:modularui:3.1.6") {transitive = false}
+    modRuntimeOnly "curse.maven:key-binding-patch-928895:5951859"
     // mouse tweaks
     modImplementation "curse.maven:mouse-tweaks-unofficial-461660:5876158"
     // Connected Textures Mod

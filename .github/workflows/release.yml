@@ -12,10 +12,6 @@ jobs:
       contents: write
     env:
       RELEASE_TAG: ${{ github.ref_name }}
-      MAVEN_PUBLISHING_URL: https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/
-      CENTRAL_NAMESPACE: ${{ vars.CENTRAL_NAMESPACE }}
-      MAVEN_GROUP: ${{ vars.MAVEN_GROUP }}
-      MAVEN_ARTIFACT_ID: ${{ vars.MAVEN_ARTIFACT_ID }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -39,46 +35,24 @@ jobs:
           echo "Release version: ${RELEASE_VERSION}"
       - name: Execute Gradle build
         run: ./gradlew build -x spotlessCheck -Pmod_version="${RELEASE_VERSION}"
-
-      - name: Publish to Maven Central staging
+      - name: Build JitPack Maven repository
         run: |
-          : "${CENTRAL_USERNAME:?Missing secret CENTRAL_USERNAME}"
-          : "${CENTRAL_PASSWORD:?Missing secret CENTRAL_PASSWORD}"
-          : "${GPG_SIGNING_KEY:?Missing secret GPG_SIGNING_KEY}"
-          : "${CENTRAL_NAMESPACE:?Missing repository variable CENTRAL_NAMESPACE}"
-          MAVEN_GROUP="${MAVEN_GROUP:-$CENTRAL_NAMESPACE}"
-
+          JITPACK_GROUP="com.github.${GITHUB_REPOSITORY_OWNER}"
+          JITPACK_ARTIFACT_ID="${GITHUB_REPOSITORY#*/}"
           ./gradlew --build-cache --info --stacktrace \
-            -Ppublish_to_maven=true \
-            -Pmaven_name=centralPortal \
-            -Pmaven_url="${MAVEN_PUBLISHING_URL}" \
-            -Pmaven_group="${MAVEN_GROUP}" \
-            -Pmaven_artifact_id="${MAVEN_ARTIFACT_ID}" \
+            -Ppublish_to_jitpack=true \
+            -Pjitpack_group="${JITPACK_GROUP}" \
+            -Pjitpack_artifact_id="${JITPACK_ARTIFACT_ID}" \
+            -Pjitpack_version="${RELEASE_TAG}" \
             -Pmod_version="${RELEASE_VERSION}" \
             -Pgenerate_sources_jar=true \
             -Pgenerate_javadocs_jar=true \
-            -PsigningInMemoryKeyPassword="" \
-            publish -x test -x spotlessCheck
-        env:
-          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
-          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
-          ORG_GRADLE_PROJECT_centralPortalUsername: ${{ secrets.CENTRAL_USERNAME }}
-          ORG_GRADLE_PROJECT_centralPortalPassword: ${{ secrets.CENTRAL_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_SIGNING_KEY }}
-
-      - name: Upload staged repository to Central Portal
+            clean publishMavenJavaPublicationToJitpackRepository -x test -x spotlessCheck
+      - name: Package JitPack Maven repository
         run: |
-          : "${CENTRAL_NAMESPACE:?Missing repository variable CENTRAL_NAMESPACE}"
-          auth="$(printf '%s:%s' "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | base64 -w 0)"
-          curl --fail-with-body --show-error --silent --request POST \
-            --header "Authorization: Bearer ${auth}" \
-            "https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/${CENTRAL_NAMESPACE}?publishing_type=automatic"
-        env:
-          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
-
+          cd build/jitpack-repository
+          zip -r "../jitpack-repository-${RELEASE_TAG}.zip" .
       - name: Create GitHub release
-        run: gh release create "$RELEASE_TAG" build/libs/* --title "$RELEASE_TAG" --generate-notes
+        run: gh release create "$RELEASE_TAG" build/libs/* "build/jitpack-repository-${RELEASE_TAG}.zip" --title "$RELEASE_TAG" --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

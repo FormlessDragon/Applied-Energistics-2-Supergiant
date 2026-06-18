@@ -1,0 +1,7 @@
+jdk:
+  - openjdk25
+
+install:
+  - sed -n '1,180p' ./scripts/install-jitpack-release.sh
+  - chmod +x ./scripts/install-jitpack-release.sh
+  - ./scripts/install-jitpack-release.sh
