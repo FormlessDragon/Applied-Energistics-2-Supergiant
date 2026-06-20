@@ -46,8 +46,10 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.fluids.FluidUtil;
 import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 import org.jetbrains.annotations.Nullable;
@@ -395,6 +397,10 @@ public class TileCrystalAssembler extends AENetworkedPoweredTile
 
     public boolean isWorking() {
         return this.working;
+    }
+
+    public boolean onPlayerUse(EntityPlayer player, EnumHand hand) {
+        return FluidUtil.interactWithFluidHandler(player, hand, this.fluidHandler);
     }
 
     private void setWorking(boolean working) {

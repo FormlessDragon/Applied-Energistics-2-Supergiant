@@ -74,6 +74,9 @@ public class CrystalAssemblerBlock extends AEBaseTileBlock<TileCrystalAssembler>
 
         TileCrystalAssembler tile = getTileEntity(world, pos);
         if (tile != null) {
+            if (tile.onPlayerUse(player, hand)) {
+                return true;
+            }
             if (!world.isRemote) {
                 GuiOpener.openGui(player, GuiIds.GuiKey.CRYSTAL_ASSEMBLER, tile);
             }

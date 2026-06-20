@@ -221,8 +221,8 @@ public class ContainerMEStorage extends AEBaseContainer
     }
 
     public boolean isKeyVisible(AEKey key) {
-        if (itemGuiHost != null && itemGuiHost.getItem() instanceof IBasicCellItem) {
-            return ((IBasicCellItem) itemGuiHost.getItem()).getKeyType().contains(key);
+        if (itemGuiHost != null && itemGuiHost.getItem() instanceof IBasicCellItem i) {
+            return i.getKeyType().contains(key);
         }
 
         return true;
