@@ -63,6 +63,10 @@ public class ConfigValueServerPacket extends ServerboundPacket {
         }
         if (container instanceof IConfigurableObject configurableObject) {
             loadSetting(configurableObject, player);
+            return;
+        }
+        if (container.getTarget() instanceof IConfigurableObject configurableObject) {
+            loadSetting(configurableObject, player);
         }
     }
 

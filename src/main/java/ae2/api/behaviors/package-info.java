@@ -27,7 +27,4 @@
  * <p>
  * API note: These classes are experimental: we might release breaking changes to them in any release.
  */
-@ApiStatus.Experimental
 package ae2.api.behaviors;
-
-import org.jetbrains.annotations.ApiStatus;

@@ -51,11 +51,13 @@ import ae2.core.definitions.AEParts;
 import ae2.core.definitions.ItemDefinition;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.LocalizationEnum;
+import ae2.core.localization.Tooltips;
 import ae2.util.EnumCycler;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
 
 import java.util.Collections;
@@ -69,6 +71,7 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
 
     private final Setting<T> buttonSetting;
     private final IHandler<SettingToggleButton<T>> onPress;
+    private final IValueHandler<T, SettingToggleButton<T>> onDirectSelection;
     private final EnumSet<T> validValues;
     private T currentValue;
     private boolean pressedBackwards;
@@ -80,9 +83,16 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
 
     public SettingToggleButton(Setting<T> setting, T val, Predicate<T> isValidValue,
                                IHandler<SettingToggleButton<T>> onPress) {
+        this(setting, val, isValidValue, onPress, SettingToggleButton::selectWithExistingHandler);
+    }
+
+    public SettingToggleButton(Setting<T> setting, T val, Predicate<T> isValidValue,
+                               IHandler<SettingToggleButton<T>> onPress,
+                               IValueHandler<T, SettingToggleButton<T>> onDirectSelection) {
         super(() -> {
         });
         this.onPress = onPress;
+        this.onDirectSelection = onDirectSelection;
 
         EnumSet<T> validValues = EnumSet.allOf(val.getDeclaringClass());
         validValues.removeIf(isValidValue.negate());
@@ -382,23 +392,10 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
         appearances.put(new EnumPair<>(setting, val), new ButtonAppearance(null, item.item(), lines));
     }
 
-    @Override
-    public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
-        boolean pressed = super.mousePressed(minecraft, mouseX, mouseY);
-        if (pressed) {
-            var currentScreen = Minecraft.getMinecraft().currentScreen;
-            this.pressedBackwards = currentScreen instanceof AEBaseGui<?> baseGui && baseGui.isHandlingRightClick();
-            if (this.pressedBackwards) {
-                triggerPress(true);
-                this.triggeredOnPress = true;
-            } else {
-                this.triggeredOnPress = false;
-            }
-        } else {
-            this.pressedBackwards = false;
-            this.triggeredOnPress = false;
-        }
-        return pressed;
+    private static <T extends Enum<T>> void selectWithExistingHandler(SettingToggleButton<T> button, T value) {
+        T previousValue = EnumCycler.rotateEnum(value, true, button.validValues);
+        button.set(previousValue);
+        button.triggerPress(false);
     }
 
     @Override
@@ -418,6 +415,57 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
 
     private void triggerPress(boolean backwards) {
         onPress.handle(this, backwards);
+    }
+
+    @Override
+    public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
+        boolean pressed = super.mousePressed(minecraft, mouseX, mouseY);
+        if (pressed) {
+            var currentScreen = Minecraft.getMinecraft().currentScreen;
+            this.pressedBackwards = currentScreen instanceof AEBaseGui<?> baseGui && baseGui.isHandlingRightClick();
+            if (this.pressedBackwards) {
+                if (this.validValues.size() >= 3 && currentScreen instanceof AEBaseGui<?> baseGui) {
+                    openSelectionPopup(baseGui);
+                } else {
+                    triggerPress(true);
+                }
+                this.triggeredOnPress = true;
+            } else {
+                this.triggeredOnPress = false;
+            }
+        } else {
+            this.pressedBackwards = false;
+            this.triggeredOnPress = false;
+        }
+        return pressed;
+    }
+
+    private void openSelectionPopup(AEBaseGui<?> gui) {
+        List<GridSelectionPopup.Entry<T>> entries = GridSelectionPopup.entries();
+        for (T value : this.validValues) {
+            ButtonAppearance appearance = getAppearance(value);
+            if (appearance == null) {
+                entries.add(GridSelectionPopup.Entry.icon(value, Icon.INVALID,
+                    Collections.singletonList(ButtonToolTips.NoSuchMessage.text())));
+            } else if (appearance.item != null) {
+                entries.add(GridSelectionPopup.Entry.item(value, new ItemStack(appearance.item),
+                    appearance.tooltipLines));
+            } else {
+                Icon icon = appearance.icon != null ? appearance.icon : Icon.TOOLBAR_BUTTON_BACKGROUND;
+                entries.add(GridSelectionPopup.Entry.icon(value, icon, appearance.tooltipLines));
+            }
+        }
+
+        var bounds = gui.getBounds(false);
+        gui.openSelectionPopup(GridSelectionPopup.forButton(this, gui.getGuiLeft(), gui.getGuiTop(), bounds.width,
+            bounds.height, entries, this::setValueDirect));
+    }
+
+    private void setValueDirect(T value) {
+        if (value == this.currentValue) {
+            return;
+        }
+        this.onDirectSelection.handle(this, value);
     }
 
     @Override
@@ -451,6 +499,14 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
         return EnumCycler.rotateEnum(currentValue, backwards, validValues);
     }
 
+    public List<T> getValidValues() {
+        return List.copyOf(this.validValues);
+    }
+
+    public ButtonAppearance getAppearance(T value) {
+        return appearances.get(new EnumPair<>(this.buttonSetting, value));
+    }
+
     @Override
     public List<ITextComponent> getTooltipMessage() {
         if (this.buttonSetting == null || this.currentValue == null) {
@@ -462,7 +518,14 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
             return Collections.singletonList(ButtonToolTips.NoSuchMessage.text());
         }
 
-        return appearance.tooltipLines;
+        if (this.validValues.size() < 3) {
+            return appearance.tooltipLines;
+        }
+
+        List<ITextComponent> lines = new ObjectArrayList<>(appearance.tooltipLines);
+        lines.add(Tooltips.muted(ButtonToolTips.CycleModeAction.text(Tooltips.getMouseButtonText(0))));
+        lines.add(Tooltips.muted(ButtonToolTips.SelectModeAction.text(Tooltips.getMouseButtonText(1))));
+        return lines;
     }
 
     private ButtonAppearance getAppearance() {
@@ -474,6 +537,11 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
         void handle(T button, boolean backwards);
     }
 
+    @FunctionalInterface
+    public interface IValueHandler<T extends Enum<T>, B extends SettingToggleButton<T>> {
+        void handle(B button, T value);
+    }
+
     private record EnumPair<T extends Enum<T>>(Setting<T> setting, T value) {
 
         @Override
@@ -483,6 +551,6 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
 
     }
 
-    private record ButtonAppearance(Icon icon, Item item, List<ITextComponent> tooltipLines) {
+    public record ButtonAppearance(Icon icon, Item item, List<ITextComponent> tooltipLines) {
     }
 }

@@ -2,6 +2,7 @@ package ae2.init.client;
 
 import ae2.api.stacks.AEFluidKey;
 import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.util.AEColor;
 import ae2.client.render.StaticItemColor;
@@ -126,12 +127,12 @@ public final class InitItemColors {
     }
 
     private static int getWrappedGenericStackColor(ItemStack stack, int tintIndex) {
-        GenericStack genericStack = GenericStack.unwrapItemStack(stack);
-        if (genericStack == null) {
+        AEKey what = GenericStack.unwrapWhat(stack);
+        if (what == null) {
             return -1;
         }
 
-        if (genericStack.what() instanceof AEItemKey itemKey) {
+        if (what instanceof AEItemKey itemKey) {
             ItemStack displayStack = itemKey.toStack();
             if (displayStack.getItem() == stack.getItem()) {
                 return -1;
@@ -139,7 +140,7 @@ public final class InitItemColors {
             return Minecraft.getMinecraft().getItemColors().colorMultiplier(displayStack, tintIndex);
         }
 
-        if (tintIndex != 0 || !(genericStack.what() instanceof AEFluidKey fluidKey)) {
+        if (tintIndex != 0 || !(what instanceof AEFluidKey fluidKey)) {
             return -1;
         }
 

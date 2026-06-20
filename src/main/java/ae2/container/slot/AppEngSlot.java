@@ -173,9 +173,9 @@ public class AppEngSlot extends Slot {
     public ItemStack getDisplayStack() {
         ItemStack stack = getRawStack();
         if (this.hideAmount) {
-            var unwrapped = GenericStack.unwrapItemStack(stack);
-            if (unwrapped != null) {
-                return GenericStack.wrapInItemStack(unwrapped.what(), 0);
+            var what = GenericStack.unwrapWhat(stack);
+            if (what != null) {
+                return GenericStack.wrapInItemStack(what, 0);
             }
 
             if (!stack.isEmpty()) {

@@ -3,6 +3,7 @@ package ae2.mixins;
 import ae2.hooks.RenderItemHooks;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.RenderItem;
+import net.minecraft.client.renderer.block.model.IBakedModel;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,8 +28,15 @@ public class RenderItemMixin {
         }
     }
 
+    @Inject(method = "renderItemModelIntoGUI", at = @At("HEAD"), cancellable = true)
+    private void ae2_renderWrappedStack(ItemStack stack, int x, int y, IBakedModel bakedmodel, CallbackInfo ci) {
+        if (RenderItemHooks.onRenderItemAndEffectIntoGui(stack, x, y)) {
+            ci.cancel();
+        }
+    }
+
     @Inject(method = "renderItemOverlayIntoGUI(Lnet/minecraft/client/gui/FontRenderer;Lnet/minecraft/item/ItemStack;IILjava/lang/String;)V", at = @At("HEAD"), cancellable = true)
-    private void ae2_skipWrappedStackOverlay(FontRenderer fontRenderer, ItemStack stack, int xPosition,
+    private void ae2_skipWrappedStackOverlay(FontRenderer fr, ItemStack stack, int xPosition,
                                              int yPosition, String text, CallbackInfo ci) {
         if (RenderItemHooks.onRenderItemOverlayIntoGui(stack)) {
             ci.cancel();

@@ -46,8 +46,7 @@ public final class RenderItemHooks {
     }
 
     private static AEKey unwrapWhat(ItemStack stack) {
-        GenericStack genericStack = GenericStack.unwrapItemStack(stack);
-        return genericStack != null ? genericStack.what() : null;
+        return GenericStack.unwrapWhat(stack);
     }
 
     private static void drawPackageOverlay(int x, int y) {

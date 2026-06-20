@@ -1,5 +1,7 @@
 package ae2.api.integrations.hei;
 
+import ae2.integration.modules.hei.FluidIngredientConverter;
+import ae2.integration.modules.hei.ItemIngredientConverter;
 import com.google.common.collect.ImmutableList;
 
 import java.util.List;
@@ -10,13 +12,18 @@ public final class IngredientConverters {
     private IngredientConverters() {
     }
 
+    static {
+        IngredientConverters.register(new ItemIngredientConverter());
+        IngredientConverters.register(new FluidIngredientConverter());
+    }
+
     public static synchronized void register(IngredientConverter<?> converter) {
         for (IngredientConverter<?> existingConverter : converters) {
             if (existingConverter.getIngredientType() == converter.getIngredientType()) {
                 return;
             }
         }
-        converters = ImmutableList.<IngredientConverter<?>>builder()
+        converters = ImmutableList.<IngredientConverter<?>>builderWithExpectedSize(converters.size() + 1)
                                   .addAll(converters)
                                   .add(converter)
                                   .build();

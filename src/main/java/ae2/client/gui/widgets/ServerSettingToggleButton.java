@@ -22,18 +22,28 @@ import ae2.api.config.Setting;
 import ae2.client.gui.AEBaseGui;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.ConfigButtonPacket;
+import ae2.core.network.serverbound.ConfigValueServerPacket;
 import net.minecraft.client.Minecraft;
 
 public class ServerSettingToggleButton<T extends Enum<T>> extends SettingToggleButton<T> {
 
     public ServerSettingToggleButton(Setting<T> setting, T val) {
-        super(setting, val, ServerSettingToggleButton::sendToServer);
+        super(setting, val, ignored -> true, ServerSettingToggleButton::sendToServer,
+            ServerSettingToggleButton::sendValueToServer);
     }
 
     private static <T extends Enum<T>> void sendToServer(SettingToggleButton<T> button, boolean backwards) {
         if (Minecraft.getMinecraft().currentScreen instanceof AEBaseGui<?> gui) {
             InitNetwork.sendToServer(new ConfigButtonPacket(gui.getContainer().windowId, button.getSetting(),
                 backwards));
+        }
+    }
+
+    private static <T extends Enum<T>> void sendValueToServer(SettingToggleButton<T> button, T value) {
+        button.set(value);
+        if (Minecraft.getMinecraft().currentScreen instanceof AEBaseGui<?> gui) {
+            InitNetwork.sendToServer(new ConfigValueServerPacket(gui.getContainer().windowId, button.getSetting(),
+                value));
         }
     }
 }

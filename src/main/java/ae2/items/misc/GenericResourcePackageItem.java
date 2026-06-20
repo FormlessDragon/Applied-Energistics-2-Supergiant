@@ -53,16 +53,12 @@ public class GenericResourcePackageItem extends AEBaseItem implements GenericSta
 
     @Nullable
     public static GenericStack unwrap(ItemStack stack) {
-        if (!isPackage(stack)) {
+        NBTTagCompound resourceTag = getResourceStackTag(stack);
+        if (resourceTag == null) {
             return null;
         }
 
-        NBTTagCompound tag = stack.getTagCompound();
-        if (tag == null || !tag.hasKey(RESOURCE_STACK, 10)) {
-            return null;
-        }
-
-        GenericStack resource = GenericStack.readTag(tag.getCompoundTag(RESOURCE_STACK));
+        GenericStack resource = GenericStack.readTag(resourceTag);
         if (resource == null) {
             return null;
         }
@@ -103,8 +99,40 @@ public class GenericResourcePackageItem extends AEBaseItem implements GenericSta
 
     @Nullable
     @Override
+    public AEKey unwrapWhat(ItemStack stack) {
+        NBTTagCompound resourceTag = getResourceStackTag(stack);
+        return GenericStack.readWhat(resourceTag);
+    }
+
+    @Override
+    public long unwrapAmount(ItemStack stack) {
+        NBTTagCompound resourceTag = getResourceStackTag(stack);
+        if (resourceTag == null) {
+            return 0;
+        }
+
+        long amount = resourceTag.getLong(GenericStack.AMOUNT_FIELD);
+        return amount > 0 ? amount : 0;
+    }
+
+    @Nullable
+    @Override
     public GenericStack getGenericStack(ItemStack stack) {
         return unwrap(stack);
+    }
+
+    @Nullable
+    private static NBTTagCompound getResourceStackTag(ItemStack stack) {
+        if (!isPackage(stack)) {
+            return null;
+        }
+
+        NBTTagCompound tag = stack.getTagCompound();
+        if (tag == null || !tag.hasKey(RESOURCE_STACK, 10)) {
+            return null;
+        }
+
+        return tag.getCompoundTag(RESOURCE_STACK);
     }
 
     @Override

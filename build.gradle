@@ -118,7 +118,7 @@ unimined.minecraft {
         if (propertyBool('use_access_transformer')) {
             accessTransformer "${rootProject.projectDir}/src/main/resources/${propertyString('access_transformer_locations')}"
         }
-        loader "0.5.6-alpha"
+        loader "0.5.14-alpha"
         runs.auth.username = minecraft_username
         runs.all {
             systemProperty('crl.dev.mixin', 'ae2.mod.mixins.json')

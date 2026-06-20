@@ -68,6 +68,19 @@ public record GenericStack(AEKey what, long amount) {
         return new GenericStack(what, tag.getLong(AMOUNT_FIELD));
     }
 
+    @Nullable
+    public static AEKey readWhat(@Nullable NBTTagCompound tag) {
+        if (tag == null || tag.isEmpty()) {
+            return null;
+        }
+
+        AEKey what = AEKey.fromTagGeneric(tag);
+        if (what == null) {
+            return createMissingContentStack(tag, "Failed to deserialize GenericStack").what();
+        }
+        return what;
+    }
+
     public static GenericStack createMissingContentStack(NBTTagCompound originalData, String error) {
         ItemStack missingContent = AEItems.MISSING_CONTENT.stack();
         if (!missingContent.hasTagCompound()) {
@@ -161,6 +174,22 @@ public record GenericStack(AEKey what, long amount) {
         }
 
         return null;
+    }
+
+    public static @Nullable AEKey unwrapWhat(ItemStack stack) {
+        if (!stack.isEmpty() && stack.getItem() instanceof GenericStackHolderItem item) {
+            return item.unwrapWhat(stack);
+        }
+
+        return null;
+    }
+
+    public static long unwrapAmount(ItemStack stack) {
+        if (!stack.isEmpty() && stack.getItem() instanceof GenericStackHolderItem item) {
+            return item.unwrapAmount(stack);
+        }
+
+        return 0;
     }
 
     public static GenericStack sum(GenericStack left, GenericStack right) {

@@ -54,7 +54,7 @@ dependencies {
     // Chisel
     modCompileOnly "curse.maven:chisel-235279:2915375"
     // Inventory Tweaks
-    modImplementation "curse.maven:inventory-tweaks-223094:2923460"
+    modCompileOnly "curse.maven:inventory-tweaks-223094:2923460"
     // Inventory Bogo-Sorter
     modImplementation "curse.maven:inventory-bogosorter-632327:8231600"
     modRuntimeOnly("com.cleanroommc:modularui:3.1.6") {transitive = false}

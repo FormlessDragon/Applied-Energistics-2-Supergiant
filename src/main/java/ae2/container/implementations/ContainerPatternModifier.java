@@ -30,7 +30,15 @@ public class ContainerPatternModifier extends AEBaseContainer {
     public static final SlotSemantic PATTERN_MODIFIER_REPLACE_WITH =
         SlotSemantics.register("PATTERN_MODIFIER_REPLACE_WITH", false);
 
+    private static final int MIN_PAGE = 0;
+    private static final int MAX_PAGE = 3;
+    private static final int PAGE_MULTIPLY = 0;
+    private static final int PAGE_REPLACE = 1;
+    private static final int PAGE_PROPERTY = 2;
+    private static final int PAGE_CLONE = 3;
+
     private static final String ACTION_NEXT_PAGE = "nextPage";
+    private static final String ACTION_SET_PAGE = "setPage";
     private static final String ACTION_CLEAR = "clear";
     private static final String ACTION_CLONE = "clone";
     private static final String ACTION_REPLACE = "replace";
@@ -170,16 +178,14 @@ public class ContainerPatternModifier extends AEBaseContainer {
         detectAndSendChanges();
     }
 
-    public void nextPage() {
-        if (isClientSide()) {
-            this.page = (this.page + 1) % 4;
-            updateVisibleSlots();
-            sendClientAction(ACTION_NEXT_PAGE);
-        } else {
-            this.page = (this.page + 1) % 4;
-            updateVisibleSlots();
-            detectAndSendChanges();
+    private static void validatePage(int page) {
+        if (page < MIN_PAGE || page > MAX_PAGE) {
+            throw new IllegalArgumentException("Pattern Modifier page must be in range 0..3: " + page);
         }
+    }
+
+    private static int nextPageIndex(int page) {
+        return page == MAX_PAGE ? MIN_PAGE : page + 1;
     }
 
     public void clearPatterns() {
@@ -248,24 +254,16 @@ public class ContainerPatternModifier extends AEBaseContainer {
         }
     }
 
-    public void updateVisibleSlots() {
-        if (isServerSide()) {
-            this.providerPage = clampProviderPage(this.providerPage);
-            this.providerPageCount = getCurrentProviderPageCount();
-            this.activePatternSlots = getCurrentPatternSlotCount();
+    public void nextPage() {
+        if (isClientSide()) {
+            this.page = nextPageIndex(this.page);
+            updateVisibleSlots();
+            sendClientAction(ACTION_NEXT_PAGE);
+        } else {
+            this.page = nextPageIndex(this.page);
+            updateVisibleSlots();
+            detectAndSendChanges();
         }
-        boolean patternPage = this.page == 0 || this.page == 1 || this.page == 2;
-        for (var slot : getSlots(SlotSemantics.ENCODED_PATTERN)) {
-            if (slot instanceof AppEngSlot appEngSlot) {
-                appEngSlot.setSlotEnabled(patternPage && appEngSlot.getSlotIndex() < this.activePatternSlots);
-                appEngSlot.setActive(patternPage && appEngSlot.getSlotIndex() < this.activePatternSlots);
-            }
-        }
-        setSlotsEnabled(PATTERN_MODIFIER_REPLACE_TARGET, this.page == 1);
-        setSlotsEnabled(PATTERN_MODIFIER_REPLACE_WITH, this.page == 1);
-        setSlotsEnabled(PATTERN_MODIFIER_TARGET, this.page == 3);
-        setSlotsEnabled(PATTERN_MODIFIER_CLONE, this.page == 3);
-        setSlotsEnabled(PATTERN_MODIFIER_BLANKS, this.page == 3);
     }
 
     @Override
@@ -285,8 +283,43 @@ public class ContainerPatternModifier extends AEBaseContainer {
         updateVisibleSlots();
     }
 
+    public void setPage(int page) {
+        validatePage(page);
+        if (isClientSide()) {
+            this.page = page;
+            updateVisibleSlots();
+            sendClientAction(ACTION_SET_PAGE, page);
+            return;
+        }
+
+        this.page = page;
+        updateVisibleSlots();
+        detectAndSendChanges();
+    }
+
+    public void updateVisibleSlots() {
+        if (isServerSide()) {
+            this.providerPage = clampProviderPage(this.providerPage);
+            this.providerPageCount = getCurrentProviderPageCount();
+            this.activePatternSlots = getCurrentPatternSlotCount();
+        }
+        boolean patternPage = this.page == PAGE_MULTIPLY || this.page == PAGE_REPLACE || this.page == PAGE_PROPERTY;
+        for (var slot : getSlots(SlotSemantics.ENCODED_PATTERN)) {
+            if (slot instanceof AppEngSlot appEngSlot) {
+                appEngSlot.setSlotEnabled(patternPage && appEngSlot.getSlotIndex() < this.activePatternSlots);
+                appEngSlot.setActive(patternPage && appEngSlot.getSlotIndex() < this.activePatternSlots);
+            }
+        }
+        setSlotsEnabled(PATTERN_MODIFIER_REPLACE_TARGET, this.page == PAGE_REPLACE);
+        setSlotsEnabled(PATTERN_MODIFIER_REPLACE_WITH, this.page == PAGE_REPLACE);
+        setSlotsEnabled(PATTERN_MODIFIER_TARGET, this.page == PAGE_CLONE);
+        setSlotsEnabled(PATTERN_MODIFIER_CLONE, this.page == PAGE_CLONE);
+        setSlotsEnabled(PATTERN_MODIFIER_BLANKS, this.page == PAGE_CLONE);
+    }
+
     private void registerActions() {
         registerClientAction(ACTION_NEXT_PAGE, this::nextPage);
+        registerClientAction(ACTION_SET_PAGE, Integer.class, this::setPage);
         registerClientAction(ACTION_CLEAR, this::clearPatterns);
         registerClientAction(ACTION_CLONE, this::clonePattern);
         registerClientAction(ACTION_REPLACE, this::replace);

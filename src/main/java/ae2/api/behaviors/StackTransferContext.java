@@ -12,7 +12,6 @@ import org.jetbrains.annotations.ApiStatus;
 /**
  * Context for import and export bus transfer operations.
  */
-@ApiStatus.Experimental
 @ApiStatus.NonExtendable
 public interface StackTransferContext {
 

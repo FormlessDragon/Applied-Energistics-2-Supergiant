@@ -12,6 +12,7 @@ import ae2.client.gui.style.WidgetStyle;
 import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.ConfirmableTextField;
+import ae2.client.gui.widgets.GridSelectionPopup;
 import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.Scrollbar;
@@ -19,8 +20,10 @@ import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.render.overlay.AdvancedMemoryCardHighlightHandler;
 import ae2.container.implementations.ContainerAdvancedMemoryCard;
 import ae2.core.AEConfig;
+import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.P2PText;
+import ae2.core.localization.Tooltips;
 import ae2.items.parts.P2PPartItem;
 import ae2.items.tools.AdvancedMemoryCardItem;
 import ae2.items.tools.advancedmemorycard.AdvancedMemoryCardAction;
@@ -31,8 +34,8 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiTextField;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.init.Items;
 import net.minecraft.item.Item;
@@ -101,6 +104,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     private final AE2Button bindButton = new AE2Button(GuiText.AdvancedMemoryCardBind.text(), null);
     private final SettingToggleButton<TerminalStyle> terminalStyleButton = new SettingToggleButton<>(
         Settings.TERMINAL_STYLE, AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle);
+    private final ModeButton modeButton;
     private final ToolbarButton typeButton;
     private final TypeSelector typeSelector = new TypeSelector();
     private final List<ResourceLocation> manageableTunnelTypes;
@@ -149,11 +153,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         this.xSize = this.backgroundTop.getSrcWidth();
         this.ySize = getPreferredHeight();
         addToLeftToolbar(this.terminalStyleButton);
-        addToLeftToolbar(new ToolbarButton(
-            this::modeIcon,
-            () -> ItemStack.EMPTY,
-            this::modeTooltip,
-            this::cycleMode));
+        this.modeButton = addToLeftToolbar(new ModeButton());
         this.typeButton = addToLeftToolbar(new ToolbarButton(
             this::typeIcon,
             () -> ItemStack.EMPTY,
@@ -627,7 +627,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     }
 
     private void cycleMode(boolean reverse) {
-        this.mode = switch (this.mode) {
+        setMode(switch (this.mode) {
             case BIND_OUTPUT -> reverse ? AdvancedMemoryCardAction.Mode.DELETE_BINDING
                 : AdvancedMemoryCardAction.Mode.BIND_INPUT;
             case BIND_INPUT -> reverse ? AdvancedMemoryCardAction.Mode.BIND_OUTPUT
@@ -636,8 +636,22 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
                 : AdvancedMemoryCardAction.Mode.DELETE_BINDING;
             case DELETE_BINDING -> reverse ? AdvancedMemoryCardAction.Mode.COPY_OUTPUT
                 : AdvancedMemoryCardAction.Mode.BIND_OUTPUT;
-        };
+        });
+    }
+
+    private void setMode(AdvancedMemoryCardAction.Mode mode) {
+        this.mode = mode;
         this.container.setMode(this.mode);
+    }
+
+    private void openModeSelector() {
+        List<GridSelectionPopup.Entry<AdvancedMemoryCardAction.Mode>> entries = GridSelectionPopup.entries();
+        for (AdvancedMemoryCardAction.Mode mode : AdvancedMemoryCardAction.Mode.values()) {
+            entries.add(GridSelectionPopup.Entry.icon(mode, modeIcon(mode), List.of(modeText(mode))));
+        }
+        var bounds = getBounds(false);
+        openSelectionPopup(GridSelectionPopup.forButton(this.modeButton, this.guiLeft, this.guiTop, bounds.width,
+            bounds.height, entries, this::setMode));
     }
 
     private void handleTypeButton(boolean rightClick) {
@@ -687,7 +701,11 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     }
 
     private Icon modeIcon() {
-        return switch (this.mode) {
+        return modeIcon(this.mode);
+    }
+
+    private Icon modeIcon(AdvancedMemoryCardAction.Mode mode) {
+        return switch (mode) {
             case BIND_OUTPUT -> Icon.ADVANCED_MEMORY_CARD_BIND_OUTPUT;
             case BIND_INPUT -> Icon.ADVANCED_MEMORY_CARD_BIND_INPUT;
             case COPY_OUTPUT -> Icon.ADVANCED_MEMORY_CARD_COPY_OUTPUT;
@@ -700,11 +718,18 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     }
 
     private List<ITextComponent> modeTooltip() {
-        return List.of(modeText(), GuiText.AdvancedMemoryCardModeHint.text());
+        return List.of(
+            modeText(),
+            Tooltips.muted(ButtonToolTips.CycleModeAction.text(Tooltips.getMouseButtonText(0))),
+            Tooltips.muted(ButtonToolTips.SelectModeAction.text(Tooltips.getMouseButtonText(1))));
     }
 
     private ITextComponent modeText() {
-        return switch (this.mode) {
+        return modeText(this.mode);
+    }
+
+    private ITextComponent modeText(AdvancedMemoryCardAction.Mode mode) {
+        return switch (mode) {
             case BIND_OUTPUT -> GuiText.AdvancedMemoryCardModeOutput.text();
             case BIND_INPUT -> GuiText.AdvancedMemoryCardModeInput.text();
             case COPY_OUTPUT -> GuiText.AdvancedMemoryCardModeCopy.text();
@@ -916,6 +941,46 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     @FunctionalInterface
     private interface ToolbarAction {
         void handle(boolean backwards);
+    }
+
+    private class ModeButton extends IconButton {
+        private boolean rightClickHandledOnPress;
+
+        private ModeButton() {
+            super(() -> cycleMode(false));
+        }
+
+        @Override
+        public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
+            boolean pressed = super.mousePressed(minecraft, mouseX, mouseY);
+            if (pressed && Minecraft.getMinecraft().currentScreen instanceof AEBaseGui<?> gui
+                && gui.isHandlingRightClick()) {
+                openModeSelector();
+                this.rightClickHandledOnPress = true;
+            } else {
+                this.rightClickHandledOnPress = false;
+            }
+            return pressed;
+        }
+
+        @Override
+        public void mouseReleased(int mouseX, int mouseY) {
+            if (this.rightClickHandledOnPress) {
+                this.rightClickHandledOnPress = false;
+                return;
+            }
+            super.mouseReleased(mouseX, mouseY);
+        }
+
+        @Override
+        public List<ITextComponent> getTooltipMessage() {
+            return modeTooltip();
+        }
+
+        @Override
+        protected Icon getIcon() {
+            return modeIcon();
+        }
     }
 
     private class TypeSelector {

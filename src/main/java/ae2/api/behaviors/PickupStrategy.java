@@ -10,7 +10,6 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.WorldServer;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
@@ -21,7 +20,6 @@ import java.util.UUID;
  * <p/>
  * This is used by the annihilation plane to pick up in-world fluids, blocks or item entities.
  */
-@ApiStatus.Experimental
 public interface PickupStrategy {
     static void register(AEKeyType type, Factory factory) {
         StackWorldBehaviors.registerPickupStrategy(type, factory);

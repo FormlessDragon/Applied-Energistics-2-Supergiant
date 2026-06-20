@@ -4,14 +4,18 @@ import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AE2Button;
+import ae2.client.gui.widgets.GridSelectionPopup;
 import ae2.client.gui.widgets.ITooltip;
 import ae2.client.gui.widgets.IconButton;
 import ae2.container.SlotSemantics;
 import ae2.container.implementations.ContainerPatternModifier;
 import ae2.core.AppEng;
+import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
+import ae2.core.localization.Tooltips;
 import ae2.helpers.patternmodifier.PatternModifierActions;
 import ae2.helpers.patternmodifier.PatternModifierLogic;
+import net.minecraft.client.gui.GuiButton;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.ResourceLocation;
@@ -19,12 +23,17 @@ import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 
 import java.awt.Rectangle;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
 public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
     private static final int TOOL_HEIGHT = 212;
     private static final int TOOL_PLAYER_INVENTORY_TOP = 128;
+    private static final int PAGE_MULTIPLY = 0;
+    private static final int PAGE_REPLACE = 1;
+    private static final int PAGE_PROPERTY = 2;
+    private static final int PAGE_CLONE = 3;
     private static final ResourceLocation MULTIPLY_TEXTURE = AppEng.makeId("textures/guis/pattern_editor_1.png");
     private static final ResourceLocation CLONE_TEXTURE = AppEng.makeId("textures/guis/pattern_editor_2.png");
     private static final ResourceLocation REPLACE_TEXTURE = AppEng.makeId("textures/guis/pattern_editor_3.png");
@@ -33,6 +42,7 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
     private static final GuiText MODE_PATTERN = GuiText.PatternModifierPatternMode;
     private static final GuiText MODE_CLONE = GuiText.PatternModifierClone;
 
+    private final ModeButton modeButton;
     private final PageButton previousProviderPageButton;
     private final PageButton nextProviderPageButton;
     private final AE2Button replaceButton;
@@ -47,7 +57,7 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
         this.xSize = 176;
         this.ySize = TOOL_HEIGHT;
 
-        ModeButton modeButton = new ModeButton(this.container::nextPage);
+        this.modeButton = new ModeButton(this.container::nextPage);
         this.previousProviderPageButton = new PageButton(Icon.ARROW_LEFT,
             () -> this.container.setProviderPage(this.container.getProviderPage() - 1));
         this.nextProviderPageButton = new PageButton(Icon.ARROW_RIGHT,
@@ -65,7 +75,7 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
             propertyButton(PatternModifierLogic.CraftingProperty.FLUID_SUBSTITUTE, true),
             propertyButton(PatternModifierLogic.CraftingProperty.FLUID_SUBSTITUTE, false)
         };
-        this.widgets.add("mode", modeButton);
+        this.widgets.add("mode", this.modeButton);
         this.widgets.add("previousProviderPage", this.previousProviderPageButton);
         this.widgets.add("nextProviderPage", this.nextProviderPageButton);
         this.widgets.add("replace", this.replaceButton);
@@ -85,6 +95,25 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
         super.initGui();
     }
 
+    private static GridSelectionPopup.Entry<Integer> modeEntry(int page, Icon icon, GuiText label) {
+        return GridSelectionPopup.Entry.icon(page, icon, Collections.singletonList(label.text()));
+    }
+
+    @Override
+    protected void actionPerformed(GuiButton button) throws IOException {
+        if (button == this.modeButton && isHandlingRightClick()) {
+            openModeSelectionPopup();
+            return;
+        }
+        super.actionPerformed(button);
+    }
+
+    @Override
+    public void drawBG(int offsetX, int offsetY, int mouseX, int mouseY, float partialTicks) {
+        bindTexture(getBackgroundTexture());
+        drawTexturedModalRect(offsetX, offsetY, 0, 0, this.xSize, TOOL_HEIGHT);
+    }
+
     @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
@@ -100,47 +129,33 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
         this.nextProviderPageButton.setVisibility(providerLayout
             && this.container.getProviderPageCount() > 1
             && this.container.getProviderPage() + 1 < this.container.getProviderPageCount());
-        this.replaceButton.visible = page == 1;
-        this.replaceButton.enabled = page == 1;
-        this.cloneButton.visible = page == 3;
-        this.cloneButton.enabled = page == 3;
-        this.clearButton.visible = page == 0;
-        this.clearButton.enabled = page == 0;
+        this.replaceButton.visible = page == PAGE_REPLACE;
+        this.replaceButton.enabled = page == PAGE_REPLACE;
+        this.cloneButton.visible = page == PAGE_CLONE;
+        this.cloneButton.enabled = page == PAGE_CLONE;
+        this.clearButton.visible = page == PAGE_MULTIPLY;
+        this.clearButton.enabled = page == PAGE_MULTIPLY;
         for (AE2Button button : this.multiplyButtons) {
-            button.visible = page == 0;
-            button.enabled = page == 0;
+            button.visible = page == PAGE_MULTIPLY;
+            button.enabled = page == PAGE_MULTIPLY;
         }
         for (AE2Button button : this.propertyButtons) {
-            button.visible = page == 2;
-            button.enabled = page == 2;
+            button.visible = page == PAGE_PROPERTY;
+            button.enabled = page == PAGE_PROPERTY;
         }
-    }
-
-    @Override
-    public void drawBG(int offsetX, int offsetY, int mouseX, int mouseY, float partialTicks) {
-        bindTexture(getBackgroundTexture());
-        drawTexturedModalRect(offsetX, offsetY, 0, 0, this.xSize, TOOL_HEIGHT);
     }
 
     @Override
     public void drawFG(int offsetX, int offsetY, int mouseX, int mouseY) {
         this.fontRenderer.drawString(GuiText.PatternModifier.getLocal(getModeName().getLocal()), 8, 6,
             0x404040);
-        if (this.container.getPage() == 2) {
+        if (this.container.getPage() == PAGE_PROPERTY) {
             this.fontRenderer.drawString(GuiText.PatternModifierSubstitute.getLocal(), 8, 22, 0x404040);
             this.fontRenderer.drawString(GuiText.PatternModifierFluidSubstitute.getLocal(), 8, 44, 0x404040);
-        } else if (this.container.getPage() == 3) {
+        } else if (this.container.getPage() == PAGE_CLONE) {
             this.fontRenderer.drawString(GuiText.PatternModifierTarget.getLocal(), 51, 25, 0x404040);
             this.fontRenderer.drawString(GuiText.PatternModifierBlank.getLocal(), 52, 62, 0x404040);
         }
-    }
-
-    private ResourceLocation getBackgroundTexture() {
-        return switch (this.container.getPage()) {
-            case 1 -> REPLACE_TEXTURE;
-            case 3 -> CLONE_TEXTURE;
-            default -> MULTIPLY_TEXTURE;
-        };
     }
 
     private void repositionPatternSlots() {
@@ -170,19 +185,40 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
         }
     }
 
+    private ResourceLocation getBackgroundTexture() {
+        return switch (this.container.getPage()) {
+            case PAGE_REPLACE -> REPLACE_TEXTURE;
+            case PAGE_CLONE -> CLONE_TEXTURE;
+            default -> MULTIPLY_TEXTURE;
+        };
+    }
+
     private boolean isProviderPatternLayout() {
         return this.container.isProviderInventoryMode()
             && this.container.isProviderInventoryAvailable()
-            && (this.container.getPage() == 0 || this.container.getPage() == 1 || this.container.getPage() == 2);
+            && (this.container.getPage() == PAGE_MULTIPLY
+            || this.container.getPage() == PAGE_REPLACE
+            || this.container.getPage() == PAGE_PROPERTY);
     }
 
     private GuiText getModeName() {
         return switch (this.container.getPage()) {
-            case 1 -> MODE_REPLACE;
-            case 2 -> MODE_PATTERN;
-            case 3 -> MODE_CLONE;
+            case PAGE_REPLACE -> MODE_REPLACE;
+            case PAGE_PROPERTY -> MODE_PATTERN;
+            case PAGE_CLONE -> MODE_CLONE;
             default -> MODE_MULTIPLY;
         };
+    }
+
+    private void openModeSelectionPopup() {
+        var entries = GridSelectionPopup.<Integer>entries();
+        entries.add(modeEntry(PAGE_MULTIPLY, Icon.CRAFT_HAMMER, MODE_MULTIPLY));
+        entries.add(modeEntry(PAGE_REPLACE, Icon.COPY_MODE_ON, MODE_REPLACE));
+        entries.add(modeEntry(PAGE_PROPERTY, Icon.COG, MODE_PATTERN));
+        entries.add(modeEntry(PAGE_CLONE, Icon.ARROW_RIGHT, MODE_CLONE));
+        var bounds = getBounds(false);
+        this.openSelectionPopup(GridSelectionPopup.forButton(this.modeButton, this.guiLeft, this.guiTop, bounds.width,
+            bounds.height, entries, this.container::setPage));
     }
 
     private AE2Button amountButton(int factor, boolean divide) {
@@ -211,14 +247,22 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
     }
 
     private static class ModeButton extends IconButton {
-        ModeButton(Runnable onPress) {
-            super(onPress);
+        ModeButton(Runnable onLeftClick) {
+            super(onLeftClick);
             setMessage(GuiText.PatternModifierChangeMode.text());
         }
 
         @Override
         protected Icon getIcon() {
             return Icon.SCHEDULING_DEFAULT;
+        }
+
+        @Override
+        public List<ITextComponent> getTooltipMessage() {
+            return List.of(
+                getMessageComponent(),
+                Tooltips.muted(ButtonToolTips.CycleModeAction.text(Tooltips.getMouseButtonText(0))),
+                Tooltips.muted(ButtonToolTips.SelectModeAction.text(Tooltips.getMouseButtonText(1))));
         }
     }
 

@@ -59,11 +59,13 @@ public class WrappedGenericStack extends AEBaseItem implements GenericStackHolde
         return wrap(new GenericStack(what, amount));
     }
 
+    @Override
     @Nullable
     public AEKey unwrapWhat(ItemStack stack) {
-        return AEKey.fromTagGeneric(getWrapped(stack));
+        return GenericStack.readWhat(getWrapped(stack));
     }
 
+    @Override
     public long unwrapAmount(ItemStack stack) {
         var wrapped = getWrapped(stack);
         return wrapped == null ? 0 : Math.max(0, wrapped.getLong(AMOUNT_FIELD));

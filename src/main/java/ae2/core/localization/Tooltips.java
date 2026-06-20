@@ -152,7 +152,7 @@ public enum Tooltips implements LocalizationEnum {
         return text.createCopy().setStyle(normalStyle());
     }
 
-    private static ITextComponent muted(ITextComponent text) {
+    public static ITextComponent muted(ITextComponent text) {
         return text.createCopy().setStyle(new Style().setColor(TextFormatting.DARK_GRAY));
     }
 

@@ -3,7 +3,6 @@ package ae2.integration.modules.hei;
 import ae2.api.config.Actionable;
 import ae2.api.config.CondenserOutput;
 import ae2.api.features.P2PTunnelAttunementInternal;
-import ae2.api.integrations.hei.IngredientConverters;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.upgrades.IUpgradeableItem;
@@ -342,9 +341,6 @@ public class HeiPlugin implements IModPlugin {
 
     @Override
     public void register(IModRegistry registry) {
-        IngredientConverters.register(new ItemIngredientConverter());
-        IngredientConverters.register(new FluidIngredientConverter());
-
         registerInscriberRecipes(registry);
         registerChargerRecipes(registry);
         registerCrystalAssemblerRecipes(registry);

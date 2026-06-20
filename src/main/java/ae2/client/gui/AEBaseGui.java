@@ -38,6 +38,7 @@ import ae2.client.gui.style.Text;
 import ae2.client.gui.style.TextAlignment;
 import ae2.client.gui.style.WidgetStyle;
 import ae2.client.gui.widgets.AETextField;
+import ae2.client.gui.widgets.GridSelectionPopup;
 import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.VerticalButtonBar;
 import ae2.container.AEBaseContainer;
@@ -129,6 +130,8 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     private Slot bl_clicked;
     private boolean handlingRightClick;
     private boolean suppressVanillaSlotHover;
+    @Nullable
+    private GridSelectionPopup<?> activeSelectionPopup;
     private final Rectangle rectangle = new Rectangle(guiLeft, guiTop, xSize, ySize);
     private final Rectangle rectangle2 = new Rectangle(0, 0, xSize, ySize);
     private int cachedGuiLeft;
@@ -342,8 +345,12 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             renderSlotHighlight(this.hoveredSlot, mouseX, mouseY);
         }
 
-        renderHoveredToolTip(mouseX, mouseY);
-        renderWidgetTooltip(mouseX, mouseY);
+        if (this.activeSelectionPopup == null) {
+            renderHoveredToolTip(mouseX, mouseY);
+        }
+        if (!renderSelectionPopupTooltip(mouseX, mouseY)) {
+            renderWidgetTooltip(mouseX, mouseY);
+        }
         renderDebugGuiOverlays();
     }
     private boolean exclusionZonesDirty = true;
@@ -351,6 +358,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     @Override
     public void initGui() {
         super.initGui();
+        closeSelectionPopup();
         positionSlots();
         widgets.populateScreen(this::addButton, getBounds(true), this);
         invalidateExclusionZonesCache();
@@ -496,9 +504,9 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     protected final void drawItemTooltipWithImages(int mouseX, int mouseY, ItemStack hoveredStack,
                                                    List<String> anchorTooltipLines) {
         if (hoveredStack.isEmpty() || !(hoveredStack.getItem() instanceof IStackTooltipDataProvider)) {
-            GenericStack genericStack = GenericStack.unwrapItemStack(hoveredStack);
-            if (genericStack != null) {
-                drawKeyTooltipLinesWithImages(mouseX, mouseY, genericStack.what(), anchorTooltipLines);
+            AEKey what = GenericStack.unwrapWhat(hoveredStack);
+            if (what != null) {
+                drawKeyTooltipLinesWithImages(mouseX, mouseY, what, anchorTooltipLines);
             } else {
                 drawTooltipLines(mouseX, mouseY, anchorTooltipLines);
             }
@@ -924,6 +932,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             GlStateManager.popMatrix();
         }
 
+        renderSelectionPopup(mouseX, mouseY);
         restoreStateForVanillaItemRender();
         if (!this.playerInventory.getItemStack().isEmpty()) {
             GlStateManager.depthMask(true);
@@ -1009,6 +1018,14 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
         this.drag_click.clear();
         this.drag_click_sent.clear();
+
+        if (this.activeSelectionPopup != null) {
+            Point mousePos = getMousePoint(mouseX, mouseY);
+            GridSelectionPopup<?> popup = this.activeSelectionPopup;
+            closeSelectionPopup();
+            popup.mousePressed(mousePos.x(), mousePos.y());
+            return;
+        }
 
         if (widgets.onMouseDownBeforeButtons(getMousePoint(mouseX, mouseY), mouseButton)) {
             return;
@@ -1343,6 +1360,37 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
     public boolean isHandlingRightClick() {
         return handlingRightClick;
+    }
+
+    public final void openSelectionPopup(GridSelectionPopup<?> popup) {
+        this.activeSelectionPopup = Objects.requireNonNull(popup, "popup");
+    }
+
+    public final void closeSelectionPopup() {
+        this.activeSelectionPopup = null;
+    }
+
+    private void renderSelectionPopup(int mouseX, int mouseY) {
+        if (this.activeSelectionPopup == null) {
+            return;
+        }
+
+        this.activeSelectionPopup.render(this.mc, mouseX - this.guiLeft, mouseY - this.guiTop);
+    }
+
+    private boolean renderSelectionPopupTooltip(int mouseX, int mouseY) {
+        if (this.activeSelectionPopup == null) {
+            return false;
+        }
+
+        List<ITextComponent> tooltip = this.activeSelectionPopup.getTooltip(mouseX - this.guiLeft,
+            mouseY - this.guiTop);
+        if (tooltip.isEmpty()) {
+            return true;
+        }
+
+        drawTooltip(mouseX, mouseY, tooltip);
+        return true;
     }
 
     public List<Rectangle> getExclusionZones() {
