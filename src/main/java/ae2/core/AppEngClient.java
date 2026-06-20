@@ -54,6 +54,7 @@ import ae2.core.network.InitNetwork;
 import ae2.core.network.clientbound.ExportedGridContent;
 import ae2.core.network.serverbound.MouseWheelPacket;
 import ae2.core.network.serverbound.UpdateHoldingCtrlPacket;
+import ae2.core.registries.CraftingUnitClientRegistry;
 import ae2.entity.TinyTNTPrimedEntity;
 import ae2.entity.TinyTNTPrimedRenderer;
 import ae2.helpers.IMouseWheelItem;
@@ -132,6 +133,7 @@ public final class AppEngClient extends AppEngServer {
         if (!FMLClientHandler.instance().hasOptifine() && ForgeModContainer.forgeLightPipelineEnabled) {
             ModelLoaderRegistry.registerLoader(UVLModelLoader.INSTANCE);
         }
+        CraftingUnitClientRegistry.getInstance().initBuiltins();
         InitBuiltInModels.init();
         InitItemModelsProperties.init();
         InitParticleTypes.init();

@@ -18,13 +18,13 @@
 
 package ae2.block.crafting;
 
+import ae2.api.crafting.cpu.ICraftingUnitDefinition;
 import ae2.block.AEBaseTileBlock;
 import ae2.container.GuiIds;
-import ae2.core.definitions.AEBlocks;
 import ae2.core.gui.GuiOpener;
 import ae2.core.localization.PlayerMessages;
+import ae2.core.registries.CraftingUnitTransformationRegistry;
 import ae2.helpers.crafting.CraftingCubeState;
-import ae2.recipes.game.CraftingUnitTransformRecipe;
 import ae2.tile.AEBaseTile;
 import ae2.tile.crafting.ICraftingCPUTileEntity;
 import ae2.util.InteractionUtil;
@@ -53,7 +53,7 @@ import java.util.EnumSet;
 import java.util.Objects;
 
 public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICraftingCPUTileEntity>
-    extends AEBaseTileBlock<T> {
+    extends AEBaseTileBlock<T> implements ICraftingUnitBlock {
     public static final PropertyBool FORMED = PropertyBool.create("formed");
     public static final PropertyBool POWERED = PropertyBool.create("powered");
     public static final IUnlistedProperty<CraftingCubeState> STATE = new IUnlistedProperty<>() {
@@ -78,11 +78,17 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
         }
     };
 
+    public final ICraftingUnitDefinition definition;
     public final ICraftingUnitType type;
 
     protected AbstractCraftingUnitBlock(ICraftingUnitType type, Class<T> tileEntityClass) {
+        this((ICraftingUnitDefinition) type, tileEntityClass);
+    }
+
+    protected AbstractCraftingUnitBlock(ICraftingUnitDefinition definition, Class<T> tileEntityClass) {
         super(Material.IRON);
-        this.type = type;
+        this.definition = Objects.requireNonNull(definition, "definition");
+        this.type = CraftingUnitTypeAdapter.wrap(definition);
         this.setHardness(2.2F);
         this.setResistance(11.0F);
         this.setTileEntity(tileEntityClass);
@@ -140,7 +146,11 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
     }
 
     private boolean isConnected(IBlockAccess world, BlockPos pos, EnumFacing side) {
-        return world.getBlockState(pos.offset(side)).getBlock() instanceof AbstractCraftingUnitBlock;
+        BlockPos otherPos = pos.offset(side);
+        IBlockState selfState = world.getBlockState(pos);
+        IBlockState otherState = world.getBlockState(otherPos);
+        return otherState.getBlock() instanceof ICraftingUnitBlock
+            && this.isCompatibleCraftingUnit(selfState, world, pos, otherState, otherPos);
     }
 
     @Override
@@ -205,7 +215,8 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
         ItemStack heldItem = player.getHeldItem(hand);
         if (heldItem.isEmpty()) {
             if (InteractionUtil.isInAlternateUseMode(player)) {
-                Block craftingUnitBlock = Objects.requireNonNull(AEBlocks.CRAFTING_UNIT.block());
+                Block craftingUnitBlock = Objects.requireNonNull(
+                    CraftingUnitTransformationRegistry.getInstance().getBaseBlock(this));
                 return this.removeUpgrade(world, pos, player, craftingUnitBlock.getDefaultState())
                     != EnumActionResult.PASS;
             }
@@ -237,7 +248,7 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
 
     private boolean upgrade(World world, BlockPos pos, IBlockState state, EntityPlayer player, EnumFacing side,
                             ItemStack heldItem) {
-        Block upgradedBlock = CraftingUnitTransformRecipe.getUpgradedBlock(heldItem);
+        Block upgradedBlock = CraftingUnitTransformationRegistry.getInstance().findUpgrade(this, heldItem);
         if (!(upgradedBlock instanceof AbstractCraftingUnitBlock<?> craftingBlock) || upgradedBlock == state.getBlock()) {
             return false;
         }
@@ -254,7 +265,7 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
             return true;
         }
 
-        ItemStack removedUpgrade = CraftingUnitTransformRecipe.getRemovedUpgrade(this);
+        ItemStack removedUpgrade = CraftingUnitTransformationRegistry.getInstance().getRemovedUpgrade(this);
         IBlockState newState = craftingBlock.getDefaultState();
         if (!craftingBlock.getOrientationStrategy().getProperties().isEmpty()) {
             newState = craftingBlock.getOrientationStrategy().setFacing(newState, side);
@@ -269,11 +280,11 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
     }
 
     private EnumActionResult removeUpgrade(World world, BlockPos pos, EntityPlayer player, IBlockState newState) {
-        if (this.type == CraftingUnitType.UNIT || world.isRemote) {
+        if (Objects.equals(this, CraftingUnitTransformationRegistry.getInstance().getBaseBlock(this)) || world.isRemote) {
             return EnumActionResult.PASS;
         }
 
-        ItemStack removedUpgrade = CraftingUnitTransformRecipe.getRemovedUpgrade(this);
+        ItemStack removedUpgrade = CraftingUnitTransformationRegistry.getInstance().getRemovedUpgrade(this);
         if (removedUpgrade.isEmpty()) {
             return EnumActionResult.PASS;
         }
@@ -295,5 +306,22 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
 
     private boolean transform(World world, BlockPos pos, IBlockState newState) {
         return !world.isRemote && world.setBlockState(pos, newState, 3);
+    }
+
+    @Override
+    public ICraftingUnitDefinition getCraftingUnitDefinition(IBlockState state, IBlockAccess world, BlockPos pos) {
+        return this.definition;
+    }
+
+    @Override
+    public boolean isCompatibleCraftingUnit(IBlockState selfState, IBlockAccess world, BlockPos selfPos,
+                                            IBlockState otherState, BlockPos otherPos) {
+        if (!(world.getTileEntity(selfPos) instanceof ICraftingCPUTileEntity selfTile)) {
+            return false;
+        }
+        if (!(world.getTileEntity(otherPos) instanceof ICraftingCPUTileEntity otherTile)) {
+            return false;
+        }
+        return selfTile.isCompatibleCraftingUnit(otherTile);
     }
 }

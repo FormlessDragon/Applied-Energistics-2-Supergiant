@@ -18,8 +18,7 @@
 
 package ae2.client.render.crafting;
 
-import ae2.block.crafting.CraftingUnitType;
-import ae2.core.AppEng;
+import ae2.api.crafting.cpu.CraftingUnitVisualDefinition;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.client.renderer.block.model.IBakedModel;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -32,47 +31,14 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.function.Function;
 
 public class CraftingCubeModel implements IModel {
-    private static final ResourceLocation RING_CORNER = texture("ring_corner");
-    private static final ResourceLocation RING_SIDE_HOR = texture("ring_side_hor");
-    private static final ResourceLocation RING_SIDE_VER = texture("ring_side_ver");
-    private static final ResourceLocation UNIT_BASE = texture("unit_base");
-    private static final ResourceLocation LIGHT_BASE = texture("light_base");
-    private static final ResourceLocation ACCELERATOR_LIGHT = texture("accelerator_light");
-    private static final ResourceLocation ACCELERATOR_4X_LIGHT = texture("accelerator_4x_light");
-    private static final ResourceLocation STORAGE_1K_LIGHT = texture("1k_storage_light");
-    private static final ResourceLocation STORAGE_4K_LIGHT = texture("4k_storage_light");
-    private static final ResourceLocation STORAGE_16K_LIGHT = texture("16k_storage_light");
-    private static final ResourceLocation STORAGE_64K_LIGHT = texture("64k_storage_light");
-    private static final ResourceLocation STORAGE_256K_LIGHT = texture("256k_storage_light");
-    private static final ResourceLocation MONITOR_BASE = texture("monitor_base");
-    private static final ResourceLocation MONITOR_LIGHT_DARK = texture("monitor_light_dark");
-    private static final ResourceLocation MONITOR_LIGHT_MEDIUM = texture("monitor_light_medium");
-    private static final ResourceLocation MONITOR_LIGHT_BRIGHT = texture("monitor_light_bright");
+    private final CraftingUnitVisualDefinition visualDefinition;
 
-    private final CraftingUnitType type;
-
-    public CraftingCubeModel(CraftingUnitType type) {
-        this.type = type;
-    }
-
-    private static TextureAtlasSprite getLightTexture(Function<ResourceLocation, TextureAtlasSprite> textureGetter,
-                                                      CraftingUnitType type) {
-        return switch (type) {
-            case ACCELERATOR -> textureGetter.apply(ACCELERATOR_LIGHT);
-            case ACCELERATOR_4X -> textureGetter.apply(ACCELERATOR_4X_LIGHT);
-            case STORAGE_1K -> textureGetter.apply(STORAGE_1K_LIGHT);
-            case STORAGE_4K -> textureGetter.apply(STORAGE_4K_LIGHT);
-            case STORAGE_16K -> textureGetter.apply(STORAGE_16K_LIGHT);
-            case STORAGE_64K -> textureGetter.apply(STORAGE_64K_LIGHT);
-            default -> textureGetter.apply(STORAGE_256K_LIGHT);
-        };
-    }
-
-    private static ResourceLocation texture(String name) {
-        return new ResourceLocation(AppEng.MOD_ID, "block/crafting/" + name);
+    public CraftingCubeModel(CraftingUnitVisualDefinition visualDefinition) {
+        this.visualDefinition = Objects.requireNonNull(visualDefinition, "visualDefinition");
     }
 
     @Override
@@ -82,29 +48,61 @@ public class CraftingCubeModel implements IModel {
 
     @Override
     public Collection<ResourceLocation> getTextures() {
-        return ImmutableList.of(RING_CORNER, RING_SIDE_HOR, RING_SIDE_VER, UNIT_BASE, LIGHT_BASE,
-            ACCELERATOR_LIGHT, ACCELERATOR_4X_LIGHT, STORAGE_1K_LIGHT, STORAGE_4K_LIGHT, STORAGE_16K_LIGHT,
-            STORAGE_64K_LIGHT, STORAGE_256K_LIGHT, MONITOR_BASE, MONITOR_LIGHT_DARK, MONITOR_LIGHT_MEDIUM,
-            MONITOR_LIGHT_BRIGHT);
+        ImmutableList.Builder<ResourceLocation> builder = ImmutableList.builder();
+        builder.add(
+            this.visualDefinition.ringCornerTexture(),
+            this.visualDefinition.ringSideHorTexture(),
+            this.visualDefinition.ringSideVerTexture());
+        if (this.visualDefinition.baseTexture() != null) {
+            builder.add(this.visualDefinition.baseTexture());
+        }
+        if (this.visualDefinition.lightTexture() != null) {
+            builder.add(this.visualDefinition.lightTexture());
+        }
+        if (this.visualDefinition.monitorBaseTexture() != null) {
+            builder.add(this.visualDefinition.monitorBaseTexture());
+        }
+        if (this.visualDefinition.monitorLightDarkTexture() != null) {
+            builder.add(this.visualDefinition.monitorLightDarkTexture());
+        }
+        if (this.visualDefinition.monitorLightMediumTexture() != null) {
+            builder.add(this.visualDefinition.monitorLightMediumTexture());
+        }
+        if (this.visualDefinition.monitorLightBrightTexture() != null) {
+            builder.add(this.visualDefinition.monitorLightBrightTexture());
+        }
+        return builder.build();
     }
 
     @Override
     public IBakedModel bake(@NotNull IModelState state, @NotNull VertexFormat format,
                             Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
-        TextureAtlasSprite ringCorner = bakedTextureGetter.apply(RING_CORNER);
-        TextureAtlasSprite ringSideHor = bakedTextureGetter.apply(RING_SIDE_HOR);
-        TextureAtlasSprite ringSideVer = bakedTextureGetter.apply(RING_SIDE_VER);
+        TextureAtlasSprite ringCorner = bakedTextureGetter.apply(this.visualDefinition.ringCornerTexture());
+        TextureAtlasSprite ringSideHor = bakedTextureGetter.apply(this.visualDefinition.ringSideHorTexture());
+        TextureAtlasSprite ringSideVer = bakedTextureGetter.apply(this.visualDefinition.ringSideVerTexture());
 
-        return switch (this.type) {
+        return switch (this.visualDefinition.visualKind()) {
             case UNIT -> new UnitBakedModel(format, ringCorner, ringSideHor, ringSideVer,
-                bakedTextureGetter.apply(UNIT_BASE));
-            case ACCELERATOR, ACCELERATOR_4X, STORAGE_1K, STORAGE_4K, STORAGE_16K, STORAGE_64K, STORAGE_256K ->
-                new LightBakedModel(format, ringCorner, ringSideHor, ringSideVer,
-                    bakedTextureGetter.apply(LIGHT_BASE), getLightTexture(bakedTextureGetter, this.type));
+                bakedTextureGetter.apply(Objects.requireNonNull(this.visualDefinition.baseTexture(),
+                    "Crafting unit visual definition missing base texture")));
+            case LIGHT -> new LightBakedModel(format, ringCorner, ringSideHor, ringSideVer,
+                bakedTextureGetter.apply(Objects.requireNonNull(this.visualDefinition.baseTexture(),
+                    "Crafting light visual definition missing base texture")),
+                bakedTextureGetter.apply(Objects.requireNonNull(this.visualDefinition.lightTexture(),
+                    "Crafting light visual definition missing light texture")));
             case MONITOR -> new MonitorBakedModel(format, ringCorner, ringSideHor, ringSideVer,
-                bakedTextureGetter.apply(UNIT_BASE), bakedTextureGetter.apply(MONITOR_BASE),
-                bakedTextureGetter.apply(MONITOR_LIGHT_DARK), bakedTextureGetter.apply(MONITOR_LIGHT_MEDIUM),
-                bakedTextureGetter.apply(MONITOR_LIGHT_BRIGHT));
+                bakedTextureGetter.apply(Objects.requireNonNull(this.visualDefinition.baseTexture(),
+                    "Crafting monitor visual definition missing chassis texture")),
+                bakedTextureGetter.apply(Objects.requireNonNull(this.visualDefinition.monitorBaseTexture(),
+                    "Crafting monitor visual definition missing base texture")),
+                bakedTextureGetter.apply(Objects.requireNonNull(this.visualDefinition.monitorLightDarkTexture(),
+                    "Crafting monitor visual definition missing dark light texture")),
+                bakedTextureGetter.apply(Objects.requireNonNull(this.visualDefinition.monitorLightMediumTexture(),
+                    "Crafting monitor visual definition missing medium light texture")),
+                bakedTextureGetter.apply(Objects.requireNonNull(this.visualDefinition.monitorLightBrightTexture(),
+                    "Crafting monitor visual definition missing bright light texture")));
+            case CUSTOM -> throw new IllegalStateException(
+                "Custom crafting unit visuals must be baked through a registered model provider");
         };
     }
 

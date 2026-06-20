@@ -1,7 +1,9 @@
 package ae2.tile.crafting;
 
+import ae2.api.crafting.cpu.ICraftingUnitDefinition;
 import ae2.api.implementations.IPowerChannelState;
 import ae2.api.util.ICustomName;
+import ae2.block.crafting.CraftingUnitTypeAdapter;
 import ae2.block.crafting.ICraftingUnitType;
 import ae2.me.cluster.IAEMultiBlock;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
@@ -14,18 +16,33 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.EnumSet;
+import java.util.Objects;
 
 public interface ICraftingCPUTileEntity
     extends IAEMultiBlock<CraftingCPUCluster>, IPowerChannelState, IGridConnectedTile, ICustomName {
 
-    ICraftingUnitType getCraftingUnitType();
+    default ICraftingUnitDefinition getCraftingUnitDefinition() {
+        return getCraftingUnitType();
+    }
+
+    default ICraftingUnitType getCraftingUnitType() {
+        return CraftingUnitTypeAdapter.wrap(getCraftingUnitDefinition());
+    }
+
+    default net.minecraft.util.ResourceLocation getCraftingUnitFamilyId() {
+        return getCraftingUnitDefinition().getFamilyId();
+    }
+
+    default boolean isCompatibleCraftingUnit(ICraftingCPUTileEntity other) {
+        return Objects.equals(getCraftingUnitFamilyId(), other.getCraftingUnitFamilyId());
+    }
 
     default long getStorageBytes() {
-        return getCraftingUnitType().getStorageBytes();
+        return getCraftingUnitDefinition().storageBytes();
     }
 
     default int getAcceleratorThreads() {
-        return getCraftingUnitType().getAcceleratorThreads();
+        return getCraftingUnitDefinition().acceleratorThreads();
     }
 
     void updateStatus(@Nullable CraftingCPUCluster cluster);

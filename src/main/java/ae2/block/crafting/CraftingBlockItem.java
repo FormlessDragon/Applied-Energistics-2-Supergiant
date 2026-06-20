@@ -20,7 +20,7 @@ package ae2.block.crafting;
 
 import ae2.block.AEBaseBlockItem;
 import ae2.core.definitions.AEBlocks;
-import ae2.recipes.game.CraftingUnitTransformRecipe;
+import ae2.core.registries.CraftingUnitTransformationRegistry;
 import ae2.util.InteractionUtil;
 import net.minecraft.block.Block;
 import net.minecraft.entity.player.EntityPlayer;
@@ -50,7 +50,7 @@ public class CraftingBlockItem extends AEBaseBlockItem {
         }
 
         ItemStack held = player.getHeldItem(hand);
-        ItemStack removedUpgrade = CraftingUnitTransformRecipe.getRemovedUpgrade(getBlock());
+        ItemStack removedUpgrade = CraftingUnitTransformationRegistry.getInstance().getRemovedUpgrade(getBlock());
         if (removedUpgrade.isEmpty()) {
             return super.onItemRightClick(world, player, hand);
         }

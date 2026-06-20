@@ -18,5 +18,6 @@ public final class AppEngRegistries {
         }
         initialized = true;
         AEKeyTypesInternal.getAllTypes();
+        CraftingUnitRegistry.getInstance().initBuiltins();
     }
 }

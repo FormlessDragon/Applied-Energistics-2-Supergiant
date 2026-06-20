@@ -18,7 +18,6 @@
 
 package ae2.init.client;
 
-import ae2.block.crafting.CraftingUnitType;
 import ae2.block.paint.PaintModel;
 import ae2.block.qnb.QnbFormedModel;
 import ae2.client.render.FacadeItemModel;
@@ -36,6 +35,7 @@ import ae2.client.render.model.WrappedGenericStackModel;
 import ae2.client.render.overlay.AdvancedMemoryCardHighlightHandler;
 import ae2.client.render.tesr.spatial.SpatialPylonModel;
 import ae2.core.AppEng;
+import ae2.core.registries.CraftingUnitRegistry;
 import ae2.parts.automation.PlaneModel;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraftforge.client.model.IModel;
@@ -62,15 +62,12 @@ public final class InitBuiltInModels {
 
         addBuiltInModel(CableBusModel::new, "block/cable_bus", "builtin/cable_bus",
             "block/builtin/cable_bus", "models/block/builtin/cable_bus");
-        addBuiltInModel("block/crafting/unit_formed", () -> new CraftingCubeModel(CraftingUnitType.UNIT));
-        addBuiltInModel("block/crafting/accelerator_formed", () -> new CraftingCubeModel(CraftingUnitType.ACCELERATOR));
-        addBuiltInModel("block/crafting/accelerator_4x_formed", () -> new CraftingCubeModel(CraftingUnitType.ACCELERATOR_4X));
-        addBuiltInModel("block/crafting/storage_1k_formed", () -> new CraftingCubeModel(CraftingUnitType.STORAGE_1K));
-        addBuiltInModel("block/crafting/storage_4k_formed", () -> new CraftingCubeModel(CraftingUnitType.STORAGE_4K));
-        addBuiltInModel("block/crafting/storage_16k_formed", () -> new CraftingCubeModel(CraftingUnitType.STORAGE_16K));
-        addBuiltInModel("block/crafting/storage_64k_formed", () -> new CraftingCubeModel(CraftingUnitType.STORAGE_64K));
-        addBuiltInModel("block/crafting/storage_256k_formed", () -> new CraftingCubeModel(CraftingUnitType.STORAGE_256K));
-        addBuiltInModel("block/crafting/monitor_formed", () -> new CraftingCubeModel(CraftingUnitType.MONITOR));
+        for (var definition : CraftingUnitRegistry.getInstance().getDefinitions()) {
+            var visualDefinition = definition.getVisualDefinition();
+            String path = visualDefinition.formedModel().getPath();
+            String shortPath = path.startsWith("block/") ? path.substring("block/".length()) : path;
+            addBuiltInModel(() -> new CraftingCubeModel(visualDefinition), path, shortPath);
+        }
         addBuiltInModel(SpatialPylonModel::new, "block/spatial_pylon", "blocks/spatial_pylon/builtin",
             "models/blocks/spatial_pylon/builtin");
         addBuiltInModel("block/qnb/qnb_formed", QnbFormedModel::new);

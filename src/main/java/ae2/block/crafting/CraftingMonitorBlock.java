@@ -18,6 +18,7 @@
 
 package ae2.block.crafting;
 
+import ae2.api.crafting.cpu.ICraftingUnitDefinition;
 import ae2.api.orientation.IOrientationStrategy;
 import ae2.api.orientation.OrientationStrategies;
 import ae2.api.util.AEColor;
@@ -53,6 +54,10 @@ public class CraftingMonitorBlock extends AbstractCraftingUnitBlock<TileCrafting
 
     public CraftingMonitorBlock(ICraftingUnitType type) {
         super(type, TileCraftingMonitor.class);
+    }
+
+    public CraftingMonitorBlock(ICraftingUnitDefinition definition) {
+        super(definition, TileCraftingMonitor.class);
     }
 
     @Override

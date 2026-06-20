@@ -1,7 +1,7 @@
 package ae2.init.client;
 
+import ae2.api.crafting.cpu.ICraftingUnitDefinition;
 import ae2.api.orientation.BlockOrientation;
-import ae2.block.crafting.CraftingUnitType;
 import ae2.client.render.cablebus.CableBusModel;
 import ae2.client.render.crafting.CraftingCubeModel;
 import ae2.client.render.model.AutoRotatingModel;
@@ -10,6 +10,7 @@ import ae2.client.render.model.FixedOrientationModel;
 import ae2.client.render.model.GlassModel;
 import ae2.client.render.tesr.spatial.SpatialPylonModel;
 import ae2.core.Tags;
+import ae2.core.registries.CraftingUnitRegistry;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.client.renderer.block.model.IBakedModel;
@@ -84,15 +85,9 @@ public final class BuiltInModelOverride {
         bakedModels.put(location("spatial_pylon", "powered_on=false"), spatialPylon);
         bakedModels.put(location("spatial_pylon", "powered_on=true"), spatialPylon);
 
-        putCraftingModel(bakedModels, "unit", CraftingUnitType.UNIT, textureGetter);
-        putCraftingModel(bakedModels, "accelerator", CraftingUnitType.ACCELERATOR, textureGetter);
-        putCraftingModel(bakedModels, "accelerator_4x", CraftingUnitType.ACCELERATOR_4X, textureGetter);
-        putCraftingModel(bakedModels, "storage_1k", CraftingUnitType.STORAGE_1K, textureGetter);
-        putCraftingModel(bakedModels, "storage_4k", CraftingUnitType.STORAGE_4K, textureGetter);
-        putCraftingModel(bakedModels, "storage_16k", CraftingUnitType.STORAGE_16K, textureGetter);
-        putCraftingModel(bakedModels, "storage_64k", CraftingUnitType.STORAGE_64K, textureGetter);
-        putCraftingModel(bakedModels, "storage_256k", CraftingUnitType.STORAGE_256K, textureGetter);
-        putCraftingModel(bakedModels, "monitor", CraftingUnitType.MONITOR, textureGetter);
+        for (ICraftingUnitDefinition definition : CraftingUnitRegistry.getInstance().getDefinitions()) {
+            putCraftingModel(bakedModels, definition, textureGetter);
+        }
         return bakedModels;
     }
 
@@ -145,15 +140,17 @@ public final class BuiltInModelOverride {
         }
     }
 
-    private static void putCraftingModel(Map<ModelResourceLocation, IBakedModel> bakedModels, String name,
-                                         CraftingUnitType type,
+    private static void putCraftingModel(Map<ModelResourceLocation, IBakedModel> bakedModels,
+                                         ICraftingUnitDefinition definition,
                                          Function<ResourceLocation, TextureAtlasSprite> textureGetter) {
-        IBakedModel model = new CraftingCubeModel(type).bake(ModelRotation.X0_Y0, DefaultVertexFormats.BLOCK,
-            textureGetter);
-        bakedModels.put(location("crafting/" + name + "_formed", "formed=true,powered=false"), model);
-        bakedModels.put(location("crafting/" + name + "_formed", "formed=true,powered=true"), model);
-        bakedModels.put(location("block/crafting/" + name + "_formed", "formed=true,powered=false"), model);
-        bakedModels.put(location("block/crafting/" + name + "_formed", "formed=true,powered=true"), model);
+        String path = definition.getVisualDefinition().formedModel().getPath();
+        String shortPath = path.startsWith("block/") ? path.substring("block/".length()) : path;
+        IBakedModel model = new CraftingCubeModel(definition.getVisualDefinition())
+            .bake(ModelRotation.X0_Y0, DefaultVertexFormats.BLOCK, textureGetter);
+        bakedModels.put(location(path, "formed=true,powered=false"), model);
+        bakedModels.put(location(path, "formed=true,powered=true"), model);
+        bakedModels.put(location(shortPath, "formed=true,powered=false"), model);
+        bakedModels.put(location(shortPath, "formed=true,powered=true"), model);
     }
 
     private static void putDriveVariants(Map<ModelResourceLocation, IBakedModel> bakedModels, IModel driveModel,

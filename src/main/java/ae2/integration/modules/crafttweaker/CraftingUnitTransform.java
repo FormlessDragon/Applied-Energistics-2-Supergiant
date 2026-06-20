@@ -1,5 +1,6 @@
 package ae2.integration.modules.crafttweaker;
 
+import ae2.core.definitions.AEBlocks;
 import ae2.recipes.AERecipeTypes;
 import ae2.recipes.game.CraftingUnitTransformRecipe;
 import crafttweaker.CraftTweakerAPI;
@@ -18,7 +19,9 @@ public final class CraftingUnitTransform {
 
     @ZenMethod
     public static void addRecipe(IBlock upgradedBlock, IItemStack upgradeItem) {
-        CraftingUnitTransformRecipe recipe = new CraftingUnitTransformRecipe(CraftTweakerMC.getBlock(upgradedBlock),
+        CraftingUnitTransformRecipe recipe = new CraftingUnitTransformRecipe(
+            AEBlocks.CRAFTING_UNIT.block(),
+            CraftTweakerMC.getBlock(upgradedBlock),
             CraftTweakerMC.getItemStack(upgradeItem).getItem());
         CraftTweakerAPI.apply(AE2CraftTweakerActions.addAERecipe(AERecipeTypes.CRAFTING_UNIT_TRANSFORM, recipe,
             "Adding AE2 crafting unit transform recipe"));

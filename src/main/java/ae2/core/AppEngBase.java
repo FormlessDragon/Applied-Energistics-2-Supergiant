@@ -25,6 +25,7 @@ import ae2.core.definitions.AEEntities;
 import ae2.core.gui.AEGuiHandler;
 import ae2.core.network.InitNetwork;
 import ae2.core.registries.AppEngRegistries;
+import ae2.core.registries.CraftingUnitTransformationRegistry;
 import ae2.helpers.WirelessTerminalActions;
 import ae2.hooks.CableBusLeftClickHook;
 import ae2.hooks.SkyStoneBreakSpeed;
@@ -159,6 +160,7 @@ public final class AppEngBase implements AppEng {
             return;
         }
 
+        CraftingUnitTransformationRegistry.getInstance().initFromRecipes();
         InitStorageCells.init();
         InitP2PAttunements.init();
         InitDispenserBehavior.init();

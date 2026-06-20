@@ -18,6 +18,7 @@
 
 package ae2.tile.crafting;
 
+import ae2.api.crafting.cpu.ICraftingUnitDefinition;
 import ae2.api.networking.GridFlags;
 import ae2.api.networking.IGridMultiblock;
 import ae2.api.networking.IGridNode;
@@ -27,7 +28,7 @@ import ae2.api.orientation.BlockOrientation;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigurableObject;
 import ae2.block.crafting.AbstractCraftingUnitBlock;
-import ae2.block.crafting.ICraftingUnitType;
+import ae2.block.crafting.ICraftingUnitBlock;
 import ae2.core.definitions.AEBlocks;
 import ae2.me.cluster.implementations.CraftingCPUCalculator;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
@@ -91,7 +92,7 @@ public class TileCraftingUnit extends AENetworkedTile
             return ItemStack.EMPTY;
         }
 
-        Item item = this.getUnitBlock().type.getItemFromType();
+        Item item = this.getCraftingUnitDefinition().getItemRepresentation();
         return item == null ? ItemStack.EMPTY : new ItemStack(item);
     }
 
@@ -129,8 +130,11 @@ public class TileCraftingUnit extends AENetworkedTile
     }
 
     @Override
-    public ICraftingUnitType getCraftingUnitType() {
-        return this.getUnitBlock().type;
+    public ICraftingUnitDefinition getCraftingUnitDefinition() {
+        return this.getUnitBlock().getCraftingUnitDefinition(
+            this.world != null ? this.world.getBlockState(this.pos) : this.getUnitBlock().getDefaultState(),
+            this.world,
+            this.pos);
     }
 
     @Override
@@ -407,7 +411,12 @@ public class TileCraftingUnit extends AENetworkedTile
         }
 
         for (EnumFacing facing : EnumFacing.values()) {
-            if (this.world.getBlockState(this.pos.offset(facing)).getBlock() instanceof AbstractCraftingUnitBlock) {
+            BlockPos otherPos = this.pos.offset(facing);
+            var otherState = this.world.getBlockState(otherPos);
+            var otherTile = this.world.getTileEntity(otherPos);
+            if (otherTile instanceof ICraftingCPUTileEntity other
+                && otherState.getBlock() instanceof ICraftingUnitBlock
+                && this.isCompatibleCraftingUnit(other)) {
                 connections.add(facing);
             }
         }

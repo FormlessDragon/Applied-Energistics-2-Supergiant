@@ -18,11 +18,16 @@
 
 package ae2.block.crafting;
 
+import ae2.api.crafting.cpu.ICraftingUnitDefinition;
 import ae2.tile.crafting.TileCraftingUnit;
 
 public class CraftingUnitBlock extends AbstractCraftingUnitBlock<TileCraftingUnit> {
     public CraftingUnitBlock(ICraftingUnitType type) {
         super(type, TileCraftingUnit.class);
+    }
+
+    public CraftingUnitBlock(ICraftingUnitDefinition definition) {
+        super(definition, TileCraftingUnit.class);
     }
 }
 
