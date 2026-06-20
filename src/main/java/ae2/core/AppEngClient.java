@@ -25,6 +25,7 @@ import ae2.client.Hotkeys;
 import ae2.client.commands.ClientCommands;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.StackTooltipRenderer;
+import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.client.gui.me.common.PendingCraftingJobs;
 import ae2.client.gui.me.common.PinnedKeys;
 import ae2.client.render.NetworkRender;
@@ -68,6 +69,7 @@ import ae2.init.client.InitItemModelsProperties;
 import ae2.init.client.InitParticleTypes;
 import ae2.init.client.InitStackRenderHandlers;
 import ae2.integration.Integrations;
+import ae2.integration.modules.bogosorter.InventoryBogoSortModule;
 import ae2.tile.crafting.TileCraftingMonitor;
 import ae2.tile.crafting.TileMolecularAssembler;
 import ae2.tile.misc.TileCharger;
@@ -83,6 +85,7 @@ import ae2.tile.storage.TileSkyChest;
 import ae2.tile.storage.TileSkyStoneTank;
 import ae2.util.MouseHelper;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -108,6 +111,7 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
 
 import java.awt.Rectangle;
 import java.util.Random;
@@ -171,6 +175,9 @@ public final class AppEngClient extends AppEngServer {
         MinecraftForge.EVENT_BUS.register(new Object() {
             @SubscribeEvent(priority = EventPriority.HIGH)
             public void onMouseInput(GuiScreenEvent.MouseInputEvent.Pre event) {
+                if (handleBogoSorterTerminalShortcut(event)) {
+                    return;
+                }
                 if (event.getGui() instanceof AEBaseGui<?> a) {
                     if (inGui(a, MouseHelper.getMouseX(), MouseHelper.getMouseY()) && a.handleAeMouseWheelInput()) {
                         event.setCanceled(true);
@@ -189,6 +196,24 @@ public final class AppEngClient extends AppEngServer {
                     }
                 }
                 return false;
+            }
+
+            private boolean handleBogoSorterTerminalShortcut(GuiScreenEvent.MouseInputEvent.Pre event) {
+                if (!InventoryBogoSortModule.isLoaded()
+                    || !(event.getGui() instanceof GuiMEStorage<?> gui)
+                    || !Mouse.getEventButtonState()
+                    || Mouse.getEventButton() != 0
+                    || !GuiScreen.isCtrlKeyDown()) {
+                    return false;
+                }
+
+                if (!gui.handleBogoSorterGuardedClick(0)) {
+                    return false;
+                }
+
+                event.setCanceled(true);
+                event.setResult(Event.Result.ALLOW);
+                return true;
             }
         });
         Integrations.hei().registerClientFeatures();

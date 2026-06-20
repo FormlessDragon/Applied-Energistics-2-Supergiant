@@ -654,6 +654,25 @@ public class ContainerMEStorage extends AEBaseContainer
         setCarried(remainder);
     }
 
+    /**
+     * Inserts an item shortcut stack from another inventory into the ME network.
+     */
+    public ItemStack insertBogoSorterShortcutStack(ItemStack input) {
+        if (!canInteractWithGrid() || input.isEmpty()) {
+            return input;
+        }
+
+        AEItemKey key = AEItemKey.of(input);
+        if (key == null || !isKeyVisible(key)) {
+            return input;
+        }
+
+        long inserted = StorageHelper.poweredInsert(energySource, storage, key, input.getCount(), getActionSource());
+        ItemStack remainder = input.copy();
+        remainder.shrink(Ints.saturatedCast(inserted));
+        return remainder;
+    }
+
     private boolean moveOneStackToPlayer(AEItemKey what) {
         long potentialAmount = storage.extract(what, what.getMaxStackSize(), Actionable.SIMULATE, getActionSource());
         if (potentialAmount <= 0) {

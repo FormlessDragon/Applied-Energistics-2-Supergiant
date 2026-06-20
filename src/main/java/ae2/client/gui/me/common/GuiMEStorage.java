@@ -718,6 +718,47 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         super.handleMouseClick(slot, slotId, mouseButton, clickType);
     }
 
+    public boolean handleBogoSorterGuardedClick(int mouseButton) {
+        Slot slot = getSlotUnderMouse();
+        ClickType clickType = isShiftKeyDown() ? ClickType.QUICK_MOVE : ClickType.PICKUP;
+
+        if (slot instanceof RepoSlot repoSlot) {
+            if (canInteractWithRepo()) {
+                handleRepoSlotMouseClick(repoSlot, mouseButton, clickType);
+            }
+            return true;
+        }
+
+        if (handlePlayerInventoryPinShortcut(slot, mouseButton, clickType)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private boolean handleGridInventoryEntryPinShortcut(@Nullable GridInventoryEntry entry,
+                                                        boolean autoPinAfterAction) {
+        if (autoPinAfterAction
+            || entry == null
+            || entry.what() == null
+            || !isCtrlKeyDown()) {
+            return false;
+        }
+
+        AEKey key = entry.what();
+        if (PinnedKeys.isPlayerPinned(key)) {
+            toggleAutoPin(key);
+            return true;
+        }
+
+        if (!canAutoPinToCurrentPlayerCapacity(key)) {
+            return false;
+        }
+
+        autoPin(key);
+        return true;
+    }
+
     private void handleRepoSlotMouseClick(RepoSlot repoSlot, int mouseButton, ClickType clickType) {
         if (clickType == ClickType.PICKUP && repoSlot.isEmptyUserPinSlot()) {
             if (manualPinCarriedStack(repoSlot.getUserPinSlotIndex(), mouseButton)) {
@@ -746,8 +787,17 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         boolean quickMove = clickType == ClickType.QUICK_MOVE || isShiftKeyDown();
         if (quickMove) {
             super.handleMouseClick(slot, slot.slotNumber, mouseButton, ClickType.QUICK_MOVE);
-            autoPin(key);
+            if (canAutoPinToCurrentPlayerCapacity(key)) {
+                autoPin(key);
+            }
         } else if (clickType == ClickType.PICKUP) {
+            if (PinnedKeys.isPlayerPinned(key)) {
+                toggleAutoPin(key);
+                return true;
+            }
+            if (!canAutoPinToCurrentPlayerCapacity(key)) {
+                return false;
+            }
             autoPin(key);
         } else {
             return false;
@@ -764,11 +814,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         boolean autoPinAfterAction = shouldAutoPinAfterGridAction(entry, mouseButton, clickType);
         if (mouseButton == 0
             && clickType == ClickType.PICKUP
-            && entry != null
-            && entry.what() != null
-            && isCtrlKeyDown()
-            && !autoPinAfterAction) {
-            toggleAutoPin(entry.what());
+            && handleGridInventoryEntryPinShortcut(entry, autoPinAfterAction)) {
             return;
         }
 
@@ -847,7 +893,8 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             && entry != null
             && entry.what() != null
             && isCtrlKeyDown()
-            && (isShiftKeyDown() || clickType == ClickType.QUICK_MOVE);
+            && (isShiftKeyDown() || clickType == ClickType.QUICK_MOVE)
+            && canAutoPinToCurrentPlayerCapacity(entry.what());
     }
 
     private void autoPinAfterGridAction(GridInventoryEntry entry, boolean autoPinAfterAction) {
@@ -887,21 +934,40 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     }
 
     private void toggleAutoPin(AEKey key) {
-        if (PinnedKeys.togglePlayerPin(key, getMaxPlayerPinCapacity())) {
+        if (PinnedKeys.togglePlayerPin(key, getCurrentPlayerPinCapacity())) {
             this.repo.updateView();
             updateScrollbar();
         }
     }
 
     private void autoPin(AEKey key) {
-        if (PinnedKeys.autoPin(key, getMaxPlayerPinCapacity())) {
+        if (PinnedKeys.autoPin(key, getCurrentPlayerPinCapacity())) {
             this.repo.updateView();
             updateScrollbar();
         }
     }
 
-    private int getMaxPlayerPinCapacity() {
-        return PinnedKeys.MAX_PLAYER_PIN_ROWS * this.terminalStyle.getSlotsPerRow();
+    private boolean canAutoPinToCurrentPlayerCapacity(AEKey key) {
+        if (PinnedKeys.isPlayerPinned(key)) {
+            return true;
+        }
+
+        int capacity = getCurrentPlayerPinCapacity();
+        if (capacity <= 0) {
+            return false;
+        }
+
+        int maxSlots = Math.min(capacity, PinnedKeys.MAX_PLAYER_PIN_ROWS * PinnedKeys.MAX_PINNED);
+        for (int slotIndex = 0; slotIndex < maxSlots; slotIndex++) {
+            if (PinnedKeys.getPlayerPinSlot(slotIndex) == null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int getCurrentPlayerPinCapacity() {
+        return Math.min(this.repo.getPlayerPinCapacity(), PinnedKeys.MAX_PLAYER_PIN_ROWS * PinnedKeys.MAX_PINNED);
     }
 
     @Nullable
@@ -1023,8 +1089,15 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         if (hoveredSlot != null && isPlayerSideSlot(hoveredSlot) && hoveredSlot.getHasStack()) {
             ItemStack stack = hoveredSlot.getStack();
             List<String> tooltip = new ObjectArrayList<>(getItemToolTip(stack));
-            tooltip.add(muted(ButtonToolTips.PlayerPinPinShortcut.text()).getFormattedText());
-            tooltip.add(muted(ButtonToolTips.PlayerPinInsertAndPinShortcut.text()).getFormattedText());
+            AEKey key = keyFromItemStack(stack);
+            if (key != null && PinnedKeys.getPlayerPinRows() > 0) {
+                if (PinnedKeys.isPlayerPinned(key)) {
+                    tooltip.add(muted(ButtonToolTips.PlayerPinUnpinShortcut.text()).getFormattedText());
+                } else if (canAutoPinToCurrentPlayerCapacity(key)) {
+                    tooltip.add(muted(ButtonToolTips.PlayerPinPinShortcut.text()).getFormattedText());
+                    tooltip.add(muted(ButtonToolTips.PlayerPinInsertAndPinShortcut.text()).getFormattedText());
+                }
+            }
             drawItemTooltipWithImages(mouseX, mouseY, stack, tooltip);
             return;
         }
@@ -1093,10 +1166,10 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             tooltip.add(muted(ButtonToolTips.Serial.text(entry.serial())));
         }
 
-        if (canInteractWithRepo()) {
-            if (inUserPinBar) {
+        if (canInteractWithRepo() && PinnedKeys.getPlayerPinRows() > 0) {
+            if (inUserPinBar || PinnedKeys.isPlayerPinned(what)) {
                 tooltip.add(muted(ButtonToolTips.PlayerPinUnpinShortcut.text()));
-            } else {
+            } else if (canAutoPinToCurrentPlayerCapacity(what)) {
                 tooltip.add(muted(ButtonToolTips.PlayerPinPinShortcut.text()));
             }
         }

@@ -20,6 +20,7 @@ package ae2.integration;
 
 import ae2.integration.abstraction.HeiAdapter;
 import ae2.integration.abstraction.IIC2;
+import ae2.integration.modules.bogosorter.InventoryBogoSortModule;
 import ae2.integration.modules.hei.HeiModule;
 import ae2.integration.modules.ic2.IC2Module;
 import ae2.integration.modules.theoneprobe.TOP;
@@ -52,6 +53,7 @@ public final class Integrations {
     public static void initOptionalIntegrations() {
         hei = Loader.isModLoaded("jei") ? new HeiModule() : NO_HEI;
         ic2 = Loader.isModLoaded("ic2") ? new IC2Module() : NO_IC2;
+        InventoryBogoSortModule.init();
     }
 
 }

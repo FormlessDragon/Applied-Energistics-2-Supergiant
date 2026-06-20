@@ -18,12 +18,30 @@
 
 package ae2.integration.modules.bogosorter;
 
+import ae2.container.me.common.ContainerMEStorage;
+import ae2.container.me.items.ContainerBasicCellChest;
+import ae2.container.me.items.ContainerCraftingTerm;
+import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.me.items.ContainerWirelessCraftingTerm;
+import ae2.core.AELog;
+import com.cleanroommc.bogosorter.api.IBogoSortAPI;
+import com.cleanroommc.bogosorter.api.IButtonPos;
+import com.cleanroommc.bogosorter.api.IPosSetter;
+import com.cleanroommc.bogosorter.api.ISlot;
+import com.cleanroommc.bogosorter.api.ISlotGroup;
+import com.cleanroommc.bogosorter.api.ISortingContextBuilder;
 import com.cleanroommc.bogosorter.common.sort.SortHandler;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.inventory.Container;
+import net.minecraft.inventory.IInventory;
+import net.minecraft.inventory.InventoryBasic;
+import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.common.Loader;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Comparator;
+import java.util.List;
 
 public final class InventoryBogoSortModule {
 
@@ -38,5 +56,156 @@ public final class InventoryBogoSortModule {
 
     public static @Nullable Comparator<ItemStack> getComparator() {
         return LOADED ? SortHandler.getClientItemComparator() : null;
+    }
+
+    public static void init() {
+        if (!LOADED) {
+            return;
+        }
+        Registration.init();
+    }
+
+    private static final class Registration {
+        private static final List<ISlot> ME_NETWORK_TARGET_SLOTS = List.of(
+            new MeNetworkInsertSlot(0),
+            new MeNetworkInsertSlot(1));
+        private static final IInventory ME_NETWORK_TARGET_INVENTORY =
+            new InventoryBasic("AE2 ME network BogoSorter target", false, 0);
+        private static final IPosSetter DISABLE_SORT_BUTTON = Registration::disableSortButton;
+
+        private Registration() {
+        }
+
+        private static void init() {
+            IBogoSortAPI api = IBogoSortAPI.getInstance();
+            registerTerminal(api, ContainerMEStorage.class);
+            registerTerminal(api, ContainerBasicCellChest.class);
+            registerTerminal(api, ContainerCraftingTerm.class);
+            registerTerminal(api, ContainerWirelessCraftingTerm.class);
+            registerTerminal(api, ContainerPatternEncodingTerm.class);
+        }
+
+        private static <T extends ContainerMEStorage> void registerTerminal(IBogoSortAPI api, Class<T> containerClass) {
+            api.addCompat(containerClass, Registration::addMeNetworkTargetGroup);
+            api.addCustomInsertable(containerClass, Registration::insertIntoMeNetwork);
+        }
+
+        private static void addMeNetworkTargetGroup(ContainerMEStorage container, ISortingContextBuilder builder) {
+            builder.addSlotGroup(ME_NETWORK_TARGET_SLOTS, ME_NETWORK_TARGET_SLOTS.size())
+                   .buttonPosSetter(DISABLE_SORT_BUTTON);
+        }
+
+        private static void disableSortButton(@SuppressWarnings("unused") ISlotGroup group, IButtonPos buttonPos) {
+            buttonPos.setEnabled(false);
+        }
+
+        private static ItemStack insertIntoMeNetwork(Container container,
+                                                     @SuppressWarnings("unused") List<ISlot> targetSlots,
+                                                     ItemStack input,
+                                                     @SuppressWarnings("unused") boolean fillEmptySlot) {
+            if (container instanceof ContainerMEStorage terminal) {
+                return terminal.insertBogoSorterShortcutStack(input);
+            }
+
+            String message = "BogoSorter ME insertable received unsupported container: "
+                + container.getClass().getName();
+            AELog.warn(message);
+            throw new IllegalArgumentException(message);
+        }
+
+        private static final class MeNetworkInsertSlot implements ISlot {
+            private static final int SLOT_NUMBER_BASE = Integer.MIN_VALUE;
+            private final int index;
+
+            private MeNetworkInsertSlot(int index) {
+                this.index = index;
+            }
+
+            @Override
+            public Slot bogo$getRealSlot() {
+                throw unsupported("real slot access");
+            }
+
+            @Override
+            public int bogo$getX() {
+                return 0;
+            }
+
+            @Override
+            public int bogo$getY() {
+                return 0;
+            }
+
+            @Override
+            public int bogo$getSlotNumber() {
+                return SLOT_NUMBER_BASE + this.index;
+            }
+
+            @Override
+            public int bogo$getSlotIndex() {
+                return -1;
+            }
+
+            @Override
+            public IInventory bogo$getInventory() {
+                return ME_NETWORK_TARGET_INVENTORY;
+            }
+
+            @Override
+            public void bogo$putStack(ItemStack itemStack) {
+                throw unsupported("direct stack mutation");
+            }
+
+            @Override
+            public ItemStack bogo$getStack() {
+                // The slot only describes a non-player ME network target for custom insertion.
+                return ItemStack.EMPTY;
+            }
+
+            @Override
+            public int bogo$getMaxStackSize(ItemStack itemStack) {
+                return itemStack.getMaxStackSize();
+            }
+
+            @Override
+            public int bogo$getItemStackLimit(ItemStack itemStack) {
+                return itemStack.getMaxStackSize();
+            }
+
+            @Override
+            public boolean bogo$isEnabled() {
+                return true;
+            }
+
+            @Override
+            public boolean bogo$isItemValid(ItemStack itemStack) {
+                return true;
+            }
+
+            @Override
+            public boolean bogo$canTakeStack(EntityPlayer entityPlayer) {
+                return false;
+            }
+
+            @Override
+            public void bogo$onSlotChanged() {
+                // Sorting and shortcut insertion never mutate this virtual slot.
+            }
+
+            @Override
+            public void bogo$onSlotChanged(ItemStack itemStack, ItemStack itemStack1) {
+                // Sorting and shortcut insertion never mutate this virtual slot.
+            }
+
+            @Override
+            public ItemStack bogo$onTake(EntityPlayer entityPlayer, ItemStack itemStack) {
+                throw unsupported("take callback");
+            }
+
+            private UnsupportedOperationException unsupported(String operation) {
+                return new UnsupportedOperationException(
+                    "BogoSorter ME network virtual target slot does not support " + operation);
+            }
+        }
     }
 }
