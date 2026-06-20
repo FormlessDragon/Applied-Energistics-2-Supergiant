@@ -436,6 +436,16 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return false;
         }
 
+        if (this.hoveredSlot instanceof AppEngSlot appEngSlot && appEngSlot.hasGenericDisplayStack()) {
+            AEKey what = appEngSlot.getGenericDisplayKey();
+            if (what == null) {
+                return false;
+            }
+            drawKeyTooltipWithImages(mouseX, mouseY, what,
+                getGenericStackTooltip(new GenericStack(what, appEngSlot.getGenericDisplayAmount())));
+            return true;
+        }
+
         ItemStack displayStack = this.hoveredSlot.getStack();
         if (displayStack.isEmpty()) {
             return false;
@@ -525,17 +535,23 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
         int tooltipX = mouseX + 12;
         int tooltipY = mouseY - 12;
-        int tooltipHeight = 8;
         int lineCount = tooltipLines.size();
+        int tooltipHeight = 8;
         if (lineCount > 1) {
             tooltipHeight += 2 + (lineCount - 1) * 10;
         }
 
-        if (tooltipX + tooltipWidth > this.width) {
-            tooltipX -= 28 + tooltipWidth;
+        if (tooltipX + tooltipWidth + 4 > this.width) {
+            tooltipX = mouseX - 16 - tooltipWidth;
+            if (tooltipX < 4) {
+                tooltipX = mouseX + 12;
+            }
         }
         if (tooltipY + tooltipHeight + 6 > this.height) {
             tooltipY = this.height - tooltipHeight - 6;
+        }
+        if (tooltipY < 4) {
+            tooltipY = 4;
         }
 
         StackTooltipRenderer.INSTANCE.drawTooltipImage(this.mc, this.fontRenderer, hoveredStack, tooltipX, tooltipY,
@@ -672,9 +688,12 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return;
         }
 
-        ItemStack stack = getRawStack(slot);
+        boolean hasGenericDisplayStack = slot.hasGenericDisplayStack();
+        ItemStack stack = hasGenericDisplayStack ? ItemStack.EMPTY : getRawStack(slot);
         var backgroundIcon = SlotBackgroundIconMapping.resolve(slot.getBackgroundIcon());
-        if ((slot.renderIconWithItem() || stack.isEmpty()) && slot.isSlotEnabled() && backgroundIcon != null) {
+        if ((slot.renderIconWithItem() || !hasGenericDisplayStack && stack.isEmpty())
+            && slot.isSlotEnabled()
+            && backgroundIcon != null) {
             backgroundIcon.getBlitter()
                           .dest(guiLeft + slot.xPos, guiTop + slot.yPos)
                           .opacity(slot.getOpacityOfIcon())
@@ -788,6 +807,11 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return;
         }
 
+        if (appEngSlot.hasGenericDisplayStack()) {
+            drawGenericStackSlot(slot, appEngSlot);
+            return;
+        }
+
         ItemStack rawStack = getRawStack(appEngSlot);
         if (rawStack.isEmpty()) {
             super.drawSlot(slot);
@@ -803,6 +827,23 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         this.dragSplitting = wasDragSplitting;
 
         renderAppEngSlotAmount(slot, appEngSlot, rawStack);
+    }
+
+    private void drawGenericStackSlot(Slot slot, AppEngSlot appEngSlot) {
+        AEKey what = appEngSlot.getGenericDisplayKey();
+        if (what == null) {
+            return;
+        }
+
+        AEKeyRendering.drawInGui(this.mc, slot.xPos, slot.yPos, what);
+        restoreStateForVanillaItemRender();
+
+        long amount = appEngSlot.getGenericDisplayAmount();
+        if (amount > 1) {
+            StackSizeRenderer.renderSizeLabel(this.fontRenderer, slot.xPos, slot.yPos,
+                what.formatAmount(amount, AmountFormat.SLOT), false);
+            restoreStateForVanillaItemRender();
+        }
     }
 
     private static void restoreStateForVanillaItemRender() {

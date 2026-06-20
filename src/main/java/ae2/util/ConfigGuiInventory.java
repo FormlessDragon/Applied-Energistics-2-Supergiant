@@ -1,7 +1,9 @@
 package ae2.util;
 
+import ae2.api.behaviors.GenericStackDisplayInventory;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKeyType;
 import ae2.api.stacks.GenericStack;
 import ae2.helpers.externalstorage.GenericStackInv;
@@ -17,7 +19,7 @@ import java.util.Objects;
  * convert appropriately from {@link ItemStack}s set by the player to the internal key-based representation with the
  * help of a matching {@link AEKeyType}.
  */
-public class ConfigGuiInventory implements InternalInventory {
+public class ConfigGuiInventory implements InternalInventory, GenericStackDisplayInventory {
     private final GenericStackInv inv;
 
     public ConfigGuiInventory(GenericStackInv inv) {
@@ -61,6 +63,22 @@ public class ConfigGuiInventory implements InternalInventory {
         }
 
         return GenericStack.wrapInItemStack(stack);
+    }
+
+    @Override
+    public boolean hasGenericDisplayStack(int slot) {
+        return inv.getKey(slot) != null;
+    }
+
+    @Override
+    @Nullable
+    public AEKey getDisplayKey(int slot) {
+        return inv.getKey(slot);
+    }
+
+    @Override
+    public long getDisplayAmount(int slot) {
+        return inv.getAmount(slot);
     }
 
     @Override

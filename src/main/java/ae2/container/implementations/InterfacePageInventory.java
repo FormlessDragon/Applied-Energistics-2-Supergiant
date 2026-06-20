@@ -1,10 +1,13 @@
 package ae2.container.implementations;
 
+import ae2.api.behaviors.GenericStackDisplayInventory;
 import ae2.api.inventories.BaseInternalInventory;
 import ae2.api.inventories.InternalInventory;
+import ae2.api.stacks.AEKey;
 import net.minecraft.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
-final class InterfacePageInventory extends BaseInternalInventory {
+final class InterfacePageInventory extends BaseInternalInventory implements GenericStackDisplayInventory {
     private final InternalInventory delegate;
     private final int slotsPerPage;
     private int page;
@@ -46,6 +49,30 @@ final class InterfacePageInventory extends BaseInternalInventory {
             return ItemStack.EMPTY;
         }
         return this.delegate.getStackInSlot(translateSlot(slotIndex));
+    }
+
+    @Override
+    public boolean hasGenericDisplayStack(int slot) {
+        return isValidTranslatedSlot(slot)
+            && this.delegate instanceof GenericStackDisplayInventory displayInventory
+            && displayInventory.hasGenericDisplayStack(translateSlot(slot));
+    }
+
+    @Override
+    @Nullable
+    public AEKey getDisplayKey(int slot) {
+        if (!isValidTranslatedSlot(slot) || !(this.delegate instanceof GenericStackDisplayInventory displayInventory)) {
+            return null;
+        }
+        return displayInventory.getDisplayKey(translateSlot(slot));
+    }
+
+    @Override
+    public long getDisplayAmount(int slot) {
+        if (!isValidTranslatedSlot(slot) || !(this.delegate instanceof GenericStackDisplayInventory displayInventory)) {
+            return 0;
+        }
+        return displayInventory.getDisplayAmount(translateSlot(slot));
     }
 
     @Override

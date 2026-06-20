@@ -4,14 +4,12 @@ import ae2.api.config.Actionable;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKeyType;
 import ae2.api.stacks.GenericStack;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Abstraction layer over the "generic" (meaning that it can accept any AEKey in each slot) inventory used by various
  * AE2 devices. This is exposed to allow addons to adapt them for foreign capabilities/API lookups.
  */
-@ApiStatus.Experimental
 public interface GenericInternalInventory {
     /**
      * @return The number of slots in this inventory. Never changes.

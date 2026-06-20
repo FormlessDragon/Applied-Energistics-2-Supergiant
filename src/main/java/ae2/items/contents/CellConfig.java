@@ -81,13 +81,17 @@ public final class CellConfig {
                 return;
             }
 
-            if (tag.hasKey(STORAGE_CELL_CONFIG_INV, 9)) {
-                var componentData = tag.getTagList(STORAGE_CELL_CONFIG_INV, 10);
-                inv.readFromList(GenericStack.readList(componentData));
-                return;
+            inv.beginBatch();
+            try {
+                if (tag.hasKey(STORAGE_CELL_CONFIG_INV, 9)) {
+                    var componentData = tag.getTagList(STORAGE_CELL_CONFIG_INV, 10);
+                    inv.readFromList(GenericStack.readList(componentData));
+                } else {
+                    inv.readFromChildTag(tag, STORAGE_CELL_CONFIG_INV_TAG);
+                }
+            } finally {
+                inv.endBatchSuppressed();
             }
-
-            inv.readFromChildTag(tag, STORAGE_CELL_CONFIG_INV_TAG);
         }
 
         private void save() {

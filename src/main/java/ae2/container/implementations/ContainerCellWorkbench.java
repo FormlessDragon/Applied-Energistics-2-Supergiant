@@ -68,6 +68,9 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
     public int pageCount = 1;
     @GuiSync(7)
     public int configSlotCount = CONFIG_SLOTS_PER_PAGE;
+    @NotNull
+    private ItemStack oldCell = ItemStack.EMPTY;
+    private int cellSize;
 
     private CellWorkbenchPageInventory configPageInventory;
 
@@ -141,7 +144,11 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
         int actualSlot = getFirstSlotOnPage(this.currentPage) + idx;
         ICellWorkbenchItem cwi = getHost().getCell();
         if (cwi != null && getCopyMode() == CopyMode.CLEAR_ON_REMOVE) {
-            return actualSlot < cwi.getConfigInventory(getWorkbenchItem()).size();
+            if (oldCell == getWorkbenchItem()) {
+                return actualSlot < cellSize;
+            }
+            oldCell = getWorkbenchItem();
+            return actualSlot < (cellSize = cwi.getConfigInventory(getWorkbenchItem()).size());
         }
         return getCopyMode() == CopyMode.KEEP_ON_REMOVE && actualSlot < getConfigInventory().size();
     }

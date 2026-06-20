@@ -391,9 +391,11 @@ public final class AppEngClient extends AppEngServer {
 
     @SubscribeEvent
     public void registerTextures(TextureStitchEvent.Pre event) {
-        event.getMap().registerSprite(AppEng.makeId("block/molecular_assembler_lights"));
-        InscriberTESR.registerTexture(event);
-        InitParticleTypes.registerTextures(event.getMap());
+        if (event.getMap() == Minecraft.getMinecraft().getTextureMapBlocks()) {
+            event.getMap().registerSprite(AppEng.makeId("block/molecular_assembler_lights"));
+            InscriberTESR.registerTexture(event);
+            InitParticleTypes.registerTextures(event.getMap());
+        }
     }
 
     private void spawnEnergy(World world, double posX, double posY, double posZ, Object data) {

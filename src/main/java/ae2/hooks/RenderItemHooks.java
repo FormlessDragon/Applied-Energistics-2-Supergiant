@@ -42,7 +42,7 @@ public final class RenderItemHooks {
     }
 
     public static boolean onRenderItemOverlayIntoGui(ItemStack stack) {
-        return unwrapWhat(stack) != null;
+        return OVERRIDING.containsKey(stack);
     }
 
     private static AEKey unwrapWhat(ItemStack stack) {

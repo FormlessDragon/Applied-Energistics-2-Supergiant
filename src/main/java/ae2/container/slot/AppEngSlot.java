@@ -1,6 +1,8 @@
 package ae2.container.slot;
 
+import ae2.api.behaviors.GenericStackDisplayInventory;
 import ae2.api.inventories.InternalInventory;
+import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.container.AEBaseContainer;
 import ae2.core.AELog;
@@ -186,6 +188,32 @@ public class AppEngSlot extends Slot {
         return stack;
     }
 
+    public boolean hasGenericDisplayStack() {
+        return this.isSlotEnabled()
+            && this.inventory instanceof GenericStackDisplayInventory displayInventory
+            && this.invSlot < this.inventory.size()
+            && displayInventory.hasGenericDisplayStack(this.invSlot);
+    }
+
+    @Nullable
+    public AEKey getGenericDisplayKey() {
+        if (!this.isSlotEnabled()
+            || !(this.inventory instanceof GenericStackDisplayInventory displayInventory)
+            || this.invSlot >= this.inventory.size()) {
+            return null;
+        }
+        return displayInventory.getDisplayKey(this.invSlot);
+    }
+
+    public long getGenericDisplayAmount() {
+        if (!this.isSlotEnabled()
+            || !(this.inventory instanceof GenericStackDisplayInventory displayInventory)
+            || this.invSlot >= this.inventory.size()) {
+            return 0;
+        }
+        return displayInventory.getDisplayAmount(this.invSlot);
+    }
+
     public int getSlotIndex() {
         return this.invSlot;
     }
@@ -196,7 +224,7 @@ public class AppEngSlot extends Slot {
 
     @Nullable
     public List<ITextComponent> getCustomTooltip(ItemStack carriedItem) {
-        if (!getDisplayStack().isEmpty()) {
+        if (hasGenericDisplayStack() || !getDisplayStack().isEmpty()) {
             return null;
         }
         return this.emptyTooltip.get();

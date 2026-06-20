@@ -63,4 +63,6 @@ dependencies {
     modImplementation "curse.maven:mouse-tweaks-unofficial-461660:5876158"
     // Connected Textures Mod
     modCompileOnly "curse.maven:ctm-267602:2915363"
+
+    modRuntimeOnly("curse.maven:spark-361579:3542217")
 }

@@ -1,13 +1,16 @@
 package ae2.container.implementations;
 
+import ae2.api.behaviors.GenericStackDisplayInventory;
 import ae2.api.inventories.BaseInternalInventory;
 import ae2.api.inventories.InternalInventory;
+import ae2.api.stacks.AEKey;
 import ae2.helpers.externalstorage.GenericStackInv;
 import ae2.tile.misc.TileCellWorkbench;
 import ae2.util.ConfigGuiInventory;
 import net.minecraft.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
-final class CellWorkbenchPageInventory extends BaseInternalInventory {
+final class CellWorkbenchPageInventory extends BaseInternalInventory implements GenericStackDisplayInventory {
     private final TileCellWorkbench host;
     private final int slotsPerPage;
     private int page;
@@ -41,6 +44,11 @@ final class CellWorkbenchPageInventory extends BaseInternalInventory {
         return slot >= 0 && slot < this.slotsPerPage && translatedSlot >= 0 && translatedSlot < getDelegate().size();
     }
 
+    private boolean isValidTranslatedSlot(InternalInventory delegate, int slot) {
+        int translatedSlot = translateSlot(slot);
+        return slot >= 0 && slot < this.slotsPerPage && translatedSlot >= 0 && translatedSlot < delegate.size();
+    }
+
     @Override
     public int size() {
         return this.slotsPerPage;
@@ -60,6 +68,33 @@ final class CellWorkbenchPageInventory extends BaseInternalInventory {
             return ItemStack.EMPTY;
         }
         return getDelegate().getStackInSlot(translateSlot(slotIndex));
+    }
+
+    @Override
+    public boolean hasGenericDisplayStack(int slot) {
+        InternalInventory delegate = getDelegate();
+        return isValidTranslatedSlot(delegate, slot)
+            && delegate instanceof GenericStackDisplayInventory displayInventory
+            && displayInventory.hasGenericDisplayStack(translateSlot(slot));
+    }
+
+    @Override
+    @Nullable
+    public AEKey getDisplayKey(int slot) {
+        InternalInventory delegate = getDelegate();
+        if (!isValidTranslatedSlot(delegate, slot) || !(delegate instanceof GenericStackDisplayInventory displayInventory)) {
+            return null;
+        }
+        return displayInventory.getDisplayKey(translateSlot(slot));
+    }
+
+    @Override
+    public long getDisplayAmount(int slot) {
+        InternalInventory delegate = getDelegate();
+        if (!isValidTranslatedSlot(delegate, slot) || !(delegate instanceof GenericStackDisplayInventory displayInventory)) {
+            return 0;
+        }
+        return displayInventory.getDisplayAmount(translateSlot(slot));
     }
 
     @Override
