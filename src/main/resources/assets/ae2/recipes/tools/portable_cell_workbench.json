@@ -1,0 +1,18 @@
+{
+  "type": "forge:ore_shapeless",
+  "ingredients": [
+    {
+      "item": "ae2:cell_workbench"
+    },
+    {
+      "item": "ae2:wireless_receiver"
+    },
+    {
+      "item": "ae2:energy_cell"
+    }
+  ],
+  "result": {
+    "item": "ae2:portable_cell_workbench",
+    "count": 1
+  }
+}

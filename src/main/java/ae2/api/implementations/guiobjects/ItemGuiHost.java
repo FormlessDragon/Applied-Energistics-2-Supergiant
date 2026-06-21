@@ -165,7 +165,7 @@ public class ItemGuiHost<T extends Item> implements IUpgradeableObject {
     }
 
     @Override
-    public final IUpgradeInventory getUpgrades() {
+    public IUpgradeInventory getUpgrades() {
         return upgrades;
     }
 

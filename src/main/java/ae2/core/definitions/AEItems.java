@@ -60,6 +60,7 @@ import ae2.items.tools.MemoryCardItem;
 import ae2.items.tools.NetworkAnalyserItem;
 import ae2.items.tools.NetworkToolItem;
 import ae2.items.tools.PatternModifierItem;
+import ae2.items.tools.PortableCellWorkbenchItem;
 import ae2.items.tools.TickAnalyserItem;
 import ae2.items.tools.fluix.FluixAxeItem;
 import ae2.items.tools.fluix.FluixHoeItem;
@@ -397,6 +398,8 @@ public final class AEItems {
         new MemoryCardItem());
     public static final ItemDefinition<AdvancedMemoryCardItem> ADVANCED_MEMORY_CARD = new ItemDefinition<>(
         AEItemIds.ADVANCED_MEMORY_CARD, new AdvancedMemoryCardItem());
+    public static final ItemDefinition<PortableCellWorkbenchItem> PORTABLE_CELL_WORKBENCH = new ItemDefinition<>(
+            AEItemIds.PORTABLE_CELL_WORKBENCH, new PortableCellWorkbenchItem());
     public static final ItemDefinition<DebugCardItem> DEBUG_CARD = new ItemDefinition<>(AEItemIds.DEBUG_CARD,
         new DebugCardItem(), DebugCreativeTab.INSTANCE);
     public static final ItemDefinition<EraserItem> DEBUG_ERASER = new ItemDefinition<>(AEItemIds.DEBUG_ERASER,
@@ -548,6 +551,7 @@ public final class AEItems {
         PATTERN_MODIFIER,
         MEMORY_CARD,
         ADVANCED_MEMORY_CARD,
+        PORTABLE_CELL_WORKBENCH,
         DEBUG_CARD,
         DEBUG_ERASER,
         DEBUG_METEORITE_PLACER,

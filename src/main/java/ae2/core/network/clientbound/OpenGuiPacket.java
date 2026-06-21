@@ -44,12 +44,12 @@ import ae2.core.AELog;
 import ae2.core.gui.locator.GuiHostLocator;
 import ae2.core.gui.locator.GuiHostLocators;
 import ae2.core.network.ClientboundPacket;
+import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.IOutputSideConfigHost;
 import ae2.helpers.IPriorityHost;
 import ae2.helpers.InterfaceLogicHost;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.text.TextComponents;
-import ae2.tile.misc.TileCellWorkbench;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import net.minecraft.client.Minecraft;
@@ -119,7 +119,7 @@ public class OpenGuiPacket extends ClientboundPacket {
             return WirelessTerminalGuiHost.class;
         }
         if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
-            return TileCellWorkbench.class;
+            return ICellWorkbenchHost.class;
         }
         return null;
     }
@@ -270,7 +270,7 @@ public class OpenGuiPacket extends ClientboundPacket {
         if (this.guiKey == GuiIds.GuiKey.WIRELESS_MAGNET && host instanceof WirelessTerminalGuiHost<?> wirelessTerminalGuiHost) {
             return new ContainerWirelessMagnet(inventory, wirelessTerminalGuiHost);
         }
-        if (this.guiKey == GuiIds.GuiKey.CELL_RESTRICTION && host instanceof TileCellWorkbench cellWorkbench) {
+        if (this.guiKey == GuiIds.GuiKey.CELL_RESTRICTION && host instanceof ICellWorkbenchHost cellWorkbench) {
             return new ContainerCellRestriction(inventory, cellWorkbench);
         }
         return null;

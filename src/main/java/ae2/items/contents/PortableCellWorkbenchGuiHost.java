@@ -1,40 +1,24 @@
-/*
- * This file is part of Applied Energistics 2.
- * Copyright (c) 2013 - 2014, AlgorithmX2, All rights reserved.
- *
- * Applied Energistics 2 is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Applied Energistics 2 is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Applied Energistics 2.  If not, see <http://www.gnu.org/licenses/lgpl>.
- */
-package ae2.tile.misc;
+package ae2.items.contents;
 
 import ae2.api.config.CopyMode;
 import ae2.api.config.Settings;
+import ae2.api.implementations.guiobjects.ItemGuiHost;
 import ae2.api.inventories.ISegmentedInventory;
 import ae2.api.inventories.InternalInventory;
-import ae2.api.stacks.GenericStack;
 import ae2.api.storage.cells.ICellWorkbenchItem;
 import ae2.api.upgrades.IUpgradeInventory;
 import ae2.api.upgrades.UpgradeInventories;
 import ae2.api.util.IConfigManager;
 import ae2.container.GuiIds;
 import ae2.container.ISubGui;
-import ae2.core.definitions.AEBlocks;
+import ae2.core.definitions.AEItems;
 import ae2.core.gui.GuiOpener;
+import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.externalstorage.GenericStackInv;
-import ae2.tile.AEBaseTile;
+import ae2.items.tools.PortableCellWorkbenchItem;
+import ae2.tile.misc.TileCellWorkbench;
 import ae2.util.ConfigInventory;
-import ae2.util.ConfigManager;
 import ae2.util.inv.AppEngInternalInventory;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -42,13 +26,14 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
-
-public class TileCellWorkbench extends AEBaseTile
+public class PortableCellWorkbenchGuiHost extends ItemGuiHost<PortableCellWorkbenchItem>
     implements ICellWorkbenchHost {
 
+    private static final String CELL_TAG = "cell";
+    private static final String CONFIG_TAG = "config";
+
     private final AppEngInternalInventory cell = new AppEngInternalInventory(this, 1);
-    private final ConfigManager manager = new ConfigManager(this::saveChanges);
+    private final IConfigManager manager;
     @Nullable
     private IUpgradeInventory cacheUpgrades;
     @Nullable
@@ -56,22 +41,14 @@ public class TileCellWorkbench extends AEBaseTile
     private boolean locked;
     private ConfigInventory config = createConfigInventory(63);
 
-    public TileCellWorkbench() {
-        this.manager.registerSetting(Settings.COPY_MODE, CopyMode.CLEAR_ON_REMOVE);
+    public PortableCellWorkbenchGuiHost(PortableCellWorkbenchItem item, EntityPlayer player,
+                                        ItemGuiHostLocator locator) {
+        super(item, player, locator);
         this.cell.setEnableClientEvents(true);
-    }
-
-    public static void copy(GenericStackInv from, GenericStackInv to) {
-        for (int i = 0; i < Math.min(from.size(), to.size()); ++i) {
-            GenericStack stack = from.getStack(i);
-            if (stack != null && !to.isAllowedIn(i, stack.what())) {
-                stack = null;
-            }
-            to.setStack(i, stack);
-        }
-        for (int i = from.size(); i < to.size(); i++) {
-            to.setStack(i, null);
-        }
+        this.manager = IConfigManager.builder(this::getItemStack)
+                                     .registerSetting(Settings.COPY_MODE, CopyMode.CLEAR_ON_REMOVE)
+                                     .build();
+        readFromStack();
     }
 
     private ConfigInventory createConfigInventory(int size) {
@@ -81,6 +58,7 @@ public class TileCellWorkbench extends AEBaseTile
     }
 
     @Nullable
+    @Override
     public ICellWorkbenchItem getCell() {
         ItemStack stack = this.cell.getStackInSlot(0);
         return !stack.isEmpty() && stack.getItem() instanceof ICellWorkbenchItem
@@ -88,29 +66,14 @@ public class TileCellWorkbench extends AEBaseTile
             : null;
     }
 
+    @Override
     public GenericStackInv getConfig() {
         ensureConfigSizeForCurrentCell();
         return this.config;
     }
 
-    @Override
-    public void saveAdditional(NBTTagCompound data) {
-        super.saveAdditional(data);
-        this.cell.writeToNBT(data, "cell");
-        this.config.writeToChildTag(data, "config");
-        this.manager.writeToNBT(data);
-    }
-
-    @Override
-    public void loadTag(NBTTagCompound data) {
-        super.loadTag(data);
-        this.cell.readFromNBT(data, "cell");
-        this.manager.readFromNBT(data);
-        ensureConfigSizeForCurrentCell();
-        this.config.readFromChildTag(data, "config");
-    }
-
     @Nullable
+    @Override
     public InternalInventory getSubInventory(ResourceLocation id) {
         if (ISegmentedInventory.CELLS.equals(id)) {
             return this.cell;
@@ -120,7 +83,7 @@ public class TileCellWorkbench extends AEBaseTile
 
     @Override
     public boolean isClientSide() {
-        return this.getWorld() != null && this.getWorld().isRemote;
+        return getPlayer().world.isRemote;
     }
 
     @Override
@@ -140,10 +103,10 @@ public class TileCellWorkbench extends AEBaseTile
                 this.resizeConfig(configInventory != null ? configInventory.size() : 63);
                 if (configInventory != null) {
                     if (!configInventory.isEmpty()) {
-                        copy(configInventory, this.config);
+                        TileCellWorkbench.copy(configInventory, this.config);
                     } else {
-                        copy(this.config, configInventory);
-                        copy(configInventory, this.config);
+                        TileCellWorkbench.copy(this.config, configInventory);
+                        TileCellWorkbench.copy(configInventory, this.config);
                     }
                 } else if (this.manager.getSetting(Settings.COPY_MODE) == CopyMode.CLEAR_ON_REMOVE) {
                     this.config.clear();
@@ -153,83 +116,6 @@ public class TileCellWorkbench extends AEBaseTile
                 this.locked = false;
             }
         }
-    }
-
-    private void configChanged() {
-        if (locked) {
-            return;
-        }
-
-        this.locked = true;
-        try {
-            ConfigInventory c = this.getCellConfigInventory();
-            if (c != null) {
-                copy(this.config, c);
-                copy(c, this.config);
-            }
-        } finally {
-            this.locked = false;
-        }
-    }
-
-    private void ensureConfigSizeForCurrentCell() {
-        ConfigInventory configInventory = this.getCellConfigInventory();
-        resizeConfig(configInventory != null ? configInventory.size() : 63);
-    }
-
-    private void resizeConfig(int size) {
-        size = Math.max(0, size);
-        if (this.config.size() == size) {
-            return;
-        }
-
-        ConfigInventory oldConfig = this.config;
-        this.config = createConfigInventory(size);
-        boolean wasLocked = this.locked;
-        this.locked = true;
-        try {
-            copy(oldConfig, this.config);
-        } finally {
-            this.locked = wasLocked;
-        }
-    }
-
-    @Nullable
-    private ConfigInventory getCellConfigInventory() {
-        if (this.cacheConfig == null) {
-            ICellWorkbenchItem cell = this.getCell();
-            if (cell == null) {
-                return null;
-            }
-
-            ItemStack stack = this.cell.getStackInSlot(0);
-            if (stack.isEmpty()) {
-                return null;
-            }
-
-            ConfigInventory inv = cell.getConfigInventory(stack);
-            if (inv == null) {
-                return null;
-            }
-
-            this.cacheConfig = inv;
-        }
-        return this.cacheConfig;
-    }
-
-    @Override
-    public void addAdditionalDrops(List<ItemStack> drops) {
-        super.addAdditionalDrops(drops);
-        ItemStack stack = this.cell.getStackInSlot(0);
-        if (!stack.isEmpty()) {
-            drops.add(stack.copy());
-        }
-    }
-
-    @Override
-    public void clearContent() {
-        super.clearContent();
-        this.cell.clear();
     }
 
     @Override
@@ -262,14 +148,101 @@ public class TileCellWorkbench extends AEBaseTile
 
     @Override
     public void returnToMainContainer(EntityPlayer player, ISubGui subGui) {
-        GuiOpener.openGui(player, GuiIds.GuiKey.CELL_WORKBENCH, this, true);
+        GuiOpener.openItemGui(player, GuiIds.GuiKey.PORTABLE_CELL_WORKBENCH, getLocator(), true);
     }
 
     @Override
     public ItemStack getMainContainerIcon() {
-        return AEBlocks.CELL_WORKBENCH.stack();
+        return AEItems.PORTABLE_CELL_WORKBENCH.stack();
     }
 
+    @Override
+    public void saveChanges() {
+        ItemStack stack = getItemStack();
+        if (stack.isEmpty()) {
+            return;
+        }
 
+        NBTTagCompound tag = stack.getTagCompound();
+        if (tag == null) {
+            tag = new NBTTagCompound();
+            stack.setTagCompound(tag);
+        }
+        this.cell.writeToNBT(tag, CELL_TAG);
+        this.config.writeToChildTag(tag, CONFIG_TAG);
+    }
 
+    private void readFromStack() {
+        NBTTagCompound tag = getItemStack().getTagCompound();
+        if (tag == null) {
+            return;
+        }
+
+        this.cell.readFromNBT(tag, CELL_TAG);
+        ensureConfigSizeForCurrentCell();
+        this.config.readFromChildTag(tag, CONFIG_TAG);
+    }
+
+    private void configChanged() {
+        if (locked) {
+            return;
+        }
+
+        this.locked = true;
+        try {
+            ConfigInventory c = this.getCellConfigInventory();
+            if (c != null) {
+                TileCellWorkbench.copy(this.config, c);
+                TileCellWorkbench.copy(c, this.config);
+            }
+            saveChanges();
+        } finally {
+            this.locked = false;
+        }
+    }
+
+    private void ensureConfigSizeForCurrentCell() {
+        ConfigInventory configInventory = this.getCellConfigInventory();
+        resizeConfig(configInventory != null ? configInventory.size() : 63);
+    }
+
+    private void resizeConfig(int size) {
+        size = Math.max(0, size);
+        if (this.config.size() == size) {
+            return;
+        }
+
+        ConfigInventory oldConfig = this.config;
+        this.config = createConfigInventory(size);
+        boolean wasLocked = this.locked;
+        this.locked = true;
+        try {
+            TileCellWorkbench.copy(oldConfig, this.config);
+        } finally {
+            this.locked = wasLocked;
+        }
+    }
+
+    @Nullable
+    private ConfigInventory getCellConfigInventory() {
+        if (this.cacheConfig == null) {
+            ICellWorkbenchItem cell = this.getCell();
+            if (cell == null) {
+                return null;
+            }
+
+            ItemStack stack = this.cell.getStackInSlot(0);
+            if (stack.isEmpty()) {
+                return null;
+            }
+
+            ConfigInventory inv = cell.getConfigInventory(stack);
+            if (inv == null) {
+                return null;
+            }
+
+            this.cacheConfig = inv;
+        }
+        return this.cacheConfig;
+    }
 }

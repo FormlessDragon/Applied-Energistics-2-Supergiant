@@ -36,8 +36,8 @@ import ae2.container.slot.CellPartitionSlot;
 import ae2.container.slot.IPartitionSlotHost;
 import ae2.container.slot.OptionalRestrictedInputSlot;
 import ae2.container.slot.RestrictedInputSlot;
+import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.externalstorage.GenericStackInv;
-import ae2.tile.misc.TileCellWorkbench;
 import ae2.util.EnumCycler;
 import ae2.util.inv.SupplierInternalInventory;
 import com.google.common.collect.Iterators;
@@ -51,7 +51,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 
-public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkbench> implements IPartitionSlotHost {
+public class ContainerCellWorkbench extends UpgradeableContainer<ICellWorkbenchHost> implements IPartitionSlotHost {
     private static final int CONFIG_SLOTS_PER_PAGE = 63;
 
     public static final String ACTION_NEXT_COPYMODE = "nextCopyMode";
@@ -74,7 +74,7 @@ public class ContainerCellWorkbench extends UpgradeableContainer<TileCellWorkben
 
     private CellWorkbenchPageInventory configPageInventory;
 
-    public ContainerCellWorkbench(InventoryPlayer ip, TileCellWorkbench host) {
+    public ContainerCellWorkbench(InventoryPlayer ip, ICellWorkbenchHost host) {
         super(ip, host);
 
         registerClientAction(ACTION_NEXT_COPYMODE, this::nextWorkBenchCopyMode);

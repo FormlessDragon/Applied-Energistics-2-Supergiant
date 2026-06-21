@@ -7,7 +7,7 @@ import ae2.container.AEBaseContainer;
 import ae2.container.ISubGui;
 import ae2.container.guisync.GuiSync;
 import ae2.core.gui.locator.GuiHostLocator;
-import ae2.tile.misc.TileCellWorkbench;
+import ae2.helpers.ICellWorkbenchHost;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.ItemStack;
 
@@ -17,7 +17,7 @@ public class ContainerCellRestriction extends AEBaseContainer implements ISubGui
 
     private static final String ACTION_SET_RESTRICTION = "setRestriction";
     private static final String ACTION_RELEASE_RESTRICTION = "releaseRestriction";
-    private final TileCellWorkbench host;
+    private final ICellWorkbenchHost host;
     @GuiSync(2)
     public long maxBytes;
     @GuiSync(3)
@@ -32,7 +32,7 @@ public class ContainerCellRestriction extends AEBaseContainer implements ISubGui
     public int restrictionTypes = -1;
     private ItemStack cachedCellStack = ItemStack.EMPTY;
 
-    public ContainerCellRestriction(InventoryPlayer ip, TileCellWorkbench host) {
+    public ContainerCellRestriction(InventoryPlayer ip, ICellWorkbenchHost host) {
         super(ip, host);
         this.host = host;
 
