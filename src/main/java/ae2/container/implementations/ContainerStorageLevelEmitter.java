@@ -23,6 +23,7 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.util.IConfigManager;
 import ae2.container.SlotSemantics;
+import ae2.container.guisync.GuiSync;
 import ae2.container.slot.FakeSlot;
 import ae2.core.definitions.AEItems;
 import ae2.parts.automation.StorageLevelEmitterPart;
@@ -33,10 +34,12 @@ public class ContainerStorageLevelEmitter extends UpgradeableContainer<StorageLe
 
     private static final String ACTION_SET_REPORTING_VALUE = "setReportingValue";
 
+    @GuiSync(7)
     private long currentValue;
 
     public ContainerStorageLevelEmitter(InventoryPlayer ip, StorageLevelEmitterPart te) {
         super(ip, te);
+        this.currentValue = te.getReportingValue();
 
         registerClientAction(ACTION_SET_REPORTING_VALUE, Long.class, this::setValue);
     }
@@ -71,6 +74,7 @@ public class ContainerStorageLevelEmitter extends UpgradeableContainer<StorageLe
                 sendClientAction(ACTION_SET_REPORTING_VALUE, initialValue);
             }
         } else {
+            this.currentValue = initialValue;
             getHost().setReportingValue(initialValue);
         }
     }

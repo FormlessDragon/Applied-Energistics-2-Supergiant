@@ -5,23 +5,20 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonSyntaxException;
 
 import net.minecraft.util.JsonUtils;
-import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidRegistry;
 import org.jetbrains.annotations.Nullable;
 
 public class TransformCircumstance {
     private static final TransformCircumstance EXPLOSION = new TransformCircumstance("explosion", null);
-    private static final TransformCircumstance WATER = new TransformCircumstance("fluid",
-        new ResourceLocation("minecraft", "water"));
-    private static final ResourceLocation WATER_TAG = new ResourceLocation("minecraft", "water");
+    private static final TransformCircumstance WATER = new TransformCircumstance("fluid", "water");
 
     private final String type;
-    private final ResourceLocation fluidId;
+    private final String fluidName;
 
-    private TransformCircumstance(String type, ResourceLocation fluidId) {
+    private TransformCircumstance(String type, String fluidName) {
         this.type = type;
-        this.fluidId = fluidId;
+        this.fluidName = fluidName;
     }
 
     public static TransformCircumstance explosion() {
@@ -32,8 +29,8 @@ public class TransformCircumstance {
         return WATER;
     }
 
-    public static TransformCircumstance fluid(ResourceLocation fluidId) {
-        return new TransformCircumstance("fluid", fluidId);
+    public static TransformCircumstance fluid(String fluidName) {
+        return new TransformCircumstance("fluid", validateFluidName(fluidName));
     }
 
     public static TransformCircumstance fromJson(JsonObject json) {
@@ -47,23 +44,28 @@ public class TransformCircumstance {
         }
         if ("fluid".equals(type)) {
             if (json.has("fluid")) {
-                return fluid(readResourceLocation(json, "fluid"));
+                return fluid(readFluidName(json, "fluid"));
             }
             if (json.has("tag")) {
-                return fluid(readResourceLocation(json, "tag"));
+                return fluid(readFluidName(json, "tag"));
             }
             return water();
         }
         throw new JsonParseException("Unknown transform circumstance: " + type);
     }
 
-    private static ResourceLocation readResourceLocation(JsonObject json, String key) {
-        String id = JsonUtils.getString(json, key);
-        try {
-            return new ResourceLocation(id);
-        } catch (RuntimeException e) {
-            throw new JsonSyntaxException("Invalid transform circumstance " + key + ": " + id, e);
+    private static String readFluidName(JsonObject json, String key) {
+        return validateFluidName(JsonUtils.getString(json, key));
+    }
+
+    private static String validateFluidName(String fluidName) {
+        if (fluidName.isEmpty()) {
+            throw new JsonSyntaxException("Invalid transform circumstance fluid: " + fluidName);
         }
+        if (FluidRegistry.getFluid(fluidName) == null) {
+            throw new JsonSyntaxException("Unknown transform circumstance fluid: " + fluidName);
+        }
+        return fluidName;
     }
 
     public boolean isExplosion() {
@@ -78,23 +80,14 @@ public class TransformCircumstance {
         return this.isFluid()
             && fluid != null
             && fluid.getName() != null
-            && new ResourceLocation(fluid.getName()).equals(this.fluidId);
+            && fluid.getName().equals(this.fluidName);
     }
 
     public @Nullable Fluid getFluid() {
-        return this.fluidId != null ? FluidRegistry.getFluid(this.fluidId.toString()) : null;
+        return this.fluidName != null ? FluidRegistry.getFluid(this.fluidName) : null;
     }
 
     public @Nullable Fluid getFluidForRendering() {
-        Fluid fluid = getFluid();
-        if (fluid != null) {
-            return fluid;
-        }
-
-        if (WATER_TAG.equals(this.fluidId)) {
-            return FluidRegistry.WATER;
-        }
-
-        return null;
+        return getFluid();
     }
 }

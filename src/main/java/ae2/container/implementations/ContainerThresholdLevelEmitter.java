@@ -23,6 +23,8 @@ public class ContainerThresholdLevelEmitter extends UpgradeableContainer<Thresho
 
     public ContainerThresholdLevelEmitter(InventoryPlayer ip, ThresholdLevelEmitterPart host) {
         super(ip, host);
+        this.upperValue = host.getUpperValue();
+        this.lowerValue = host.getLowerValue();
         registerClientAction(ACTION_SET_UPPER_VALUE, Long.class, this::setUpperValue);
         registerClientAction(ACTION_SET_LOWER_VALUE, Long.class, this::setLowerValue);
     }
@@ -73,6 +75,7 @@ public class ContainerThresholdLevelEmitter extends UpgradeableContainer<Thresho
                 sendClientAction(ACTION_SET_UPPER_VALUE, value);
             }
         } else {
+            this.upperValue = value;
             getHost().setUpperValue(value);
         }
     }
@@ -88,6 +91,7 @@ public class ContainerThresholdLevelEmitter extends UpgradeableContainer<Thresho
                 sendClientAction(ACTION_SET_LOWER_VALUE, value);
             }
         } else {
+            this.lowerValue = value;
             getHost().setLowerValue(value);
         }
     }

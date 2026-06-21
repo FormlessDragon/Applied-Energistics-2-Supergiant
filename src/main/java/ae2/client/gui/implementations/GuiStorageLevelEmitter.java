@@ -54,7 +54,8 @@ public class GuiStorageLevelEmitter extends GuiUpgradeable<ContainerStorageLevel
         this.level.setTextFieldStyle(style.getWidget("levelInput"));
         this.level.setLongValue(this.container.getCurrentValue());
         this.level.setOnChange(this::saveReportingValue);
-        this.level.setOnConfirm(this::onClose);
+        this.level.setOnConfirm(this::saveReportingValue);
+        this.level.setFocused(false);
     }
 
     @Override
@@ -62,6 +63,7 @@ public class GuiStorageLevelEmitter extends GuiUpgradeable<ContainerStorageLevel
         super.updateBeforeRender();
 
         this.level.setType(NumberEntryType.of(container.getConfiguredFilter()));
+        syncLevelFromContainer();
 
         this.fuzzyMode.set(container.getFuzzyMode());
         this.fuzzyMode.setVisibility(container.supportsFuzzySearch());
@@ -77,9 +79,11 @@ public class GuiStorageLevelEmitter extends GuiUpgradeable<ContainerStorageLevel
         this.craftingMode.setVisibility(!notCraftingMode);
     }
 
-    private void onClose() {
-        if (this.mc.player != null) {
-            this.mc.player.closeScreen();
+    private void syncLevelFromContainer() {
+        long currentValue = this.container.getCurrentValue();
+        var levelValue = this.level.getLongValue();
+        if (!this.level.isFocused() && (levelValue.isEmpty() || levelValue.getAsLong() != currentValue)) {
+            this.level.setLongValue(currentValue);
         }
     }
 

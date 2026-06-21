@@ -44,7 +44,7 @@ public class GuiCraftAmount extends AEBaseGui<ContainerCraftAmount> {
     private boolean amountInitialized;
     private boolean shiftDown;
 
-    public GuiCraftAmount(ContainerCraftAmount container, InventoryPlayer playerInventory, ITextComponent title,
+    public GuiCraftAmount(ContainerCraftAmount container, InventoryPlayer playerInventory,
                           GuiStyle style) {
         super(container, playerInventory, style);
 
@@ -60,7 +60,6 @@ public class GuiCraftAmount extends AEBaseGui<ContainerCraftAmount> {
         this.amountToCraft.setLongValue(1);
         this.amountToCraft.setTextFieldStyle(style.getWidget("amountToCraftInput"));
         this.amountToCraft.setPreviewFieldStyle(style.getWidget("amountToCraftPreview"));
-        this.amountToCraft.setHideValidationIcon(true);
         this.amountToCraft.setOnConfirm(this::confirm);
     }
 

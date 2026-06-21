@@ -45,20 +45,25 @@ public class GuiEnergyLevelEmitter extends GuiUpgradeable<ContainerEnergyLevelEm
         this.level.setTextFieldStyle(style.getWidget("levelInput"));
         this.level.setLongValue(container.getReportingValue());
         this.level.setOnChange(this::saveReportingValue);
-        this.level.setOnConfirm(this::onClose);
+        this.level.setOnConfirm(this::saveReportingValue);
+        this.level.setFocused(false);
     }
 
     @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
 
+        syncLevelFromContainer();
+
         this.redstoneMode.enabled = true;
         this.redstoneMode.set(container.getRedStoneMode());
     }
 
-    private void onClose() {
-        if (this.mc.player != null) {
-            this.mc.player.closeScreen();
+    private void syncLevelFromContainer() {
+        long reportingValue = this.container.getReportingValue();
+        var currentValue = this.level.getLongValue();
+        if (!this.level.isFocused() && (currentValue.isEmpty() || currentValue.getAsLong() != reportingValue)) {
+            this.level.setLongValue(reportingValue);
         }
     }
 

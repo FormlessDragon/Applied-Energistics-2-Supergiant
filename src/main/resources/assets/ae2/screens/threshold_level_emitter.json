@@ -47,9 +47,9 @@
   "widgets": {
     "upperLevel": {
       "left": 20,
-      "top": 17,
-      "width": 138,
-      "height": 62
+      "top": 34,
+      "width": 83,
+      "height": 12
     },
     "upperLevelInput": {
       "left": 20,
@@ -59,9 +59,9 @@
     },
     "lowerLevel": {
       "left": 20,
-      "top": 17,
-      "width": 138,
-      "height": 62
+      "top": 69,
+      "width": 83,
+      "height": 12
     },
     "lowerLevelInput": {
       "left": 20,

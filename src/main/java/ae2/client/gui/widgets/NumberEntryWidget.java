@@ -88,12 +88,11 @@ public class NumberEntryWidget implements ICompositeWidget {
     private List<GuiButton> buttons = ObjectLists.emptyList();
     private long minValue;
     private long maxValue = Long.MAX_VALUE;
-    private ValidationIcon validationIcon;
 
     private Runnable onChange;
     private Runnable onConfirm;
 
-    private boolean hideValidationIcon;
+    private boolean showIncrementButtons = true;
 
     private Rectangle bounds = new Rectangle(0, 0, 0, 0);
 
@@ -139,8 +138,9 @@ public class NumberEntryWidget implements ICompositeWidget {
             }
         });
         this.textField.setOnConfirm(() -> {
-            if (this.onConfirm != null && getCachedValidation().value().externalValue().isPresent()) {
+            if (this.focused && this.onConfirm != null && getCachedValidation().value().externalValue().isPresent()) {
                 this.onConfirm.run();
+                setFocused(false);
             }
         });
 
@@ -290,6 +290,22 @@ public class NumberEntryWidget implements ICompositeWidget {
         List<GuiButton> buttons = new ObjectArrayList<>(9);
         List<AE2Button> amountButtons = new ObjectArrayList<>(8);
 
+        this.currentScreenOrigin = Point.fromTopLeft(bounds);
+        setTextFieldBounds(this.textFieldBounds);
+        this.textField.setFocused(this.focused);
+        if (this.previewFieldConfigured) {
+            setPreviewFieldBounds(this.previewFieldBounds);
+        }
+
+        if (!this.showIncrementButtons) {
+            this.buttons = ObjectLists.emptyList();
+            this.amountButtons = ObjectLists.emptyList();
+            this.ceilButtonBounds = Rects.ZERO;
+            this.floorButtonBounds = Rects.ZERO;
+            this.validate();
+            return;
+        }
+
         amountButtons.add(new AE2Button(left, top, 22, 20, makeButtonLabel(PLUS, getCurrentButtonValues()[0]),
             () -> applyButton(0, true)));
         amountButtons.add(new AE2Button(left + 25, top, 26, 20, makeButtonLabel(PLUS, getCurrentButtonValues()[1]),
@@ -301,13 +317,6 @@ public class NumberEntryWidget implements ICompositeWidget {
 
         buttons.addAll(amountButtons);
         amountButtons.forEach(addWidget);
-
-        this.currentScreenOrigin = Point.fromTopLeft(bounds);
-        setTextFieldBounds(this.textFieldBounds);
-        this.textField.setFocused(this.focused);
-        if (this.previewFieldConfigured) {
-            setPreviewFieldBounds(this.previewFieldBounds);
-        }
 
         amountButtons.add(new AE2Button(left, top + 42, 22, 20, makeButtonLabel(MINUS, getCurrentButtonValues()[0]),
             () -> applyButton(0, false)));
@@ -322,12 +331,6 @@ public class NumberEntryWidget implements ICompositeWidget {
 
         buttons.addAll(amountButtons.subList(4, amountButtons.size()));
 
-        if (!hideValidationIcon) {
-            this.validationIcon = new ValidationIcon();
-            this.validationIcon.x = left + 104;
-            this.validationIcon.y = top + 27;
-            buttons.add(this.validationIcon);
-        }
         this.ceilButtonBounds = new Rectangle(this.bounds.x + 124, this.bounds.y, 14, 20);
         this.floorButtonBounds = new Rectangle(this.bounds.x + 124, this.bounds.y + 42, 14, 20);
         var ceilButton = new AE2Button(left + 124, top, 14, 20, CEIL, () -> roundValue(RoundingMode.CEILING));
@@ -344,6 +347,10 @@ public class NumberEntryWidget implements ICompositeWidget {
 
     @Override
     public void updateBeforeRender() {
+        if (!this.showIncrementButtons) {
+            return;
+        }
+
         ButtonMode mode = getButtonMode();
         long[] values = getValues(mode);
         if (mode == this.lastButtonMode && Arrays.equals(values, this.lastButtonValues)) {
@@ -516,10 +523,6 @@ public class NumberEntryWidget implements ICompositeWidget {
         this.textField.setTextColor(valid ? normalTextColor : errorTextColor);
         this.textField.setTooltipMessage(tooltip);
 
-        if (this.validationIcon != null) {
-            this.validationIcon.setValid(valid);
-            this.validationIcon.setTooltip(tooltip);
-        }
     }
 
     private CachedValidation getCachedValidation() {
@@ -550,16 +553,15 @@ public class NumberEntryWidget implements ICompositeWidget {
             var internalValue = possibleValue.internalValue().get();
             if (possibleValue.notAnInteger()) {
                 validationErrors.add(GuiText.NumberNonInteger.text());
-            } else if (possibleValue.externalValue().isEmpty()) {
-                validationErrors.add(GuiText.InvalidNumber.text());
+            } else if (internalValue.compareTo(minInternalValue) < 0) {
+                var formatted = decimalFormat.format(minInternalValue);
+                validationErrors.add(GuiText.NumberLessThanMinValue.text(formatted));
+            } else if (internalValue.compareTo(maxInternalValue) > 0) {
+                var formatted = decimalFormat.format(maxInternalValue);
+                validationErrors.add(GuiText.NumberGreaterThanMaxValue.text(formatted));
             } else {
-                var value = possibleValue.externalValue().getAsLong();
-                if (value < minValue) {
-                    var formatted = decimalFormat.format(minInternalValue);
-                    validationErrors.add(GuiText.NumberLessThanMinValue.text(formatted));
-                } else if (value > maxValue) {
-                    var formatted = decimalFormat.format(maxInternalValue);
-                    validationErrors.add(GuiText.NumberGreaterThanMaxValue.text(formatted));
+                if (possibleValue.externalValue().isEmpty()) {
+                    validationErrors.add(GuiText.InvalidNumber.text());
                 } else if (!isNumber(text)) {
                     infoMessages.add(new TextComponentString("= " + decimalFormat.format(internalValue)));
                 }
@@ -606,8 +608,8 @@ public class NumberEntryWidget implements ICompositeWidget {
         };
     }
 
-    public void setHideValidationIcon(boolean hideValidationIcon) {
-        this.hideValidationIcon = hideValidationIcon;
+    public void setShowIncrementButtons(boolean showIncrementButtons) {
+        this.showIncrementButtons = showIncrementButtons;
     }
 
     public NumberEntryType getType() {
@@ -694,6 +696,7 @@ public class NumberEntryWidget implements ICompositeWidget {
         }
 
         if (!this.textFieldBounds.contains(mousePos.x(), mousePos.y())) {
+            setFocused(false);
             return false;
         }
 
@@ -701,22 +704,62 @@ public class NumberEntryWidget implements ICompositeWidget {
             this.currentScreenOrigin.x() + mousePos.x(),
             this.currentScreenOrigin.y() + mousePos.y(),
             button);
-        this.focused = this.textField.isFocused();
+        setFocused(this.textField.isFocused());
         return clicked;
     }
 
     @Override
     public boolean wantsAllMouseDownEvents() {
-        return this.previewFieldConfigured;
+        return true;
+    }
+
+    @Override
+    public boolean hitTest(Point mousePos) {
+        if (this.textFieldBounds.contains(mousePos.x(), mousePos.y())) {
+            return true;
+        }
+
+        if (this.previewFieldConfigured && this.previewFieldBounds.contains(mousePos.x(), mousePos.y())) {
+            return true;
+        }
+
+        if (!this.showIncrementButtons) {
+            return false;
+        }
+
+        if (this.ceilButtonBounds.contains(mousePos.x(), mousePos.y())
+            || this.floorButtonBounds.contains(mousePos.x(), mousePos.y())) {
+            return true;
+        }
+
+        for (AE2Button button : this.amountButtons) {
+            int screenMouseX = this.currentScreenOrigin.x() + mousePos.x();
+            int screenMouseY = this.currentScreenOrigin.y() + mousePos.y();
+            if (screenMouseX >= button.x
+                && screenMouseY >= button.y
+                && screenMouseX < button.x + button.width
+                && screenMouseY < button.y + button.height) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     @Override
     public boolean onKeyTyped(char typedChar, int keyCode) {
+        if (!this.focused) {
+            return false;
+        }
         return this.textField.textboxKeyTyped(typedChar, keyCode);
     }
 
     @Override
     public boolean onMouseWheel(Point mousePos, double delta) {
+        if (!this.showIncrementButtons) {
+            return false;
+        }
+
         if (textFieldBounds.contains(mousePos.x(), mousePos.y())) {
             if (getValueInternal().isPresent()) {
                 if (delta < 0) {

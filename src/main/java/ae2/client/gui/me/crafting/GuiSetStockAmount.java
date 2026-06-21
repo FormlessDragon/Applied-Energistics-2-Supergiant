@@ -10,14 +10,13 @@ import ae2.client.gui.widgets.NumberEntryWidget;
 import ae2.container.implementations.ContainerSetStockAmount;
 import ae2.core.localization.GuiText;
 import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.util.text.ITextComponent;
 
 public class GuiSetStockAmount extends AEBaseGui<ContainerSetStockAmount> {
 
     private final NumberEntryWidget amount;
     private boolean amountInitialized;
 
-    public GuiSetStockAmount(ContainerSetStockAmount container, InventoryPlayer playerInventory, ITextComponent title,
+    public GuiSetStockAmount(ContainerSetStockAmount container, InventoryPlayer playerInventory,
                              GuiStyle style) {
         super(container, playerInventory, style);
 
@@ -30,7 +29,6 @@ public class GuiSetStockAmount extends AEBaseGui<ContainerSetStockAmount> {
         this.amount.setTextFieldStyle(style.getWidget("amountToStockInput"));
         this.amount.setPreviewFieldStyle(style.getWidget("amountToStockPreview"));
         this.amount.setMinValue(0);
-        this.amount.setHideValidationIcon(true);
         this.amount.setOnConfirm(this::confirm);
     }
 

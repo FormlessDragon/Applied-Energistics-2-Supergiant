@@ -1,8 +1,11 @@
 package ae2.init;
 
+import ae2.api.util.AEColor;
 import ae2.core.Tags;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.definitions.AEItems;
+import ae2.core.definitions.AEParts;
+import ae2.core.definitions.ColoredItemDefinition;
 import ae2.init.client.InitModelRegistration;
 import ae2.init.internal.InitStorageCells;
 import ae2.init.worldgen.InitBiomes;
@@ -63,6 +66,7 @@ public final class RegistryHandler {
         OreDictionary.registerOre("itemQuartzKnife", AEItems.CERTUS_QUARTZ_KNIFE.stack());
         OreDictionary.registerOre("itemQuartzKnife", AEItems.NETHER_QUARTZ_KNIFE.stack());
         OreDictionary.registerOre("enderPearl", new ItemStack(Items.ENDER_PEARL));
+        registerCableOres();
         registerVanillaDyes();
     }
 
@@ -96,6 +100,27 @@ public final class RegistryHandler {
         OreDictionary.registerOre("dyeMagenta", new ItemStack(Items.DYE, 1, 13));
         OreDictionary.registerOre("dyeOrange", new ItemStack(Items.DYE, 1, 14));
         OreDictionary.registerOre("dyeWhite", new ItemStack(Items.DYE, 1, 15));
+    }
+
+    static void registerCableOres() {
+        registerCableOre("cableGlass", AEParts.GLASS_CABLE);
+        registerCableOre("cableCovered", AEParts.COVERED_CABLE);
+        registerCableOre("cableSmart", AEParts.SMART_CABLE);
+        registerCableOre("cableDenseCovered", AEParts.COVERED_DENSE_CABLE);
+        registerCableOre("cableDenseSmart", AEParts.SMART_DENSE_CABLE);
+    }
+
+    private static void registerCableOre(String oreName, ColoredItemDefinition<?> cableDefinition) {
+        for (AEColor color : AEColor.values()) {
+            ItemStack stack = cableDefinition.stack(color);
+            if (stack.isEmpty()) {
+                throw new IllegalStateException("Missing cable item for ore dictionary entry " + oreName
+                    + " color " + color.name());
+            }
+
+            OreDictionary.registerOre(oreName, stack);
+            OreDictionary.registerOre("cableME", stack);
+        }
     }
 
     @SideOnly(Side.CLIENT)

@@ -57,7 +57,6 @@ public class GuiSetProcessingPatternAmount extends AEBaseGui<AEBaseContainer> {
         this.amount.setTextFieldStyle(currentStyle.getWidget("amountToStockInput"));
         this.amount.setPreviewFieldStyle(currentStyle.getWidget("amountToStockPreview"));
         this.amount.setMinValue(0);
-        this.amount.setHideValidationIcon(true);
         this.amount.setOnConfirm(this::confirm);
 
         this.displaySlot = getContainer().addClientSideSlot(new ClientDisplaySlot(currentStack),

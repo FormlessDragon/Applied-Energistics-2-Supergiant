@@ -12,7 +12,6 @@ import crafttweaker.api.item.IItemStack;
 import crafttweaker.api.minecraft.CraftTweakerMC;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.item.crafting.Ingredient;
-import net.minecraft.util.ResourceLocation;
 import stanhebben.zenscript.annotations.Optional;
 import stanhebben.zenscript.annotations.ZenClass;
 import stanhebben.zenscript.annotations.ZenMethod;
@@ -72,6 +71,6 @@ public final class Transform {
         if ("explosion".equalsIgnoreCase(value)) {
             return TransformCircumstance.explosion();
         }
-        return TransformCircumstance.fluid(new ResourceLocation(value));
+        return TransformCircumstance.fluid(value);
     }
 }

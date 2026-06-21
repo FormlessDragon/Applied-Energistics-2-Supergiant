@@ -20,6 +20,7 @@ package ae2.container.implementations;
 
 import ae2.api.config.Settings;
 import ae2.api.util.IConfigManager;
+import ae2.container.guisync.GuiSync;
 import ae2.parts.automation.EnergyLevelEmitterPart;
 import net.minecraft.entity.player.InventoryPlayer;
 
@@ -27,10 +28,12 @@ public class ContainerEnergyLevelEmitter extends UpgradeableContainer<EnergyLeve
 
     private static final String ACTION_SET_REPORTING_VALUE = "setReportingValue";
 
+    @GuiSync(7)
     private long reportingValue;
 
     public ContainerEnergyLevelEmitter(InventoryPlayer ip, EnergyLevelEmitterPart host) {
         super(ip, host);
+        this.reportingValue = host.getReportingValue();
 
         registerClientAction(ACTION_SET_REPORTING_VALUE, Long.class, this::setReportingValue);
     }
@@ -58,6 +61,7 @@ public class ContainerEnergyLevelEmitter extends UpgradeableContainer<EnergyLeve
                 sendClientAction(ACTION_SET_REPORTING_VALUE, reportingValue);
             }
         } else {
+            this.reportingValue = reportingValue;
             getHost().setReportingValue(reportingValue);
         }
     }

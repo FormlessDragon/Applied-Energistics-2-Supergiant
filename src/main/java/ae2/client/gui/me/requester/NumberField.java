@@ -110,21 +110,21 @@ public class NumberField extends ConfirmableTextField {
 
         var possibleValue = getValueInternal();
         if (possibleValue.isPresent()) {
-            var externalValue = convertToExternalValue(possibleValue.get());
-            if (type.amountPerUnit() == 1 && possibleValue.get().scale() > 0) {
+            var internalValue = possibleValue.get();
+            if (type.amountPerUnit() == 1 && internalValue.scale() > 0) {
                 validationErrors.add(GuiText.NumberNonInteger.text());
-            } else if (externalValue.isEmpty()) {
-                validationErrors.add(GuiText.InvalidNumber.text());
+            } else if (internalValue.compareTo(convertToInternalValue(minValue)) < 0) {
+                var formatted = decimalFormat.format(convertToInternalValue(minValue));
+                validationErrors.add(GuiText.NumberLessThanMinValue.text(formatted));
+            } else if (internalValue.compareTo(convertToInternalValue(MAX_VALUE)) > 0) {
+                var formatted = decimalFormat.format(convertToInternalValue(MAX_VALUE));
+                validationErrors.add(GuiText.NumberGreaterThanMaxValue.text(formatted));
             } else {
-                var value = externalValue.getAsLong();
-                if (value < minValue) {
-                    var formatted = decimalFormat.format(convertToInternalValue(minValue));
-                    validationErrors.add(GuiText.NumberLessThanMinValue.text(formatted));
-                } else if (value > MAX_VALUE) {
-                    var formatted = decimalFormat.format(convertToInternalValue(MAX_VALUE));
-                    validationErrors.add(GuiText.NumberGreaterThanMaxValue.text(formatted));
+                var externalValue = convertToExternalValue(internalValue);
+                if (externalValue.isEmpty()) {
+                    validationErrors.add(GuiText.InvalidNumber.text());
                 } else if (!isNumber()) {
-                    infoMessages.add(new TextComponentString("= " + decimalFormat.format(possibleValue.get())));
+                    infoMessages.add(new TextComponentString("= " + decimalFormat.format(internalValue)));
                 }
             }
         } else {

@@ -280,7 +280,7 @@ public class OpenGuiPacket extends ClientboundPacket {
     @Nullable
     private GuiScreen createScreen(AEBaseContainer container, InventoryPlayer inventory) {
         if (this.guiKey == GuiIds.GuiKey.CRAFT_AMOUNT) {
-            return new GuiCraftAmount((ContainerCraftAmount) container, inventory, this.guiTitle,
+            return new GuiCraftAmount((ContainerCraftAmount) container, inventory,
                 GuiStyleManager.loadStyleDoc("/screens/craft_amount.json"));
         }
         if (this.guiKey == GuiIds.GuiKey.CRAFT_CONFIRM) {
@@ -296,7 +296,7 @@ public class OpenGuiPacket extends ClientboundPacket {
                 this.guiTitle != null ? this.guiTitle : container.getGuiTitle());
         }
         if (this.guiKey == GuiIds.GuiKey.SET_STOCK_AMOUNT) {
-            return new GuiSetStockAmount((ContainerSetStockAmount) container, inventory, this.guiTitle,
+            return new GuiSetStockAmount((ContainerSetStockAmount) container, inventory,
                 GuiStyleManager.loadStyleDoc("/screens/set_stock_amount.json"));
         }
         if (this.guiKey == GuiIds.GuiKey.PRIORITY) {

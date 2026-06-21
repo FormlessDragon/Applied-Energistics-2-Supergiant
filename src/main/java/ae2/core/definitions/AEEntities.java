@@ -20,7 +20,6 @@ package ae2.core.definitions;
 
 import ae2.core.AppEng;
 import ae2.core.AppEngBase;
-import ae2.entity.EntityChargedQuartz;
 import ae2.entity.EntitySingularity;
 import ae2.entity.TinyTNTPrimedEntity;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -45,9 +44,6 @@ public final class AEEntities {
         ENTITY_ENGLISH_NAMES.put("tiny_tnt_primed", "Tiny TNT Primed");
         EntityRegistry.registerModEntity(new ResourceLocation(AppEng.MOD_ID, "tiny_tnt_primed"), TinyTNTPrimedEntity.class, "tiny_tnt_primed", 0,
             AppEngBase.INSTANCE, 16, 4, true);
-        ENTITY_ENGLISH_NAMES.put("charged_quartz", "Charged Quartz");
-        EntityRegistry.registerModEntity(new ResourceLocation(AppEng.MOD_ID, "charged_quartz"),
-            EntityChargedQuartz.class, "Charged Quartz", 1, AppEngBase.INSTANCE, 16, 4, true);
         ENTITY_ENGLISH_NAMES.put("singularity", "Singularity");
         EntityRegistry.registerModEntity(new ResourceLocation(AppEng.MOD_ID, "singularity"),
             EntitySingularity.class, "Singularity", 2, AppEngBase.INSTANCE, 16, 4, true);

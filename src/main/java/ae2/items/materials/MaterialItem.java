@@ -1,6 +1,5 @@
 package ae2.items.materials;
 
-import ae2.entity.EntityChargedQuartz;
 import ae2.entity.EntitySingularity;
 import ae2.items.AEBaseItem;
 import net.minecraft.entity.Entity;
@@ -15,15 +14,13 @@ public class MaterialItem extends AEBaseItem {
 
     @Override
     public boolean hasCustomEntity(ItemStack stack) {
-        return EntityChargedQuartz.applies(stack) || EntitySingularity.applies(stack);
+        return EntitySingularity.applies(stack);
     }
 
     @Override
     public Entity createEntity(World world, Entity location, ItemStack itemstack) {
         Entity entity;
-        if (EntityChargedQuartz.applies(itemstack)) {
-            entity = new EntityChargedQuartz(world, location.posX, location.posY, location.posZ, itemstack);
-        } else if (EntitySingularity.applies(itemstack)) {
+        if (EntitySingularity.applies(itemstack)) {
             entity = new EntitySingularity(world, location.posX, location.posY, location.posZ, itemstack);
         } else {
             return null;
