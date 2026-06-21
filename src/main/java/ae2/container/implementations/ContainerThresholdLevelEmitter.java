@@ -51,7 +51,6 @@ public class ContainerThresholdLevelEmitter extends UpgradeableContainer<Thresho
             this.setFuzzyMode(cm.getSetting(Settings.FUZZY_MODE));
         }
         this.setRedStoneMode(cm.getSetting(Settings.REDSTONE_EMITTER));
-        this.setCraftingMode(cm.getSetting(Settings.CRAFT_VIA_REDSTONE));
     }
 
     public boolean supportsFuzzySearch() {

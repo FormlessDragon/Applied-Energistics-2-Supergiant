@@ -70,7 +70,6 @@ public final class InitUpgrades {
         Upgrades.add(AEItems.FUZZY_CARD.item(), AEParts.LEVEL_EMITTER.item(), 1);
         Upgrades.add(AEItems.CRAFTING_CARD.item(), AEParts.LEVEL_EMITTER.item(), 1);
         Upgrades.add(AEItems.FUZZY_CARD.item(), AEParts.THRESHOLD_LEVEL_EMITTER.item(), 1);
-        Upgrades.add(AEItems.CRAFTING_CARD.item(), AEParts.THRESHOLD_LEVEL_EMITTER.item(), 1);
 
         Upgrades.add(AEItems.FUZZY_CARD.item(), AEParts.IMPORT_BUS.item(), 1, itemIoBusGroup);
         Upgrades.add(AEItems.REDSTONE_CARD.item(), AEParts.IMPORT_BUS.item(), 1, itemIoBusGroup);

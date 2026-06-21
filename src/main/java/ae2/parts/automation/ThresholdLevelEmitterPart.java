@@ -3,17 +3,12 @@ package ae2.parts.automation;
 import ae2.api.config.FuzzyMode;
 import ae2.api.config.RedstoneMode;
 import ae2.api.config.Settings;
-import ae2.api.config.YesNo;
-import ae2.api.crafting.IPatternDetails;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IStackWatcher;
-import ae2.api.networking.crafting.ICraftingProvider;
-import ae2.api.networking.crafting.ICraftingWatcherNode;
 import ae2.api.networking.storage.IStorageWatcherNode;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
 import ae2.api.stacks.AEKey;
-import ae2.api.stacks.KeyCounter;
 import ae2.api.util.IConfigManagerBuilder;
 import ae2.container.GuiIds;
 import ae2.core.AppEng;
@@ -33,11 +28,8 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
-import java.util.Set;
-
 public class ThresholdLevelEmitterPart extends AbstractLevelEmitterPart
-    implements IConfigInvHost, ICraftingProvider {
+    implements IConfigInvHost {
 
     @PartModels
     public static final ResourceLocation MODEL_BASE_OFF = AppEng.makeId("part/threshold_level_emitter_base_off");
@@ -56,7 +48,6 @@ public class ThresholdLevelEmitterPart extends AbstractLevelEmitterPart
     public static final PartModel MODEL_ON_HAS_CHANNEL = new PartModel(MODEL_BASE_ON,
         StorageLevelEmitterPart.MODEL_STATUS_HAS_CHANNEL);
     private IStackWatcher storageWatcher;
-    private IStackWatcher craftingWatcher;
     private long lastUpdateTick = -1;
     private final ConfigInventory config = ConfigInventory.configTypes(1)
                                                           .changeListener(this::configureWatchers)
@@ -87,23 +78,6 @@ public class ThresholdLevelEmitterPart extends AbstractLevelEmitterPart
                 }
             }
         });
-        getMainNode().addService(ICraftingWatcherNode.class, new ICraftingWatcherNode() {
-            @Override
-            public void updateWatcher(IStackWatcher newWatcher) {
-                craftingWatcher = newWatcher;
-                configureWatchers();
-            }
-
-            @Override
-            public void onRequestChange(AEKey what) {
-                updateState();
-            }
-
-            @Override
-            public void onCraftableChange(AEKey what) {
-            }
-        });
-        getMainNode().addService(ICraftingProvider.class, this);
     }
 
     static boolean shouldEmit(long value, long lowerValue, long upperValue, boolean previousState) {
@@ -122,7 +96,6 @@ public class ThresholdLevelEmitterPart extends AbstractLevelEmitterPart
     @Override
     protected void registerSettings(IConfigManagerBuilder builder) {
         super.registerSettings(builder);
-        builder.registerSetting(Settings.CRAFT_VIA_REDSTONE, YesNo.NO);
         builder.registerSetting(Settings.FUZZY_MODE, FuzzyMode.IGNORE_ALL);
     }
 
@@ -143,52 +116,12 @@ public class ThresholdLevelEmitterPart extends AbstractLevelEmitterPart
 
     @Override
     protected boolean hasDirectOutput() {
-        return isUpgradedWith(AEItems.CRAFTING_CARD);
+        return false;
     }
 
     @Override
     protected boolean getDirectOutput() {
-        var grid = getMainNode().getGrid();
-        if (grid == null) {
-            return false;
-        }
-        var key = getConfiguredKey();
-        return key == null ? grid.getCraftingService().isRequestingAny() : grid.getCraftingService().isRequesting(key);
-    }
-
-    @Override
-    public List<IPatternDetails> getAvailablePatterns() {
-        return List.of();
-    }
-
-    @Override
-    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder, int multiplier) {
-        return false;
-    }
-
-    @Override
-    public boolean canMergePatternPush(IPatternDetails patternDetails) {
-        return false;
-    }
-
-    @Override
-    public int getMaxPatternPushMultiplier(IPatternDetails patternDetails, int maxMultiplier) {
-        return 0;
-    }
-
-    @Override
-    public boolean isBusy() {
-        return true;
-    }
-
-    @Override
-    public Set<AEKey> getEmitableItems() {
-        if (isUpgradedWith(AEItems.CRAFTING_CARD)
-            && getConfigManager().getSetting(Settings.CRAFT_VIA_REDSTONE) == YesNo.YES
-            && getConfiguredKey() != null) {
-            return Set.of(getConfiguredKey());
-        }
-        return Set.of();
+        throw new UnsupportedOperationException("Threshold level emitters do not support direct output");
     }
 
     @Override
@@ -202,28 +135,16 @@ public class ThresholdLevelEmitterPart extends AbstractLevelEmitterPart
         if (this.storageWatcher != null) {
             this.storageWatcher.reset();
         }
-        if (this.craftingWatcher != null) {
-            this.craftingWatcher.reset();
-        }
-        ICraftingProvider.requestUpdate(getMainNode());
-        if (isUpgradedWith(AEItems.CRAFTING_CARD)) {
-            if (this.craftingWatcher != null) {
-                if (key == null) {
-                    this.craftingWatcher.setWatchAll(true);
-                } else {
-                    this.craftingWatcher.add(key);
-                }
+
+        if (this.storageWatcher != null) {
+            if (isUpgradedWith(AEItems.FUZZY_CARD) || key == null) {
+                this.storageWatcher.setWatchAll(true);
+            } else {
+                this.storageWatcher.add(key);
             }
-        } else {
-            if (this.storageWatcher != null) {
-                if (isUpgradedWith(AEItems.FUZZY_CARD) || key == null) {
-                    this.storageWatcher.setWatchAll(true);
-                } else {
-                    this.storageWatcher.add(key);
-                }
-            }
-            getMainNode().ifPresent(this::updateReportingValue);
         }
+
+        getMainNode().ifPresent(this::updateReportingValue);
         updateState();
     }
 
