@@ -126,6 +126,7 @@ import ae2.helpers.WirelessCraftingTerminalGuiHost;
 import ae2.helpers.WirelessPatternAccessTerminalGuiHost;
 import ae2.helpers.WirelessPatternEncodingTerminalGuiHost;
 import ae2.helpers.WirelessRequesterTerminalGuiHost;
+import ae2.helpers.ICellWorkbenchHost;
 import ae2.items.contents.AdvancedMemoryCardGuiHost;
 import ae2.items.contents.ConfigModifierGuiHost;
 import ae2.items.contents.NetworkToolGuiHost;
@@ -208,6 +209,7 @@ public class AEGuiHandler implements IGuiHandler {
             || bridge == GuiIds.GuiKey.ADVANCED_MEMORY_CARD
             || bridge == GuiIds.GuiKey.NETWORK_STATUS
             || bridge == GuiIds.GuiKey.PORTABLE_ITEM_CELL
+            || bridge == GuiIds.GuiKey.PORTABLE_CELL_WORKBENCH
             || bridge == GuiIds.GuiKey.VOID_CELL
             || bridge == GuiIds.GuiKey.PORTABLE_FLUID_CELL
             || bridge == GuiIds.GuiKey.WIRELESS_TERMINAL
@@ -595,6 +597,9 @@ public class AEGuiHandler implements IGuiHandler {
             }
             case PORTABLE_ITEM_CELL -> {
                 return createPortableItemCellContainer(player, x, ID);
+            }
+            case PORTABLE_CELL_WORKBENCH -> {
+                return createPortableCellWorkbenchContainer(player, x, ID);
             }
             case VOID_CELL -> {
                 return createVoidCellContainer(player, x, ID);
@@ -1148,6 +1153,14 @@ public class AEGuiHandler implements IGuiHandler {
                 }
                 return null;
             }
+            case PORTABLE_CELL_WORKBENCH -> {
+                ContainerCellWorkbench container = createPortableCellWorkbenchContainer(player, x, ID);
+                if (container != null) {
+                    return new GuiCellWorkbench(container, player.inventory, null,
+                        GuiStyleManager.loadStyleDoc("/screens/portable_cell_workbench.json"));
+                }
+                return null;
+            }
             case VOID_CELL -> {
                 ContainerVoidCell container = createVoidCellContainer(player, x, ID);
                 if (container != null) {
@@ -1295,6 +1308,17 @@ public class AEGuiHandler implements IGuiHandler {
         }
 
         return initContainer(new ContainerVoidCell(player.inventory, voidCellHost), locator, guiId);
+    }
+
+    private @Nullable ContainerCellWorkbench createPortableCellWorkbenchContainer(EntityPlayer player, int slot,
+                                                                                  int guiId) {
+        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+        ItemGuiHost<?> host = createItemGuiHost(player, locator, GuiIds.GuiKey.PORTABLE_CELL_WORKBENCH);
+        if (!(host instanceof ICellWorkbenchHost cellWorkbenchHost)) {
+            return null;
+        }
+
+        return initContainer(new ContainerCellWorkbench(player.inventory, cellWorkbenchHost), locator, guiId);
     }
 
     private @Nullable ContainerMEStorage createPortableFluidCellContainer(EntityPlayer player, int slot, int guiId) {

@@ -24,13 +24,13 @@ import ae2.core.network.InitNetwork;
 import ae2.core.network.ServerboundPacket;
 import ae2.core.network.clientbound.OpenGuiPacket;
 import ae2.core.network.clientbound.RestorePreviousGuiPacket;
+import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.IOutputSideConfigHost;
 import ae2.helpers.IPriorityHost;
 import ae2.helpers.InterfaceLogicHost;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.parts.AEBasePart;
 import ae2.tile.AEBaseTile;
-import ae2.tile.misc.TileCellWorkbench;
 import ae2.util.EmptyArrays;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -188,7 +188,7 @@ public class SwitchGuisPacket extends ServerboundPacket {
             return WirelessTerminalGuiHost.class;
         }
         if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
-            return TileCellWorkbench.class;
+            return ICellWorkbenchHost.class;
         }
         return null;
     }
@@ -216,7 +216,7 @@ public class SwitchGuisPacket extends ServerboundPacket {
         if (guiKey == GuiIds.GuiKey.WIRELESS_MAGNET && host instanceof WirelessTerminalGuiHost<?> wirelessTerminalHost) {
             return new ContainerWirelessMagnet(inventory, wirelessTerminalHost);
         }
-        if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION && host instanceof TileCellWorkbench cellWorkbench) {
+        if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION && host instanceof ICellWorkbenchHost cellWorkbench) {
             return new ContainerCellRestriction(inventory, cellWorkbench);
         }
         return null;

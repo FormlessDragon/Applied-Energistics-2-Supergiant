@@ -4,20 +4,20 @@ import ae2.api.behaviors.GenericStackDisplayInventory;
 import ae2.api.inventories.BaseInternalInventory;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.stacks.AEKey;
+import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.externalstorage.GenericStackInv;
-import ae2.tile.misc.TileCellWorkbench;
 import ae2.util.ConfigGuiInventory;
 import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 final class CellWorkbenchPageInventory extends BaseInternalInventory implements GenericStackDisplayInventory {
-    private final TileCellWorkbench host;
+    private final ICellWorkbenchHost host;
     private final int slotsPerPage;
     private int page;
     private GenericStackInv cachedConfig;
     private ConfigGuiInventory cachedGuiWrapper;
 
-    CellWorkbenchPageInventory(TileCellWorkbench host, int slotsPerPage) {
+    CellWorkbenchPageInventory(ICellWorkbenchHost host, int slotsPerPage) {
         this.host = host;
         this.slotsPerPage = slotsPerPage;
     }

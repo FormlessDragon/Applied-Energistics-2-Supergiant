@@ -1,0 +1,48 @@
+{
+  "$schema": "schema.json",
+  "includes": [
+    "common/common.json",
+    "common/player_inventory.json",
+    "common/toolbox.json"
+  ],
+  "background": {
+    "texture": "guis/cellworkbench.png",
+    "srcRect": [0, 0, 176, 253]
+  },
+  "slots": {
+    "STORAGE_CELL": {
+      "left": 152,
+      "top": 8
+    },
+    "CONFIG": {
+      "left": 8,
+      "top": 29,
+      "grid": "BREAK_AFTER_9COLS"
+    }
+  },
+  "widgets": {
+    "previousPage": {
+      "left": 116,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "nextPage": {
+      "left": 134,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    }
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2.PortableCellWorkbench"
+      },
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    }
+  }
+}
