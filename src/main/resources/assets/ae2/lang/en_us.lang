@@ -396,6 +396,7 @@ gui.ae2.CraftingLockIsLocked=Crafting is locked
 gui.ae2.CraftingLockIsUnlocked=Crafting is unlocked
 gui.ae2.CraftingPattern=Crafting Patterns
 gui.ae2.CraftingPlan=Plan - %s
+gui.ae2.CraftingPlanRequests=Craft Steps: %s
 gui.ae2.CraftingStatus=Crafting Status
 gui.ae2.CraftingTerminal=Crafting Terminal
 gui.ae2.Crafts=Crafts

@@ -396,6 +396,7 @@ gui.ae2.CraftingLockIsLocked=合成已锁定
 gui.ae2.CraftingLockIsUnlocked=合成已解锁
 gui.ae2.CraftingPattern=合成样板
 gui.ae2.CraftingPlan=合成计划 - %s
+gui.ae2.CraftingPlanRequests=合成轮数：%s
 gui.ae2.CraftingStatus=合成状态
 gui.ae2.CraftingTerminal=合成终端
 gui.ae2.Crafts=合成

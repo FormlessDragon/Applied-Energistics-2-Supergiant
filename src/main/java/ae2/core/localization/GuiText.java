@@ -78,6 +78,7 @@ public enum GuiText implements LocalizationEnum {
     CraftingCPUs,
     CraftingPattern,
     ProcessingPattern,
+    CraftingPlanRequests,
     CraftErrorIncompletePlan,
     CraftErrorNoCpuFound,
     CraftErrorNoSuitableCpu,

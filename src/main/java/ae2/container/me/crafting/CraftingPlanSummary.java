@@ -38,7 +38,7 @@ import java.util.Objects;
 
 public record CraftingPlanSummary(long usedBytes, boolean simulation, List<CraftingPlanSummaryEntry> entries) {
     private static final int MAX_ENTRY_COUNT = 4096;
-    private static final int MIN_ENTRY_BYTES = 7;
+    private static final int MIN_ENTRY_BYTES = 8;
 
     public static CraftingPlanSummary read(PacketBuffer buffer) {
         long bytesUsed = buffer.readVarLong();
@@ -85,6 +85,7 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
                 var stats = mapping(plan, out.what());
                 stats.crafting = LongMath.saturatedAdd(stats.crafting,
                     LongMath.saturatedMultiply(out.amount(), entry.getLongValue()));
+                stats.requests = LongMath.saturatedAdd(stats.requests, entry.getLongValue());
             }
         }
 
@@ -95,6 +96,7 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
             long missingAmount = out.getValue().missing;
             long storedAmount = out.getValue().stored;
             long craftAmount = out.getValue().crafting;
+            long requestCount = out.getValue().requests;
             long intermediateCraftAmount = 0;
             long inventoryAmount = cachedInventory.get(out.getKey());
             boolean finalOutputEntry = out.getKey().equals(finalOutput);
@@ -103,7 +105,7 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
                 intermediateCraftAmount = job.intermediateFinalOutputAmount();
             }
             entries.add(new CraftingPlanSummaryEntry(out.getKey(), missingAmount, storedAmount, craftAmount,
-                intermediateCraftAmount, inventoryAmount, finalOutputEntry));
+                requestCount, intermediateCraftAmount, inventoryAmount, finalOutputEntry));
         }
 
         Collections.sort(entries);
@@ -151,5 +153,6 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
         private long stored;
         private long missing;
         private long crafting;
+        private long requests;
     }
 }

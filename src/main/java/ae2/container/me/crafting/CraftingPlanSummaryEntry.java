@@ -26,8 +26,9 @@ import java.util.Comparator;
 import java.util.Objects;
 
 public record CraftingPlanSummaryEntry(AEKey what, long missingAmount, long storedAmount,
-                                       long craftAmount, long intermediateCraftAmount, long inventoryAmount,
-                                       boolean finalOutput) implements Comparable<CraftingPlanSummaryEntry> {
+                                       long craftAmount, long requestCount, long intermediateCraftAmount,
+                                       long inventoryAmount, boolean finalOutput)
+        implements Comparable<CraftingPlanSummaryEntry> {
     private static final Comparator<CraftingPlanSummaryEntry> COMPARATOR = Comparator
         .comparing(CraftingPlanSummaryEntry::missingAmount)
         .thenComparing(CraftingPlanSummaryEntry::craftAmount)
@@ -43,16 +44,17 @@ public record CraftingPlanSummaryEntry(AEKey what, long missingAmount, long stor
         long missingAmount = buffer.readVarLong();
         long storedAmount = buffer.readVarLong();
         long craftAmount = buffer.readVarLong();
+        long requestCount = buffer.readVarLong();
         long intermediateCraftAmount = buffer.readVarLong();
         long inventoryAmount = buffer.readVarLong();
-        if (missingAmount < 0 || storedAmount < 0 || craftAmount < 0 || intermediateCraftAmount < 0
-            || inventoryAmount < 0) {
+        if (missingAmount < 0 || storedAmount < 0 || craftAmount < 0 || requestCount < 0
+            || intermediateCraftAmount < 0 || inventoryAmount < 0) {
             throw new IllegalArgumentException("Crafting plan summary entry contains negative amounts");
         }
 
         boolean finalOutput = buffer.readBoolean();
-        return new CraftingPlanSummaryEntry(what, missingAmount, storedAmount, craftAmount, intermediateCraftAmount,
-            inventoryAmount, finalOutput);
+        return new CraftingPlanSummaryEntry(what, missingAmount, storedAmount, craftAmount, requestCount,
+            intermediateCraftAmount, inventoryAmount, finalOutput);
     }
 
     @Override
@@ -66,6 +68,7 @@ public record CraftingPlanSummaryEntry(AEKey what, long missingAmount, long stor
         buffer.writeVarLong(this.missingAmount);
         buffer.writeVarLong(this.storedAmount);
         buffer.writeVarLong(this.craftAmount);
+        buffer.writeVarLong(this.requestCount);
         buffer.writeVarLong(this.intermediateCraftAmount);
         buffer.writeVarLong(this.inventoryAmount);
         buffer.writeBoolean(this.finalOutput);
