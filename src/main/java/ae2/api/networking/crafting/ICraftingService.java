@@ -149,6 +149,26 @@ public interface ICraftingService extends IGridService {
     }
 
     /**
+     * Submit the job to the Crafting system for processing.
+     *
+     * @param skipMerge if true, a player request will start on a free CPU instead of merging into a matching running
+     *                  job.
+     */
+    default ICraftingSubmitResult submitJob(ICraftingPlan job, @Nullable ICraftingRequester requestingMachine,
+                                            @Nullable ICraftingCPU target,
+                                            boolean prioritizePower, IActionSource src, boolean forceStart,
+                                            boolean skipMerge) {
+        return submitJob(job, requestingMachine, target, prioritizePower, src, forceStart);
+    }
+
+    /**
+     * @return true when this player-facing plan can be merged into a running CPU job on this grid.
+     */
+    default boolean canMergeJob(ICraftingPlan job, IActionSource src) {
+        return false;
+    }
+
+    /**
      * @return set of all the crafting cpus on the grid
      */
     ImmutableSet<ICraftingCPU> getCpus();
