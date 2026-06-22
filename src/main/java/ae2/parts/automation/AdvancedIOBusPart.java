@@ -39,11 +39,6 @@ public class AdvancedIOBusPart extends StockExportBusPart implements KeyTypeSele
     }
 
     @Override
-    protected int getUpgradeSlots() {
-        return 8;
-    }
-
-    @Override
     protected void registerSettings(IConfigManagerBuilder builder) {
         super.registerSettings(builder);
         builder.registerSetting(Settings.REGULATE_STOCK, YesNo.YES);

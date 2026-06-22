@@ -108,7 +108,7 @@ public abstract class IOBusPart extends UpgradeablePart implements IGridTickable
 
     @Override
     protected int getUpgradeSlots() {
-        return 5;
+        return 6;
     }
 
     @Override

@@ -27,11 +27,6 @@ public class StockExportBusPart extends ExportBusPart {
     }
 
     @Override
-    protected int getUpgradeSlots() {
-        return 6;
-    }
-
-    @Override
     public ConfigInventory getConfig() {
         if (this.stackConfig == null) {
             this.stackConfig = ConfigInventory.configStacks(63)

@@ -246,7 +246,7 @@ public class StorageBusPart extends UpgradeablePart
 
     @Override
     protected int getUpgradeSlots() {
-        return 5;
+        return 6;
     }
 
     @Override
