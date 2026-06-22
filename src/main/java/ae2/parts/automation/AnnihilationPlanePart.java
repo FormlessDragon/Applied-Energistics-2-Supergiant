@@ -42,11 +42,12 @@ import ae2.api.util.AECableType;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigManagerBuilder;
 import ae2.container.GuiIds;
+import ae2.container.ISubGui;
 import ae2.core.AEConfig;
 import ae2.core.definitions.AEItems;
 import ae2.core.gui.GuiOpener;
-import ae2.core.settings.TickRates;
 import ae2.helpers.IConfigInvHost;
+import ae2.helpers.IWorkIntervalHost;
 import ae2.items.parts.PartModels;
 import ae2.me.helpers.MachineSource;
 import ae2.util.ConfigInventory;
@@ -76,10 +77,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-public class AnnihilationPlanePart extends UpgradeablePart implements IGridTickable, IConfigInvHost {
+public class AnnihilationPlanePart extends UpgradeablePart implements IGridTickable, IConfigInvHost, IWorkIntervalHost {
 
     private static final String VANILLA_ENCHANTMENTS_TAG = "ench";
     private static final String PART_ENCHANTMENTS_TAG = "enchantments";
+    private static final String WORK_INTERVAL_TAG = "workInterval";
+    private static final long DEFAULT_WORK_INTERVAL = 2L;
     private static final PlaneModels MODELS = new PlaneModels("part/annihilation_plane",
         "part/annihilation_plane_on");
     private final IActionSource actionSource = new MachineSource(this);
@@ -95,6 +98,9 @@ public class AnnihilationPlanePart extends UpgradeablePart implements IGridTicka
     private ContinuousGeneration continuousGeneration;
     private int continuousGenerationTicks;
     private IncludeExclude listMode = IncludeExclude.WHITELIST;
+    private long workInterval = DEFAULT_WORK_INTERVAL;
+    private long pendingWorkTicks;
+
     public AnnihilationPlanePart(IPartItem<?> partItem) {
         super(partItem);
         getMainNode().addService(IGridTickable.class, this);
@@ -179,6 +185,8 @@ public class AnnihilationPlanePart extends UpgradeablePart implements IGridTicka
 
         this.enchantments = readEnchantmentsFromTag(data);
         this.config.readFromChildTag(data, "config");
+        this.workInterval = Math.max(1L, data.hasKey(WORK_INTERVAL_TAG) ? data.getLong(WORK_INTERVAL_TAG) : DEFAULT_WORK_INTERVAL);
+        this.pendingWorkTicks = 0;
         this.updateFilter();
     }
 
@@ -205,6 +213,7 @@ public class AnnihilationPlanePart extends UpgradeablePart implements IGridTicka
             data.setTag(PART_ENCHANTMENTS_TAG, writeEnchantments(this.enchantments));
         }
         this.config.writeToChildTag(data, "config");
+        data.setLong(WORK_INTERVAL_TAG, this.workInterval);
     }
 
     @Override
@@ -240,6 +249,33 @@ public class AnnihilationPlanePart extends UpgradeablePart implements IGridTicka
             return true;
         }
         return this.onUseWithoutItem(player, pos);
+    }
+
+    @Override
+    public void returnToMainContainer(EntityPlayer player, ISubGui subGui) {
+        GuiOpener.openPartGui(player, GuiIds.GuiKey.ANNIHILATION_PLANE, this, true);
+    }
+
+    @Override
+    public ItemStack getMainContainerIcon() {
+        return getPartItem().asItemStack();
+    }
+
+    @Override
+    public long getWorkInterval() {
+        return this.workInterval;
+    }
+
+    @Override
+    public void setWorkInterval(long newValue) {
+        long clamped = Math.max(1L, newValue);
+        if (this.workInterval == clamped) {
+            return;
+        }
+        this.workInterval = clamped;
+        this.pendingWorkTicks = 0;
+        this.getHost().markForSave();
+        this.refresh();
     }
 
     protected List<PickupStrategy> getPickupStrategies() {
@@ -361,7 +397,12 @@ public class AnnihilationPlanePart extends UpgradeablePart implements IGridTicka
     @Override
     public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
         if (!isActive()) {
+            this.pendingWorkTicks = 0;
             return TickRateModulation.SLEEP;
+        }
+
+        if (!shouldRunWork(ticksSinceLastCall)) {
+            return TickRateModulation.IDLE;
         }
 
         IGrid grid = node.grid();
@@ -411,7 +452,16 @@ public class AnnihilationPlanePart extends UpgradeablePart implements IGridTicka
 
     @Override
     public TickingRequest getTickingRequest(IGridNode node) {
-        return new TickingRequest(TickRates.AnnihilationPlane, false);
+        return new TickingRequest(1, 1, !isActive());
+    }
+
+    private boolean shouldRunWork(int ticksSinceLastCall) {
+        this.pendingWorkTicks += ticksSinceLastCall;
+        if (this.pendingWorkTicks < this.workInterval) {
+            return false;
+        }
+        this.pendingWorkTicks %= this.workInterval;
+        return true;
     }
 
     private long insertIntoGrid(AEKey what, long amount, Actionable mode) {

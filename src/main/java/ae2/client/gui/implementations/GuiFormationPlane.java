@@ -18,14 +18,19 @@
 
 package ae2.client.gui.implementations;
 
+import ae2.api.config.ActionItems;
 import ae2.api.config.FormationPlaneMode;
 import ae2.api.config.FuzzyMode;
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
 import ae2.client.gui.style.GuiStyle;
+import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
+import ae2.container.GuiIds;
 import ae2.container.implementations.ContainerFormationPlane;
+import ae2.core.network.InitNetwork;
+import ae2.core.network.serverbound.SwitchGuisPacket;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 
@@ -34,6 +39,7 @@ public class GuiFormationPlane extends GuiUpgradeable<ContainerFormationPlane> {
     private final SettingToggleButton<FuzzyMode> fuzzyMode;
     private final SettingToggleButton<FormationPlaneMode> formationPlaneMode;
     private final SettingToggleButton<YesNo> placeMode;
+    private final ActionButton workIntervalButton;
 
     public GuiFormationPlane(ContainerFormationPlane container, InventoryPlayer playerInventory, ITextComponent title,
                              GuiStyle style) {
@@ -43,6 +49,8 @@ public class GuiFormationPlane extends GuiUpgradeable<ContainerFormationPlane> {
             FormationPlaneMode.PASSIVE));
         this.placeMode = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.PLACE_BLOCK, YesNo.YES));
         this.fuzzyMode = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.FUZZY_MODE, FuzzyMode.IGNORE_ALL));
+        this.workIntervalButton = addToLeftToolbar(new ActionButton(ActionItems.WORK_INTERVAL,
+            this::openWorkInterval));
 
         widgets.addOpenPriorityButton();
     }
@@ -53,8 +61,18 @@ public class GuiFormationPlane extends GuiUpgradeable<ContainerFormationPlane> {
 
         this.fuzzyMode.set(container.getFuzzyMode());
         this.fuzzyMode.setVisibility(container.supportsFuzzyMode());
-        this.formationPlaneMode.set(container.getFormationPlaneMode());
+        FormationPlaneMode formationMode = container.getFormationPlaneMode();
+        if (formationMode != null) {
+            this.formationPlaneMode.set(formationMode);
+        } else {
+            formationMode = FormationPlaneMode.PASSIVE;
+        }
         this.placeMode.set(container.getPlaceMode());
+        this.workIntervalButton.setVisibility(formationMode == FormationPlaneMode.ACTIVE);
+    }
+
+    private void openWorkInterval() {
+        InitNetwork.sendToServer(SwitchGuisPacket.openSubGui(GuiIds.GuiKey.WORK_INTERVAL));
     }
 }
 

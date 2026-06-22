@@ -24,6 +24,7 @@ import ae2.client.gui.PreviousExternalGui;
 import ae2.client.gui.implementations.GuiCellRestriction;
 import ae2.client.gui.implementations.GuiOutputSides;
 import ae2.client.gui.implementations.GuiPriority;
+import ae2.client.gui.implementations.GuiWorkInterval;
 import ae2.client.gui.implementations.GuiWirelessMagnet;
 import ae2.client.gui.me.crafting.GuiCraftAmount;
 import ae2.client.gui.me.crafting.GuiCraftConfirm;
@@ -39,6 +40,7 @@ import ae2.container.implementations.ContainerCraftingStatus;
 import ae2.container.implementations.ContainerOutputSides;
 import ae2.container.implementations.ContainerPriority;
 import ae2.container.implementations.ContainerSetStockAmount;
+import ae2.container.implementations.ContainerWorkInterval;
 import ae2.container.implementations.ContainerWirelessMagnet;
 import ae2.core.AELog;
 import ae2.core.gui.locator.GuiHostLocator;
@@ -47,6 +49,7 @@ import ae2.core.network.ClientboundPacket;
 import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.IOutputSideConfigHost;
 import ae2.helpers.IPriorityHost;
+import ae2.helpers.IWorkIntervalHost;
 import ae2.helpers.InterfaceLogicHost;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.text.TextComponents;
@@ -114,6 +117,9 @@ public class OpenGuiPacket extends ClientboundPacket {
         }
         if (guiKey == GuiIds.GuiKey.PRIORITY) {
             return IPriorityHost.class;
+        }
+        if (guiKey == GuiIds.GuiKey.WORK_INTERVAL) {
+            return IWorkIntervalHost.class;
         }
         if (guiKey == GuiIds.GuiKey.WIRELESS_MAGNET) {
             return WirelessTerminalGuiHost.class;
@@ -267,6 +273,9 @@ public class OpenGuiPacket extends ClientboundPacket {
             }
             return priorityContainer;
         }
+        if (this.guiKey == GuiIds.GuiKey.WORK_INTERVAL && host instanceof IWorkIntervalHost workIntervalHost) {
+            return new ContainerWorkInterval(inventory, workIntervalHost);
+        }
         if (this.guiKey == GuiIds.GuiKey.WIRELESS_MAGNET && host instanceof WirelessTerminalGuiHost<?> wirelessTerminalGuiHost) {
             return new ContainerWirelessMagnet(inventory, wirelessTerminalGuiHost);
         }
@@ -292,8 +301,8 @@ public class OpenGuiPacket extends ClientboundPacket {
                 GuiStyleManager.loadStyleDoc("/screens/crafting_status.json"));
         }
         if (this.guiKey == GuiIds.GuiKey.OUTPUT_SIDES) {
-            return new GuiOutputSides((ContainerOutputSides) container, inventory,
-                this.guiTitle != null ? this.guiTitle : container.getGuiTitle());
+            return new GuiOutputSides((ContainerOutputSides) container, inventory
+            );
         }
         if (this.guiKey == GuiIds.GuiKey.SET_STOCK_AMOUNT) {
             return new GuiSetStockAmount((ContainerSetStockAmount) container, inventory,
@@ -301,6 +310,10 @@ public class OpenGuiPacket extends ClientboundPacket {
         }
         if (this.guiKey == GuiIds.GuiKey.PRIORITY) {
             return new GuiPriority((ContainerPriority) container, inventory,
+                this.guiTitle != null ? this.guiTitle : container.getGuiTitle());
+        }
+        if (this.guiKey == GuiIds.GuiKey.WORK_INTERVAL) {
+            return new GuiWorkInterval((ContainerWorkInterval) container, inventory,
                 this.guiTitle != null ? this.guiTitle : container.getGuiTitle());
         }
         if (this.guiKey == GuiIds.GuiKey.WIRELESS_MAGNET) {

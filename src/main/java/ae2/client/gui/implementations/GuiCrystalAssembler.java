@@ -1,17 +1,16 @@
 package ae2.client.gui.implementations;
 
+import ae2.api.config.ActionItems;
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
 import ae2.api.stacks.GenericStack;
-import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
-import ae2.client.gui.widgets.IconButton;
+import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.ProgressBar;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.container.GuiIds;
 import ae2.container.implementations.ContainerCrystalAssembler;
-import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.SwitchGuisPacket;
@@ -23,12 +22,10 @@ import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 
-import java.util.List;
-
 public class GuiCrystalAssembler extends GuiUpgradeable<ContainerCrystalAssembler> {
     private final ProgressBar progressBar;
     private final SettingToggleButton<YesNo> autoExportBtn;
-    private final IconButton outputSidesBtn;
+    private final ActionButton outputSidesBtn;
     private String lastProgressText = "";
 
     public GuiCrystalAssembler(ContainerCrystalAssembler container, InventoryPlayer playerInventory,
@@ -37,23 +34,7 @@ public class GuiCrystalAssembler extends GuiUpgradeable<ContainerCrystalAssemble
         this.progressBar = new ProgressBar(this.container, style.getImage("progressBar"), ProgressBar.Direction.VERTICAL);
         this.widgets.add("progressBar", this.progressBar);
         this.autoExportBtn = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.AUTO_EXPORT, YesNo.NO));
-        this.outputSidesBtn = addToLeftToolbar(new IconButton(this::openOutputSides) {
-            {
-                setMessage(ButtonToolTips.OutputSideConfig.text());
-            }
-
-            @Override
-            protected Icon getIcon() {
-                return Icon.OUTPUT_SIDE_CONFIG;
-            }
-
-            @Override
-            public List<ITextComponent> getTooltipMessage() {
-                return List.of(
-                    ButtonToolTips.OutputSideConfig.text(),
-                    ButtonToolTips.OutputSideConfigHint.text());
-            }
-        });
+        this.outputSidesBtn = addToLeftToolbar(new ActionButton(ActionItems.OUTPUT_SIDES, this::openOutputSides));
     }
 
     @Override

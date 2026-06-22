@@ -21,6 +21,7 @@ package ae2.client.gui.widgets;
 import ae2.api.config.ActionItems;
 import ae2.client.gui.Icon;
 import ae2.core.localization.ButtonToolTips;
+import ae2.core.localization.GuiText;
 import ae2.core.localization.LocalizationEnum;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.util.text.ITextComponent;
@@ -104,6 +105,26 @@ public class ActionButton extends IconButton {
             case TERMINAL_SETTINGS -> {
                 this.icon = Icon.COG;
                 title = ButtonToolTips.TerminalSettings;
+                detail = null;
+            }
+            case WORK_INTERVAL -> {
+                this.icon = Icon.COG;
+                title = GuiText.WorkInterval;
+                detail = GuiText.WorkIntervalHint;
+            }
+            case OUTPUT_SIDES -> {
+                this.icon = Icon.OUTPUT_SIDE_CONFIG;
+                title = ButtonToolTips.OutputSideConfig;
+                detail = ButtonToolTips.OutputSideConfigHint;
+            }
+            case OUTPUT_SIDES_CLEAR -> {
+                this.icon = Icon.CLEAR;
+                title = ButtonToolTips.OutputSideClear;
+                detail = ButtonToolTips.OutputSideClearHint;
+            }
+            case PATTERN_IMPORT_PRIORITIES -> {
+                this.icon = Icon.PRIORITY;
+                title = GuiText.PatternImportPrioritiesTitle;
                 detail = null;
             }
             default -> throw new IllegalArgumentException("Unknown ActionItem: " + action);

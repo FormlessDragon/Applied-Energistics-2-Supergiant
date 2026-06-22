@@ -51,6 +51,7 @@ import ae2.core.gui.GuiOpener;
 import ae2.core.settings.TickRates;
 import ae2.helpers.IConfigInvHost;
 import ae2.helpers.IPriorityHost;
+import ae2.helpers.IWorkIntervalHost;
 import ae2.items.parts.PartModels;
 import ae2.me.helpers.MachineSource;
 import ae2.text.TextComponentItemStack;
@@ -77,11 +78,13 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 public class FormationPlanePart extends UpgradeablePart
-    implements IStorageProvider, IPriorityHost, IConfigInvHost, IGridTickable {
+    implements IStorageProvider, IPriorityHost, IConfigInvHost, IGridTickable, IWorkIntervalHost {
 
     private static final PlaneModels MODELS = new PlaneModels("part/formation_plane",
         "part/formation_plane_on");
     private static final int ACTIVE_OPERATIONS_PER_TICK = 1;
+    private static final String WORK_INTERVAL_TAG = "workInterval";
+    private static final long DEFAULT_WORK_INTERVAL = 10L;
     private static final Logger LOG = LoggerFactory.getLogger(FormationPlanePart.class);
     private final PlaneConnectionHelper connectionHelper = new PlaneConnectionHelper(this);
     private final MEStorage inventory = new InWorldStorage();
@@ -93,6 +96,8 @@ public class FormationPlanePart extends UpgradeablePart
     private PlacementStrategy placementStrategies;
     private IncludeExclude filterMode = IncludeExclude.WHITELIST;
     private IPartitionList filter;
+    private long workInterval = DEFAULT_WORK_INTERVAL;
+    private long pendingWorkTicks;
 
     public FormationPlanePart(IPartItem<?> partItem) {
         super(partItem);
@@ -257,6 +262,8 @@ public class FormationPlanePart extends UpgradeablePart
     public void readFromNBT(NBTTagCompound data) {
         super.readFromNBT(data);
         this.priority = data.getInteger("priority");
+        this.workInterval = Math.max(1L, data.hasKey(WORK_INTERVAL_TAG) ? data.getLong(WORK_INTERVAL_TAG) : DEFAULT_WORK_INTERVAL);
+        this.pendingWorkTicks = 0;
         this.config.readFromChildTag(data, "config");
         remountStorage();
     }
@@ -265,6 +272,7 @@ public class FormationPlanePart extends UpgradeablePart
     public void writeToNBT(NBTTagCompound data) {
         super.writeToNBT(data);
         data.setInteger("priority", this.getPriority());
+        data.setLong(WORK_INTERVAL_TAG, this.workInterval);
         this.config.writeToChildTag(data, "config");
     }
 
@@ -278,6 +286,24 @@ public class FormationPlanePart extends UpgradeablePart
         this.priority = newValue;
         this.getHost().markForSave();
         this.remountStorage();
+    }
+
+    @Override
+    public long getWorkInterval() {
+        return this.workInterval;
+    }
+
+    @Override
+    public void setWorkInterval(long newValue) {
+        long clamped = Math.max(1L, newValue);
+        if (this.workInterval == clamped) {
+            return;
+        }
+        this.workInterval = clamped;
+        this.pendingWorkTicks = 0;
+        this.getHost().markForSave();
+        this.updateTickingState();
+        getMainNode().ifPresent((grid, node) -> grid.getTickManager().alertDevice(node));
     }
 
     @Override
@@ -365,12 +391,13 @@ public class FormationPlanePart extends UpgradeablePart
 
     @Override
     public TickingRequest getTickingRequest(IGridNode node) {
-        return new TickingRequest(TickRates.FormationPlane, !isActiveMode());
+        return new TickingRequest(1, 1, !isActiveMode());
     }
 
     @Override
     public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
         if (!isActiveMode()) {
+            this.pendingWorkTicks = 0;
             return TickRateModulation.SLEEP;
         }
 
@@ -378,7 +405,25 @@ public class FormationPlanePart extends UpgradeablePart
             return TickRateModulation.IDLE;
         }
 
+        if (!canRunActivePlacement()) {
+            this.pendingWorkTicks = 0;
+            return TickRateModulation.IDLE;
+        }
+
+        if (!shouldRunWork(ticksSinceLastCall)) {
+            return TickRateModulation.IDLE;
+        }
+
         return doActivePlacement(node) ? TickRateModulation.FASTER : TickRateModulation.SLOWER;
+    }
+
+    private boolean shouldRunWork(int ticksSinceLastCall) {
+        this.pendingWorkTicks += ticksSinceLastCall;
+        if (this.pendingWorkTicks < this.workInterval) {
+            return false;
+        }
+        this.pendingWorkTicks %= this.workInterval;
+        return true;
     }
 
     private boolean canPlaceInTargetChunk() {
@@ -391,9 +436,12 @@ public class FormationPlanePart extends UpgradeablePart
         return Platform.areBlockEntitiesTicking(self.getWorld(), targetPos);
     }
 
-    private boolean doActivePlacement(IGridNode node) {
+    private boolean canRunActivePlacement() {
         updateFilter();
+        return this.filterMode == IncludeExclude.BLACKLIST || (this.filter != null && !this.filter.isEmpty());
+    }
 
+    private boolean doActivePlacement(IGridNode node) {
         var storageService = node.grid().getStorageService();
         var cachedInventory = storageService.getCachedInventory();
 

@@ -249,6 +249,8 @@ public enum GuiText implements LocalizationEnum {
     Priority,
     PriorityExtractionHint,
     PriorityInsertionHint,
+    WorkInterval,
+    WorkIntervalHint,
     Resume,
     ReturnToPreviousGui,
     ReturnInventory,

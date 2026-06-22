@@ -16,6 +16,7 @@ import ae2.container.implementations.ContainerInscriber;
 import ae2.container.implementations.ContainerOutputSides;
 import ae2.container.implementations.ContainerPriority;
 import ae2.container.implementations.ContainerSetStockAmount;
+import ae2.container.implementations.ContainerWorkInterval;
 import ae2.container.implementations.ContainerWirelessMagnet;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.core.definitions.AEItems;
@@ -27,6 +28,7 @@ import ae2.core.network.clientbound.RestorePreviousGuiPacket;
 import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.IOutputSideConfigHost;
 import ae2.helpers.IPriorityHost;
+import ae2.helpers.IWorkIntervalHost;
 import ae2.helpers.InterfaceLogicHost;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.parts.AEBasePart;
@@ -184,6 +186,9 @@ public class SwitchGuisPacket extends ServerboundPacket {
         if (guiKey == GuiIds.GuiKey.PRIORITY) {
             return IPriorityHost.class;
         }
+        if (guiKey == GuiIds.GuiKey.WORK_INTERVAL) {
+            return IWorkIntervalHost.class;
+        }
         if (guiKey == GuiIds.GuiKey.WIRELESS_MAGNET) {
             return WirelessTerminalGuiHost.class;
         }
@@ -212,6 +217,9 @@ public class SwitchGuisPacket extends ServerboundPacket {
         }
         if (guiKey == GuiIds.GuiKey.PRIORITY && host instanceof IPriorityHost priorityHost) {
             return new ContainerPriority(inventory, priorityHost);
+        }
+        if (guiKey == GuiIds.GuiKey.WORK_INTERVAL && host instanceof IWorkIntervalHost workIntervalHost) {
+            return new ContainerWorkInterval(inventory, workIntervalHost);
         }
         if (guiKey == GuiIds.GuiKey.WIRELESS_MAGNET && host instanceof WirelessTerminalGuiHost<?> wirelessTerminalHost) {
             return new ContainerWirelessMagnet(inventory, wirelessTerminalHost);
@@ -266,6 +274,7 @@ public class SwitchGuisPacket extends ServerboundPacket {
                 || source instanceof ContainerCrystalAssembler assembler
                 && assembler.getAutoExport() == YesNo.YES;
             case PRIORITY -> source.getTarget() instanceof IPriorityHost;
+            case WORK_INTERVAL -> source.getTarget() instanceof IWorkIntervalHost;
             case WIRELESS_MAGNET -> source instanceof ContainerMEStorage
                 && source.getTarget() instanceof WirelessTerminalGuiHost<?> wirelessHost
                 && wirelessHost.getUpgrades().isInstalled(AEItems.MAGNET_CARD.item());

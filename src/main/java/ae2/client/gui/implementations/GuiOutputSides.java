@@ -1,12 +1,12 @@
 package ae2.client.gui.implementations;
 
+import ae2.api.config.ActionItems;
 import ae2.api.orientation.RelativeSide;
 import ae2.api.parts.IPart;
 import ae2.client.gui.AEBaseGui;
-import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.GuiStyleManager;
-import ae2.client.gui.widgets.IconButton;
+import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.OutputSideSelectionButton;
 import ae2.container.implementations.ContainerOutputSides;
 import ae2.core.localization.ButtonToolTips;
@@ -16,7 +16,6 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
-import net.minecraft.util.text.ITextComponent;
 
 import java.awt.Rectangle;
 import java.util.EnumMap;
@@ -32,11 +31,11 @@ public class GuiOutputSides extends AEBaseGui<ContainerOutputSides> {
     private final Map<RelativeSide, Boolean> lastAllowedStates = new EnumMap<>(RelativeSide.class);
     private final Map<RelativeSide, Boolean> lastEnabledStates = new EnumMap<>(RelativeSide.class);
 
-    public GuiOutputSides(ContainerOutputSides container, InventoryPlayer playerInventory, ITextComponent title) {
-        this(container, playerInventory, title, GuiStyleManager.loadStyleDoc(STYLE_PATH));
+    public GuiOutputSides(ContainerOutputSides container, InventoryPlayer playerInventory) {
+        this(container, playerInventory, GuiStyleManager.loadStyleDoc(STYLE_PATH));
     }
 
-    private GuiOutputSides(ContainerOutputSides container, InventoryPlayer playerInventory, ITextComponent title, GuiStyle style) {
+    private GuiOutputSides(ContainerOutputSides container, InventoryPlayer playerInventory, GuiStyle style) {
         super(container, playerInventory, style);
         var background = style.getBackground();
         if (background != null) {
@@ -49,25 +48,7 @@ public class GuiOutputSides extends AEBaseGui<ContainerOutputSides> {
         }
 
         AESubGui.addBackButton(container, "returnToParent", this.widgets);
-        this.widgets.add("clear", new IconButton(this.container::clearSides) {
-            private final List<ITextComponent> tooltip = List.of(
-                ButtonToolTips.OutputSideClear.text(),
-                ButtonToolTips.OutputSideClearHint.text());
-
-            {
-                setMessage(this.tooltip.getFirst());
-            }
-
-            @Override
-            protected Icon getIcon() {
-                return Icon.CLEAR;
-            }
-
-            @Override
-            public List<ITextComponent> getTooltipMessage() {
-                return this.tooltip;
-            }
-        });
+        this.widgets.add("clear", new ActionButton(ActionItems.OUTPUT_SIDES_CLEAR, this.container::clearSides));
 
         for (RelativeSide side : RELATIVE_SIDES) {
             var button = new OutputSideSelectionButton(side, () -> getDisplayStack(side), () -> {

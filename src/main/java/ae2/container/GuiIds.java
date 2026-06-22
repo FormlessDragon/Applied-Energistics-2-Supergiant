@@ -98,7 +98,8 @@ public final class GuiIds {
         PATTERN_MODIFIER,
         ADVANCED_MEMORY_CARD,
         CELL_RESTRICTION,
-        RENAMER;
+        RENAMER,
+        WORK_INTERVAL;
 
         private static final GuiKey[] VALUES = values();
 

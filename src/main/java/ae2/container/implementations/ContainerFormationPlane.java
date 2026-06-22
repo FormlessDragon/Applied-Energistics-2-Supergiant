@@ -33,7 +33,7 @@ public class ContainerFormationPlane extends UpgradeableContainer<FormationPlane
     @GuiSync(7)
     public YesNo placeMode = YesNo.YES;
     @GuiSync(8)
-    public FormationPlaneMode formationPlaneMode;
+    public FormationPlaneMode formationPlaneMode = FormationPlaneMode.PASSIVE;
 
     public ContainerFormationPlane(InventoryPlayer ip, FormationPlanePart host) {
         super(ip, host);

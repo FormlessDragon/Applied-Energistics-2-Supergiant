@@ -87,16 +87,8 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
             () -> container.encode(Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)
                 || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT))));
         if (Integrations.hei().isEnabled()) {
-            addToLeftToolbar(new IconButton(this::openImportPrioritySettings) {
-                {
-                    setMessage(GuiText.PatternImportPrioritiesTitle.text());
-                }
-
-                @Override
-                protected Icon getIcon() {
-                    return Icon.PRIORITY;
-                }
-            });
+            addToLeftToolbar(new ActionButton(ActionItems.PATTERN_IMPORT_PRIORITIES,
+                this::openImportPrioritySettings));
         }
         this.patternModifierPanel = new PatternModifierPanelWidget(this, new EncodingTerminalPanelHost());
         this.patternModifierPanel.addButtons();
