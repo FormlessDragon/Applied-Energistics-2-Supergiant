@@ -55,7 +55,7 @@ public abstract class ModelHelper {
     /**
      * @see #faceFromIndex(int)
      */
-    private static final EnumFacing[] FACES = Arrays.copyOf(EnumFacing.values(), 7);
+    private static final EnumFacing[] FACES = Arrays.copyOf(EnumFacing.VALUES, 7);
 
     private ModelHelper() {
     }

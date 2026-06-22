@@ -18,6 +18,7 @@
 
 package ae2.client.gui.widgets;
 
+import ae2.api.config.AdvancedMemoryCardStatusFilter;
 import ae2.api.config.AccessRestriction;
 import ae2.api.config.BlockingMode;
 import ae2.api.config.CondenserOutput;
@@ -50,6 +51,7 @@ import ae2.client.gui.Icon;
 import ae2.core.definitions.AEParts;
 import ae2.core.definitions.ItemDefinition;
 import ae2.core.localization.ButtonToolTips;
+import ae2.core.localization.GuiText;
 import ae2.core.localization.LocalizationEnum;
 import ae2.core.localization.Tooltips;
 import ae2.util.EnumCycler;
@@ -199,6 +201,18 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
                 ButtonToolTips.TerminalStyle, ButtonToolTips.TerminalStyle_Tall);
             registerApp(Icon.TERMINAL_STYLE_FULL, Settings.TERMINAL_STYLE, TerminalStyle.FULL,
                 ButtonToolTips.TerminalStyle, ButtonToolTips.TerminalStyle_Full);
+            registerAppWithoutTitle(Icon.TYPE_FILTER_ALL, Settings.ADVANCED_MEMORY_CARD_STATUS_FILTER,
+                AdvancedMemoryCardStatusFilter.ANY,
+                GuiText.AdvancedMemoryCardStatus.text(GuiText.AdvancedMemoryCardStatusAny.text()));
+            registerAppWithoutTitle(Icon.ADVANCED_MEMORY_CARD_STATUS_INPUT, Settings.ADVANCED_MEMORY_CARD_STATUS_FILTER,
+                AdvancedMemoryCardStatusFilter.INPUT,
+                GuiText.AdvancedMemoryCardStatus.text(GuiText.AdvancedMemoryCardStatusInput.text()));
+            registerAppWithoutTitle(Icon.ADVANCED_MEMORY_CARD_STATUS_OUTPUT, Settings.ADVANCED_MEMORY_CARD_STATUS_FILTER,
+                AdvancedMemoryCardStatusFilter.OUTPUT,
+                GuiText.AdvancedMemoryCardStatus.text(GuiText.AdvancedMemoryCardStatusOutput.text()));
+            registerAppWithoutTitle(Icon.ADVANCED_MEMORY_CARD_STATUS_UNBOUND, Settings.ADVANCED_MEMORY_CARD_STATUS_FILTER,
+                AdvancedMemoryCardStatusFilter.UNBOUND,
+                GuiText.AdvancedMemoryCardStatus.text(GuiText.AdvancedMemoryCardStatusUnbound.text()));
 
             registerApp(Icon.PATTERN_TERMINAL_ALL, Settings.TERMINAL_SHOW_PATTERN_PROVIDERS, ShowPatternProviders.ALL,
                 ButtonToolTips.InterfaceTerminalDisplayMode, ButtonToolTips.ShowAllProviders);
@@ -363,7 +377,7 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
 
     private static <T extends Enum<T>> void registerApp(Icon icon, Setting<T> setting, T val,
                                                         LocalizationEnum title, ITextComponent... tooltipLines) {
-        var lines = new ObjectArrayList<ITextComponent>();
+        var lines = new ObjectArrayList<ITextComponent>(tooltipLines.length + 1);
         lines.add(title.text());
         Collections.addAll(lines, tooltipLines);
 
@@ -372,7 +386,7 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
 
     private static <T extends Enum<T>> void registerAppWithoutTitle(Icon icon, Setting<T> setting, T val,
                                                                     ITextComponent... tooltipLines) {
-        var lines = new ObjectArrayList<ITextComponent>();
+        var lines = new ObjectArrayList<ITextComponent>(tooltipLines.length);
         Collections.addAll(lines, tooltipLines);
 
         appearances.put(new EnumPair<>(setting, val), new ButtonAppearance(icon, null, lines));
@@ -385,7 +399,7 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
 
     private static <T extends Enum<T>> void registerApp(ItemDefinition<?> item, Setting<T> setting, T val,
                                                         LocalizationEnum title, ITextComponent... tooltipLines) {
-        var lines = new ObjectArrayList<ITextComponent>();
+        var lines = new ObjectArrayList<ITextComponent>(tooltipLines.length + 1);
         lines.add(title.text());
         Collections.addAll(lines, tooltipLines);
 
@@ -441,7 +455,7 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
     }
 
     private void openSelectionPopup(AEBaseGui<?> gui) {
-        List<GridSelectionPopup.Entry<T>> entries = GridSelectionPopup.entries();
+        List<GridSelectionPopup.Entry<T>> entries = new ObjectArrayList<>(this.validValues.size());
         for (T value : this.validValues) {
             ButtonAppearance appearance = getAppearance(value);
             if (appearance == null) {
@@ -522,7 +536,8 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
             return appearance.tooltipLines;
         }
 
-        List<ITextComponent> lines = new ObjectArrayList<>(appearance.tooltipLines);
+        List<ITextComponent> lines = new ObjectArrayList<>(appearance.tooltipLines.size() + 2);
+        lines.addAll(appearance.tooltipLines);
         lines.add(Tooltips.muted(ButtonToolTips.CycleModeAction.text(Tooltips.getMouseButtonText(0))));
         lines.add(Tooltips.muted(ButtonToolTips.SelectModeAction.text(Tooltips.getMouseButtonText(1))));
         return lines;

@@ -24,6 +24,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.Vec3d;
 
 public class Splotch {
+    private static final AEColor[] COLORS = AEColor.values();
 
     private final EnumFacing side;
     private final boolean lumen;
@@ -66,15 +67,14 @@ public class Splotch {
     }
 
     private static EnumFacing readSide(int ordinal) {
-        if (ordinal > 0 && ordinal < EnumFacing.values().length) {
+        if (ordinal >= 0 && ordinal < EnumFacing.VALUES.length) {
             return EnumFacing.VALUES[ordinal];
         }
         return EnumFacing.NORTH;
     }
 
     private static AEColor readColor(int ordinal) {
-        AEColor[] colors = AEColor.values();
-        return ordinal < colors.length ? colors[ordinal] : AEColor.TRANSPARENT;
+        return ordinal >= 0 && ordinal < COLORS.length ? COLORS[ordinal] : AEColor.TRANSPARENT;
     }
 
     public void writeToStream(ByteBuf stream) {

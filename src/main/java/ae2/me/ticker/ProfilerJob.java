@@ -25,7 +25,8 @@ public final class ProfilerJob {
     }
 
     public ProfileData generateData() {
-        var ticks = new ObjectArrayList<ProfileData.ATick>(this.nanoseconds.size());
+        var ticks = new ObjectArrayList<ProfileData.ATick>(
+            Math.min(this.nanoseconds.size(), ProfileData.MAX_PROFILE_TICKS));
         for (var entry : this.nanoseconds.object2LongEntrySet()) {
             if (ticks.size() >= ProfileData.MAX_PROFILE_TICKS) {
                 break;

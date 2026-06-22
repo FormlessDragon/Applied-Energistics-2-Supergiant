@@ -89,7 +89,7 @@ public class CertusQuartzClusterBlock extends AEBaseBlock {
 
     @Override
     public boolean canPlaceBlockAt(World world, BlockPos pos) {
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             if (canStay(world, pos, facing)) {
                 return true;
             }

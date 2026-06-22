@@ -23,7 +23,7 @@ import java.util.Random;
 public class BuddingCertusQuartzBlock extends AEBaseBlock {
     public static final int GROWTH_CHANCE = 5;
     public static final int DECAY_CHANCE = 12;
-    private static final EnumFacing[] DIRECTIONS = EnumFacing.values();
+    private static final EnumFacing[] DIRECTIONS = EnumFacing.VALUES;
 
     public BuddingCertusQuartzBlock() {
         super(Material.ROCK);

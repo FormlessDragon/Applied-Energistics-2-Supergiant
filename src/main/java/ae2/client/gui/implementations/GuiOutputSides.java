@@ -26,8 +26,11 @@ import java.util.Map;
 
 public class GuiOutputSides extends AEBaseGui<ContainerOutputSides> {
     private static final String STYLE_PATH = "/screens/output_sides.json";
+    private static final RelativeSide[] RELATIVE_SIDES = RelativeSide.values();
 
     private final Map<RelativeSide, OutputSideSelectionButton> sideButtons = new EnumMap<>(RelativeSide.class);
+    private final Map<RelativeSide, Boolean> lastAllowedStates = new EnumMap<>(RelativeSide.class);
+    private final Map<RelativeSide, Boolean> lastEnabledStates = new EnumMap<>(RelativeSide.class);
 
     public GuiOutputSides(ContainerOutputSides container, InventoryPlayer playerInventory, ITextComponent title) {
         this(container, playerInventory, title, GuiStyleManager.loadStyleDoc(STYLE_PATH));
@@ -66,7 +69,7 @@ public class GuiOutputSides extends AEBaseGui<ContainerOutputSides> {
             }
         });
 
-        for (RelativeSide side : RelativeSide.values()) {
+        for (RelativeSide side : RELATIVE_SIDES) {
             var button = new OutputSideSelectionButton(side, () -> getDisplayStack(side), () -> {
                 if (!this.container.isSideAllowed(side)) {
                     return;
@@ -75,6 +78,8 @@ public class GuiOutputSides extends AEBaseGui<ContainerOutputSides> {
             });
             this.widgets.add(getButtonId(side), button);
             this.sideButtons.put(side, button);
+            this.lastAllowedStates.put(side, null);
+            this.lastEnabledStates.put(side, null);
         }
     }
 
@@ -92,10 +97,15 @@ public class GuiOutputSides extends AEBaseGui<ContainerOutputSides> {
             boolean enabled = this.container.isSideEnabled(side);
             button.setAllowed(allowed);
             button.enabled = allowed;
-            button.setTooltipMessage(List.of(
-                ButtonToolTips.OutputSideConfig.text(),
-                allowed ? GuiText.OutputSideToggleHint.text() : GuiText.OutputSideUnavailable.text(),
-                enabled ? GuiText.OutputSideEnabled.text() : GuiText.OutputSideDisabled.text()));
+            if (!Boolean.valueOf(allowed).equals(this.lastAllowedStates.get(side))
+                || !Boolean.valueOf(enabled).equals(this.lastEnabledStates.get(side))) {
+                button.setTooltipMessage(List.of(
+                    ButtonToolTips.OutputSideConfig.text(),
+                    allowed ? GuiText.OutputSideToggleHint.text() : GuiText.OutputSideUnavailable.text(),
+                    enabled ? GuiText.OutputSideEnabled.text() : GuiText.OutputSideDisabled.text()));
+                this.lastAllowedStates.put(side, allowed);
+                this.lastEnabledStates.put(side, enabled);
+            }
         }
     }
 

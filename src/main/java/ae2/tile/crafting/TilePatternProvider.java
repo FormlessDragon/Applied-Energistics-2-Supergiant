@@ -48,6 +48,7 @@ import java.util.List;
 
 public class TilePatternProvider extends AENetworkedTile implements PatternProviderLogicHost, IConfigurableObject {
     private static final String MEMORY_CARD_PUSH_DIRECTION = "pushDirection";
+    private static final PushDirection[] PUSH_DIRECTIONS = PushDirection.values();
 
     private final PatternProviderLogic logic = new PatternProviderLogic(this.getMainNode(), this,
         AEBlocks.PATTERN_PROVIDER.item(),
@@ -143,13 +144,12 @@ public class TilePatternProvider extends AENetworkedTile implements PatternProvi
         this.logic.importSettings(input, player);
 
         if (input.hasKey(MEMORY_CARD_PUSH_DIRECTION, Constants.NBT.TAG_INT)) {
-            PushDirection[] values = PushDirection.values();
             int ordinal = input.getInteger(MEMORY_CARD_PUSH_DIRECTION);
-            if (ordinal >= 0 && ordinal < values.length) {
+            if (ordinal >= 0 && ordinal < PUSH_DIRECTIONS.length) {
                 IBlockState state = this.getBlockState();
                 if (state != null && state.getBlock() instanceof PatternProviderBlock) {
                     this.getWorld().setBlockState(this.getPos(),
-                        state.withProperty(PatternProviderBlock.PUSH_DIRECTION, values[ordinal]), 3);
+                        state.withProperty(PatternProviderBlock.PUSH_DIRECTION, PUSH_DIRECTIONS[ordinal]), 3);
                     this.onGridConnectableSidesChanged();
                 }
             }

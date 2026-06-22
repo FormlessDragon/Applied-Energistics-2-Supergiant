@@ -18,6 +18,8 @@ import java.util.Locale;
 import java.util.function.Function;
 
 class CableBuilder {
+    private static final CableCoreType[] CABLE_CORE_TYPES = CableCoreType.values();
+    private static final AEColor[] COLORS = AEColor.values();
 
     private final EnumMap<CableCoreType, EnumMap<AEColor, TextureAtlasSprite>> coreTextures;
     private final EnumMap<AECableType, EnumMap<AEColor, TextureAtlasSprite>> connectionTextures;
@@ -25,9 +27,9 @@ class CableBuilder {
 
     CableBuilder(Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
         this.coreTextures = new EnumMap<>(CableCoreType.class);
-        for (CableCoreType type : CableCoreType.values()) {
+        for (CableCoreType type : CABLE_CORE_TYPES) {
             EnumMap<AEColor, TextureAtlasSprite> colorTextures = new EnumMap<>(AEColor.class);
-            for (AEColor color : AEColor.values()) {
+            for (AEColor color : COLORS) {
                 colorTextures.put(color, bakedTextureGetter.apply(type.getTexture(color)));
             }
             this.coreTextures.put(type, colorTextures);
@@ -36,7 +38,7 @@ class CableBuilder {
         this.connectionTextures = new EnumMap<>(AECableType.class);
         for (AECableType type : AECableType.VALIDCABLES) {
             EnumMap<AEColor, TextureAtlasSprite> colorTextures = new EnumMap<>(AEColor.class);
-            for (AEColor color : AEColor.values()) {
+            for (AEColor color : COLORS) {
                 colorTextures.put(color, bakedTextureGetter.apply(getConnectionTexture(type, color)));
             }
             this.connectionTextures.put(type, colorTextures);
@@ -62,7 +64,7 @@ class CableBuilder {
         result.addAll(CableCoreType.getTextureDependencies());
         result.addAll(SmartCableTextures.getTextureDependencies());
         for (AECableType type : AECableType.VALIDCABLES) {
-            for (AEColor color : AEColor.values()) {
+            for (AEColor color : COLORS) {
                 result.add(getConnectionTexture(type, color));
             }
         }

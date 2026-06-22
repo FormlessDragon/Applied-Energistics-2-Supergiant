@@ -15,8 +15,9 @@ public final class PatternImportPriorityOrder {
     }
 
     public static List<String> getOrderedIds() {
-        List<String> configuredIds = new ObjectArrayList<>();
-        Collections.addAll(configuredIds, AEConfig.instance().getPatternImportPriorityOrder());
+        String[] configuredIdArray = AEConfig.instance().getPatternImportPriorityOrder();
+        List<String> configuredIds = new ObjectArrayList<>(configuredIdArray.length);
+        Collections.addAll(configuredIds, configuredIdArray);
 
         List<String> repairedIds = repairIds(configuredIds);
         if (!repairedIds.equals(configuredIds)) {
@@ -26,8 +27,9 @@ public final class PatternImportPriorityOrder {
     }
 
     public static List<PatternImportPriority> getOrderedPriorities() {
-        List<PatternImportPriority> ordered = new ObjectArrayList<>();
-        for (String id : getOrderedIds()) {
+        List<String> orderedIds = getOrderedIds();
+        List<PatternImportPriority> ordered = new ObjectArrayList<>(orderedIds.size());
+        for (String id : orderedIds) {
             PatternImportPriority priority = PatternImportPriorities.getById(id);
             if (priority != null) {
                 ordered.add(priority);
@@ -46,14 +48,15 @@ public final class PatternImportPriorityOrder {
     }
 
     public static List<String> repairIds(List<String> configuredIds) {
-        List<String> registeredIds = new ObjectArrayList<>();
-        for (PatternImportPriority priority : PatternImportPriorities.getRegistered()) {
+        List<PatternImportPriority> registeredPriorities = PatternImportPriorities.getRegistered();
+        List<String> registeredIds = new ObjectArrayList<>(registeredPriorities.size());
+        for (PatternImportPriority priority : registeredPriorities) {
             registeredIds.add(priority.getId());
         }
 
         Set<String> knownIds = new ObjectLinkedOpenHashSet<>(registeredIds);
-        Set<String> seenIds = new ObjectLinkedOpenHashSet<>();
-        List<String> repaired = new ObjectArrayList<>();
+        Set<String> seenIds = new ObjectLinkedOpenHashSet<>(registeredIds.size());
+        List<String> repaired = new ObjectArrayList<>(registeredIds.size());
         if (configuredIds != null) {
             for (String configuredId : configuredIds) {
                 if (configuredId != null && knownIds.contains(configuredId) && seenIds.add(configuredId)) {

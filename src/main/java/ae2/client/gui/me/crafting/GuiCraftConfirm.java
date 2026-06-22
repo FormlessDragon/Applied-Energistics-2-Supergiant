@@ -76,7 +76,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
     private final SettingToggleButton<CraftingPlanSortMode> sortModeButton;
     private final SettingToggleButton<SortDir> sortDirectionButton;
     private final AEKeySearch search = new AEKeySearch();
-    private final List<CraftingPlanSummaryEntry> visibleEntries = new ObjectArrayList<>();
+    private final ObjectArrayList<CraftingPlanSummaryEntry> visibleEntries = new ObjectArrayList<>();
     private String searchText = "";
     private CraftingPlanSortMode lastSortMode = AEConfig.instance().getCraftingPlanSortMode();
     private SortDir lastSortDirection = AEConfig.instance().getCraftingPlanSortDirection();
@@ -231,6 +231,8 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
                 cpuDetails = GuiText.ConfirmCraftCpuStatus.text(
                     this.container.getCpuAvailableBytes(),
                     this.container.getCpuCoProcessors());
+            } else if (this.container.canMerge()) {
+                cpuDetails = GuiText.ConfirmCraftMergeAvailable.text();
             } else {
                 cpuDetails = GuiText.ConfirmCraftNoCpu.text();
             }
@@ -293,7 +295,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
             return;
         }
 
-        List<GenericStack> missingStacks = new ObjectArrayList<>();
+        List<GenericStack> missingStacks = new ObjectArrayList<>(plan.entries().size());
         for (CraftingPlanSummaryEntry entry : plan.entries()) {
             if (entry.missingAmount() > 0) {
                 missingStacks.add(new GenericStack(entry.what(), entry.missingAmount()));
@@ -387,6 +389,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
 
         this.filteredPlan = plan;
         this.visibleEntries.clear();
+        this.visibleEntries.ensureCapacity(plan.entries().size());
         for (CraftingPlanSummaryEntry entry : plan.entries()) {
             if (this.search.matches(entry.what())) {
                 this.visibleEntries.add(entry);

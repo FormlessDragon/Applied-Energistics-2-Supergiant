@@ -138,12 +138,12 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
     private final Long2ObjectMap<PatternContainerEntry> byId = new Long2ObjectOpenHashMap<>();
     private final HashMultimap<PatternContainerGroup, PatternContainerEntry> byGroup = HashMultimap.create();
-    private final List<PatternContainerGroup> groups = new ObjectArrayList<>();
-    private final List<Row> rows = new ObjectArrayList<>();
+    private final ObjectArrayList<PatternContainerGroup> groups = new ObjectArrayList<>();
+    private final ObjectArrayList<Row> rows = new ObjectArrayList<>();
     private final Map<ItemStack, PatternSearchData> patternSearchText = new Reference2ObjectOpenHashMap<>();
     private final Long2ObjectMap<PatternProviderInfo> providerInfo = new Long2ObjectOpenHashMap<>();
     private final Set<MatchedPatternSlot> matchedPatternSlots = new HashSet<>();
-    private final List<ProviderActionButton> providerActionButtons = new ObjectArrayList<>();
+    private final ObjectArrayList<ProviderActionButton> providerActionButtons = new ObjectArrayList<>();
 
     private final ITextComponent title;
     private final Scrollbar scrollbar;
@@ -745,8 +745,12 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
         for (ProviderActionButton button : this.providerActionButtons) {
             if (button.visible && button.getTooltipArea().contains(mouseX, mouseY)) {
-                drawTooltipLines(mouseX, mouseY,
-                    button.getTooltipMessage().stream().map(ITextComponent::getFormattedText).toList());
+                var tooltipMessage = button.getTooltipMessage();
+                var tooltipLines = new ObjectArrayList<String>(tooltipMessage.size());
+                for (ITextComponent component : tooltipMessage) {
+                    tooltipLines.add(component.getFormattedText());
+                }
+                drawTooltipLines(mouseX, mouseY, tooltipLines);
                 return;
             }
         }
@@ -824,11 +828,19 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             }
         }
 
+        int groupCount = this.byGroup.keySet().size();
+        int rowCapacity = groupCount;
+        for (PatternContainerEntry container : this.byGroup.values()) {
+            rowCapacity += (container.getInventory().size() + COLUMNS - 1) / COLUMNS;
+        }
+
         this.groups.clear();
+        this.groups.ensureCapacity(groupCount);
         this.groups.addAll(this.byGroup.keySet());
         this.groups.sort(GROUP_COMPARATOR);
 
         this.rows.clear();
+        this.rows.ensureCapacity(rowCapacity);
         for (PatternContainerGroup group : this.groups) {
             this.rows.add(new GroupHeaderRow(group));
 
@@ -925,6 +937,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         clearProviderActionButtons();
 
         int scroll = this.scrollbar.getCurrentScroll();
+        this.providerActionButtons.ensureCapacity(Math.min(this.visibleRows, Math.max(0, this.rows.size() - scroll)));
         boolean renameFieldVisible = false;
         boolean groupRenameFieldVisible = false;
         for (int i = 0; i < this.visibleRows; i++) {
@@ -1371,7 +1384,16 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
         @Override
         public List<ITextComponent> getTooltipMessage() {
-            ObjectList<ITextComponent> tooltip = new ObjectArrayList<>();
+            boolean editable = isEditable(this.entry);
+            int lineCount = 0;
+            if (this.info != null) {
+                lineCount += 3;
+            }
+            if (editable) {
+                lineCount++;
+            }
+
+            ObjectList<ITextComponent> tooltip = new ObjectArrayList<>(lineCount);
             if (this.info != null) {
                 tooltip.add(GuiText.PatternAccessTerminalHighlightProvider.text());
                 String dimensionName = CraftingSupplierLocator.getDimensionName(this.info.dimensionId());
@@ -1382,7 +1404,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
                     dimensionName));
                 tooltip.add(GuiText.PatternAccessTerminalOpenProvider.text());
             }
-            if (isEditable(this.entry)) {
+            if (editable) {
                 tooltip.add(GuiText.PatternAccessTerminalRenameProvider.text());
             }
             return tooltip;

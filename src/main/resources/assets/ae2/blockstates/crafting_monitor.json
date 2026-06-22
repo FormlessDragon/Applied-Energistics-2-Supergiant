@@ -255,35 +255,35 @@
     },
     "facing=up,formed=false,powered=false,spin=0": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 270 }, { "z": 180 } ] }
+      "transform": { "rotation": [ { "x": 90 } ] }
     },
     "facing=up,formed=false,powered=false,spin=1": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 270 }, { "z": 90 } ] }
+      "transform": { "rotation": [ { "x": 90 }, { "z": 270 } ] }
     },
     "facing=up,formed=false,powered=false,spin=2": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 270 } ] }
+      "transform": { "rotation": [ { "x": 90 }, { "z": 180 } ] }
     },
     "facing=up,formed=false,powered=false,spin=3": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 270 }, { "z": 270 } ] }
+      "transform": { "rotation": [ { "x": 90 }, { "z": 90 } ] }
     },
     "facing=up,formed=false,powered=true,spin=0": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 270 }, { "z": 180 } ] }
+      "transform": { "rotation": [ { "x": 90 } ] }
     },
     "facing=up,formed=false,powered=true,spin=1": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 270 }, { "z": 90 } ] }
+      "transform": { "rotation": [ { "x": 90 }, { "z": 270 } ] }
     },
     "facing=up,formed=false,powered=true,spin=2": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 270 } ] }
+      "transform": { "rotation": [ { "x": 90 }, { "z": 180 } ] }
     },
     "facing=up,formed=false,powered=true,spin=3": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 270 }, { "z": 270 } ] }
+      "transform": { "rotation": [ { "x": 90 }, { "z": 90 } ] }
     },
     "facing=up,formed=true,powered=false,spin=0": {
       "model": "ae2:crafting/monitor_formed",
@@ -319,35 +319,35 @@
     },
     "facing=down,formed=false,powered=false,spin=0": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 90 } ] }
+      "transform": { "rotation": [ { "x": 270 }, { "z": 180 } ] }
     },
     "facing=down,formed=false,powered=false,spin=1": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 90 }, { "z": 270 } ] }
+      "transform": { "rotation": [ { "x": 270 }, { "z": 90 } ] }
     },
     "facing=down,formed=false,powered=false,spin=2": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 90 }, { "z": 180 } ] }
+      "transform": { "rotation": [ { "x": 270 } ] }
     },
     "facing=down,formed=false,powered=false,spin=3": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 90 }, { "z": 90 } ] }
+      "transform": { "rotation": [ { "x": 270 }, { "z": 270 } ] }
     },
     "facing=down,formed=false,powered=true,spin=0": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 90 } ] }
+      "transform": { "rotation": [ { "x": 270 }, { "z": 180 } ] }
     },
     "facing=down,formed=false,powered=true,spin=1": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 90 }, { "z": 270 } ] }
+      "transform": { "rotation": [ { "x": 270 }, { "z": 90 } ] }
     },
     "facing=down,formed=false,powered=true,spin=2": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 90 }, { "z": 180 } ] }
+      "transform": { "rotation": [ { "x": 270 } ] }
     },
     "facing=down,formed=false,powered=true,spin=3": {
       "model": "ae2:crafting/monitor",
-      "transform": { "rotation": [ { "x": 90 }, { "z": 90 } ] }
+      "transform": { "rotation": [ { "x": 270 }, { "z": 270 } ] }
     },
     "facing=down,formed=true,powered=false,spin=0": {
       "model": "ae2:crafting/monitor_formed",

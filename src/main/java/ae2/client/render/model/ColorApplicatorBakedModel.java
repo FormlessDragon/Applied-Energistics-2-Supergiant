@@ -24,7 +24,7 @@ class ColorApplicatorBakedModel implements IBakedModel {
         this.baseModel = baseModel;
         this.generalQuads = this.fixQuadTint(null, texDark, texMedium, texBright);
         this.quadsBySide = new EnumMap<>(EnumFacing.class);
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             this.quadsBySide.put(facing, this.fixQuadTint(facing, texDark, texMedium, texBright));
         }
     }

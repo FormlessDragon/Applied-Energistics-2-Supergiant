@@ -242,7 +242,7 @@ public class TileQuantumBridge extends AENetworkedInvTile
         final EnumSet<EnumFacing> result = EnumSet.noneOf(EnumFacing.class);
 
         if (this.world != null) {
-            for (EnumFacing direction : EnumFacing.values()) {
+            for (EnumFacing direction : EnumFacing.VALUES) {
                 if (this.world.getTileEntity(this.pos.offset(direction)) instanceof TileQuantumBridge) {
                     result.add(direction);
                 }

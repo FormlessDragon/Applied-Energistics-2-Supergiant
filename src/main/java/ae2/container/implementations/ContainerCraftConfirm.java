@@ -108,6 +108,11 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     @Nullable
     private CraftingPlanSummary plan;
     @Nullable
+    private ICraftingPlan cachedMergeResult;
+    @Nullable
+    private ICraftingCPU cachedMergeCpu;
+    private long cachedMergeCpuStateChangeTick = Long.MIN_VALUE;
+    @Nullable
     private List<ICraftingGridContainer.AutoCraftEntry> autoCraftingQueue;
     @Nullable
     private TemporaryPseudoCraftingProvider temporaryPseudoProvider;
@@ -210,6 +215,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         }
         this.result = null;
         this.mergeAvailable = false;
+        invalidateMergeCache();
         this.clearError();
         this.whatToCraft = what;
         this.amount = amount;
@@ -231,6 +237,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         }
         this.result = null;
         this.mergeAvailable = false;
+        invalidateMergeCache();
         this.clearError();
         this.whatToCraft = what;
         this.amount = amount;
@@ -291,7 +298,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
                     this.setAutoStart(false);
                 }
 
-                this.plan = CraftingPlanSummary.fromJob(this.getGrid(), this.result);
+                this.plan = CraftingPlanSummary.fromJob(grid, this.result);
                 this.mergeAvailable = canMergeCurrentResult(grid);
                 sendPacketToClient(new CraftConfirmPlanPacket(this.plan));
             } catch (Throwable e) {
@@ -300,6 +307,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
                 AELog.warn("Failed to start crafting job.", e);
                 this.setValidContainer(false);
                 this.result = null;
+                invalidateMergeCache();
             }
 
             this.job = null;
@@ -324,14 +332,39 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         if (this.plan == null) {
             return true;
         }
-        return cpu.getAvailableStorage() >= this.plan.usedBytes() && !cpu.isBusy();
+        return cpuMatchesPlan(cpu, this.plan, this.result);
+    }
+
+    static boolean cpuMatchesPlan(ICraftingCPU cpu, CraftingPlanSummary plan, @Nullable ICraftingPlan result) {
+        return (cpu.getAvailableStorage() >= plan.usedBytes() && !cpu.isBusy())
+            || (result != null && cpu.canMergeJob(result));
     }
 
     private boolean canMergeCurrentResult(IGrid grid) {
-        return this.result != null
-            && !this.result.simulation()
-            && this.selectedCpu == null
-            && grid.getCraftingService().canMergeJob(this.result, this.getActionSrc());
+        if (this.result == null || this.result.simulation()) {
+            return false;
+        }
+        ICraftingService craftingService = grid.getCraftingService();
+        long cpuStateChangeTick = craftingService.getCraftingCpuStateChangeTick();
+        if (this.cachedMergeResult == this.result
+            && this.cachedMergeCpu == this.selectedCpu
+            && this.cachedMergeCpuStateChangeTick == cpuStateChangeTick) {
+            return this.mergeAvailable;
+        }
+
+        this.cachedMergeResult = this.result;
+        this.cachedMergeCpu = this.selectedCpu;
+        this.cachedMergeCpuStateChangeTick = cpuStateChangeTick;
+        if (this.selectedCpu != null) {
+            return this.selectedCpu.canMergeJob(this.result);
+        }
+        return craftingService.canMergeJob(this.result, this.getActionSrc());
+    }
+
+    private void invalidateMergeCache() {
+        this.cachedMergeResult = null;
+        this.cachedMergeCpu = null;
+        this.cachedMergeCpuStateChangeTick = Long.MIN_VALUE;
     }
 
     public void startJob() {
@@ -423,6 +456,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             this.cpuName = cpuRecord.getName();
             this.selectedCpu = cpuRecord.getCpu();
         }
+        invalidateMergeCache();
     }
 
     public World getLevel() {

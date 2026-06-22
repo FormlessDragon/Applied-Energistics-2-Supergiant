@@ -18,6 +18,7 @@ import ae2.helpers.patternprovider.PatternProviderCapacity;
 import ae2.tile.crafting.TileMolecularAssembler;
 import ae2.util.inv.AppEngInternalInventory;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.shorts.ShortSet;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
@@ -76,6 +77,12 @@ public class ContainerMolecularAssembler extends AEBaseContainer
             return 0;
         }
         return Math.clamp(page, 0, pageCount - 1);
+    }
+
+    @Override
+    public void onClientDataSync(ShortSet updatedFields) {
+        super.onClientDataSync(updatedFields);
+        this.updatePatternSlotState();
     }
 
     @Override

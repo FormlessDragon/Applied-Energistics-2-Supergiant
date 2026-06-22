@@ -12,7 +12,7 @@ public enum RelativeSide {
     LEFT(EnumFacing.WEST),
     RIGHT(EnumFacing.EAST);
 
-    private static final RelativeSide[] BY_UNROTATED_SIDE = new RelativeSide[EnumFacing.values().length];
+    private static final RelativeSide[] BY_UNROTATED_SIDE = new RelativeSide[EnumFacing.VALUES.length];
 
     static {
         for (var side : values()) {

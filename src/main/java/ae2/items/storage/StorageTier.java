@@ -1,14 +1,15 @@
 package ae2.items.storage;
 
 import ae2.core.definitions.AEItems;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import com.google.common.base.Objects;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraft.item.Item;
 
-import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 
 public record StorageTier(int index, String namePrefix, int bytes, double idleDrain, Supplier<Item> componentSupplier) {
-    public static final List<StorageTier> VALUES = new ObjectArrayList<>();
+    public static final Set<StorageTier> VALUES = new ObjectLinkedOpenHashSet<>();
 
     public static final StorageTier SIZE_1K = new StorageTier(1, "1k", toBytes(1), 0.5, AEItems.CELL_COMPONENT_1K::item);
     public static final StorageTier SIZE_4K = new StorageTier(2, "4k", toBytes(4), 1.0, AEItems.CELL_COMPONENT_4K::item);
@@ -27,5 +28,18 @@ public record StorageTier(int index, String namePrefix, int bytes, double idleDr
 
     public static int toBytes(int value) {
         return value * 1024;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof StorageTier(
+            int index1, String namePrefix1, int bytes1, double idleDrain1, _
+        ))) return false;
+        return index == index1 && bytes == bytes1 && Double.compare(idleDrain, idleDrain1) == 0 && Objects.equal(namePrefix, namePrefix1);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(index, namePrefix, bytes, idleDrain);
     }
 }

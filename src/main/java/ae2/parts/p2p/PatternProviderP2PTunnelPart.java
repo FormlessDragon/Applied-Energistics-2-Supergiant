@@ -12,9 +12,9 @@ import ae2.api.parts.IPart;
 import ae2.api.parts.IPartHost;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
+import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKeyType;
-import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.MEStorage;
@@ -362,7 +362,7 @@ public class PatternProviderP2PTunnelPart extends P2PTunnelPart<PatternProviderP
         if (tag.getKeySet().isEmpty() || !tag.hasKey(LAST_INPUT_SIDE_TAG)) {
             return null;
         }
-        EnumFacing[] values = EnumFacing.values();
+        EnumFacing[] values = EnumFacing.VALUES;
         int sideOrdinal = tag.getInteger(LAST_INPUT_SIDE_TAG);
         if (sideOrdinal < 0 || sideOrdinal >= values.length) {
             return null;

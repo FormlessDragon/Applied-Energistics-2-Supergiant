@@ -137,7 +137,7 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
         }
 
         EnumSet<EnumFacing> connections = EnumSet.noneOf(EnumFacing.class);
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             if (this.isConnected(world, pos, facing)) {
                 connections.add(facing);
             }
@@ -305,7 +305,17 @@ public abstract class AbstractCraftingUnitBlock<T extends AEBaseTile & ICrafting
     }
 
     private boolean transform(World world, BlockPos pos, IBlockState newState) {
-        return !world.isRemote && world.setBlockState(pos, newState, 3);
+        if (world.isRemote || !world.setBlockState(pos, newState, 3)) {
+            return false;
+        }
+
+        if (newState.getBlock() instanceof AEBaseTileBlock<?> tileBlock) {
+            AEBaseTile tile = tileBlock.getTileEntity(world, pos);
+            if (tile != null) {
+                tile.initializeOrientationFromBlockState(newState);
+            }
+        }
+        return true;
     }
 
     @Override

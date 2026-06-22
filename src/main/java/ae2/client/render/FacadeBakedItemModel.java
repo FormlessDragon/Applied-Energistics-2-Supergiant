@@ -51,9 +51,11 @@ public class FacadeBakedItemModel extends DelegateBakedModel {
             return Collections.emptyList();
         }
         if (this.quads == null) {
-            ObjectList<BakedQuad> result = new ObjectArrayList<>();
-            result.addAll(this.facadeBuilder.buildFacadeItemQuads(this.textureStack, EnumFacing.NORTH));
-            result.addAll(this.getBaseModel().getQuads(state, side, rand));
+            List<BakedQuad> facadeQuads = this.facadeBuilder.buildFacadeItemQuads(this.textureStack, EnumFacing.NORTH);
+            List<BakedQuad> baseQuads = this.getBaseModel().getQuads(state, side, rand);
+            ObjectList<BakedQuad> result = new ObjectArrayList<>(facadeQuads.size() + baseQuads.size());
+            result.addAll(facadeQuads);
+            result.addAll(baseQuads);
             this.quads = ObjectLists.unmodifiable(result);
         }
         return this.quads;

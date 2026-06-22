@@ -120,7 +120,7 @@ public class GuiNetworkStatus<T extends AEBaseContainer & INetworkStatusContaine
 
             if (localMouseX >= cellX && localMouseX < cellX + CELL_WIDTH
                 && localMouseY >= cellY && localMouseY < cellY + CELL_HEIGHT) {
-                tooltip = new ObjectArrayList<>();
+                tooltip = new ObjectArrayList<>(5);
                 tooltip.add(entry.getDisplay().getDisplayName());
                 if (entry.isMissingChannel()) {
                     ITextComponent noChannel = GuiText.NoChannel.text();

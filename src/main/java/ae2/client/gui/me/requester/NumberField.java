@@ -105,8 +105,8 @@ public class NumberField extends ConfirmableTextField {
     }
 
     private void validate() {
-        List<ITextComponent> validationErrors = new ObjectArrayList<>();
-        List<ITextComponent> infoMessages = new ObjectArrayList<>();
+        List<ITextComponent> validationErrors = new ObjectArrayList<>(1);
+        List<ITextComponent> infoMessages = new ObjectArrayList<>(1);
 
         var possibleValue = getValueInternal();
         if (possibleValue.isPresent()) {

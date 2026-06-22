@@ -69,7 +69,7 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
     private final SettingToggleButton<TerminalStyle> terminalStyleButton;
     private final AETextField searchField;
     private final AEKeySearch search = new AEKeySearch();
-    private final List<CraftingStatusEntry> visibleEntries = new ObjectArrayList<>();
+    private final ObjectArrayList<CraftingStatusEntry> visibleEntries = new ObjectArrayList<>();
     private String searchText = "";
     @Nullable
     private CraftingStatus filteredStatus;
@@ -272,6 +272,7 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
 
         this.filteredStatus = this.status;
         this.visibleEntries.clear();
+        this.visibleEntries.ensureCapacity(this.status.entries().size());
         for (CraftingStatusEntry entry : this.status.entries()) {
             if (entry.what() != null && this.search.matches(entry.what())) {
                 this.visibleEntries.add(entry);

@@ -50,6 +50,7 @@ public final class ProfileRender {
 
         int dimension = mc.world.provider.getDimension();
         visibleTicks.clear();
+        visibleTicks.ensureCapacity(data.ticks.length);
         for (ProfileData.ATick tick : data.ticks) {
             if (tick.dimension() != dimension || !ProfileDataHandler.shouldRender(tick.rate())) {
                 continue;

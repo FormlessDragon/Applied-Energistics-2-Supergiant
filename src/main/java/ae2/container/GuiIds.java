@@ -100,10 +100,11 @@ public final class GuiIds {
         CELL_RESTRICTION,
         RENAMER;
 
+        private static final GuiKey[] VALUES = values();
+
         public static @Nullable GuiKey fromId(int guiId) {
             int baseGuiId = getBaseGuiId(guiId);
-            GuiKey[] values = values();
-            return baseGuiId >= 0 && baseGuiId < values.length ? values[baseGuiId] : null;
+            return baseGuiId >= 0 && baseGuiId < VALUES.length ? VALUES[baseGuiId] : null;
         }
 
         public int getGuiId() {

@@ -116,9 +116,10 @@ public class GuiMolecularAssembler extends AEBaseGui<ContainerMolecularAssembler
     }
 
     private List<ITextComponent> getCompatibleUpgrades() {
-        var list = new ObjectArrayList<ITextComponent>();
+        var upgradeLines = Upgrades.getTooltipLinesForInventory(this.container.getHost().getUpgrades());
+        var list = new ObjectArrayList<ITextComponent>(upgradeLines.size() + 1);
         list.add(GuiText.CompatibleUpgrades.text());
-        list.addAll(Upgrades.getTooltipLinesForInventory(this.container.getHost().getUpgrades()));
+        list.addAll(upgradeLines);
         return list;
     }
 

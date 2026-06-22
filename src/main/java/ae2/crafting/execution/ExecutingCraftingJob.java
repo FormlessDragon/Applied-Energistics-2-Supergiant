@@ -87,16 +87,7 @@ public class ExecutingCraftingJob {
         this.planBytes = plan.bytes();
         this.waitingFor = new ListCraftingInventory(postCraftingDifference::onCraftingDifference);
         this.pseudoInventory = new ListCraftingInventory(postCraftingDifference::onCraftingDifference);
-        if (plan instanceof CraftingPlan craftingPlan) {
-            for (var provider : craftingPlan.temporaryProviders()) {
-                for (var pattern : provider.getAvailablePatterns()) {
-                    var temporaryProvider = provider instanceof TemporaryPseudoCraftingProvider temporary
-                        ? temporary
-                        : new TemporaryPseudoCraftingProvider(pattern);
-                    this.temporaryProviders.put(PseudoPatternDetails.unwrap(pattern).getDefinition(), temporaryProvider);
-                }
-            }
-        }
+        addTemporaryProviders(plan);
 
         // Fill waiting for and tasks
         this.timeTracker = new ElapsedTimeTracker();
@@ -230,17 +221,26 @@ public class ExecutingCraftingJob {
     }
 
     void merge(ICraftingPlan plan, KeyCounter remainingMissingItems) {
-        if (!this.finalOutput.what().equals(plan.finalOutput().what())) {
+        var planFinalOutput = plan.finalOutput();
+        if (!this.finalOutput.what().equals(planFinalOutput.what())) {
             throw new IllegalArgumentException("Cannot merge crafting jobs with different final outputs");
         }
 
-        this.remainingAmount = LongMath.saturatedAdd(this.remainingAmount, plan.finalOutput().amount());
-        this.totalFinalOutputAmount = LongMath.saturatedAdd(this.totalFinalOutputAmount, plan.finalOutput().amount());
+        this.remainingAmount = LongMath.saturatedAdd(this.remainingAmount, planFinalOutput.amount());
+        this.totalFinalOutputAmount = LongMath.saturatedAdd(this.totalFinalOutputAmount, planFinalOutput.amount());
         this.finalOutput = new GenericStack(this.finalOutput.what(), this.totalFinalOutputAmount);
         this.remainingIntermediateFinalOutput = LongMath.saturatedAdd(this.remainingIntermediateFinalOutput,
             plan.intermediateFinalOutputAmount());
         this.planBytes = LongMath.saturatedAdd(this.planBytes, plan.bytes());
 
+        addTemporaryProviders(plan);
+
+        addWaitingFor(plan.emittedItems());
+        addWaitingFor(remainingMissingItems);
+        addTasks(plan);
+    }
+
+    private void addTemporaryProviders(ICraftingPlan plan) {
         if (plan instanceof CraftingPlan craftingPlan) {
             for (var provider : craftingPlan.temporaryProviders()) {
                 for (var pattern : provider.getAvailablePatterns()) {
@@ -251,15 +251,16 @@ public class ExecutingCraftingJob {
                 }
             }
         }
+    }
 
-        for (var entry : plan.emittedItems()) {
+    private void addWaitingFor(Iterable<Object2LongMap.Entry<AEKey>> entries) {
+        for (var entry : entries) {
             waitingFor.insert(entry.getKey(), entry.getLongValue(), Actionable.MODULATE);
             timeTracker.addMaxItems(entry.getLongValue(), entry.getKey().getType());
         }
-        for (var entry : remainingMissingItems) {
-            waitingFor.insert(entry.getKey(), entry.getLongValue(), Actionable.MODULATE);
-            timeTracker.addMaxItems(entry.getLongValue(), entry.getKey().getType());
-        }
+    }
+
+    private void addTasks(ICraftingPlan plan) {
         for (Object2LongMap.Entry<IPatternDetails> entry : plan.patternTimes().object2LongEntrySet()) {
             var progress = tasks.computeIfAbsent(entry.getKey(), ignored -> new TaskProgress());
             progress.value = LongMath.saturatedAdd(progress.value, entry.getLongValue());

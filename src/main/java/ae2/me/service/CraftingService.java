@@ -78,7 +78,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class CraftingService implements ICraftingService, IGridServiceProvider {
     private static final String TAG_RECURSIVE_INGREDIENT_RESERVE_AMOUNT = "recursiveIngredientReserveAmount";
@@ -108,7 +107,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
             (service, ignoredEvent) -> ((CraftingService) service).updateList = true);
     }
 
-    private final ObjectSet<CraftingCPUCluster> craftingCPUClusters = new ObjectOpenHashSet<>();
+    private final ObjectOpenHashSet<CraftingCPUCluster> craftingCPUClusters = new ObjectOpenHashSet<>();
     private final Reference2ObjectMap<IGridNode, StackWatcher<ICraftingWatcherNode>> craftingWatchers =
         new Reference2ObjectOpenHashMap<>();
     private final IGrid grid;
@@ -119,7 +118,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         this.interests);
     private final IEnergyService energyGrid;
     private final ObjectSet<AEKey> currentlyCrafting = new ObjectOpenHashSet<>();
-    private final ObjectSet<AEKey> currentlyCraftable = new ObjectOpenHashSet<>();
+    private final ObjectOpenHashSet<AEKey> currentlyCraftable = new ObjectOpenHashSet<>();
     private long lastProcessedCraftingLogicChangeTick;
     private long lastProcessedCraftableChangeTick;
     private long recursiveIngredientReserveAmount = DEFAULT_RECURSIVE_INGREDIENT_RESERVE_AMOUNT;
@@ -229,6 +228,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
     private void updateCPUClusters() {
         this.craftingCPUClusters.clear();
+        this.craftingCPUClusters.ensureCapacity(this.grid.size());
 
         for (var node : this.grid.getNodes()) {
             if (!(node.getOwner() instanceof ICraftingCPUTileEntity tile)) {
@@ -344,26 +344,24 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
             return CraftingSubmitResult.NO_CRAFTING_PATTERN;
         }
 
-        if (requestingMachine == null && target == null && !skipMerge) {
-            var mergeTarget = this.findMergeableCraftingCPU(job, src);
-            if (mergeTarget != null) {
-                return mergeTarget.mergeJob(this.grid, job, src);
-            }
-        }
-
         CraftingCPUCluster cpuCluster;
 
         if (target instanceof CraftingCPUCluster craftingCPUCluster) {
+            if (requestingMachine == null && !skipMerge && craftingCPUCluster.canMergeJob(job)) {
+                return craftingCPUCluster.mergeJob(this.grid, job, src);
+            }
             cpuCluster = craftingCPUCluster;
         } else {
-            var unsuitableCpusResult = new AtomicReference<UnsuitableCpus>();
-            cpuCluster = this.findSuitableCraftingCPU(job, prioritizePower, src, unsuitableCpusResult);
+            var selection = this.findCraftingCPU(job, prioritizePower, src, requestingMachine == null && !skipMerge);
+            if (selection.mergeCpu() != null) {
+                return selection.mergeCpu().mergeJob(this.grid, job, src);
+            }
+            cpuCluster = selection.suitableCpu();
             if (cpuCluster == null) {
-                var unsuitableCpus = unsuitableCpusResult.get();
-                if (unsuitableCpus == null) {
+                if (selection.unsuitableCpus() == null) {
                     return CraftingSubmitResult.NO_CPU_FOUND;
                 }
-                return CraftingSubmitResult.noSuitableCpu(unsuitableCpus);
+                return CraftingSubmitResult.noSuitableCpu(selection.unsuitableCpus());
             }
         }
 
@@ -373,6 +371,11 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
     @Override
     public boolean canMergeJob(ICraftingPlan job, IActionSource src) {
         return findMergeableCraftingCPU(job, src) != null;
+    }
+
+    @Override
+    public long getCraftingCpuStateChangeTick() {
+        return this.lastProcessedCraftingLogicChangeTick;
     }
 
     @Override
@@ -422,15 +425,19 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         if (this.lastProcessedCraftableChangeTick != this.craftingProviders.getLastModifiedOnTick()) {
             this.lastProcessedCraftableChangeTick = this.craftingProviders.getLastModifiedOnTick();
 
-            if (!this.currentlyCraftable.isEmpty() || !this.craftingProviders.getCraftableKeys().isEmpty()
-                || !this.craftingProviders.getEmittableKeys().isEmpty()) {
+            var craftableKeys = this.craftingProviders.getCraftableKeys();
+            var emittableKeys = this.craftingProviders.getEmittableKeys();
+
+            if (!this.currentlyCraftable.isEmpty() || !craftableKeys.isEmpty()
+                || !emittableKeys.isEmpty()) {
                 boolean hasInterests = !this.interests.isEmpty();
                 Set<AEKey> previouslyCraftable = hasInterests
                     ? copySet(this.currentlyCraftable)
                     : Set.of();
                 this.currentlyCraftable.clear();
-                this.currentlyCraftable.addAll(this.craftingProviders.getCraftableKeys());
-                this.currentlyCraftable.addAll(this.craftingProviders.getEmittableKeys());
+                this.currentlyCraftable.ensureCapacity(craftableKeys.size() + emittableKeys.size());
+                this.currentlyCraftable.addAll(craftableKeys);
+                this.currentlyCraftable.addAll(emittableKeys);
 
                 if (hasInterests) {
                     var changedCraftable = new ObjectOpenHashSet<AEKey>();
@@ -502,45 +509,51 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         return this.recursiveIngredientReserveAmount;
     }
 
-    @Nullable
-    private CraftingCPUCluster findSuitableCraftingCPU(ICraftingPlan job, boolean prioritizePower, IActionSource src,
-                                                       AtomicReference<UnsuitableCpus> unsuitableCpus) {
-        CraftingCPUCluster bestCpu = null;
+    private CpuSelection findCraftingCPU(ICraftingPlan job, boolean prioritizePower, IActionSource src,
+                                         boolean includeMergeCpu) {
+        CraftingCPUCluster bestSuitableCpu = null;
+        CraftingCPUCluster bestMergeCpu = null;
         int offline = 0;
         int busy = 0;
         int tooSmall = 0;
         int excluded = 0;
+        long jobBytes = job.bytes();
 
         for (var cpu : this.craftingCPUClusters) {
             if (!cpu.isActive()) {
                 offline++;
                 continue;
             }
+            var canBeAutoSelected = cpu.canBeAutoSelectedFor(src);
+            if (includeMergeCpu
+                && !cpu.isDestroyed()
+                && canBeAutoSelected
+                && cpu.canMergeJob(job)
+                && (bestMergeCpu == null || compareCandidateCpu(cpu, bestMergeCpu, true, src) < 0)) {
+                bestMergeCpu = cpu;
+            }
             if (cpu.isBusy()) {
                 busy++;
                 continue;
             }
-            if (cpu.getAvailableStorage() < job.bytes()) {
+            if (cpu.getAvailableStorage() < jobBytes) {
                 tooSmall++;
                 continue;
             }
-            if (!cpu.canBeAutoSelectedFor(src)) {
+            if (!canBeAutoSelected) {
                 excluded++;
                 continue;
             }
-            if (bestCpu == null || compareCandidateCpu(cpu, bestCpu, prioritizePower, src) < 0) {
-                bestCpu = cpu;
+            if (bestSuitableCpu == null || compareCandidateCpu(cpu, bestSuitableCpu, prioritizePower, src) < 0) {
+                bestSuitableCpu = cpu;
             }
         }
 
-        if (bestCpu == null) {
-            if (offline > 0 || busy > 0 || tooSmall > 0 || excluded > 0) {
-                unsuitableCpus.set(new UnsuitableCpus(offline, busy, tooSmall, excluded));
-            }
-            return null;
+        UnsuitableCpus unsuitableCpus = null;
+        if (bestSuitableCpu == null && (offline > 0 || busy > 0 || tooSmall > 0 || excluded > 0)) {
+            unsuitableCpus = new UnsuitableCpus(offline, busy, tooSmall, excluded);
         }
-
-        return bestCpu;
+        return new CpuSelection(bestSuitableCpu, bestMergeCpu, unsuitableCpus);
     }
 
     @Nullable
@@ -562,6 +575,11 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
             }
         }
         return bestCpu;
+    }
+
+    private record CpuSelection(@Nullable CraftingCPUCluster suitableCpu,
+                                @Nullable CraftingCPUCluster mergeCpu,
+                                @Nullable UnsuitableCpus unsuitableCpus) {
     }
 
     @Override

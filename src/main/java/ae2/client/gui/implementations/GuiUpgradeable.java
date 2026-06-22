@@ -52,9 +52,10 @@ public class GuiUpgradeable<T extends UpgradeableContainer<?>> extends AEBaseGui
     }
 
     private List<ITextComponent> getCompatibleUpgrades() {
-        var list = new ObjectArrayList<ITextComponent>();
+        var upgradeLines = Upgrades.getTooltipLinesForInventory(container.getUpgrades());
+        var list = new ObjectArrayList<ITextComponent>(upgradeLines.size() + 1);
         list.add(GuiText.CompatibleUpgrades.text());
-        list.addAll(Upgrades.getTooltipLinesForInventory(container.getUpgrades()));
+        list.addAll(upgradeLines);
         return list;
     }
 }

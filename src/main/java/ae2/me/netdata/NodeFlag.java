@@ -5,8 +5,9 @@ public enum NodeFlag {
     DENSE,
     MISSING;
 
+    private static final NodeFlag[] VALUES = values();
+
     public static NodeFlag byIndex(int index) {
-        NodeFlag[] values = values();
-        return values[Math.floorMod(index, values.length)];
+        return VALUES[Math.floorMod(index, VALUES.length)];
     }
 }

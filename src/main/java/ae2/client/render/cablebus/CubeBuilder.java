@@ -402,7 +402,7 @@ public class CubeBuilder {
     }
 
     public void setTexture(TextureAtlasSprite texture) {
-        for (EnumFacing face : EnumFacing.values()) {
+        for (EnumFacing face : EnumFacing.VALUES) {
             this.textures.put(face, texture);
         }
     }

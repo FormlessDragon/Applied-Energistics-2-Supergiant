@@ -1016,7 +1016,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     }
 
     private List<ITextComponent> buildTextFieldInsertionTooltip(ItemStack stack) {
-        var tooltip = new ObjectArrayList<ITextComponent>();
+        var tooltip = new ObjectArrayList<ITextComponent>(2);
         String leftClickText = getTextFieldInsertionText(stack, 0);
         tooltip.add(buildTextFieldInsertionAction(0, leftClickText));
 

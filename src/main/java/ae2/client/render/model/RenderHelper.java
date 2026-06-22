@@ -40,7 +40,7 @@ final class RenderHelper {
     private static EnumMap<EnumFacing, List<Vec3d>> generateCornersForFacings() {
         EnumMap<EnumFacing, List<Vec3d>> result = new EnumMap<>(EnumFacing.class);
 
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             List<Vec3d> corners;
 
             float offset = facing.getAxisDirection() == EnumFacing.AxisDirection.NEGATIVE ? 0 : 1;

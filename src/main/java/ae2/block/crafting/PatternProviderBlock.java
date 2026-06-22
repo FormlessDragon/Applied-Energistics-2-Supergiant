@@ -36,6 +36,8 @@ import net.minecraft.world.World;
 
 @SuppressWarnings("deprecation")
 public class PatternProviderBlock extends AEBaseTileBlock<TilePatternProvider> {
+    private static final PushDirection[] PUSH_DIRECTIONS = PushDirection.values();
+
     public static final PropertyEnum<PushDirection> PUSH_DIRECTION = PropertyEnum.create("push_direction",
         PushDirection.class);
 
@@ -59,9 +61,8 @@ public class PatternProviderBlock extends AEBaseTileBlock<TilePatternProvider> {
 
     @Override
     public IBlockState getStateFromMeta(int meta) {
-        PushDirection[] values = PushDirection.values();
-        int index = meta >= 0 && meta < values.length ? meta : PushDirection.ALL.ordinal();
-        return this.getDefaultState().withProperty(PUSH_DIRECTION, values[index]);
+        int index = meta >= 0 && meta < PUSH_DIRECTIONS.length ? meta : PushDirection.ALL.ordinal();
+        return this.getDefaultState().withProperty(PUSH_DIRECTION, PUSH_DIRECTIONS[index]);
     }
 
     @Override

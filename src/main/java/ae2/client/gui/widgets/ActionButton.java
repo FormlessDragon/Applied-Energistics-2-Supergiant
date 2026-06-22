@@ -96,6 +96,11 @@ public class ActionButton extends IconButton {
                 title = ButtonToolTips.CycleProcessingOutput;
                 detail = ButtonToolTips.CycleProcessingOutputTooltip;
             }
+            case S_CLEAR_PROCESSING_SECONDARY_OUTPUTS -> {
+                this.icon = Icon.S_CLEAR;
+                title = ButtonToolTips.ClearProcessingSecondaryOutputs;
+                detail = ButtonToolTips.ClearProcessingSecondaryOutputsTooltip;
+            }
             case TERMINAL_SETTINGS -> {
                 this.icon = Icon.COG;
                 title = ButtonToolTips.TerminalSettings;
@@ -113,12 +118,12 @@ public class ActionButton extends IconButton {
             return Collections.singletonList(title.text());
         }
 
-        List<ITextComponent> lines = new ObjectArrayList<>();
-        lines.add(title.text());
         String text = detail.getLocal();
         text = PATTERN_NEW_LINE.matcher(text).replaceAll("\n");
-
-        for (String line : wrapTooltip(text)) {
+        List<String> wrappedLines = wrapTooltip(text);
+        List<ITextComponent> lines = new ObjectArrayList<>(wrappedLines.size() + 1);
+        lines.add(title.text());
+        for (String line : wrappedLines) {
             lines.add(new TextComponentString(line));
         }
 

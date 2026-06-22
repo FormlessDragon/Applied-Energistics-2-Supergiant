@@ -31,7 +31,7 @@ public class CableBusTESR extends TileEntitySpecialRenderer<TileCableBus> {
             return;
         }
 
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             IPart part = te.getPart(facing);
             if (part != null && part.requireDynamicRender()) {
                 part.renderDynamic(x, y, z, partialTicks, destroyStage);

@@ -38,6 +38,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 public class FacadeBuilder {
+    private static final BlockRenderLayer[] BLOCK_RENDER_LAYERS = BlockRenderLayer.values();
 
     public static final double THICK_THICKNESS = 2D / 16D;
     public static final double THIN_THICKNESS = 1D / 16D;
@@ -68,7 +69,7 @@ public class FacadeBuilder {
         EnumMap<EnumFacing, List<BakedQuad>> rotatedQuads = new EnumMap<>(EnumFacing.class);
 
         if (model == null) {
-            for (EnumFacing side : EnumFacing.values()) {
+            for (EnumFacing side : EnumFacing.VALUES) {
                 rotatedQuads.put(side, Collections.emptyList());
             }
             return rotatedQuads;
@@ -76,7 +77,7 @@ public class FacadeBuilder {
 
         QuadRotator rotator = new QuadRotator();
 
-        for (EnumFacing side : EnumFacing.values()) {
+        for (EnumFacing side : EnumFacing.VALUES) {
             List<BakedQuad> rotated = new ObjectArrayList<>();
 
             for (int cullFaceIdx = 0; cullFaceIdx <= ModelHelper.NULL_FACE_ID; cullFaceIdx++) {
@@ -116,7 +117,7 @@ public class FacadeBuilder {
             return Collections.singletonList(facadeBox);
         }
 
-        List<AxisAlignedBB> boxes = new ObjectArrayList<>();
+        List<AxisAlignedBB> boxes = new ObjectArrayList<>(4);
         switch (axis) {
             case Y -> {
                 boxes.add(new AxisAlignedBB(facadeBox.minX, facadeBox.minY, facadeBox.minZ, hole.minX, facadeBox.maxY,
@@ -311,7 +312,7 @@ public class FacadeBuilder {
         if (facadeRenderState.transparent()) {
             double offset = thinFacades ? THIN_THICKNESS : THICK_THICKNESS;
             AEAxisAlignedBB shrunkBox = null;
-            for (EnumFacing face : EnumFacing.values()) {
+            for (EnumFacing face : EnumFacing.VALUES) {
                 if (face.getAxis() == side.getAxis()) {
                     continue;
                 }
@@ -364,7 +365,7 @@ public class FacadeBuilder {
         MutableQuadView mutableQuad = MutableQuadView.getInstance();
 
         if (transparent || layer == null) {
-            for (BlockRenderLayer forcedLayer : BlockRenderLayer.values()) {
+            for (BlockRenderLayer forcedLayer : BLOCK_RENDER_LAYERS) {
                 if (!renderedState.getBlock().canRenderInLayer(renderedState, forcedLayer)) {
                     continue;
                 }

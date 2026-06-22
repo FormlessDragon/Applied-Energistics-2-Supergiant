@@ -2,13 +2,13 @@ package ae2.client.gui.me.search;
 
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKeyType;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 final class OreDictSearchPredicate implements Predicate<AEKey> {
     private final String term;
@@ -19,9 +19,13 @@ final class OreDictSearchPredicate implements Predicate<AEKey> {
     }
 
     private List<String> getOreDictEntriesMatchingTerm(AEKeyType keyType) {
-        return keyType.getTagNames()
-                      .filter(this::matchesTerm)
-                      .collect(Collectors.toList());
+        var matches = new ObjectArrayList<String>();
+        keyType.getTagNames().forEach(tagName -> {
+            if (matchesTerm(tagName)) {
+                matches.add(tagName);
+            }
+        });
+        return matches;
     }
 
     private boolean matchesTerm(String oreDictName) {

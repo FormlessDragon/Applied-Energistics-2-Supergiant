@@ -82,6 +82,7 @@ public class CableBusContainer implements IPartHost, ICableBusContainer {
         "east",
         "cable"
     };
+    private static final YesNo[] YES_NO_VALUES = YesNo.values();
     private static final ThreadLocal<Boolean> IS_LOADING = new ThreadLocal<>();
 
     private final CableBusStorage storage = new CableBusStorage();
@@ -682,9 +683,8 @@ public class CableBusContainer implements IPartHost, ICableBusContainer {
         try {
             if (data.hasKey("hasRedstone", NBT.TAG_INT)) {
                 int redstoneState = data.getInteger("hasRedstone");
-                YesNo[] states = YesNo.values();
-                this.hasRedstone = redstoneState >= 0 && redstoneState < states.length
-                    ? states[redstoneState]
+                this.hasRedstone = redstoneState >= 0 && redstoneState < YES_NO_VALUES.length
+                    ? YES_NO_VALUES[redstoneState]
                     : YesNo.UNDECIDED;
             }
 

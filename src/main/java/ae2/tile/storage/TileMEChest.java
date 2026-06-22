@@ -91,6 +91,9 @@ public class TileMEChest extends AENetworkedPoweredTile
     implements IMEChest, ITerminalHost, IPriorityHost, IColorableBlockEntity,
     IStorageProvider, ServerTickingTile, KeyTypeSelectionHost, IViewCellStorage {
 
+    private static final CellState[] CELL_STATES = CellState.values();
+    private static final AEColor[] COLORS = AEColor.values();
+
     private final AppEngInternalInventory inputInventory = new AppEngInternalInventory(this, 1, 64,
         new InputInventoryFilter());
     private final AppEngInternalInventory cellInventory = new AppEngInternalInventory(this, 1, 1,
@@ -127,6 +130,14 @@ public class TileMEChest extends AENetworkedPoweredTile
 
     private static boolean isVisibleKeyType(AEKeyType keyType) {
         return true;
+    }
+
+    private static CellState readCellState(int ordinal) {
+        return ordinal >= 0 && ordinal < CELL_STATES.length ? CELL_STATES[ordinal] : CellState.ABSENT;
+    }
+
+    private static AEColor readColor(int ordinal) {
+        return ordinal >= 0 && ordinal < COLORS.length ? COLORS[ordinal] : AEColor.TRANSPARENT;
     }
 
     @Override
@@ -324,16 +335,10 @@ public class TileMEChest extends AENetworkedPoweredTile
         var oldCellItem = clientCellItem;
 
         int stateOrdinal = data.readUnsignedByte();
-        CellState[] cellStates = CellState.values();
-        clientCellState = stateOrdinal >= 0 && stateOrdinal < cellStates.length
-            ? cellStates[stateOrdinal]
-            : CellState.ABSENT;
+        clientCellState = readCellState(stateOrdinal);
         clientPowered = data.readBoolean();
         int colorOrdinal = data.readUnsignedByte();
-        AEColor[] colors = AEColor.values();
-        paintedColor = colorOrdinal >= 0 && colorOrdinal < colors.length
-            ? colors[colorOrdinal]
-            : AEColor.TRANSPARENT;
+        paintedColor = readColor(colorOrdinal);
         clientCellItem = Item.getItemById(data.readInt());
         if (clientCellItem == null) {
             clientCellItem = Items.AIR;
@@ -356,19 +361,13 @@ public class TileMEChest extends AENetworkedPoweredTile
     protected void loadVisualState(NBTTagCompound data) {
         super.loadVisualState(data);
         int stateOrdinal = data.getByte("cellState") & 0xFF;
-        CellState[] cellStates = CellState.values();
-        this.clientCellState = stateOrdinal < cellStates.length
-            ? cellStates[stateOrdinal]
-            : CellState.ABSENT;
+        this.clientCellState = readCellState(stateOrdinal);
         this.clientPowered = data.getBoolean("powered");
         var item = Item.getItemById(data.getInteger("cellItem"));
         this.clientCellItem = item == null ? Items.AIR : item;
         if (data.hasKey("paintedColor", Constants.NBT.TAG_ANY_NUMERIC)) {
             int colorOrdinal = data.getByte("paintedColor") & 0xFF;
-            AEColor[] colors = AEColor.values();
-            this.paintedColor = colorOrdinal < colors.length
-                ? colors[colorOrdinal]
-                : AEColor.TRANSPARENT;
+            this.paintedColor = readColor(colorOrdinal);
         }
     }
 
@@ -383,10 +382,7 @@ public class TileMEChest extends AENetworkedPoweredTile
         priority = data.getInteger("priority");
         if (data.hasKey("paintedColor", Constants.NBT.TAG_ANY_NUMERIC)) {
             int colorOrdinal = data.getByte("paintedColor") & 0xFF;
-            AEColor[] colors = AEColor.values();
-            this.paintedColor = colorOrdinal < colors.length
-                ? colors[colorOrdinal]
-                : AEColor.TRANSPARENT;
+            this.paintedColor = readColor(colorOrdinal);
         }
     }
 

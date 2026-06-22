@@ -56,6 +56,8 @@ public enum ButtonToolTips implements LocalizationEnum {
     CycleModeAction,
     Craftable,
     CraftingPlanSortMode,
+    ClearProcessingSecondaryOutputs,
+    ClearProcessingSecondaryOutputsTooltip,
     CycleProcessingOutput,
     CycleProcessingOutputTooltip,
     Descending,

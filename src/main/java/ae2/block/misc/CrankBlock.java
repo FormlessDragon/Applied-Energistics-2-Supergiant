@@ -116,7 +116,7 @@ public class CrankBlock extends AEBaseTileBlock<TileCrank> {
 
     @Override
     public boolean canPlaceBlockAt(World world, BlockPos pos) {
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             if (this.canBlockStay(world, pos, this.getDefaultState().withProperty(BlockDirectional.FACING, facing))) {
                 return true;
             }

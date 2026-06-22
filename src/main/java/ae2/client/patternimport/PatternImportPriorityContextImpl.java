@@ -28,8 +28,9 @@ public final class PatternImportPriorityContextImpl implements PatternImportPrio
     private PatternImportPriorityContextImpl(ContainerPatternEncodingTerm container, List<GenericStack> bookmarkedStacks) {
         this.container = Objects.requireNonNull(container, "container");
         this.clientRepo = container.getClientRepo();
-        this.bookmarkedKeys = new ObjectOpenHashSet<>();
-        List<GenericStack> sanitizedBookmarkedStacks = new ObjectArrayList<>();
+        int bookmarkedCount = bookmarkedStacks != null ? bookmarkedStacks.size() : 0;
+        this.bookmarkedKeys = new ObjectOpenHashSet<>(bookmarkedCount);
+        List<GenericStack> sanitizedBookmarkedStacks = new ObjectArrayList<>(bookmarkedCount);
         if (bookmarkedStacks != null) {
             for (GenericStack bookmarkedStack : bookmarkedStacks) {
                 if (bookmarkedStack != null) {
@@ -39,7 +40,8 @@ public final class PatternImportPriorityContextImpl implements PatternImportPrio
             }
         }
         this.bookmarkedStacks = Collections.unmodifiableList(sanitizedBookmarkedStacks);
-        this.repoEntries = new Object2ObjectOpenHashMap<>();
+        int repoEntryCount = this.clientRepo != null ? this.clientRepo.getAllEntries().size() : 0;
+        this.repoEntries = new Object2ObjectOpenHashMap<>(repoEntryCount);
         if (this.clientRepo != null) {
             for (GridInventoryEntry entry : this.clientRepo.getAllEntries()) {
                 if (entry == null || entry.what() == null) {

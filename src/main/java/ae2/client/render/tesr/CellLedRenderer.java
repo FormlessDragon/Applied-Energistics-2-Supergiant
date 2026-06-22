@@ -29,6 +29,7 @@ import javax.vecmath.Vector3f;
 import java.util.EnumMap;
 
 public final class CellLedRenderer {
+    private static final CellState[] CELL_STATES = CellState.values();
     private static final EnumMap<CellState, Vector3f> STATE_COLORS = new EnumMap<>(CellState.class);
     private static final Vector3f UNPOWERED_COLOR = new Vector3f(0, 0, 0);
     private static final Vector3f BLINK_COLOR = new Vector3f(1, 0.5f, 0.5f);
@@ -48,7 +49,7 @@ public final class CellLedRenderer {
         R, B, FR, L, B, FR, L, B, BA, R, B, BA};
 
     static {
-        for (var cellState : CellState.values()) {
+        for (var cellState : CELL_STATES) {
             int color = cellState.getStateColor();
             STATE_COLORS.put(cellState, new Vector3f(
                 ((color >> 16) & 0xFF) / 255.0f,
@@ -61,7 +62,8 @@ public final class CellLedRenderer {
     }
 
     public static void renderLed(IChestOrDrive drive, int slot) {
-        Vector3f color = getColorForSlot(drive, slot, Float.NaN);
+        Vector3f scratchColor = new Vector3f();
+        Vector3f color = getColorForSlot(drive, slot, Float.NaN, scratchColor);
         if (color == null) {
             return;
         }
@@ -76,9 +78,10 @@ public final class CellLedRenderer {
     public static void renderLeds(IChestOrDrive drive, int slotCount, SlotOriginProvider slotOriginProvider) {
         float blinkFactor = getBlinkFactor();
         int firstSlot = -1;
+        Vector3f scratchColor = new Vector3f();
         Vector3f firstColor = null;
         for (int slot = 0; slot < slotCount; slot++) {
-            firstColor = getColorForSlot(drive, slot, blinkFactor);
+            firstColor = getColorForSlot(drive, slot, blinkFactor, scratchColor);
             if (firstColor != null) {
                 firstSlot = slot;
                 break;
@@ -96,7 +99,7 @@ public final class CellLedRenderer {
         slotOriginProvider.getSlotOrigin(firstSlot, slotOrigin);
         renderLed(buffer, firstColor, slotOrigin.x, slotOrigin.y, slotOrigin.z);
         for (int slot = firstSlot + 1; slot < slotCount; slot++) {
-            Vector3f color = getColorForSlot(drive, slot, blinkFactor);
+            Vector3f color = getColorForSlot(drive, slot, blinkFactor, scratchColor);
             if (color == null) {
                 continue;
             }
@@ -115,7 +118,8 @@ public final class CellLedRenderer {
         }
     }
 
-    private static @Nullable Vector3f getColorForSlot(IChestOrDrive drive, int slot, float blinkFactor) {
+    private static @Nullable Vector3f getColorForSlot(IChestOrDrive drive, int slot, float blinkFactor,
+                                                      Vector3f scratchColor) {
         CellState state = drive.getCellStatus(slot);
         if (state == CellState.ABSENT) {
             return null;
@@ -129,12 +133,12 @@ public final class CellLedRenderer {
             return color;
         }
 
-        color = new Vector3f(color);
+        scratchColor.set(color);
         if (Float.isNaN(blinkFactor)) {
             blinkFactor = getBlinkFactor();
         }
-        color.interpolate(BLINK_COLOR, blinkFactor);
-        return color;
+        scratchColor.interpolate(BLINK_COLOR, blinkFactor);
+        return scratchColor;
     }
 
     private static float getBlinkFactor() {

@@ -68,6 +68,8 @@ public enum BlockOrientation {
     EAST_SOUTH(0, 90, 90, 3);
     // @formatter:on
 
+    private static final BlockOrientation[] VALUES = values();
+
     private final int angleX;
     private final int angleY;
     private final int angleZ;
@@ -99,12 +101,12 @@ public enum BlockOrientation {
     public static BlockOrientation get(EnumFacing front, EnumFacing top) {
         var offset = front.ordinal() * 4;
         for (var i = offset; i < offset + 4; i++) {
-            var orientation = values()[i];
+            var orientation = VALUES[i];
             if (orientation.getSide(RelativeSide.TOP) == top) {
                 return orientation;
             }
         }
-        return values()[offset]; // Degenerated up -> return default
+        return VALUES[offset]; // Degenerated up -> return default
     }
 
     public static BlockOrientation get(EnumFacing facing, int spin) {
@@ -112,7 +114,7 @@ public enum BlockOrientation {
             return get(EnumFacing.NORTH);
         }
 
-        return values()[facing.ordinal() * 4 + spin];
+        return VALUES[facing.ordinal() * 4 + spin];
     }
 
     public static BlockOrientation get(TileEntity blockEntity) {
@@ -218,7 +220,7 @@ public enum BlockOrientation {
     }
 
     public EnumFacing resultingRotate(EnumFacing facing) {
-        for (EnumFacing candidate : EnumFacing.values()) {
+        for (EnumFacing candidate : EnumFacing.VALUES) {
             if (rotate(candidate) == facing) {
                 return candidate;
             }

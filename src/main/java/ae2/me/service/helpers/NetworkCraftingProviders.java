@@ -15,6 +15,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
@@ -144,7 +145,7 @@ public class NetworkCraftingProviders {
     public Collection<IPatternDetails> getCraftingFor(AEKey whatToCraft) {
         var patterns = this.craftableItems.get(whatToCraft);
         if (patterns != null) {
-            return patterns.getSortedPatterns(); // The result of Stream.toList() is already unmodifiable
+            return patterns.getSortedPatterns();
         }
         return Collections.emptyList();
     }
@@ -282,13 +283,21 @@ public class NetworkCraftingProviders {
         private boolean needsSorting = false;
 
         private void sortPatterns() {
-            sortedPatterns = patterns.stream()
-                                     .sorted(Comparator
-                                         .comparingInt((PatternInfo pi) -> pi.state().priority).reversed()
-                                         .thenComparingLong(pi -> pi.state().order))
-                                     .map(PatternInfo::pattern)
-                                     .distinct()
-                                     .toList();
+            var sortedPatternInfos = new ObjectArrayList<>(patterns);
+            sortedPatternInfos.sort(Comparator
+                .comparingInt((PatternInfo pi) -> pi.state().priority).reversed()
+                .thenComparingLong(pi -> pi.state().order));
+
+            var seenPatterns = new ObjectOpenHashSet<IPatternDetails>(sortedPatternInfos.size());
+            var deduplicatedPatterns = new ObjectArrayList<IPatternDetails>(sortedPatternInfos.size());
+            for (var patternInfo : sortedPatternInfos) {
+                var pattern = patternInfo.pattern();
+                if (seenPatterns.add(pattern)) {
+                    deduplicatedPatterns.add(pattern);
+                }
+            }
+
+            sortedPatterns = ObjectLists.unmodifiable(deduplicatedPatterns);
             needsSorting = false;
         }
 

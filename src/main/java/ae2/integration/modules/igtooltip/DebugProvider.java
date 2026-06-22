@@ -147,7 +147,7 @@ public final class DebugProvider {
         if (tag.hasKey(TAG_NODE_EXPOSED, Constants.NBT.TAG_INT)) {
             var exposedSides = tag.getInteger(TAG_NODE_EXPOSED);
             var line = new StringBuilder(label(tooltip, TopText.debug_node_exposed, TextFormatting.WHITE));
-            for (EnumFacing value : EnumFacing.values()) {
+            for (EnumFacing value : EnumFacing.VALUES) {
                 line.append((exposedSides & (1 << value.ordinal())) == 0 ? TextFormatting.GRAY : TextFormatting.GREEN);
                 line.append(value.name().charAt(0));
             }
@@ -205,7 +205,7 @@ public final class DebugProvider {
 
         if (node instanceof InWorldGridNode inWorldNode) {
             int exposedSides = 0;
-            for (var value : EnumFacing.values()) {
+            for (var value : EnumFacing.VALUES) {
                 if (inWorldNode.isExposedOnSide(value)) {
                     exposedSides |= 1 << value.ordinal();
                 }

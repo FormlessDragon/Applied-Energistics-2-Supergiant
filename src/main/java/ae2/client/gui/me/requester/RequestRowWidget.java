@@ -30,7 +30,7 @@ public final class RequestRowWidget {
     private final AEBaseGui<?> gui;
     private final FontRenderer font;
     private final int currentY;
-    private final List<ToggleButton> buttons = new ObjectArrayList<>();
+    private final List<ToggleButton> buttons = new ObjectArrayList<>(2);
 
     private final ToggleButton enableBtn;
     private final ToggleButton forceStartBtn;

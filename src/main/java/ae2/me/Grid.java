@@ -42,7 +42,6 @@ import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
 import com.google.gson.stream.JsonWriter;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.Reference2IntMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import net.minecraft.crash.CrashReportCategory;
@@ -55,13 +54,12 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public class Grid implements IGrid {
     /**
      * We use this to copy the list of grid nodes we'll notify. Avoids a potential ConcurrentModificationException.
      */
-    private static final ObjectList<IGridNode> ITERATION_BUFFER = new ObjectArrayList<>();
+    private static final ObjectArrayList<IGridNode> ITERATION_BUFFER = new ObjectArrayList<>();
     private static int nextSerial = 0;
 
     private final SetMultimap<Class<?>, IGridNode> machines = MultimapBuilder.hashKeys().hashSetValues().build();
@@ -283,6 +281,7 @@ public class Grid implements IGrid {
             // We're copying the nodes to a temporary buffer here because changing the power state of a node
             // may actually cause adjacent nodes to suddenly boot (i.e. QNBs) and modify the grid while
             // we're iterating over it.
+            ITERATION_BUFFER.ensureCapacity(this.machines.size());
             ITERATION_BUFFER.addAll(getNodes());
 
             for (IGridNode node : ITERATION_BUFFER) {
@@ -297,8 +296,16 @@ public class Grid implements IGrid {
         category.addCrashSection("Nodes", this.machines.size());
         category.addCrashSection("Serial number", this.serialNumber);
         if (AELog.isGridLogEnabled()) {
-            category.addCrashSection("All GridNodes",
-                this.machines.values().stream().map(Object::toString).collect(Collectors.joining(";")));
+            StringBuilder nodes = new StringBuilder();
+            boolean first = true;
+            for (var node : this.machines.values()) {
+                if (!first) {
+                    nodes.append(';');
+                }
+                nodes.append(node);
+                first = false;
+            }
+            category.addCrashSection("All GridNodes", nodes.toString());
         }
         if (this.pivot != null) {
             this.pivot.fillCrashReportCategory(category);

@@ -42,10 +42,6 @@ public enum CraftingUnitType implements ICraftingUnitType {
     private final ResourceLocation id;
     private final CraftingUnitVisualDefinition visualDefinition;
 
-    CraftingUnitType(int storageKb) {
-        this(storageKb, 0, CraftingUnitVisualKind.LIGHT);
-    }
-
     CraftingUnitType(int storageKb, int accelerator, CraftingUnitVisualKind visualKind) {
         this.storageKb = storageKb;
         this.accelerator = accelerator;

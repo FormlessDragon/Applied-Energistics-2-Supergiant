@@ -124,7 +124,10 @@ public class GuiKeyTypeSelection<C extends AEBaseContainer & IKeyTypeSelectionCo
 
             checkboxes.clear();
 
-            for (AEKeyType keyType : getContainer().getClientKeyTypeSelection().keyTypes().keySet()) {
+            var keyTypes = getContainer().getClientKeyTypeSelection().keyTypes().keySet();
+            checkboxes.ensureCapacity(keyTypes.size());
+
+            for (AEKeyType keyType : keyTypes) {
                 ITextComponent text = keyType.getDescription();
                 int textboxWidth = 24 + Minecraft.getMinecraft().fontRenderer.getStringWidth(text.getFormattedText());
 

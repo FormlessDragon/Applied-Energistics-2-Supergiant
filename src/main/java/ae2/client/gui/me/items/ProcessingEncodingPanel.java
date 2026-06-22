@@ -27,6 +27,7 @@ public class ProcessingEncodingPanel extends EncodingModePanel {
 
     private final ActionButton clearBtn;
     private final ActionButton cycleOutputBtn;
+    private final ActionButton clearSecondaryOutputsBtn;
     private final Scrollbar scrollbar;
     private final ProcessingAmountButton[] amountButtons;
 
@@ -42,6 +43,12 @@ public class ProcessingEncodingPanel extends EncodingModePanel {
         this.cycleOutputBtn.setHalfSize(true);
         this.cycleOutputBtn.setDisableBackground(true);
         widgets.add("processingCycleOutput", this.cycleOutputBtn);
+
+        this.clearSecondaryOutputsBtn = new ActionButton(ActionItems.S_CLEAR_PROCESSING_SECONDARY_OUTPUTS,
+            this.container::clearProcessingSecondaryOutputs);
+        this.clearSecondaryOutputsBtn.setHalfSize(true);
+        this.clearSecondaryOutputsBtn.setDisableBackground(true);
+        widgets.add("processingClearSecondaryOutputs", this.clearSecondaryOutputsBtn);
 
         this.scrollbar = widgets.addScrollBar("processingPatternModeScrollbar", Scrollbar.SMALL);
         this.scrollbar.setRange(0, Math.max(0, this.container.getProcessingInputSlots().length / 3 - 3), 3);
@@ -83,6 +90,7 @@ public class ProcessingEncodingPanel extends EncodingModePanel {
         }
 
         this.cycleOutputBtn.setVisibility(this.visible && this.container.canCycleProcessingOutputs());
+        this.clearSecondaryOutputsBtn.setVisibility(this.visible && this.container.canCycleProcessingOutputs());
         updateTooltipVisibility();
     }
 
@@ -148,6 +156,7 @@ public class ProcessingEncodingPanel extends EncodingModePanel {
         this.scrollbar.setVisible(visible);
         this.clearBtn.setVisibility(visible);
         this.cycleOutputBtn.setVisibility(visible && this.container.canCycleProcessingOutputs());
+        this.clearSecondaryOutputsBtn.setVisibility(visible && this.container.canCycleProcessingOutputs());
         for (ProcessingAmountButton button : this.amountButtons) {
             button.visible = visible;
             button.enabled = visible;

@@ -52,6 +52,7 @@ public class TileCaner extends AENetworkedPoweredTile
     implements IGridTickable, ICraftingMachine, InternalInventoryHost {
     private static final int POWER_MAXIMUM_AMOUNT = 3200;
     private static final int POWER_USAGE = 80;
+    private static final CanerMode[] MODES = CanerMode.values();
 
     private final AppEngInternalInventory container = new AppEngInternalInventory(this, 1, 1);
     private final GenericStackInv stuff = new GenericStackInv(this::wake, 1);
@@ -336,9 +337,8 @@ public class TileCaner extends AENetworkedPoweredTile
         this.ejectSide = data.hasKey("ejectSide") ? EnumFacing.byName(data.getString("ejectSide")) : null;
         if (data.hasKey("mode")) {
             int ordinal = data.getByte("mode");
-            CanerMode[] modes = CanerMode.values();
-            if (ordinal >= 0 && ordinal < modes.length) {
-                this.mode = modes[ordinal];
+            if (ordinal >= 0 && ordinal < MODES.length) {
+                this.mode = MODES[ordinal];
             }
         }
         this.emptyKey = data.hasKey("emptyKey", 10) ? AEKey.fromTagGeneric(data.getCompoundTag("emptyKey")) : null;

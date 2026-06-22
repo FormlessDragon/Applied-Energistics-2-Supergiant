@@ -118,7 +118,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     private static String rememberedSearch = "";
 
     protected final Repo repo;
-    private final List<ItemStack> currentViewCells = new ObjectArrayList<>();
+    private final ObjectArrayList<ItemStack> currentViewCells = new ObjectArrayList<>();
     private final List<RepoSlot> repoSlots = new ObjectArrayList<>();
     private final IConfigManager configSrc;
     private final boolean supportsViewCells;
@@ -329,6 +329,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         List<ItemStack> viewCells = this.container.getViewCells();
         if (!this.currentViewCells.equals(viewCells)) {
             this.currentViewCells.clear();
+            this.currentViewCells.ensureCapacity(viewCells.size());
             this.currentViewCells.addAll(viewCells);
             this.repo.setPartitionList(createPartitionList(viewCells));
         }
@@ -457,7 +458,8 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
     private void refreshRepoSlots() {
         this.repo.setTerminalRows(this.rows);
-        List<RepoSlot> existingSlots = new ObjectArrayList<>();
+        int repoSlotCount = this.rows * this.terminalStyle.getSlotsPerRow();
+        List<RepoSlot> existingSlots = new ObjectArrayList<>(Math.max(this.repoSlots.size(), repoSlotCount));
         for (Slot slot : this.container.inventorySlots) {
             if (slot instanceof RepoSlot) {
                 existingSlots.add((RepoSlot) slot);
@@ -729,11 +731,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             return true;
         }
 
-        if (handlePlayerInventoryPinShortcut(slot, mouseButton, clickType)) {
-            return true;
-        }
-
-        return false;
+        return handlePlayerInventoryPinShortcut(slot, mouseButton, clickType);
     }
 
     private boolean handleGridInventoryEntryPinShortcut(@Nullable GridInventoryEntry entry,

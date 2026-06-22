@@ -30,7 +30,6 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Mouse;
 
 import java.awt.Rectangle;
-import java.util.List;
 import java.util.function.Consumer;
 
 public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget {
@@ -45,7 +44,7 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
     private static final int TITLE_Y = 7;
 
     private final AEBaseGui<? extends AEBaseContainer> parent;
-    private final List<GuiButton> buttons = new ObjectArrayList<>();
+    private final ObjectArrayList<GuiButton> buttons = new ObjectArrayList<>();
     private Rectangle bounds = new Rectangle(0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
     private Point screenOrigin = Point.ZERO;
     private boolean visible;
@@ -288,6 +287,7 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
         if (!this.visible) {
             return;
         }
+        this.buttons.ensureCapacity(getInstalledTerminalCount() + 1);
 
         IconButton closeButton = new IconButton(this::close) {
             @Override

@@ -196,7 +196,7 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     }
 
     private static EnumFacing readPackedFacing(int ordinal) {
-        if (ordinal > 0 && ordinal < EnumFacing.values().length) {
+        if (ordinal >= 0 && ordinal < EnumFacing.VALUES.length) {
             return EnumFacing.VALUES[ordinal];
         }
         return null;
@@ -399,6 +399,13 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
         BlockOrientation orientation = BlockOrientation.get(strategy, state);
         this.orientationResolved = true;
         this.setOrientationInternal(facing, orientation.getSide(RelativeSide.TOP));
+    }
+
+    public final void initializeOrientationFromBlockState(IBlockState state) {
+        this.syncOrientationFromBlockState(state);
+        this.refreshOrientation();
+        this.saveChanges();
+        this.markForUpdate();
     }
 
     public IBlockState applyOrientationToBlockState(IBlockState state) {

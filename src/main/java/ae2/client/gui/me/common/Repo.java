@@ -41,6 +41,7 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.item.Item;
 import net.minecraft.item.crafting.Ingredient;
 import org.jetbrains.annotations.Nullable;
@@ -74,18 +75,18 @@ public class Repo implements IClientRepo {
         return pinInfo != null ? pinInfo.since : Instant.MAX;
     });
     private final BiMap<Long, GridInventoryEntry> entries = HashBiMap.create();
-    private final ObjectList<GridInventoryEntry> view = new ObjectArrayList<>();
-    private final ObjectList<GridInventoryEntry> pinnedSlots = new ObjectArrayList<>();
-    private final IntList pinnedSlotUserSlotIndexes = new IntArrayList();
-    private final ObjectList<GridInventoryEntry> scrollableUserPinSlots = new ObjectArrayList<>();
-    private final IntList scrollableUserPinSlotIndexes = new IntArrayList();
-    private final ObjectList<GridInventoryEntry> craftingPinnedEntries = new ObjectArrayList<>();
-    private final ObjectList<GridInventoryEntry> playerPinnedEntries = new ObjectArrayList<>();
+    private final ObjectArrayList<GridInventoryEntry> view = new ObjectArrayList<>();
+    private final ObjectArrayList<GridInventoryEntry> pinnedSlots = new ObjectArrayList<>();
+    private final IntArrayList pinnedSlotUserSlotIndexes = new IntArrayList();
+    private final ObjectArrayList<GridInventoryEntry> scrollableUserPinSlots = new ObjectArrayList<>();
+    private final IntArrayList scrollableUserPinSlotIndexes = new IntArrayList();
+    private final ObjectArrayList<GridInventoryEntry> craftingPinnedEntries = new ObjectArrayList<>();
+    private final ObjectArrayList<GridInventoryEntry> playerPinnedEntries = new ObjectArrayList<>();
     private final Map<AEKey, PinnedKeys.PinReason> pinnedReasons = new Object2ObjectOpenHashMap<>();
     /**
      * Entries by item ID to speed up ingredient matching.
      */
-    private final Int2ObjectOpenHashMap<List<GridInventoryEntry>> entriesByItemId = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectOpenHashMap<ObjectList<GridInventoryEntry>> entriesByItemId = new Int2ObjectOpenHashMap<>();
     private final RepoSearch search = new RepoSearch();
     private final IScrollSource src;
     private final ISortSource sortSrc;
@@ -95,7 +96,6 @@ public class Repo implements IClientRepo {
     private int visiblePlayerPinRows;
     private int configuredPlayerPinRows;
     private boolean enabled = false;
-    private boolean entriesByItemIdNeedsUpdate = true;
     private IPartitionList partitionList;
     private Runnable updateViewListener;
     private boolean paused;
@@ -142,8 +142,6 @@ public class Repo implements IClientRepo {
     }
 
     private void handleUpdate(GridInventoryEntry serverEntry) {
-        entriesByItemIdNeedsUpdate = true;
-
         var localEntry = entries.get(serverEntry.serial());
         if (localEntry == null) {
             // First time we're seeing this serial -> create new entry
@@ -153,6 +151,7 @@ public class Repo implements IClientRepo {
             }
             if (serverEntry.isMeaningful()) {
                 entries.put(serverEntry.serial(), serverEntry);
+                addEntryByItemId(serverEntry);
             }
             return;
         }
@@ -160,15 +159,19 @@ public class Repo implements IClientRepo {
         // Update the local entry
         if (!serverEntry.isMeaningful()) {
             entries.remove(serverEntry.serial());
+            removeEntryByItemId(localEntry);
         } else if (serverEntry.what() == null) {
-            entries.put(serverEntry.serial(), new GridInventoryEntry(
+            var updatedEntry = new GridInventoryEntry(
                 serverEntry.serial(),
                 localEntry.what(),
                 serverEntry.storedAmount(),
                 serverEntry.requestableAmount(),
-                serverEntry.craftable()));
+                serverEntry.craftable());
+            entries.put(serverEntry.serial(), updatedEntry);
+            replaceEntryByItemId(localEntry, updatedEntry);
         } else {
             entries.put(serverEntry.serial(), serverEntry);
+            replaceEntryByItemId(localEntry, serverEntry);
         }
     }
 
@@ -196,7 +199,7 @@ public class Repo implements IClientRepo {
             var playerPinnedFreeSlots = getFreeSlots(playerPinnedEntries);
             var viewFreeSlots = getFreeSlots(view);
 
-            ObjectList<GridInventoryEntry> entriesToAdd = new ObjectArrayList<>();
+            ObjectList<GridInventoryEntry> entriesToAdd = new ObjectArrayList<>(this.entries.size());
 
             // Determine what to do with server entries that are not currently being shown
             for (var serverEntry : entries.values()) {
@@ -221,6 +224,9 @@ public class Repo implements IClientRepo {
             this.view.clear();
             this.craftingPinnedEntries.clear();
             this.playerPinnedEntries.clear();
+            this.view.ensureCapacity(this.entries.size());
+            this.craftingPinnedEntries.ensureCapacity(this.entries.size());
+            this.playerPinnedEntries.ensureCapacity(this.entries.size());
 
             addEntriesToView(this.entries.values());
         }
@@ -327,6 +333,13 @@ public class Repo implements IClientRepo {
         boolean lockedGridPins = this.sortSrc.getPinDisplayMode() == PinDisplayMode.LOCKED_GRID;
         this.visiblePlayerPinRows = lockedGridPins ? getVisiblePlayerPinRowsForCurrentView() : 0;
         this.pinnedRowCount = craftingRows + this.visiblePlayerPinRows;
+        int pinnedSlotCount = this.pinnedRowCount * this.rowSize;
+        int playerSlotCount = this.configuredPlayerPinRows * this.rowSize;
+        int scrollableUserPinSlotCount = lockedGridPins ? 0 : playerSlotCount;
+        this.pinnedSlots.ensureCapacity(pinnedSlotCount);
+        this.pinnedSlotUserSlotIndexes.ensureCapacity(pinnedSlotCount);
+        this.scrollableUserPinSlots.ensureCapacity(scrollableUserPinSlotCount);
+        this.scrollableUserPinSlotIndexes.ensureCapacity(scrollableUserPinSlotCount);
 
         for (GridInventoryEntry entry : craftingPinnedEntries) {
             if (pinnedSlots.size() >= craftingRows * rowSize) {
@@ -341,7 +354,6 @@ public class Repo implements IClientRepo {
             pinnedSlotUserSlotIndexes.add(NO_USER_PIN_SLOT);
         }
 
-        int playerSlotCount = this.configuredPlayerPinRows * this.rowSize;
         if (lockedGridPins) {
             int visiblePlayerSlotCount = this.visiblePlayerPinRows * this.rowSize;
             for (int slotIndex = 0; slotIndex < visiblePlayerSlotCount; slotIndex++) {
@@ -456,7 +468,7 @@ public class Repo implements IClientRepo {
     }
 
     public List<GridInventoryEntry> getPinnedEntries() {
-        ObjectArrayList<GridInventoryEntry> entries = new ObjectArrayList<>();
+        ObjectArrayList<GridInventoryEntry> entries = new ObjectArrayList<>(this.pinnedSlots.size());
         for (GridInventoryEntry entry : this.pinnedSlots) {
             if (entry != null) {
                 entries.add(entry);
@@ -514,7 +526,6 @@ public class Repo implements IClientRepo {
         this.visiblePlayerPinRows = 0;
         this.configuredPlayerPinRows = 0;
         this.entriesByItemId.clear();
-        this.entriesByItemIdNeedsUpdate = true;
     }
 
     public final boolean hasPinnedRow() {
@@ -629,34 +640,37 @@ public class Repo implements IClientRepo {
     }
 
     private Collection<GridInventoryEntry> getByItemId(int itemId) {
-        // Build the itemid->entry map if needed
-        if (entriesByItemIdNeedsUpdate) {
-            rebuildItemIdToEntries();
-            entriesByItemIdNeedsUpdate = false;
-        }
-        return entriesByItemId.getOrDefault(itemId, List.of());
+        return entriesByItemId.getOrDefault(itemId, ObjectLists.emptyList());
     }
 
-    private void rebuildItemIdToEntries() {
-        entriesByItemId.clear();
-        for (var entry : getAllEntries()) {
-            if (entry.what() instanceof AEItemKey itemKey) {
-                var itemId = Item.getIdFromItem(itemKey.getItem());
-                var currentList = entriesByItemId.get(itemId);
-                if (currentList == null) {
-                    // For many items without NBT, this list will only ever have one entry
-                    entriesByItemId.put(itemId, List.of(entry));
-                } else if (currentList.size() == 1) {
-                    // Convert the list from an immutable single-entry list to a mutable normal arraylist
-                    ObjectList<GridInventoryEntry> mutableList = new ObjectArrayList<>(10);
-                    mutableList.addAll(currentList);
-                    mutableList.add(entry);
-                    entriesByItemId.put(itemId, mutableList);
-                } else {
-                    // If it had more than 1 item, it must have been mutable already
-                    currentList.add(entry);
-                }
-            }
+    private void replaceEntryByItemId(GridInventoryEntry oldEntry, GridInventoryEntry newEntry) {
+        if (oldEntry == newEntry) {
+            return;
+        }
+        removeEntryByItemId(oldEntry);
+        addEntryByItemId(newEntry);
+    }
+
+    private void addEntryByItemId(GridInventoryEntry entry) {
+        if (!(entry.what() instanceof AEItemKey itemKey)) {
+            return;
+        }
+        this.entriesByItemId.computeIfAbsent(Item.getIdFromItem(itemKey.getItem()), ignored -> new ObjectArrayList<>(1))
+                            .add(entry);
+    }
+
+    private void removeEntryByItemId(GridInventoryEntry entry) {
+        if (!(entry.what() instanceof AEItemKey itemKey)) {
+            return;
+        }
+        int itemId = Item.getIdFromItem(itemKey.getItem());
+        var currentList = this.entriesByItemId.get(itemId);
+        if (currentList == null) {
+            return;
+        }
+        currentList.remove(entry);
+        if (currentList.isEmpty()) {
+            this.entriesByItemId.remove(itemId);
         }
     }
 

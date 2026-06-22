@@ -136,7 +136,7 @@ class QnbFormedBakedModel extends DelegateBakedModel {
             if (formedState.powered()) {
                 builder.setTexture(this.lightCornerTexture);
                 builder.setEmissiveMaterial(true);
-                for (EnumFacing facing : EnumFacing.values()) {
+                for (EnumFacing facing : EnumFacing.VALUES) {
                     float xOffset = Math.abs(facing.getXOffset() * 0.01f);
                     float yOffset = Math.abs(facing.getYOffset() * 0.01f);
                     float zOffset = Math.abs(facing.getZOffset() * 0.01f);
@@ -157,7 +157,7 @@ class QnbFormedBakedModel extends DelegateBakedModel {
             if (formedState.powered()) {
                 builder.setTexture(this.lightTexture);
                 builder.setEmissiveMaterial(true);
-                for (EnumFacing facing : EnumFacing.values()) {
+                for (EnumFacing facing : EnumFacing.VALUES) {
                     float xOffset = Math.abs(facing.getXOffset() * 0.01f);
                     float yOffset = Math.abs(facing.getYOffset() * 0.01f);
                     float zOffset = Math.abs(facing.getZOffset() * 0.01f);

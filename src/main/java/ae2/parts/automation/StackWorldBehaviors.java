@@ -158,10 +158,11 @@ public final class StackWorldBehaviors {
 
     public static List<PickupStrategy> createPickupStrategies(WorldServer level, BlockPos fromPos, EnumFacing fromSide,
                                                               TileEntity host, Object2IntMap<Enchantment> enchantments, @Nullable UUID owningEntityPlayerId) {
-        return pickupStrategies.getMap().values()
-                               .stream()
-                               .map(f -> f.create(level, fromPos, fromSide, host, enchantments, owningEntityPlayerId))
-                               .toList();
+        var strategies = new ObjectArrayList<PickupStrategy>(pickupStrategies.getMap().size());
+        for (var factory : pickupStrategies.getMap().values()) {
+            strategies.add(factory.create(level, fromPos, fromSide, host, enchantments, owningEntityPlayerId));
+        }
+        return strategies;
     }
 
 }

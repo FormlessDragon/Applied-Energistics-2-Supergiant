@@ -78,7 +78,7 @@ public class TileCraftingUnit extends AENetworkedTile
 
     private static EnumSet<EnumFacing> decodeConnections(int mask) {
         EnumSet<EnumFacing> connections = EnumSet.noneOf(EnumFacing.class);
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             if ((mask & (1 << facing.getIndex())) != 0) {
                 connections.add(facing);
             }
@@ -294,7 +294,7 @@ public class TileCraftingUnit extends AENetworkedTile
             if (this == blockEntity) {
                 places.add(this.pos);
             } else {
-                for (EnumFacing facing : EnumFacing.values()) {
+                for (EnumFacing facing : EnumFacing.VALUES) {
                     BlockPos place = blockEntity.getLocation().offset(facing);
                     if (this.world.isAirBlock(place)) {
                         places.add(place);
@@ -410,7 +410,7 @@ public class TileCraftingUnit extends AENetworkedTile
             return connections;
         }
 
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             BlockPos otherPos = this.pos.offset(facing);
             var otherState = this.world.getBlockState(otherPos);
             var otherTile = this.world.getTileEntity(otherPos);

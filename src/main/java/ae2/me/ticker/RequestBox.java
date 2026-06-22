@@ -72,7 +72,7 @@ public final class RequestBox {
         if (event.phase != TickEvent.Phase.END || WAITING.isEmpty()) {
             return;
         }
-        var finished = new ObjectArrayList<EntityPlayer>();
+        var finished = new ObjectArrayList<EntityPlayer>(WAITING.size());
         for (var entry : WAITING.entrySet()) {
             if (entry.getValue().isFinished()) {
                 finished.add(entry.getKey());

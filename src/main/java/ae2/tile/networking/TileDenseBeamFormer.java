@@ -42,6 +42,7 @@ public class TileDenseBeamFormer extends AENetworkedTile implements BeamFormerEn
     private static final int BEAM_VISIBLE_FLAG = 4;
     private static final double MAX_RENDER_DISTANCE_SQUARED = 9216.0;
     private static final double DENSE_BEAM_ORIGIN_FACE_OFFSET = 2.0D / 16.0D;
+    private static final AEColor[] COLORS = AEColor.values();
 
     @Nullable
     private IGridConnection connection;
@@ -64,8 +65,7 @@ public class TileDenseBeamFormer extends AENetworkedTile implements BeamFormerEn
     }
 
     private static AEColor readColor(int ordinal) {
-        AEColor[] colors = AEColor.values();
-        return ordinal >= 0 && ordinal < colors.length ? colors[ordinal] : AEColor.TRANSPARENT;
+        return ordinal >= 0 && ordinal < COLORS.length ? COLORS[ordinal] : AEColor.TRANSPARENT;
     }
 
     @Override

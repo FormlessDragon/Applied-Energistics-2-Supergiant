@@ -173,7 +173,7 @@ public abstract class MBCalculator<TBlockEntity extends IAEMultiBlock<TCluster>,
     public abstract boolean checkMultiblockScale(BlockPos min, BlockPos max);
 
     private boolean verifyUnownedRegion(World level, BlockPos min, BlockPos max) {
-        for (EnumFacing side : EnumFacing.values()) {
+        for (EnumFacing side : EnumFacing.VALUES) {
             if (this.verifyUnownedRegionInner(level, min.getX(), min.getY(), min.getZ(), max.getX(), max.getY(),
                 max.getZ(),
                 side)) {

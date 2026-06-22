@@ -63,7 +63,7 @@ public class QuartzFixtureBlock extends AEBaseBlock {
 
     private static EnumFacing[] getNearestLookingDirections(EntityLivingBase placer) {
         if (placer == null) {
-            return EnumFacing.values();
+            return EnumFacing.VALUES;
         }
 
         Vec3d look = placer.getLookVec();
@@ -122,7 +122,7 @@ public class QuartzFixtureBlock extends AEBaseBlock {
             }
         }
 
-        for (EnumFacing direction : EnumFacing.values()) {
+        for (EnumFacing direction : EnumFacing.VALUES) {
             IBlockState placedState = state.withProperty(BlockDirectional.FACING, direction);
             if (this.canBlockStay(world, pos, placedState)) {
                 return placedState;
@@ -146,7 +146,7 @@ public class QuartzFixtureBlock extends AEBaseBlock {
 
     @Override
     public boolean canPlaceBlockAt(World world, BlockPos pos) {
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             if (this.canBlockStay(world, pos, this.getDefaultState().withProperty(BlockDirectional.FACING, facing))) {
                 return true;
             }

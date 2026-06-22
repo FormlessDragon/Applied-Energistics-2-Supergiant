@@ -20,7 +20,7 @@ public class CraftingSupplierHighlightHandler {
     public static final CraftingSupplierHighlightHandler INSTANCE = new CraftingSupplierHighlightHandler();
     private static final long DURATION_MS = 20_000L;
 
-    private final List<OverlayHighlightLocation> currentDimensionLocations = new ObjectArrayList<>();
+    private final ObjectArrayList<OverlayHighlightLocation> currentDimensionLocations = new ObjectArrayList<>();
     private long expiresAt;
     private int highlightedDimension = Integer.MIN_VALUE;
 
@@ -45,6 +45,7 @@ public class CraftingSupplierHighlightHandler {
         }
 
         this.currentDimensionLocations.clear();
+        this.currentDimensionLocations.ensureCapacity(locations.size());
         int currentDimension = minecraft.world.provider.getDimension();
         this.highlightedDimension = currentDimension;
         this.expiresAt = System.currentTimeMillis() + DURATION_MS;

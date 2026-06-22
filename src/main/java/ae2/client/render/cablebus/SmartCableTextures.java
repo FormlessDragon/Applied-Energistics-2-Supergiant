@@ -37,20 +37,30 @@ public class SmartCableTextures {
         AppEng.makeId("part/cable/dense_smart/channels_13"),
         AppEng.makeId("part/cable/dense_smart/channels_14")
     };
+    private static final Collection<ResourceLocation> TEXTURE_DEPENDENCIES = buildTextureDependencies();
 
     private final TextureAtlasSprite[] textures;
     private final TextureAtlasSprite[] denseTextures;
 
     public SmartCableTextures(Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
-        this.textures = Arrays.stream(SMART_CHANNELS_TEXTURES)
-                              .map(bakedTextureGetter)
-                              .toArray(TextureAtlasSprite[]::new);
-        this.denseTextures = Arrays.stream(DENSE_SMART_CHANNELS_TEXTURES)
-                                   .map(bakedTextureGetter)
-                                   .toArray(TextureAtlasSprite[]::new);
+        this.textures = bakeTextures(SMART_CHANNELS_TEXTURES, bakedTextureGetter);
+        this.denseTextures = bakeTextures(DENSE_SMART_CHANNELS_TEXTURES, bakedTextureGetter);
     }
 
     public static Collection<ResourceLocation> getTextureDependencies() {
+        return TEXTURE_DEPENDENCIES;
+    }
+
+    private static TextureAtlasSprite[] bakeTextures(ResourceLocation[] textureIds,
+                                                     Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter) {
+        var textures = new TextureAtlasSprite[textureIds.length];
+        for (int i = 0; i < textureIds.length; i++) {
+            textures[i] = bakedTextureGetter.apply(textureIds[i]);
+        }
+        return textures;
+    }
+
+    private static Collection<ResourceLocation> buildTextureDependencies() {
         ObjectLinkedOpenHashSet<ResourceLocation> result = new ObjectLinkedOpenHashSet<>();
         result.addAll(Arrays.asList(SMART_CHANNELS_TEXTURES));
         result.addAll(Arrays.asList(DENSE_SMART_CHANNELS_TEXTURES));

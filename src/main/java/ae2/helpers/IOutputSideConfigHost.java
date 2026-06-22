@@ -15,7 +15,7 @@ public interface IOutputSideConfigHost extends ISubGuiHost {
     BlockOrientation getBlockOrientation();
 
     default void clearOutputSides() {
-        for (EnumFacing side : EnumFacing.values()) {
+        for (EnumFacing side : EnumFacing.VALUES) {
             setOutputSideEnabled(side, false);
         }
     }

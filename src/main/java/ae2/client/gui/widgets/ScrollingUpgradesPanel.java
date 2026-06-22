@@ -53,8 +53,8 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
     private final BooleanSupplier hideLeadingSlots;
     private final Supplier<List<ITextComponent>> tooltipSupplier;
     private final Scrollbar scrollbar;
-    private final List<Slot> panelSlots = new ObjectArrayList<>();
-    private final List<Slot> visiblePanelSlots = new ObjectArrayList<>();
+    private final ObjectArrayList<Slot> panelSlots;
+    private final ObjectArrayList<Slot> visiblePanelSlots;
 
     private Point screenOrigin = Point.ZERO;
     private int x;
@@ -69,6 +69,9 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
         this.tooltipSupplier = tooltipSupplier;
         this.scrollbar = scrollbar;
         this.scrollbar.setCaptureMouseWheel(false);
+        int totalSlots = slots.size() + leadingSlots.size();
+        this.panelSlots = new ObjectArrayList<>(totalSlots);
+        this.visiblePanelSlots = new ObjectArrayList<>(Math.min(DEFAULT_MAX_ROWS, totalSlots));
     }
 
     private static void disableSlots(List<Slot> slots) {
@@ -133,14 +136,16 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
         rebuildPanelSlots();
         updateScrollbar();
         deactivatePanelSlots();
+        int visibleSlotCount = getVisibleSlotCount();
         this.visiblePanelSlots.clear();
+        this.visiblePanelSlots.ensureCapacity(visibleSlotCount);
         int slotOriginX = this.x + SLOT_X_OFFSET;
         int slotOriginY = this.y + SLOT_Y_OFFSET;
         int firstSlot = this.scrollbar.getCurrentScroll();
         int index = 0;
 
         for (Slot slot : this.panelSlots) {
-            boolean slotVisible = index >= firstSlot && index < firstSlot + getVisibleSlotCount();
+            boolean slotVisible = index >= firstSlot && index < firstSlot + visibleSlotCount;
             index++;
 
             if (!slotVisible) {
@@ -240,6 +245,8 @@ final class ScrollingUpgradesPanel implements ICompositeWidget {
     }
 
     private void rebuildPanelSlots() {
+        this.panelSlots.ensureCapacity(this.slots.size()
+            + (this.hideLeadingSlots.getAsBoolean() ? 0 : this.leadingSlots.size()));
         this.panelSlots.clear();
         if (!this.hideLeadingSlots.getAsBoolean()) {
             enableSlots(this.leadingSlots);

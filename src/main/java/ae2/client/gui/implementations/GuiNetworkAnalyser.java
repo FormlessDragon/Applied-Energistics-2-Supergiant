@@ -31,7 +31,7 @@ public class GuiNetworkAnalyser extends AEBaseGui<ContainerNetworkAnalyser> {
         NodeFlag.NORMAL, NodeFlag.DENSE, NodeFlag.MISSING
     );
 
-    private final Reference2ObjectMap<Enum<?>, ColorData> colors = new Reference2ObjectOpenHashMap<>();
+    private final Reference2ObjectOpenHashMap<Enum<?>, ColorData> colors = new Reference2ObjectOpenHashMap<>();
     private final Reference2ObjectMap<Enum<?>, ColorArea> colorBtns = new Reference2ObjectOpenHashMap<>();
     private final ColorWindow colorWindow;
 
@@ -68,6 +68,7 @@ public class GuiNetworkAnalyser extends AEBaseGui<ContainerNetworkAnalyser> {
         this.mode = config.mode();
         this.size = config.nodeSize();
         this.colors.clear();
+        this.colors.ensureCapacity(NetworkAnalyserConfig.DEFAULT_COLORS.size() + config.colors().size());
         this.colors.putAll(NetworkAnalyserConfig.DEFAULT_COLORS);
         this.colors.putAll(config.colors());
         for (var entry : this.colors.entrySet()) {
@@ -81,6 +82,7 @@ public class GuiNetworkAnalyser extends AEBaseGui<ContainerNetworkAnalyser> {
 
     public void loadDefault() {
         this.colors.clear();
+        this.colors.ensureCapacity(NetworkAnalyserConfig.DEFAULT_COLORS.size());
         this.colors.putAll(NetworkAnalyserConfig.DEFAULT_COLORS);
         for (var entry : this.colors.entrySet()) {
             ColorArea button = this.colorBtns.get(entry.getKey());

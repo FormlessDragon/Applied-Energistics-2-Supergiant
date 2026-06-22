@@ -155,7 +155,7 @@ public final class BuiltInModelOverride {
 
     private static void putDriveVariants(Map<ModelResourceLocation, IBakedModel> bakedModels, IModel driveModel,
                                          Function<ResourceLocation, TextureAtlasSprite> textureGetter) {
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             for (int spin = 0; spin < 4; spin++) {
                 BlockOrientation orientation = BlockOrientation.get(facing, spin);
                 IBakedModel bakedModel = driveModel.bake(createBlockStateTransform(orientation),
@@ -175,7 +175,7 @@ public final class BuiltInModelOverride {
             return;
         }
 
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             for (int spin = 0; spin < 4; spin++) {
                 BlockOrientation orientation = BlockOrientation.get(facing, spin);
                 IBakedModel bakedModel = model.bake(createBlockStateTransform(orientation),

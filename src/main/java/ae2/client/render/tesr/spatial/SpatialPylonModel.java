@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 public class SpatialPylonModel implements IModel {
+    private static final SpatialPylonTextureType[] TEXTURE_TYPES = SpatialPylonTextureType.values();
 
     private static ResourceLocation getTexturePath(SpatialPylonTextureType type) {
         return AppEng.makeId("block/spatial_pylon/" + type.name().toLowerCase(Locale.ROOT));
@@ -50,8 +51,8 @@ public class SpatialPylonModel implements IModel {
 
     @Override
     public Collection<ResourceLocation> getTextures() {
-        ObjectList<ResourceLocation> textures = new ObjectArrayList<>(SpatialPylonTextureType.values().length);
-        for (SpatialPylonTextureType type : SpatialPylonTextureType.values()) {
+        ObjectList<ResourceLocation> textures = new ObjectArrayList<>(TEXTURE_TYPES.length);
+        for (SpatialPylonTextureType type : TEXTURE_TYPES) {
             textures.add(getTexturePath(type));
         }
         return textures;
@@ -63,7 +64,7 @@ public class SpatialPylonModel implements IModel {
         Map<SpatialPylonTextureType, TextureAtlasSprite> textures = new EnumMap<>(
             SpatialPylonTextureType.class);
 
-        for (SpatialPylonTextureType type : SpatialPylonTextureType.values()) {
+        for (SpatialPylonTextureType type : TEXTURE_TYPES) {
             textures.put(type, bakedTextureGetter.apply(getTexturePath(type)));
         }
 

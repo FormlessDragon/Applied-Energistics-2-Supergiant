@@ -7,6 +7,7 @@ import ae2.items.contents.VoidCellGuiHost;
 import net.minecraft.entity.player.InventoryPlayer;
 
 public class ContainerVoidCell extends AEBaseContainer {
+    private static final CondenserOutput[] CONDENSER_OUTPUTS = CondenserOutput.values();
 
     private final VoidCellGuiHost host;
 
@@ -38,12 +39,11 @@ public class ContainerVoidCell extends AEBaseContainer {
     }
 
     public void setMode(Integer mode) {
-        CondenserOutput[] modes = CondenserOutput.values();
-        if (mode == null || mode < 0 || mode >= modes.length) {
+        if (mode == null || mode < 0 || mode >= CONDENSER_OUTPUTS.length) {
             return;
         }
 
-        this.host.setMode(modes[mode]);
+        this.host.setMode(CONDENSER_OUTPUTS[mode]);
         this.output = this.host.getMode();
         this.detectAndSendChanges();
     }

@@ -24,6 +24,8 @@ public final class NetworkData {
     public static final int MAX_NETWORK_NODES = 262_144;
     public static final int MAX_NETWORK_LINKS = 524_288;
     public static final NetworkData EMPTY = new NetworkData(EmptyArrays.EMPTY_NETWORK_DATA_ANODE_ARRAY, EmptyArrays.EMPTY_NETWORK_DATA_ALINK_ARRAY);
+    private static final NodeFlag[] NODE_FLAGS = NodeFlag.values();
+    private static final LinkFlag[] LINK_FLAGS = LinkFlag.values();
 
     public ANode[] nodes;
     public ALink[] links;
@@ -83,20 +85,18 @@ public final class NetworkData {
 
     private static NodeFlag readNodeFlag(DataInputStream stream) throws IOException {
         int index = stream.readByte();
-        NodeFlag[] values = NodeFlag.values();
-        if (index < 0 || index >= values.length) {
+        if (index < 0 || index >= NODE_FLAGS.length) {
             throw new IOException("Invalid network node flag index: " + index);
         }
-        return values[index];
+        return NODE_FLAGS[index];
     }
 
     private static LinkFlag readLinkFlag(DataInputStream stream) throws IOException {
         int index = stream.readByte();
-        LinkFlag[] values = LinkFlag.values();
-        if (index < 0 || index >= values.length) {
+        if (index < 0 || index >= LINK_FLAGS.length) {
             throw new IOException("Invalid network link flag index: " + index);
         }
-        return values[index];
+        return LINK_FLAGS[index];
     }
 
     public boolean isCorrupt() {
@@ -108,7 +108,7 @@ public final class NetworkData {
             return 0;
         }
         if (this.nodeCounts == null) {
-            this.nodeCounts = new int[NodeFlag.values().length];
+            this.nodeCounts = new int[NODE_FLAGS.length];
             for (ANode node : nodes) {
                 this.nodeCounts[node.state().get().ordinal()]++;
             }

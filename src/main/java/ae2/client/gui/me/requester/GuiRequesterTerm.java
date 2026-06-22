@@ -50,7 +50,7 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
 
     private final Long2ObjectMap<ClientRequester> byId = new Long2ObjectOpenHashMap<>();
     private final HashMultimap<String, ClientRequester> byName = HashMultimap.create();
-    private final List<String> requesterNames = new ArrayList<>();
+    private final ArrayList<String> requesterNames = new ArrayList<>();
     private final Map<String, Set<Object>> searchCache = new WeakHashMap<>();
     private final AETextField searchField;
 
@@ -176,6 +176,7 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
         }
 
         this.requesterNames.clear();
+        this.requesterNames.ensureCapacity(this.byName.keySet().size());
         this.requesterNames.addAll(this.byName.keySet());
         Collections.sort(this.requesterNames);
 

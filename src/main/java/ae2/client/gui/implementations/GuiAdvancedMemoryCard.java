@@ -1,8 +1,10 @@
 package ae2.client.gui.implementations;
 
+import ae2.api.config.AdvancedMemoryCardStatusFilter;
 import ae2.api.config.Settings;
 import ae2.api.config.TerminalStyle;
 import ae2.api.features.P2PTunnelAttunementInternal;
+import ae2.api.ids.AEPartIds;
 import ae2.client.Point;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
@@ -27,6 +29,7 @@ import ae2.core.localization.Tooltips;
 import ae2.items.parts.P2PPartItem;
 import ae2.items.tools.AdvancedMemoryCardItem;
 import ae2.items.tools.advancedmemorycard.AdvancedMemoryCardAction;
+import ae2.items.tools.advancedmemorycard.AdvancedMemoryCardFilterLogic;
 import ae2.items.tools.advancedmemorycard.AdvancedMemoryCardP2PEntry;
 import ae2.items.tools.advancedmemorycard.AdvancedMemoryCardP2PIdentity;
 import ae2.items.tools.advancedmemorycard.AdvancedMemoryCardP2PSnapshot;
@@ -42,6 +45,9 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
@@ -52,9 +58,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard> implements ITextFieldGui {
+    private static final AdvancedMemoryCardAction.Mode[] MODES = AdvancedMemoryCardAction.Mode.values();
     private static final String STYLE_PATH = "/screens/advanced_memory_card.json";
 
     private static final String IMAGE_BACKGROUND_TOP = "backgroundTop";
@@ -83,6 +91,10 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     private static final int ERROR_COLOR = 0x45da4527;
     private static final int INACTIVE_COLOR = 0x45ffea05;
     private static final int ENTRY_COLOR_OVERLAY_RIGHT_INSET = 4;
+    private static final int SELECTOR_BACKGROUND_COLOR = 0xAA000000;
+    private static final int SELECTED_FILTER_COLOR = 0x995BCBFF;
+    private static final int SELECTED_FILTER_HOVER_COLOR = 0x99FF6B6B;
+    private static final int UNSELECTED_FILTER_HOVER_COLOR = 0xFF00FF00;
 
     private final Blitter backgroundTop;
     private final Blitter backgroundRow;
@@ -105,6 +117,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     private final SettingToggleButton<TerminalStyle> terminalStyleButton = new SettingToggleButton<>(
         Settings.TERMINAL_STYLE, AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle);
     private final ModeButton modeButton;
+    private final SettingToggleButton<AdvancedMemoryCardStatusFilter> statusButton;
     private final ToolbarButton typeButton;
     private final TypeSelector typeSelector = new TypeSelector();
     private final List<ResourceLocation> manageableTunnelTypes;
@@ -115,9 +128,11 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     private boolean initialFocusApplied;
     private int rows = DEFAULT_ROWS;
     private AdvancedMemoryCardAction.Mode mode = AdvancedMemoryCardAction.Mode.BIND_OUTPUT;
-    private ResourceLocation filteredTunnelType;
+    private final Set<ResourceLocation> selectedTunnelTypes = new it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet<>();
+    private AdvancedMemoryCardStatusFilter statusFilter = AdvancedMemoryCardStatusFilter.ANY;
     private AdvancedMemoryCardP2PSnapshot cachedFilteredSnapshot;
-    private ResourceLocation cachedFilteredTunnelType;
+    private AdvancedMemoryCardStatusFilter cachedStatusFilter = AdvancedMemoryCardStatusFilter.ANY;
+    private Set<ResourceLocation> cachedSelectedTunnelTypes = Set.of();
     private String cachedSearchText = "";
     private List<AdvancedMemoryCardP2PEntry> cachedFilteredEntries = List.of();
     private ConfirmableTextField activeRenameField;
@@ -154,22 +169,29 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         this.ySize = getPreferredHeight();
         addToLeftToolbar(this.terminalStyleButton);
         this.modeButton = addToLeftToolbar(new ModeButton());
+        this.statusButton = addToLeftToolbar(new SettingToggleButton<>(
+            Settings.ADVANCED_MEMORY_CARD_STATUS_FILTER,
+            this.statusFilter,
+            ignored -> true,
+            this::toggleStatusFilter,
+            (_, value) -> setStatusFilter(value)));
         this.typeButton = addToLeftToolbar(new ToolbarButton(
-            this::typeIcon,
+            () -> null,
             () -> ItemStack.EMPTY,
-            () -> this.filteredTunnelType,
+            () -> AEPartIds.ME_P2P_TUNNEL,
             this::typeTooltip,
             this::handleTypeButton));
         addToLeftToolbar(new ToolbarButton(
             () -> Icon.ADVANCED_MEMORY_CARD_REFRESH,
             () -> ItemStack.EMPTY,
             () -> List.of(GuiText.AdvancedMemoryCardRefresh.text()),
-            ignored -> this.container.refresh()));
+            (ignored, mouseX, mouseY) -> this.container.refresh()));
     }
 
     private static Map<ResourceLocation, ItemStack> createTypeStacks() {
-        Map<ResourceLocation, ItemStack> stacks = new Object2ObjectLinkedOpenHashMap<>();
-        for (Item item : P2PTunnelAttunementInternal.getManageableTunnels()) {
+        var manageableTunnels = P2PTunnelAttunementInternal.getManageableTunnels();
+        Map<ResourceLocation, ItemStack> stacks = new Object2ObjectLinkedOpenHashMap<>(manageableTunnels.size());
+        for (Item item : manageableTunnels) {
             ResourceLocation id = item.getRegistryName();
             if (id != null && item != Items.AIR) {
                 stacks.putIfAbsent(id, new ItemStack(item));
@@ -189,6 +211,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         this.ySize = getPreferredHeight();
         super.initGui();
         this.terminalStyleButton.set(AEConfig.instance().getTerminalStyle());
+        this.statusButton.set(this.statusFilter);
         updateScrollbar();
         if (AEConfig.instance().isAutoFocusSearch()) {
             setInitialFocus(this.searchField);
@@ -353,22 +376,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
                 drawHoveringText(List.of(GuiText.AdvancedMemoryCardRenameHint.getLocal()), mouseX, mouseY);
                 return;
             }
-
-            List<String> lines = new ObjectArrayList<>();
-            lines.add(GuiText.AdvancedMemoryCardType.getLocal(localizedTypeName(hovered)));
-            lines.add(GuiText.AdvancedMemoryCardPos.getLocal(hovered.pos().getX(), hovered.pos().getY(),
-                hovered.pos().getZ()));
-            lines.add(GuiText.AdvancedMemoryCardSide.getLocal(
-                hovered.side() == null ? GuiText.AdvancedMemoryCardUnknown.getLocal() : hovered.side().name()));
-            lines.add(GuiText.AdvancedMemoryCardDim.getLocal(hovered.dimension()));
-            lines.add(hovered.error() || hovered.frequency() == 0
-                ? GuiText.AdvancedMemoryCardUnbound.getLocal()
-                : GuiText.AdvancedMemoryCardBound.getLocal());
-            if (hovered.missingChannel()) {
-                lines.add(GuiText.AdvancedMemoryCardOffline.getLocal());
-            }
-            lines.add(GuiText.AdvancedMemoryCardChangeTypeHint.getLocal());
-            drawHoveringText(lines, mouseX, mouseY);
+            drawTooltipWithHeader(mouseX, mouseY, buildEntryTooltip(hovered));
             return;
         }
 
@@ -393,7 +401,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         Icon ioIcon = entry.input() ? Icon.ADVANCED_MEMORY_CARD_INPUT : Icon.ADVANCED_MEMORY_CARD_OUTPUT;
         Point ioIconPos = widgetPos(this.entryIoIconStyle);
         ioIcon.getBlitter().dest(x + ioIconPos.x(), y + ioIconPos.y()).blit();
-        Icon statusIcon = entry.error() || entry.frequency() == 0 || entry.missingChannel()
+        Icon statusIcon = entry.error() || entry.frequency() == 0
             ? Icon.ADVANCED_MEMORY_CARD_UNBOUND
             : Icon.ADVANCED_MEMORY_CARD_BOUND;
         Point statusIconPos = widgetPos(this.entryStatusIconStyle);
@@ -455,6 +463,28 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         this.p2pIconRenderer.render(entry.tunnelType(), x, y);
     }
 
+    private List<ITextComponent> buildEntryTooltip(AdvancedMemoryCardP2PEntry entry) {
+        var lines = new ObjectArrayList<ITextComponent>(8);
+        lines.add(GuiText.AdvancedMemoryCardType.text(localizedTypeName(entry)));
+        lines.add(GuiText.AdvancedMemoryCardPos.text(entry.pos().getX(), entry.pos().getY(), entry.pos().getZ()));
+        lines.add(GuiText.AdvancedMemoryCardSide.text(
+            entry.side() == null ? GuiText.AdvancedMemoryCardUnknown.getLocal() : entry.side().name()));
+        lines.add(GuiText.AdvancedMemoryCardDim.text(entry.dimension()));
+        lines.add((entry.error() || entry.frequency() == 0)
+            ? GuiText.AdvancedMemoryCardUnbound.text()
+            : GuiText.AdvancedMemoryCardBound.text());
+        if (entry.missingChannel()) {
+            lines.add(GuiText.AdvancedMemoryCardOffline.text());
+        }
+        lines.add(goldTooltipLine(GuiText.AdvancedMemoryCardRenameHint.text()));
+        lines.add(goldTooltipLine(GuiText.AdvancedMemoryCardChangeTypeHint.text()));
+        return lines;
+    }
+
+    private ITextComponent goldTooltipLine(ITextComponent text) {
+        return text.createCopy().setStyle(new Style().setColor(TextFormatting.GOLD).setItalic(false));
+    }
+
     private boolean clickEntry(int localX, int localY, int mouseButton) {
         int row = rowAt(localX, localY);
         if (row < 0) {
@@ -474,7 +504,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         }
 
         if (mouseButton == 1) {
-            this.typeSelector.openForEntry(entryX() + 40, rowY, clicked.entryId());
+            this.typeSelector.openForEntry(localX, localY, clicked.entryId());
             return true;
         }
 
@@ -645,8 +675,8 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     }
 
     private void openModeSelector() {
-        List<GridSelectionPopup.Entry<AdvancedMemoryCardAction.Mode>> entries = GridSelectionPopup.entries();
-        for (AdvancedMemoryCardAction.Mode mode : AdvancedMemoryCardAction.Mode.values()) {
+        List<GridSelectionPopup.Entry<AdvancedMemoryCardAction.Mode>> entries = new ObjectArrayList<>(MODES.length);
+        for (AdvancedMemoryCardAction.Mode mode : MODES) {
             entries.add(GridSelectionPopup.Entry.icon(mode, modeIcon(mode), List.of(modeText(mode))));
         }
         var bounds = getBounds(false);
@@ -654,37 +684,24 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
             bounds.height, entries, this::setMode));
     }
 
-    private void handleTypeButton(boolean rightClick) {
-        if (rightClick) {
-            this.typeSelector.openForFilter(this.typeButton.y - this.guiTop);
+    private void handleTypeButton(boolean backwards, int mouseX, int mouseY) {
+        if (backwards) {
+            this.typeSelector.openForFilter(mouseX - this.guiLeft, mouseY - this.guiTop);
             return;
         }
-        cycleTypeFilter();
+        this.typeSelector.openForFilter(this.typeButton.x - this.guiLeft + this.typeButton.width + 2,
+            this.typeButton.y - this.guiTop);
     }
 
-    private void cycleTypeFilter() {
-        List<ResourceLocation> types = manageableTunnelTypes();
-        if (types.isEmpty()) {
-            this.filteredTunnelType = null;
-            updateScrollbar();
-            return;
-        }
+    private void toggleStatusFilter(SettingToggleButton<AdvancedMemoryCardStatusFilter> button,
+                                    boolean reverse) {
+        setStatusFilter(button.getNextValue(reverse));
+    }
 
-        if (this.filteredTunnelType == null) {
-            this.filteredTunnelType = types.getFirst();
-        } else {
-            int current = types.indexOf(this.filteredTunnelType);
-            if (current < 0) {
-                this.filteredTunnelType = null;
-            } else {
-                int next = current + 1;
-                if (next >= types.size()) {
-                    this.filteredTunnelType = null;
-                } else {
-                    this.filteredTunnelType = types.get(next);
-                }
-            }
-        }
+    private void setStatusFilter(AdvancedMemoryCardStatusFilter filter) {
+        this.statusFilter = filter;
+        this.statusButton.set(filter);
+        invalidateFilteredEntries();
         updateScrollbar();
     }
 
@@ -695,7 +712,8 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
 
     private void invalidateFilteredEntries() {
         this.cachedFilteredSnapshot = null;
-        this.cachedFilteredTunnelType = null;
+        this.cachedStatusFilter = AdvancedMemoryCardStatusFilter.ANY;
+        this.cachedSelectedTunnelTypes = Set.of();
         this.cachedSearchText = "";
         this.cachedFilteredEntries = List.of();
     }
@@ -711,10 +729,6 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
             case COPY_OUTPUT -> Icon.ADVANCED_MEMORY_CARD_COPY_OUTPUT;
             case DELETE_BINDING -> Icon.ADVANCED_MEMORY_CARD_DELETE_BINDING;
         };
-    }
-
-    private Icon typeIcon() {
-        return this.filteredTunnelType == null ? Icon.TYPE_FILTER_ALL : null;
     }
 
     private List<ITextComponent> modeTooltip() {
@@ -738,9 +752,15 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     }
 
     private List<ITextComponent> typeTooltip() {
-        ITextComponent current = this.filteredTunnelType == null
-            ? GuiText.AdvancedMemoryCardFilterAny.text()
-            : GuiText.AdvancedMemoryCardFilterType.text(displayNameForType(this.filteredTunnelType));
+        ITextComponent current;
+        if (this.selectedTunnelTypes.isEmpty()) {
+            current = GuiText.AdvancedMemoryCardFilterAny.text();
+        } else if (this.selectedTunnelTypes.size() == 1) {
+            current = GuiText.AdvancedMemoryCardFilterType.text(
+                displayNameForType(this.selectedTunnelTypes.iterator().next()));
+        } else {
+            current = GuiText.AdvancedMemoryCardFilterTypes.text(this.selectedTunnelTypes.size());
+        }
         return List.of(current, GuiText.AdvancedMemoryCardFilterHint.text());
     }
 
@@ -772,47 +792,28 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         AdvancedMemoryCardP2PSnapshot currentSnapshot = this.container.getSnapshot();
         String searchText = normalizedSearchText();
         if (currentSnapshot == this.cachedFilteredSnapshot
-            && Objects.equals(this.filteredTunnelType, this.cachedFilteredTunnelType)
+            && this.statusFilter == this.cachedStatusFilter
+            && Objects.equals(this.selectedTunnelTypes, this.cachedSelectedTunnelTypes)
             && Objects.equals(searchText, this.cachedSearchText)) {
             return this.cachedFilteredEntries;
         }
 
         this.cachedFilteredSnapshot = currentSnapshot;
-        this.cachedFilteredTunnelType = this.filteredTunnelType;
+        this.cachedStatusFilter = this.statusFilter;
+        this.cachedSelectedTunnelTypes = Set.copyOf(this.selectedTunnelTypes);
         this.cachedSearchText = searchText;
-        if (this.filteredTunnelType == null && searchText.isEmpty()) {
+        var filter = new AdvancedMemoryCardFilterLogic.Filter(this.statusFilter, this.selectedTunnelTypes, searchText);
+        if (filter.isDefault()) {
             this.cachedFilteredEntries = currentSnapshot.entries();
             return this.cachedFilteredEntries;
         }
-        this.cachedFilteredEntries = currentSnapshot.entries().stream()
-                                                    .filter(entry -> this.filteredTunnelType == null
-                                                        || this.filteredTunnelType.equals(entry.tunnelType()))
-                                                    .filter(entry -> matchesSearch(entry, searchText))
-                                                    .toList();
+        this.cachedFilteredEntries = AdvancedMemoryCardFilterLogic.filter(currentSnapshot.entries(), filter,
+            this::visibleEntryName);
         return this.cachedFilteredEntries;
     }
 
     private String normalizedSearchText() {
         return this.searchField.getText().trim().toLowerCase(Locale.ROOT);
-    }
-
-    private boolean matchesSearch(AdvancedMemoryCardP2PEntry entry, String searchText) {
-        if (searchText.isEmpty()) {
-            return true;
-        }
-
-        String visibleName = visibleEntryName(entry).toLowerCase(Locale.ROOT);
-        if (visibleName.contains(searchText)) {
-            return true;
-        }
-
-        String frequency = Integer.toHexString(Short.toUnsignedInt(entry.frequency())).toLowerCase(Locale.ROOT);
-        if (frequency.contains(searchText)) {
-            return true;
-        }
-
-        String paddedFrequency = String.format(Locale.ROOT, "%04x", Short.toUnsignedInt(entry.frequency()));
-        return paddedFrequency.contains(searchText);
     }
 
     private List<ResourceLocation> manageableTunnelTypes() {
@@ -940,7 +941,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
 
     @FunctionalInterface
     private interface ToolbarAction {
-        void handle(boolean backwards);
+        void handle(boolean backwards, int mouseX, int mouseY);
     }
 
     private class ModeButton extends IconButton {
@@ -983,38 +984,50 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         }
     }
 
+    private AdvancedMemoryCardP2PEntry hoveredEntryById(int entryId) {
+        for (var entry : this.container.getSnapshot().entries()) {
+            if (entry.entryId() == entryId) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    private enum SelectorMode {
+        FILTER,
+        ENTRY_TYPE_CHANGE
+    }
+
     private class TypeSelector {
         private static final int ICONS_PER_ROW = 5;
         private static final int CELL_SIZE = 18;
         private static final int PADDING = 4;
-        private static final int BACKGROUND_COLOR = 0xAA000000;
-        private static final int HOVER_COLOR = 0xFF00FF00;
 
         private int x;
         private int y;
         private boolean visible;
-        private boolean useAny;
         private int entryId;
         private int hoveredIndex = -1;
         private List<ResourceLocation> types = List.of();
+        private SelectorMode mode = SelectorMode.FILTER;
 
         boolean isVisible() {
             return this.visible;
         }
 
-        void openForFilter(int y) {
-            open(0, y, true, -1);
+        void openForFilter(int x, int y) {
+            open(x, y, SelectorMode.FILTER, -1);
         }
 
         void openForEntry(int x, int y, int entryId) {
-            open(x, y, false, entryId);
+            open(x, y, SelectorMode.ENTRY_TYPE_CHANGE, entryId);
         }
 
-        private void open(int x, int y, boolean useAny, int entryId) {
+        private void open(int x, int y, SelectorMode mode, int entryId) {
             this.x = x;
             this.y = y;
             this.visible = true;
-            this.useAny = useAny;
+            this.mode = mode;
             this.entryId = entryId;
             this.types = manageableTunnelTypes();
             this.hoveredIndex = -1;
@@ -1026,24 +1039,26 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
             }
 
             this.hoveredIndex = hoveredIndex(mouseX, mouseY);
-            drawRect(this.x, this.y, this.x + width(), this.y + height(), BACKGROUND_COLOR);
+            drawRect(this.x, this.y, this.x + width(), this.y + height(), SELECTOR_BACKGROUND_COLOR);
 
-            for (int i = 0; i < this.types.size(); i++) {
+            for (int i = 0; i < typeCount(); i++) {
                 drawCell(i);
-            }
-            if (this.useAny) {
-                drawCell(this.types.size());
             }
         }
 
         private void drawCell(int index) {
             int iconX = iconX(index);
             int iconY = iconY(index);
+            boolean selected = isSelected(index);
+            if (selected) {
+                drawRect(iconX, iconY, iconX + CELL_SIZE, iconY + CELL_SIZE, SELECTED_FILTER_COLOR);
+            }
             if (this.hoveredIndex == index) {
-                drawRect(iconX, iconY, iconX + CELL_SIZE, iconY + CELL_SIZE, HOVER_COLOR);
+                drawRect(iconX, iconY, iconX + CELL_SIZE, iconY + CELL_SIZE,
+                    selected ? SELECTED_FILTER_HOVER_COLOR : UNSELECTED_FILTER_HOVER_COLOR);
             }
 
-            if (index == this.types.size()) {
+            if (isAnyIndex(index)) {
                 Icon.TYPE_FILTER_ALL.getBlitter().dest(iconX + 1, iconY + 1).blit();
                 return;
             }
@@ -1065,20 +1080,22 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
                 return true;
             }
 
-            if (this.useAny && index == this.types.size()) {
-                filteredTunnelType = null;
+            if (this.mode == SelectorMode.FILTER) {
+                if (isAnyIndex(index)) {
+                    selectedTunnelTypes.clear();
+                } else if (index < this.types.size()) {
+                    ResourceLocation type = this.types.get(index);
+                    if (!selectedTunnelTypes.remove(type)) {
+                        selectedTunnelTypes.add(type);
+                    }
+                }
+                invalidateFilteredEntries();
                 updateScrollbar();
-                this.visible = false;
                 return true;
             }
+
             if (index < this.types.size()) {
-                ResourceLocation type = this.types.get(index);
-                if (this.useAny) {
-                    filteredTunnelType = type;
-                    updateScrollbar();
-                } else {
-                    container.changeType(this.entryId, type);
-                }
+                container.changeType(this.entryId, this.types.get(index));
                 this.visible = false;
             }
             return true;
@@ -1094,11 +1111,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
                 return true;
             }
 
-            if (this.useAny && index == this.types.size()) {
-                drawHoveringText(List.of(GuiText.AdvancedMemoryCardTypeAny.getLocal()), screenX, screenY);
-            } else if (index < this.types.size()) {
-                drawHoveringText(List.of(displayNameForType(this.types.get(index))), screenX, screenY);
-            }
+            drawTooltipWithHeader(screenX, screenY, List.of(typeTooltipText(index)));
             return true;
         }
 
@@ -1135,7 +1148,36 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         }
 
         private int typeCount() {
-            return this.types.size() + (this.useAny ? 1 : 0);
+            return this.types.size() + (this.mode == SelectorMode.FILTER ? 1 : 0);
+        }
+
+        private boolean isAnyIndex(int index) {
+            return this.mode == SelectorMode.FILTER && index == this.types.size();
+        }
+
+        private boolean isSelected(int index) {
+            if (isAnyIndex(index)) {
+                return selectedTunnelTypes.isEmpty();
+            }
+            if (index >= this.types.size()) {
+                return false;
+            }
+            ResourceLocation type = this.types.get(index);
+            if (this.mode == SelectorMode.FILTER) {
+                return selectedTunnelTypes.contains(type);
+            }
+            AdvancedMemoryCardP2PEntry entry = hoveredEntryById(this.entryId);
+            return entry != null && Objects.equals(entry.tunnelType(), type);
+        }
+
+        private ITextComponent typeTooltipText(int index) {
+            if (isAnyIndex(index)) {
+                return GuiText.AdvancedMemoryCardTypeAny.text();
+            }
+            if (index < this.types.size()) {
+                return new TextComponentString(displayNameForType(this.types.get(index)));
+            }
+            return GuiText.AdvancedMemoryCardUnknown.text();
         }
     }
 
@@ -1186,7 +1228,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
                 var screen = Minecraft.getMinecraft().currentScreen;
                 this.pressedBackwards = screen instanceof AEBaseGui<?> gui && gui.isHandlingRightClick();
                 if (this.pressedBackwards) {
-                    this.action.handle(true);
+                    this.action.handle(true, mouseX, mouseY);
                     this.triggeredOnPress = true;
                 } else {
                     this.triggeredOnPress = false;
@@ -1207,7 +1249,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
                 && mouseY < this.y + this.height;
             super.mouseReleased(mouseX, mouseY);
             if (releasedInside && !this.triggeredOnPress) {
-                this.action.handle(this.pressedBackwards);
+                this.action.handle(this.pressedBackwards, mouseX, mouseY);
             }
             this.pressedBackwards = false;
             this.triggeredOnPress = false;
@@ -1228,4 +1270,5 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
             return this.stackSupplier.get();
         }
     }
+
 }

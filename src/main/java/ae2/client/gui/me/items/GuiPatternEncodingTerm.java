@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 
 public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodingTerm> {
+    private static final EncodingMode[] ENCODING_MODES = EncodingMode.values();
     private final Map<EncodingMode, EncodingModePanel> modePanels = new EnumMap<>(EncodingMode.class);
     private final Map<EncodingMode, TabButton> modeTabButtons = new EnumMap<>(EncodingMode.class);
     private final SettingToggleButton<YesNo> autoFillPatternsButton;
@@ -134,7 +135,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     protected void updateBeforeRender() {
         super.updateBeforeRender();
         this.autoFillPatternsButton.set(this.container.getAutoFillPatterns());
-        for (var mode : EncodingMode.values()) {
+        for (var mode : ENCODING_MODES) {
             boolean selected = this.container.getMode() == mode;
             var tabButton = this.modeTabButtons.get(mode);
             var panel = this.modePanels.get(mode);

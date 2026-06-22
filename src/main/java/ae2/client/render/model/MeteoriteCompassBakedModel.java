@@ -86,10 +86,13 @@ public class MeteoriteCompassBakedModel implements IBakedModel {
 
     @Override
     public List<BakedQuad> getQuads(@Nullable IBlockState state, @Nullable EnumFacing side, long rand) {
-        List<BakedQuad> quads = new ObjectArrayList<>(this.base.getQuads(state, side, rand));
+        List<BakedQuad> baseQuads = this.base.getQuads(state, side, rand);
+        ObjectArrayList<BakedQuad> quads = new ObjectArrayList<>(baseQuads);
         if (side == null && state == null) {
+            List<BakedQuad> pointerQuads = this.pointer.getQuads(state, side, rand);
+            quads.ensureCapacity(baseQuads.size() + pointerQuads.size());
             MatrixVertexTransformer transformer = new MatrixVertexTransformer(createRotationMatrix(this.rotation));
-            for (BakedQuad bakedQuad : this.pointer.getQuads(state, side, rand)) {
+            for (BakedQuad bakedQuad : pointerQuads) {
                 UnpackedBakedQuad.Builder builder = new UnpackedBakedQuad.Builder(bakedQuad.getFormat());
                 transformer.setParent(builder);
                 transformer.setVertexFormat(builder.getVertexFormat());

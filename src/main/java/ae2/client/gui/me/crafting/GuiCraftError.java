@@ -92,7 +92,7 @@ public class GuiCraftError extends AEBaseGui<ContainerCraftConfirm> {
     private ITextComponent getNoSuitableCpuErrorText(Object details) {
         ITextComponent text = GuiText.CraftErrorNoSuitableCpu.text();
         if (details instanceof UnsuitableCpus(int offline, int busy, int tooSmall, int excluded)) {
-            ObjectList<ITextComponent> stats = new ObjectArrayList<>();
+            ObjectList<ITextComponent> stats = new ObjectArrayList<>(4);
             if (offline > 0) {
                 stats.add(GuiText.CraftErrorNoSuitableCpuOffline.text(offline));
             }

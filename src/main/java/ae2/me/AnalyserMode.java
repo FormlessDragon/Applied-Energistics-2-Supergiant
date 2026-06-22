@@ -10,9 +10,10 @@ public enum AnalyserMode {
     NONUM,
     P2P;
 
+    private static final AnalyserMode[] VALUES = values();
+
     public static AnalyserMode byIndex(int index) {
-        AnalyserMode[] values = values();
-        return values[Math.floorMod(index, values.length)];
+        return VALUES[Math.floorMod(index, VALUES.length)];
     }
 
     public ITextComponent getTranslatedName() {

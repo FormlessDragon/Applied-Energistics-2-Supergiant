@@ -180,7 +180,14 @@ public class P2PService implements IGridService, IGridServiceProvider {
 
     public <T extends P2PTunnelPart<T>> Stream<T> getOutputs(short freq, Class<T> c) {
         // Check that a matching input exists for the requested type
-        if (this.inputs.get(freq).stream().noneMatch(c::isInstance)) {
+        boolean hasMatchingInput = false;
+        for (P2PTunnelPart<?> input : this.inputs.get(freq)) {
+            if (c.isInstance(input)) {
+                hasMatchingInput = true;
+                break;
+            }
+        }
+        if (!hasMatchingInput) {
             return Stream.empty();
         }
 

@@ -14,6 +14,7 @@ import java.util.Objects;
 
 public final class PatternImportPriorityRegistry {
     private static final Map<String, PatternImportPriority> PRIORITIES = new Object2ObjectLinkedOpenHashMap<>();
+    private static List<PatternImportPriority> cachedRegistered = List.of();
     private static boolean initialized;
 
     private PatternImportPriorityRegistry() {
@@ -28,7 +29,7 @@ public final class PatternImportPriorityRegistry {
     public static synchronized List<PatternImportPriority> getRegistered() {
         ensureClientSide();
         ensureInitialized();
-        return Collections.unmodifiableList(new ObjectArrayList<>(PRIORITIES.values()));
+        return cachedRegistered;
     }
 
     @Nullable
@@ -57,6 +58,7 @@ public final class PatternImportPriorityRegistry {
         if (PRIORITIES.putIfAbsent(id, priority) != null) {
             throw new IllegalArgumentException("Duplicate pattern import priority registration: " + id);
         }
+        cachedRegistered = Collections.unmodifiableList(new ObjectArrayList<>(PRIORITIES.values()));
     }
 
     private static void ensureClientSide() {

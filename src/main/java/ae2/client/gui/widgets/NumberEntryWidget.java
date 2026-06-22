@@ -545,8 +545,8 @@ public class NumberEntryWidget implements ICompositeWidget {
     }
 
     private CachedValidation computeValidation(String text) {
-        List<ITextComponent> validationErrors = new ObjectArrayList<>();
-        List<ITextComponent> infoMessages = new ObjectArrayList<>();
+        List<ITextComponent> validationErrors = new ObjectArrayList<>(1);
+        List<ITextComponent> infoMessages = new ObjectArrayList<>(1);
 
         var possibleValue = validateValue(text);
         if (possibleValue.internalValue().isPresent()) {
@@ -575,7 +575,7 @@ public class NumberEntryWidget implements ICompositeWidget {
         var preview = valid && possibleValue.externalValue().isPresent()
             ? Long.toString(possibleValue.externalValue().getAsLong())
             : PREVIEW_ERROR;
-        return new CachedValidation(possibleValue, valid, List.copyOf(tooltip), preview);
+        return new CachedValidation(possibleValue, valid, tooltip, preview);
     }
 
     private void invalidateValidationCache() {
@@ -790,7 +790,7 @@ public class NumberEntryWidget implements ICompositeWidget {
 
     private List<ITextComponent> getTextFieldTooltip() {
         CachedValidation validation = getCachedValidation();
-        List<ITextComponent> tooltip = new ObjectArrayList<>();
+        List<ITextComponent> tooltip = new ObjectArrayList<>(3);
         tooltip.add(GuiText.SelectAmount.text());
         if (validation.valid()) {
             tooltip.add(new TextComponentString("= " + validation.previewText()));

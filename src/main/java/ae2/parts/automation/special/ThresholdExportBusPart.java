@@ -16,6 +16,7 @@ import net.minecraft.util.ResourceLocation;
 
 public class ThresholdExportBusPart extends PreciseExportBusPart implements ThresholdModeHost {
     private static final ResourceLocation MODEL_BASE = AppEng.makeId("part/threshold_export_bus_base");
+    private static final ThresholdMode[] THRESHOLD_MODES = ThresholdMode.values();
 
     @PartModels
     public static final IPartModel MODELS_OFF = new PartModel(MODEL_BASE, ExportBusPartModels.OFF);
@@ -36,9 +37,8 @@ public class ThresholdExportBusPart extends PreciseExportBusPart implements Thre
     public void readFromNBT(NBTTagCompound extra) {
         super.readFromNBT(extra);
         int modeIndex = extra.getByte("thresholdMode");
-        var modes = ThresholdMode.values();
-        if (modeIndex >= 0 && modeIndex < modes.length) {
-            this.mode = modes[modeIndex];
+        if (modeIndex >= 0 && modeIndex < THRESHOLD_MODES.length) {
+            this.mode = THRESHOLD_MODES[modeIndex];
         }
     }
 

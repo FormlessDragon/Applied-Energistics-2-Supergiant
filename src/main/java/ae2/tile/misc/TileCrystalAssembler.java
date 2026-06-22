@@ -153,7 +153,7 @@ public class TileCrystalAssembler extends AENetworkedPoweredTile
             return;
         }
         this.neighbors.clear();
-        for (EnumFacing side : EnumFacing.values()) {
+        for (EnumFacing side : EnumFacing.VALUES) {
             ItemTransfer target = InternalInventory.wrapExternal(this.world, this.pos.offset(side), side.getOpposite());
             if (target != null) {
                 this.neighbors.put(side, target);
@@ -495,7 +495,7 @@ public class TileCrystalAssembler extends AENetworkedPoweredTile
 
     private void decodeOutputSides(int mask) {
         this.outputSides.clear();
-        for (EnumFacing side : EnumFacing.values()) {
+        for (EnumFacing side : EnumFacing.VALUES) {
             if ((mask & (1 << side.ordinal())) != 0) {
                 this.outputSides.add(side);
             }

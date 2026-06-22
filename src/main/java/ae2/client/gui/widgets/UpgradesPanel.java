@@ -178,9 +178,10 @@ public class UpgradesPanel implements ICompositeWidget {
     }
 
     private static List<ITextComponent> getCompatibleUpgrades(IUpgradeableObject upgradeableObject) {
-        var tooltip = new ObjectArrayList<ITextComponent>();
+        var upgradeLines = Upgrades.getTooltipLinesForInventory(upgradeableObject.getUpgrades());
+        var tooltip = new ObjectArrayList<ITextComponent>(upgradeLines.size() + 1);
         tooltip.add(GuiText.CompatibleUpgrades.text());
-        tooltip.addAll(Upgrades.getTooltipLinesForInventory(upgradeableObject.getUpgrades()));
+        tooltip.addAll(upgradeLines);
         return tooltip;
     }
 

@@ -39,7 +39,7 @@ import java.util.Map.Entry;
 public class CableBusBakedModel implements IBakedModel {
 
     private static final int CACHE_QUAD_COUNT = 5000;
-    private static final EnumFacing[] DIRECTIONS = EnumFacing.values();
+    private static final EnumFacing[] DIRECTIONS = EnumFacing.VALUES;
     private static final QuadRotator QUAD_ROTATOR = new QuadRotator();
 
     private final LoadingCache<CableBusRenderState, List<BakedQuad>> cableModelCache;
@@ -185,8 +185,13 @@ public class CableBusBakedModel implements IBakedModel {
         AEColor cableColor = renderState.getCableColor();
         EnumMap<EnumFacing, AECableType> connectionTypes = renderState.getConnectionTypes();
 
-        boolean noAttachments = renderState.getAttachments().values().stream()
-                                           .noneMatch(IPartModel::requireCableConnection);
+        boolean noAttachments = true;
+        for (IPartModel attachment : renderState.getAttachments().values()) {
+            if (attachment.requireCableConnection()) {
+                noAttachments = false;
+                break;
+            }
+        }
         if (noAttachments && isStraightLine(cableType, connectionTypes)) {
             EnumFacing facing = connectionTypes.keySet().iterator().next();
             switch (cableType) {

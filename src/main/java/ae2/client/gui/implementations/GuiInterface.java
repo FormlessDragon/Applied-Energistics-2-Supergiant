@@ -24,7 +24,7 @@ import java.util.List;
 public class GuiInterface extends GuiUpgradeable<ContainerInterface> {
 
     private final SettingToggleButton<FuzzyMode> fuzzyMode;
-    private final List<SetAmountButton> amountButtons = new ObjectArrayList<>();
+    private final ObjectArrayList<SetAmountButton> amountButtons = new ObjectArrayList<>();
     private final PageButton previousPageButton;
     private final PageButton nextPageButton;
 
@@ -39,6 +39,7 @@ public class GuiInterface extends GuiUpgradeable<ContainerInterface> {
         widgets.add("nextPage", this.nextPageButton);
 
         var configSlots = container.getSlots(SlotSemantics.CONFIG);
+        this.amountButtons.ensureCapacity(configSlots.size());
         for (int i = 0; i < configSlots.size(); i++) {
             int slotIndex = i;
             var button = new SetAmountButton(() -> {

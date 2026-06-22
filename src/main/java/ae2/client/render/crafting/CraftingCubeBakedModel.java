@@ -113,7 +113,7 @@ abstract class CraftingCubeBakedModel implements IBakedModel {
         this.addCornerCap(builder, connections, side, EnumFacing.DOWN, EnumFacing.WEST, EnumFacing.NORTH);
         this.addCornerCap(builder, connections, side, EnumFacing.DOWN, EnumFacing.WEST, EnumFacing.SOUTH);
 
-        for (EnumFacing direction : EnumFacing.values()) {
+        for (EnumFacing direction : EnumFacing.VALUES) {
             if (direction == side || direction == side.getOpposite()) {
                 continue;
             }

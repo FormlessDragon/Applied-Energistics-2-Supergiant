@@ -68,6 +68,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     private static final String ACTION_SET_SUBSTITUTION = "setSubstitution";
     private static final String ACTION_SET_FLUID_SUBSTITUTION = "setFluidSubstitution";
     private static final String ACTION_CYCLE_PROCESSING_OUTPUT = "cycleProcessingOutput";
+    private static final String ACTION_CLEAR_PROCESSING_SECONDARY_OUTPUTS = "clearProcessingSecondaryOutputs";
     private static final String ACTION_PROCESSING_MULTIPLY_2 = "processingMultiply2";
     private static final String ACTION_PROCESSING_MULTIPLY_3 = "processingMultiply3";
     private static final String ACTION_PROCESSING_MULTIPLY_5 = "processingMultiply5";
@@ -169,6 +170,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         registerClientAction(ACTION_SET_SUBSTITUTION, Boolean.class, this::changeSubstitution);
         registerClientAction(ACTION_SET_FLUID_SUBSTITUTION, Boolean.class, this::changeFluidSubstitution);
         registerClientAction(ACTION_CYCLE_PROCESSING_OUTPUT, this::cycleProcessingOutput);
+        registerClientAction(ACTION_CLEAR_PROCESSING_SECONDARY_OUTPUTS, this::clearProcessingSecondaryOutputs);
         registerClientAction(ACTION_PROCESSING_MULTIPLY_2,
             () -> modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation.MULTIPLY_2));
         registerClientAction(ACTION_PROCESSING_MULTIPLY_3,
@@ -1073,6 +1075,21 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         for (int i = 0; i < newOutputs.length; i++) {
             this.processingOutputSlots[i].putStack(newOutputs[i]);
         }
+    }
+
+    public void clearProcessingSecondaryOutputs() {
+        if (isClientSide()) {
+            sendClientAction(ACTION_CLEAR_PROCESSING_SECONDARY_OUTPUTS);
+            return;
+        }
+        if (this.mode != EncodingMode.PROCESSING) {
+            return;
+        }
+
+        for (int slot = 1; slot < this.encodedOutputsInv.size(); slot++) {
+            this.encodedOutputsInv.setStack(slot, null);
+        }
+        broadcastChanges();
     }
 
     public void modifyProcessingPatternAmounts(ProcessingPatternAmountHelper.Operation operation) {

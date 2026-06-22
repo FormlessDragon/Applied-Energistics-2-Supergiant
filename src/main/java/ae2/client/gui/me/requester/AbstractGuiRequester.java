@@ -39,7 +39,6 @@ import java.awt.Rectangle;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 public abstract class AbstractGuiRequester<C extends AbstractContainerRequester> extends AEBaseGui<C>
     implements RequesterDisplay {
@@ -64,7 +63,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
     protected final Scrollbar scrollbar;
     protected final ArrayList<Object> lines = new ArrayList<>();
     private final ResourceLocation texture;
-    private final List<RequestRowWidget> requestWidgets = new ObjectArrayList<>();
+    private final ObjectArrayList<RequestRowWidget> requestWidgets = new ObjectArrayList<>();
 
     protected boolean refreshList;
     protected int rowAmount = MIN_ROW_COUNT;
@@ -137,6 +136,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
 
         super.initGui();
 
+        this.requestWidgets.ensureCapacity(this.rowAmount);
         for (int i = 0; i < this.rowAmount; i++) {
             int y = (i + 1) * ROW_HEIGHT + 1;
             var widget = new RequestRowWidget(this, this.style, new Request(), y);

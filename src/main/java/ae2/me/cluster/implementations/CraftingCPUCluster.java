@@ -222,6 +222,7 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
         return craftingLogic.trySubmitJob(grid, plan, src, requestingMachine);
     }
 
+    @Override
     public boolean canMergeJob(ICraftingPlan plan) {
         return craftingLogic.canMergeJob(plan);
     }

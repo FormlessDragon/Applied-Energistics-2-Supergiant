@@ -16,6 +16,10 @@ public record NetworkAnalyserConfig(AnalyserMode mode, float nodeSize, Map<Enum<
     private static final String TAG_MODE = "mode";
     private static final String TAG_NODE_SIZE = "nodeSize";
     private static final String TAG_COLORS = "colors";
+    private static final AnalyserMode[] ANALYSER_MODES = AnalyserMode.values();
+    private static final FlagType[] FLAG_TYPES = FlagType.values();
+    private static final LinkFlag[] LINK_FLAGS = LinkFlag.values();
+    private static final NodeFlag[] NODE_FLAGS = NodeFlag.values();
 
     public static final Reference2ObjectMap<Enum<?>, ColorData> DEFAULT_COLORS = new Reference2ObjectOpenHashMap<>();
     public static final NetworkAnalyserConfig DEFAULT;
@@ -35,7 +39,7 @@ public record NetworkAnalyserConfig(AnalyserMode mode, float nodeSize, Map<Enum<
             return null;
         }
         int modeIndex = buf.readByte();
-        AnalyserMode mode = getEnumByIndex(AnalyserMode.values(), modeIndex);
+        AnalyserMode mode = getEnumByIndex(ANALYSER_MODES, modeIndex);
         if (mode == null) {
             return null;
         }
@@ -52,7 +56,7 @@ public record NetworkAnalyserConfig(AnalyserMode mode, float nodeSize, Map<Enum<
             if (buf.readableBytes() < 6) {
                 return null;
             }
-            FlagType type = getEnumByIndex(FlagType.values(), buf.readByte());
+            FlagType type = getEnumByIndex(FLAG_TYPES, buf.readByte());
             int ordinal = buf.readByte();
             if (type == null) {
                 return null;
@@ -60,7 +64,7 @@ public record NetworkAnalyserConfig(AnalyserMode mode, float nodeSize, Map<Enum<
             ColorData color = ColorData.read(buf);
             switch (type) {
                 case LINK -> {
-                    LinkFlag flag = getEnumByIndex(LinkFlag.values(), ordinal);
+                    LinkFlag flag = getEnumByIndex(LINK_FLAGS, ordinal);
                     if (flag == null) {
                         return null;
                     }
@@ -70,7 +74,7 @@ public record NetworkAnalyserConfig(AnalyserMode mode, float nodeSize, Map<Enum<
                     colors.put(flag, color);
                 }
                 case NODE -> {
-                    NodeFlag flag = getEnumByIndex(NodeFlag.values(), ordinal);
+                    NodeFlag flag = getEnumByIndex(NODE_FLAGS, ordinal);
                     if (flag == null) {
                         return null;
                     }
@@ -94,7 +98,7 @@ public record NetworkAnalyserConfig(AnalyserMode mode, float nodeSize, Map<Enum<
         }
         AnalyserMode mode = DEFAULT.mode;
         if (tag.hasKey(TAG_MODE, 99)) {
-            AnalyserMode tagMode = getEnumByIndex(AnalyserMode.values(), tag.getInteger(TAG_MODE));
+            AnalyserMode tagMode = getEnumByIndex(ANALYSER_MODES, tag.getInteger(TAG_MODE));
             if (tagMode != null) {
                 mode = tagMode;
             }

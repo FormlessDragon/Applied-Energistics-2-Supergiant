@@ -4,8 +4,9 @@ public enum FlagType {
     LINK,
     NODE;
 
+    private static final FlagType[] VALUES = values();
+
     public static FlagType byIndex(int index) {
-        FlagType[] values = values();
-        return values[Math.floorMod(index, values.length)];
+        return VALUES[Math.floorMod(index, VALUES.length)];
     }
 }

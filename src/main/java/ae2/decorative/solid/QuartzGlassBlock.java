@@ -44,12 +44,12 @@ public class QuartzGlassBlock extends BlockGlass {
 
     private static GlassState getGlassState(IBlockAccess level, IBlockState state, BlockPos pos) {
         int[] masks = new int[6];
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             masks[facing.getIndex()] = makeBitmask(level, state, pos, facing);
         }
 
         boolean[] adjacentGlassBlocks = new boolean[6];
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             adjacentGlassBlocks[facing.getIndex()] = isGlassBlock(level, state, pos, facing, facing,
                 facing.getOpposite());
         }

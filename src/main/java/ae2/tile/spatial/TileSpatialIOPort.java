@@ -43,6 +43,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.world.WorldServer;
 
 public class TileSpatialIOPort extends AENetworkedInvTile {
+    private static final YesNo[] YES_NO_VALUES = YesNo.values();
 
     private final AppEngInternalInventory inv = new AppEngInternalInventory(this, 2);
     private final InternalInventory invExt = new FilteredInternalInventory(this.inv, new SpatialIOFilter());
@@ -59,8 +60,9 @@ public class TileSpatialIOPort extends AENetworkedInvTile {
         super.loadTag(data);
         if (data.hasKey("lastRedstoneState")) {
             int state = data.getInteger("lastRedstoneState");
-            YesNo[] values = YesNo.values();
-            this.lastRedstoneState = state >= 0 && state < values.length ? values[state] : YesNo.UNDECIDED;
+            this.lastRedstoneState = state >= 0 && state < YES_NO_VALUES.length
+                ? YES_NO_VALUES[state]
+                : YesNo.UNDECIDED;
         }
     }
 

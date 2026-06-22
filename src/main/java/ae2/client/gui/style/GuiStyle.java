@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Objects;
 
 public class GuiStyle {
+    private static final PaletteColor[] PALETTE_COLORS = PaletteColor.values();
 
     public static final Gson GSON = new GsonBuilder()
         .disableHtmlEscaping()
@@ -117,7 +118,7 @@ public class GuiStyle {
     }
 
     public void validate() {
-        for (PaletteColor value : PaletteColor.values()) {
+        for (PaletteColor value : PALETTE_COLORS) {
             if (!palette.containsKey(value)) {
                 throw new RuntimeException("Palette is missing color " + value);
             }

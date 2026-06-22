@@ -28,6 +28,8 @@ import ae2.util.JsonStreamUtil;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
 import com.google.gson.stream.JsonWriter;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.nbt.NBTTagCompound;
@@ -39,7 +41,6 @@ import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * A grid providing precomupted statistics about a network.
@@ -144,12 +145,16 @@ public class StatisticsService implements IGridService, IGridServiceProvider {
 
     @Override
     public void debugDump(JsonWriter writer) throws IOException {
-        JsonStreamUtil.writeProperties(Map.<String, Object>of("chunks",
-                chunks.keySet().stream().collect(
-                    Collectors.toMap(
-                        level -> Integer.toString(level.provider.getDimension()),
-                        level -> chunks.get(level).elementSet().stream().map(JsonStreamUtil::toJson)
-                                       .toList()))),
-            writer);
+        Map<String, Object> chunksJson = new Object2ObjectOpenHashMap<>(chunks.size());
+        for (var level : chunks.keySet()) {
+            var levelChunks = chunks.get(level).elementSet();
+            var chunkJson = new ObjectArrayList<>(levelChunks.size());
+            for (var chunk : levelChunks) {
+                chunkJson.add(JsonStreamUtil.toJson(chunk));
+            }
+            chunksJson.put(Integer.toString(level.provider.getDimension()), chunkJson);
+        }
+
+        JsonStreamUtil.writeProperties(Map.of("chunks", chunksJson), writer);
     }
 }

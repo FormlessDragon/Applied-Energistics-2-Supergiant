@@ -110,9 +110,10 @@ public final class StatusDisplay implements ITooltip {
 
     @Override
     public List<ITextComponent> getTooltipMessage() {
-        List<ITextComponent> tooltip = new ArrayList<>();
+        boolean showAllStatuses = GuiScreen.isShiftKeyDown();
+        List<ITextComponent> tooltip = new ArrayList<>(showAllStatuses ? 20 : 4);
         tooltip.add(GuiText.RequesterStatus.text());
-        if (GuiScreen.isShiftKeyDown()) {
+        if (showAllStatuses) {
             tooltip.add(new TextComponentString(" "));
             addStatusTooltipLine(tooltip, RequestStatus.IDLE);
             addStatusTooltipLine(tooltip, RequestStatus.MISSING);

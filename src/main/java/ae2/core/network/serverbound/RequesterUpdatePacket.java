@@ -8,6 +8,8 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.PacketBuffer;
 
 public class RequesterUpdatePacket extends ServerboundPacket {
+    private static final UpdateType[] UPDATE_TYPES = UpdateType.values();
+
     private UpdateType updateType = UpdateType.STATE;
     private int windowId;
     private long requesterId;
@@ -40,8 +42,7 @@ public class RequesterUpdatePacket extends ServerboundPacket {
 
     private static UpdateType readUpdateType(PacketBuffer packetBuffer) {
         int ordinal = packetBuffer.readVarInt();
-        UpdateType[] values = UpdateType.values();
-        return ordinal >= 0 && ordinal < values.length - 1 ? values[ordinal] : UpdateType.INVALID;
+        return ordinal >= 0 && ordinal < UPDATE_TYPES.length - 1 ? UPDATE_TYPES[ordinal] : UpdateType.INVALID;
     }
 
     @Override

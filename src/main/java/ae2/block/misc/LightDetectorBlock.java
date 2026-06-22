@@ -59,7 +59,7 @@ public class LightDetectorBlock extends AEBaseTileBlock<TileLightDetector> {
 
     private static EnumFacing[] getNearestLookingDirections(EntityLivingBase placer) {
         if (placer == null) {
-            return EnumFacing.values();
+            return EnumFacing.VALUES;
         }
 
         Vec3d look = placer.getLookVec();
@@ -119,7 +119,7 @@ public class LightDetectorBlock extends AEBaseTileBlock<TileLightDetector> {
             }
         }
 
-        for (EnumFacing direction : EnumFacing.values()) {
+        for (EnumFacing direction : EnumFacing.VALUES) {
             IBlockState placedState = state.withProperty(BlockDirectional.FACING, direction);
             if (this.canBlockStay(world, pos, placedState)) {
                 return placedState;
@@ -148,7 +148,7 @@ public class LightDetectorBlock extends AEBaseTileBlock<TileLightDetector> {
 
     @Override
     public boolean canPlaceBlockAt(World world, BlockPos pos) {
-        for (EnumFacing facing : EnumFacing.values()) {
+        for (EnumFacing facing : EnumFacing.VALUES) {
             if (this.canBlockStay(world, pos, this.getDefaultState().withProperty(BlockDirectional.FACING, facing))) {
                 return true;
             }

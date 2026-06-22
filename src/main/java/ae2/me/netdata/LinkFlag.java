@@ -5,8 +5,9 @@ public enum LinkFlag {
     DENSE,
     COMPRESSED;
 
+    private static final LinkFlag[] VALUES = values();
+
     public static LinkFlag byIndex(int index) {
-        LinkFlag[] values = values();
-        return values[Math.floorMod(index, values.length)];
+        return VALUES[Math.floorMod(index, VALUES.length)];
     }
 }

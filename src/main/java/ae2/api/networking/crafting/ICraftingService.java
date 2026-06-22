@@ -169,6 +169,13 @@ public interface ICraftingService extends IGridService {
     }
 
     /**
+     * @return a change marker for crafting CPU job state updates.
+     */
+    default long getCraftingCpuStateChangeTick() {
+        return 0;
+    }
+
+    /**
      * @return set of all the crafting cpus on the grid
      */
     ImmutableSet<ICraftingCPU> getCpus();

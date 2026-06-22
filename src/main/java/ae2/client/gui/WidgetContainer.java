@@ -40,6 +40,8 @@ import ae2.core.network.ServerboundPacket;
 import ae2.core.network.serverbound.SwitchGuisPacket;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiTextField;
@@ -47,7 +49,6 @@ import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.Rectangle;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +67,7 @@ public class WidgetContainer {
     private final Object2ObjectLinkedOpenHashMap<String, GuiButton> widgets = new Object2ObjectLinkedOpenHashMap<>();
     private final Object2ObjectLinkedOpenHashMap<String, AETextField> textFields = new Object2ObjectLinkedOpenHashMap<>();
     private final Object2ObjectLinkedOpenHashMap<String, ICompositeWidget> compositeWidgets = new Object2ObjectLinkedOpenHashMap<>();
+    private final ObjectList<ICompositeWidget> compositeWidgetOrder = new ObjectArrayList<>();
     private final Object2ObjectLinkedOpenHashMap<String, ResolvedTooltipArea> tooltips = new Object2ObjectLinkedOpenHashMap<>();
     private Rectangle currentBounds = Rects.ZERO;
     private long layoutVersion;
@@ -151,6 +153,7 @@ public class WidgetContainer {
         if (compositeWidgets.put(id, widget) != null) {
             throw new IllegalStateException("Duplicate id: " + id);
         }
+        this.compositeWidgetOrder.add(widget);
         this.layoutVersion++;
     }
 
@@ -449,9 +452,8 @@ public class WidgetContainer {
             }
         }
 
-        var mouseWheelCaptureWidgets = new ArrayList<>(compositeWidgets.values());
-        for (int i = mouseWheelCaptureWidgets.size() - 1; i >= 0; i--) {
-            var widget = mouseWheelCaptureWidgets.get(i);
+        for (int i = this.compositeWidgetOrder.size() - 1; i >= 0; i--) {
+            var widget = this.compositeWidgetOrder.get(i);
             if (widget.isVisible()
                 && widget.wantsAllMouseWheelEvents()
                 && widget.onMouseWheel(mousePos, wheelDelta)) {

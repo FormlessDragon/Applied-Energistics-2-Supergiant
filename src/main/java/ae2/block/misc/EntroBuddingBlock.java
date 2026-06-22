@@ -23,7 +23,7 @@ import java.util.Random;
 public class EntroBuddingBlock extends AEBaseBlock {
     private static final int GROWTH_CHANCE = 5;
     private static final int DECAY_CHANCE = 12;
-    private static final EnumFacing[] DIRECTIONS = EnumFacing.values();
+    private static final EnumFacing[] DIRECTIONS = EnumFacing.VALUES;
 
     private final Stage stage;
 

@@ -137,8 +137,10 @@ public class ConfigModifierItem extends AEBaseItem implements IGuiItem {
         SET,
         RMV;
 
+        private static final Mode[] VALUES = values();
+
         static Mode byName(String name) {
-            for (Mode mode : values()) {
+            for (Mode mode : VALUES) {
                 if (mode.getSerializedName().equals(name)) {
                     return mode;
                 }
@@ -184,7 +186,7 @@ public class ConfigModifierItem extends AEBaseItem implements IGuiItem {
         }
 
         public Mode next() {
-            return values()[(ordinal() + 1) % values().length];
+            return VALUES[(ordinal() + 1) % VALUES.length];
         }
     }
 

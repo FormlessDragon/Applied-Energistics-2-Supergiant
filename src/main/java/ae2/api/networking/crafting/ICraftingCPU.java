@@ -43,4 +43,8 @@ public interface ICraftingCPU {
     ITextComponent getName();
 
     CpuSelectionMode getSelectionMode();
+
+    default boolean canMergeJob(ICraftingPlan plan) {
+        return false;
+    }
 }

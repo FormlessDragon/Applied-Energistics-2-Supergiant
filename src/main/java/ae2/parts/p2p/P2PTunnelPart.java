@@ -42,6 +42,7 @@ import ae2.parts.AEBasePart;
 import ae2.util.InteractionUtil;
 import ae2.util.Platform;
 import ae2.util.SettingsFrom;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -52,12 +53,10 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.Vec3d;
-
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public abstract class P2PTunnelPart<T extends P2PTunnelPart<T>> extends AEBasePart {
@@ -95,15 +94,19 @@ public abstract class P2PTunnelPart<T extends P2PTunnelPart<T>> extends AEBasePa
     }
 
     public List<T> getOutputs() {
-        return getOutputStream().collect(Collectors.<T>toList());
+        var outputs = new ObjectArrayList<T>();
+        getOutputStream().forEach(outputs::add);
+        return outputs;
     }
 
     public List<T> getInputs() {
         if (this.getFrequency() == 0 || getMainNode().getGrid() == null) {
             return List.of();
         }
-        return P2PService.get(getMainNode().getGrid()).getInputs(this.getFrequency(), getTunnelClass())
-                         .collect(Collectors.<T>toList());
+        var inputs = new ObjectArrayList<T>();
+        P2PService.get(getMainNode().getGrid()).getInputs(this.getFrequency(), getTunnelClass())
+                  .forEach(inputs::add);
+        return inputs;
     }
 
     public boolean supportsMultipleInputs() {

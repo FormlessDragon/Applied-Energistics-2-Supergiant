@@ -247,7 +247,7 @@ public class DebugCardItem extends AEBaseItem {
             }
             if (center instanceof CablePart cablePart) {
                 var msg = new TextComponentString("");
-                for (var v : EnumFacing.values()) {
+                for (var v : EnumFacing.VALUES) {
                     msg.appendSibling(
                         style(new TextComponentString(v.name().substring(0, 1)),
                             cablePart.isConnected(v) ? TextFormatting.GREEN : TextFormatting.DARK_GRAY));

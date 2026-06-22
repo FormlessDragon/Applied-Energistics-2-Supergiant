@@ -189,7 +189,7 @@ public class CPUSelectionList implements ICompositeWidget {
     public Tooltip getTooltip(int mouseX, int mouseY) {
         var modeButtonCpu = hitTestModeButton(new Point(mouseX, mouseY));
         if (modeButtonCpu != null) {
-            var tooltipLines = new ObjectArrayList<ITextComponent>();
+            var tooltipLines = new ObjectArrayList<ITextComponent>(2);
             tooltipLines.add(ButtonToolTips.CpuSelectionMode.text());
             tooltipLines.add(gray(getModeButtonTooltip(modeButtonCpu.mode()).text()));
             return new Tooltip(tooltipLines);
@@ -200,7 +200,17 @@ public class CPUSelectionList implements ICompositeWidget {
             return null;
         }
 
-        var tooltipLines = new ObjectArrayList<ITextComponent>();
+        int tooltipLineCount = 2;
+        if (cpu.coProcessors() > 0) {
+            tooltipLineCount++;
+        }
+        if (cpu.mode() != CpuSelectionMode.ANY) {
+            tooltipLineCount++;
+        }
+        if (cpu.currentJob() != null) {
+            tooltipLineCount += 2;
+        }
+        var tooltipLines = new ObjectArrayList<ITextComponent>(tooltipLineCount);
         tooltipLines.add(getCpuName(cpu));
         tooltipLines.add(gray(ButtonToolTips.CpuStatusStorage.text(formatStorage(cpu))));
 

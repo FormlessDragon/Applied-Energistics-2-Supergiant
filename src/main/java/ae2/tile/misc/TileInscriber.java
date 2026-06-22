@@ -687,7 +687,7 @@ public class TileInscriber extends AENetworkedPoweredTile
 
     private void decodeOutputSides(int mask) {
         this.outputSides.clear();
-        for (EnumFacing side : EnumFacing.values()) {
+        for (EnumFacing side : EnumFacing.VALUES) {
             if ((mask & (1 << side.ordinal())) != 0) {
                 this.outputSides.add(side);
             }

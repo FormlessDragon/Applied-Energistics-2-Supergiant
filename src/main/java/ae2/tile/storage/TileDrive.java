@@ -54,6 +54,7 @@ import java.util.List;
 
 public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPriorityHost, IStorageProvider {
     private static final int CELL_COUNT = 10;
+    private static final CellState[] CELL_STATES = CellState.values();
 
     private final AppEngCellInventory inv = new AppEngCellInventory(this, CELL_COUNT);
     private final DriveWatcher[] invBySlot = new DriveWatcher[CELL_COUNT];
@@ -126,10 +127,9 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
         boolean changed = super.readFromStream(data);
 
         int packedState = data.readInt();
-        CellState[] cellStates = CellState.values();
         for (int i = 0; i < CELL_COUNT; i++) {
             int stateIndex = (packedState >> (i * 3)) & 0b111;
-            CellState state = stateIndex < cellStates.length ? cellStates[stateIndex] : CellState.ABSENT;
+            CellState state = stateIndex < CELL_STATES.length ? CELL_STATES[stateIndex] : CellState.ABSENT;
             if (clientCellState[i] != state) {
                 clientCellState[i] = state;
                 changed = true;

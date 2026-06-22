@@ -474,7 +474,12 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
             if (grid == null) {
                 return false;
             }
-            return grid.getCraftingService().getCpus().stream().anyMatch(cpu -> !cpu.isBusy());
+            for (var cpu : grid.getCraftingService().getCpus()) {
+                if (!cpu.isBusy()) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override

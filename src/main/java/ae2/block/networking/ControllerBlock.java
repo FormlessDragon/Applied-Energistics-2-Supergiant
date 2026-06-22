@@ -37,6 +37,7 @@ import net.minecraft.world.World;
 
 @SuppressWarnings("deprecation")
 public class ControllerBlock extends AEBaseTileBlock<TileController> {
+    private static final ControllerBlockState[] CONTROLLER_STATES = ControllerBlockState.values();
 
     public static final PropertyEnum<ControllerBlockState> CONTROLLER_STATE = PropertyEnum.create("state",
         ControllerBlockState.class);
@@ -99,9 +100,8 @@ public class ControllerBlock extends AEBaseTileBlock<TileController> {
 
     @Override
     public IBlockState getStateFromMeta(int meta) {
-        ControllerBlockState[] values = ControllerBlockState.values();
-        int safeMeta = meta < 0 || meta >= values.length ? 0 : meta;
-        return this.getDefaultState().withProperty(CONTROLLER_STATE, values[safeMeta]);
+        int safeMeta = meta < 0 || meta >= CONTROLLER_STATES.length ? 0 : meta;
+        return this.getDefaultState().withProperty(CONTROLLER_STATE, CONTROLLER_STATES[safeMeta]);
     }
 
     @Override

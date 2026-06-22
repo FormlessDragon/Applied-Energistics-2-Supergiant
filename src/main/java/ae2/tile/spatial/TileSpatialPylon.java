@@ -46,6 +46,9 @@ import java.util.Set;
 
 public class TileSpatialPylon extends AENetworkedTile implements IAEMultiBlock<SpatialPylonCluster> {
 
+    private static final AxisPosition[] AXIS_POSITIONS = AxisPosition.values();
+    private static final SpatialPylonCluster.Axis[] AXES = SpatialPylonCluster.Axis.values();
+
     private final SpatialPylonCalculator calculator = new SpatialPylonCalculator(this);
     private SpatialPylonCluster cluster;
     private boolean removing;
@@ -176,16 +179,14 @@ public class TileSpatialPylon extends AENetworkedTile implements IAEMultiBlock<S
 
         boolean powered = data.readBoolean();
         boolean online = data.readBoolean();
-        AxisPosition[] axisPositions = AxisPosition.values();
         int axisPositionOrdinal = data.readUnsignedByte();
-        AxisPosition axisPosition = axisPositionOrdinal < axisPositions.length
-            ? axisPositions[axisPositionOrdinal]
+        AxisPosition axisPosition = axisPositionOrdinal < AXIS_POSITIONS.length
+            ? AXIS_POSITIONS[axisPositionOrdinal]
             : AxisPosition.NONE;
 
-        SpatialPylonCluster.Axis[] axes = SpatialPylonCluster.Axis.values();
         int axisOrdinal = data.readUnsignedByte();
-        SpatialPylonCluster.Axis axis = axisOrdinal < axes.length
-            ? axes[axisOrdinal]
+        SpatialPylonCluster.Axis axis = axisOrdinal < AXES.length
+            ? AXES[axisOrdinal]
             : SpatialPylonCluster.Axis.UNFORMED;
 
         changed = changed || powered != this.clientPowered || online != this.clientOnline
@@ -215,15 +216,13 @@ public class TileSpatialPylon extends AENetworkedTile implements IAEMultiBlock<S
         this.clientOnline = data.getBoolean("online");
 
         int axisPositionOrdinal = data.getByte("axisPosition");
-        AxisPosition[] axisPositions = AxisPosition.values();
-        if (axisPositionOrdinal >= 0 && axisPositionOrdinal < axisPositions.length) {
-            this.clientAxisPosition = axisPositions[axisPositionOrdinal];
+        if (axisPositionOrdinal >= 0 && axisPositionOrdinal < AXIS_POSITIONS.length) {
+            this.clientAxisPosition = AXIS_POSITIONS[axisPositionOrdinal];
         }
 
         int axisOrdinal = data.getByte("axis");
-        SpatialPylonCluster.Axis[] axes = SpatialPylonCluster.Axis.values();
-        if (axisOrdinal >= 0 && axisOrdinal < axes.length) {
-            this.clientAxis = axes[axisOrdinal];
+        if (axisOrdinal >= 0 && axisOrdinal < AXES.length) {
+            this.clientAxis = AXES[axisOrdinal];
         }
     }
 

@@ -43,6 +43,7 @@ public class BeamFormerPart extends AEBasePart implements BeamFormerEndpoint, IG
     private static final String TAG_BEAM_COLOR = "beamColor";
     private static final String TAG_BEAM_VISIBLE = "beamVisible";
     private static final String TAG_BEAM_LINKED = "beamLinked";
+    private static final AEColor[] COLORS = AEColor.values();
     @Nullable
     private IGridConnection connection;
     @Nullable
@@ -61,8 +62,7 @@ public class BeamFormerPart extends AEBasePart implements BeamFormerEndpoint, IG
     }
 
     private static AEColor readColor(int ordinal) {
-        AEColor[] colors = AEColor.values();
-        return ordinal >= 0 && ordinal < colors.length ? colors[ordinal] : AEColor.TRANSPARENT;
+        return ordinal >= 0 && ordinal < COLORS.length ? COLORS[ordinal] : AEColor.TRANSPARENT;
     }
 
     @Override

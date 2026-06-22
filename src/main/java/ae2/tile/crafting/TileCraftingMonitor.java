@@ -32,12 +32,13 @@ import java.util.Objects;
 
 public class TileCraftingMonitor extends TileCraftingUnit implements IColorableBlockEntity {
 
+    private static final AEColor[] COLORS = AEColor.values();
+
     private GenericStack display;
     private AEColor paintedColor = AEColor.TRANSPARENT;
 
     private static AEColor readColor(int colorIndex) {
-        AEColor[] colors = AEColor.values();
-        return colorIndex >= 0 && colorIndex < colors.length ? colors[colorIndex] : AEColor.TRANSPARENT;
+        return colorIndex >= 0 && colorIndex < COLORS.length ? COLORS[colorIndex] : AEColor.TRANSPARENT;
     }
 
     @Override
