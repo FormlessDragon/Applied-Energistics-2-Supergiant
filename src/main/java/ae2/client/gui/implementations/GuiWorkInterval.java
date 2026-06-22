@@ -16,6 +16,8 @@ public class GuiWorkInterval extends AEBaseGui<ContainerWorkInterval> {
     private static final String STYLE_PATH = "/screens/work_interval.json";
 
     private final NumberEntryWidget workInterval;
+    private boolean userEditedWorkInterval;
+    private boolean syncingWorkInterval;
 
     public GuiWorkInterval(ContainerWorkInterval container, InventoryPlayer playerInventory, ITextComponent title) {
         this(container, playerInventory, title, GuiStyleManager.loadStyleDoc(STYLE_PATH));
@@ -40,7 +42,7 @@ public class GuiWorkInterval extends AEBaseGui<ContainerWorkInterval> {
         this.workInterval.setTextFieldStyle(style.getWidget("workIntervalInput"));
         this.workInterval.setMinValue(1);
         this.workInterval.setLongValue(this.container.getWorkInterval());
-        this.workInterval.setOnChange(this::saveWorkInterval);
+        this.workInterval.setOnChange(this::workIntervalChanged);
         this.workInterval.setOnConfirm(() -> {
             saveWorkInterval();
             AESubGui.goBack();
@@ -53,10 +55,24 @@ public class GuiWorkInterval extends AEBaseGui<ContainerWorkInterval> {
 
         var currentValue = this.workInterval.getLongValue();
         long containerValue = this.container.getWorkInterval();
-        if (!this.workInterval.isFocused()
+        if (!this.userEditedWorkInterval
             && (currentValue.isEmpty() || currentValue.getAsLong() != containerValue)) {
-            this.workInterval.setLongValue(containerValue);
+            this.syncingWorkInterval = true;
+            try {
+                this.workInterval.setLongValue(containerValue);
+            } finally {
+                this.syncingWorkInterval = false;
+            }
         }
+    }
+
+    private void workIntervalChanged() {
+        if (this.syncingWorkInterval) {
+            return;
+        }
+
+        this.userEditedWorkInterval = true;
+        saveWorkInterval();
     }
 
     private void saveWorkInterval() {

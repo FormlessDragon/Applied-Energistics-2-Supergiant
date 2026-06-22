@@ -7,16 +7,20 @@ import ae2.client.gui.style.GuiStyleManager;
 import ae2.container.AEBaseContainer;
 import ae2.core.localization.GuiText;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import org.lwjgl.input.Keyboard;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.io.IOException;
 import java.util.OptionalLong;
 
 public class GuiNumberEntryButtonSettings extends AEBaseGui<AEBaseContainer> {
+    private static final ITextComponent ADD_SUBTRACT_LABEL = new TextComponentString("+/-");
+    private static final ITextComponent MULTIPLY_DIVIDE_LABEL = new TextComponentString("×/÷");
     private static final int GROUP_COUNT = 4;
     private static final int BUTTON_COUNT = 4;
     private static final int VALID_COLOR = 0xFFFFFF;
@@ -28,6 +32,8 @@ public class GuiNumberEntryButtonSettings extends AEBaseGui<AEBaseContainer> {
     private final AETextField previewField;
     private final DecimalFormat decimalFormat;
     private final AETextField[][] fields = new AETextField[GROUP_COUNT][BUTTON_COUNT];
+    private final AE2Button[] modeButtons = new AE2Button[GROUP_COUNT];
+    private final NumberEntryButtonConfig.OperationMode[] modes = new NumberEntryButtonConfig.OperationMode[GROUP_COUNT];
     private boolean fieldsValid;
     private AETextField previewCacheField;
     private String previewCacheText = "";
@@ -51,12 +57,20 @@ public class GuiNumberEntryButtonSettings extends AEBaseGui<AEBaseContainer> {
         this.saveButton = widgets.addButton("save", GuiText.Set.text(), this::saveAndReturn);
         widgets.addButton("resetDefaults", GuiText.NumberEntryButtonSettingsReset.text(), this::resetDefaults);
 
+        addModeButton("default", 0);
+        addModeButton("shift", 1);
+        addModeButton("ctrl", 2);
+        addModeButton("alt", 3);
         addFields("default", 0);
         addFields("shift", 1);
         addFields("ctrl", 2);
         addFields("alt", 3);
         loadConfigToFields(NumberEntryButtonConfig.get());
         validateFields();
+    }
+
+    private void addModeButton(String prefix, int group) {
+        this.modeButtons[group] = widgets.addButton(prefix + "Mode", ADD_SUBTRACT_LABEL, () -> toggleMode(group));
     }
 
     private void addFields(String prefix, int group) {
@@ -69,6 +83,11 @@ public class GuiNumberEntryButtonSettings extends AEBaseGui<AEBaseContainer> {
             });
             this.fields[group][i] = field;
         }
+    }
+
+    private void toggleMode(int group) {
+        this.modes[group] = this.modes[group].next();
+        updateModeButton(group);
     }
 
     @Override
@@ -131,7 +150,11 @@ public class GuiNumberEntryButtonSettings extends AEBaseGui<AEBaseContainer> {
             defaultAddSteps,
             shiftAddSteps,
             ctrlMultiplyFactors,
-            altMultiplyFactors));
+            altMultiplyFactors,
+            this.modes[0],
+            this.modes[1],
+            this.modes[2],
+            this.modes[3]));
         return true;
     }
 
@@ -140,7 +163,27 @@ public class GuiNumberEntryButtonSettings extends AEBaseGui<AEBaseContainer> {
         writeGroup(1, config.shiftAddSteps());
         writeGroup(2, config.ctrlMultiplyFactors());
         writeGroup(3, config.altMultiplyFactors());
+        setMode(0, config.defaultOperationMode());
+        setMode(1, config.shiftOperationMode());
+        setMode(2, config.ctrlOperationMode());
+        setMode(3, config.altOperationMode());
         invalidatePreviewCache();
+    }
+
+    private void setMode(int group, NumberEntryButtonConfig.OperationMode mode) {
+        this.modes[group] = mode;
+        updateModeButton(group);
+    }
+
+    private void updateModeButton(int group) {
+        this.modeButtons[group].setMessage(labelFor(this.modes[group]));
+    }
+
+    private ITextComponent labelFor(NumberEntryButtonConfig.OperationMode mode) {
+        return switch (mode) {
+            case ADD_SUBTRACT -> ADD_SUBTRACT_LABEL;
+            case MULTIPLY_DIVIDE -> MULTIPLY_DIVIDE_LABEL;
+        };
     }
 
     private void writeGroup(int group, long[] values) {

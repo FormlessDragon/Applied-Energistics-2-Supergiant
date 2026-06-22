@@ -66,8 +66,8 @@ public class NumberEntryWidget implements ICompositeWidget {
 
     private static final ITextComponent PLUS = new TextComponentString("+");
     private static final ITextComponent MINUS = new TextComponentString("-");
-    private static final ITextComponent MULTIPLY = new TextComponentString("*");
-    private static final ITextComponent DIVIDE = new TextComponentString("/");
+    private static final ITextComponent MULTIPLY = new TextComponentString("×");
+    private static final ITextComponent DIVIDE = new TextComponentString("÷");
     private static final ITextComponent CEIL = new TextComponentString("C");
     private static final ITextComponent FLOOR = new TextComponentString("F");
     private static final String PREVIEW_ERROR = "error";
@@ -104,6 +104,7 @@ public class NumberEntryWidget implements ICompositeWidget {
     private Rectangle ceilButtonBounds = Rects.ZERO;
     private Rectangle floorButtonBounds = Rects.ZERO;
     private ButtonMode lastButtonMode;
+    private NumberEntryButtonConfig.OperationMode lastOperationMode;
     private long[] lastButtonValues = EmptyArrays.EMPTY_LONG_ARRAY;
     private boolean previewFieldConfigured;
     private boolean focused = true;
@@ -306,25 +307,31 @@ public class NumberEntryWidget implements ICompositeWidget {
             return;
         }
 
-        amountButtons.add(new AE2Button(left, top, 22, 20, makeButtonLabel(PLUS, getCurrentButtonValues()[0]),
+        ButtonMode currentMode = getButtonMode();
+        NumberEntryButtonConfig.OperationMode currentOperationMode = getOperationMode(currentMode);
+        long[] currentButtonValues = getValues(currentMode);
+        ITextComponent upperPrefix = getButtonPrefix(currentOperationMode, true);
+        ITextComponent lowerPrefix = getButtonPrefix(currentOperationMode, false);
+
+        amountButtons.add(new AE2Button(left, top, 22, 20, makeButtonLabel(upperPrefix, currentButtonValues[0]),
             () -> applyButton(0, true)));
-        amountButtons.add(new AE2Button(left + 25, top, 26, 20, makeButtonLabel(PLUS, getCurrentButtonValues()[1]),
+        amountButtons.add(new AE2Button(left + 25, top, 26, 20, makeButtonLabel(upperPrefix, currentButtonValues[1]),
             () -> applyButton(1, true)));
-        amountButtons.add(new AE2Button(left + 54, top, 30, 20, makeButtonLabel(PLUS, getCurrentButtonValues()[2]),
+        amountButtons.add(new AE2Button(left + 54, top, 30, 20, makeButtonLabel(upperPrefix, currentButtonValues[2]),
             () -> applyButton(2, true)));
-        amountButtons.add(new AE2Button(left + 86, top, 34, 20, makeButtonLabel(PLUS, getCurrentButtonValues()[3]),
+        amountButtons.add(new AE2Button(left + 86, top, 34, 20, makeButtonLabel(upperPrefix, currentButtonValues[3]),
             () -> applyButton(3, true)));
 
         buttons.addAll(amountButtons);
         amountButtons.forEach(addWidget);
 
-        amountButtons.add(new AE2Button(left, top + 42, 22, 20, makeButtonLabel(MINUS, getCurrentButtonValues()[0]),
+        amountButtons.add(new AE2Button(left, top + 42, 22, 20, makeButtonLabel(lowerPrefix, currentButtonValues[0]),
             () -> applyButton(0, false)));
-        amountButtons.add(new AE2Button(left + 25, top + 42, 26, 20, makeButtonLabel(MINUS, getCurrentButtonValues()[1]),
+        amountButtons.add(new AE2Button(left + 25, top + 42, 26, 20, makeButtonLabel(lowerPrefix, currentButtonValues[1]),
             () -> applyButton(1, false)));
-        amountButtons.add(new AE2Button(left + 54, top + 42, 30, 20, makeButtonLabel(MINUS, getCurrentButtonValues()[2]),
+        amountButtons.add(new AE2Button(left + 54, top + 42, 30, 20, makeButtonLabel(lowerPrefix, currentButtonValues[2]),
             () -> applyButton(2, false)));
-        amountButtons.add(new AE2Button(left + 86, top + 42, 34, 20, makeButtonLabel(MINUS, getCurrentButtonValues()[3]),
+        amountButtons.add(new AE2Button(left + 86, top + 42, 34, 20, makeButtonLabel(lowerPrefix, currentButtonValues[3]),
             () -> applyButton(3, false)));
 
         this.amountButtons = List.copyOf(amountButtons);
@@ -353,17 +360,17 @@ public class NumberEntryWidget implements ICompositeWidget {
 
         ButtonMode mode = getButtonMode();
         long[] values = getValues(mode);
-        if (mode == this.lastButtonMode && Arrays.equals(values, this.lastButtonValues)) {
+        NumberEntryButtonConfig.OperationMode operationMode = getOperationMode(mode);
+        if (mode == this.lastButtonMode && operationMode == this.lastOperationMode
+            && Arrays.equals(values, this.lastButtonValues)) {
             return;
         }
         this.lastButtonMode = mode;
+        this.lastOperationMode = operationMode;
         this.lastButtonValues = Arrays.copyOf(values, values.length);
         for (int i = 0; i < amountButtons.size(); i++) {
             boolean positive = i < 4;
-            ITextComponent prefix = switch (mode) {
-                case ADD, SHIFT_ADD -> positive ? PLUS : MINUS;
-                case MULTIPLY, ALT_MULTIPLY -> positive ? MULTIPLY : DIVIDE;
-            };
+            ITextComponent prefix = getButtonPrefix(operationMode, positive);
             amountButtons.get(i).setMessage(makeButtonLabel(prefix, values[i % 4]));
         }
     }
@@ -446,9 +453,9 @@ public class NumberEntryWidget implements ICompositeWidget {
     private void applyButton(int amountIndex, boolean positive) {
         ButtonMode mode = getButtonMode();
         long value = getValues(mode)[amountIndex];
-        switch (mode) {
-            case ADD, SHIFT_ADD -> addQty(positive ? value : -value);
-            case MULTIPLY, ALT_MULTIPLY -> multiplyQty(BigDecimal.valueOf(value), !positive);
+        switch (getOperationMode(mode)) {
+            case ADD_SUBTRACT -> addQty(positive ? value : -value);
+            case MULTIPLY_DIVIDE -> multiplyQty(BigDecimal.valueOf(value), !positive);
         }
     }
 
@@ -594,8 +601,11 @@ public class NumberEntryWidget implements ICompositeWidget {
         return new TextComponentString(prefix.getFormattedText() + decimalFormat.format(amount));
     }
 
-    private long[] getCurrentButtonValues() {
-        return getValues(getButtonMode());
+    private ITextComponent getButtonPrefix(NumberEntryButtonConfig.OperationMode operationMode, boolean positive) {
+        return switch (operationMode) {
+            case ADD_SUBTRACT -> positive ? PLUS : MINUS;
+            case MULTIPLY_DIVIDE -> positive ? MULTIPLY : DIVIDE;
+        };
     }
 
     private long[] getValues(ButtonMode mode) {
@@ -605,6 +615,16 @@ public class NumberEntryWidget implements ICompositeWidget {
             case SHIFT_ADD -> config.shiftAddSteps();
             case MULTIPLY -> config.ctrlMultiplyFactors();
             case ALT_MULTIPLY -> config.altMultiplyFactors();
+        };
+    }
+
+    private NumberEntryButtonConfig.OperationMode getOperationMode(ButtonMode mode) {
+        NumberEntryButtonConfig.Data config = NumberEntryButtonConfig.get();
+        return switch (mode) {
+            case ADD -> config.defaultOperationMode();
+            case SHIFT_ADD -> config.shiftOperationMode();
+            case MULTIPLY -> config.ctrlOperationMode();
+            case ALT_MULTIPLY -> config.altOperationMode();
         };
     }
 
