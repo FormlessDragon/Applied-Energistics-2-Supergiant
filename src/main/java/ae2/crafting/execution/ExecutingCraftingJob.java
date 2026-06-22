@@ -34,6 +34,7 @@ import ae2.crafting.TemporaryPseudoCraftingProvider;
 import ae2.crafting.inv.ListCraftingInventory;
 import ae2.helpers.patternprovider.PseudoPatternDetails;
 import ae2.me.service.CraftingService;
+import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.nbt.NBTTagCompound;
@@ -53,6 +54,8 @@ public class ExecutingCraftingJob {
     private static final String NBT_TIME_TRACKER = "timeTracker";
     private static final String NBT_REMAINING_AMOUNT = "remainingAmount";
     private static final String NBT_REMAINING_INTERMEDIATE_FINAL_OUTPUT = "remainingIntermediateFinalOutput";
+    private static final String NBT_PLAN_BYTES = "planBytes";
+    private static final String NBT_TOTAL_FINAL_OUTPUT_AMOUNT = "totalFinalOutputAmount";
     private static final String NBT_TASKS = "tasks";
     private static final String NBT_TASK_PSEUDO = "pseudo";
     private static final String NBT_TEMPORARY_PATTERNS = "temporaryPatterns";
@@ -65,19 +68,23 @@ public class ExecutingCraftingJob {
     final Map<IPatternDetails, TaskProgress> tasks = new Object2ObjectOpenHashMap<>();
     final Map<AEItemKey, TemporaryPseudoCraftingProvider> temporaryProviders = new Object2ObjectOpenHashMap<>();
     final ElapsedTimeTracker timeTracker;
-    final GenericStack finalOutput;
+    GenericStack finalOutput;
     @Nullable
     final
     Integer playerId;
+    long totalFinalOutputAmount;
     long remainingAmount;
     long remainingIntermediateFinalOutput;
+    long planBytes;
     boolean suspended;
 
     ExecutingCraftingJob(ICraftingPlan plan, CraftingDifferenceListener postCraftingDifference, CraftingLink link,
                          @Nullable Integer playerId, KeyCounter remainingMissingItems) {
         this.finalOutput = plan.finalOutput();
+        this.totalFinalOutputAmount = this.finalOutput.amount();
         this.remainingAmount = this.finalOutput.amount();
         this.remainingIntermediateFinalOutput = plan.intermediateFinalOutputAmount();
+        this.planBytes = plan.bytes();
         this.waitingFor = new ListCraftingInventory(postCraftingDifference::onCraftingDifference);
         this.pseudoInventory = new ListCraftingInventory(postCraftingDifference::onCraftingDifference);
         if (plan instanceof CraftingPlan craftingPlan) {
@@ -122,8 +129,14 @@ public class ExecutingCraftingJob {
         }
 
         this.finalOutput = GenericStack.readTag(data.getCompoundTag(NBT_FINAL_OUTPUT));
+        this.totalFinalOutputAmount = data.hasKey(NBT_TOTAL_FINAL_OUTPUT_AMOUNT, Constants.NBT.TAG_LONG)
+            ? data.getLong(NBT_TOTAL_FINAL_OUTPUT_AMOUNT)
+            : GenericStack.getStackSizeOrZero(this.finalOutput);
         this.remainingAmount = data.getLong(NBT_REMAINING_AMOUNT);
         this.remainingIntermediateFinalOutput = data.getLong(NBT_REMAINING_INTERMEDIATE_FINAL_OUTPUT);
+        this.planBytes = data.hasKey(NBT_PLAN_BYTES, Constants.NBT.TAG_LONG)
+            ? data.getLong(NBT_PLAN_BYTES)
+            : 0;
         this.waitingFor = new ListCraftingInventory(postCraftingDifference::onCraftingDifference);
         this.waitingFor.readFromNBT(data.getTagList(NBT_WAITING_FOR, Constants.NBT.TAG_COMPOUND));
         this.pseudoInventory = new ListCraftingInventory(postCraftingDifference::onCraftingDifference);
@@ -194,6 +207,8 @@ public class ExecutingCraftingJob {
 
         data.setLong(NBT_REMAINING_AMOUNT, remainingAmount);
         data.setLong(NBT_REMAINING_INTERMEDIATE_FINAL_OUTPUT, remainingIntermediateFinalOutput);
+        data.setLong(NBT_PLAN_BYTES, planBytes);
+        data.setLong(NBT_TOTAL_FINAL_OUTPUT_AMOUNT, totalFinalOutputAmount);
         if (this.playerId != null) {
             data.setInteger(NBT_PLAYER_ID, this.playerId);
         }
@@ -212,6 +227,58 @@ public class ExecutingCraftingJob {
 
     boolean isTemporaryPattern(IPatternDetails details) {
         return this.temporaryProviders.containsKey(PseudoPatternDetails.unwrap(details).getDefinition());
+    }
+
+    void merge(ICraftingPlan plan, KeyCounter remainingMissingItems) {
+        if (!this.finalOutput.what().equals(plan.finalOutput().what())) {
+            throw new IllegalArgumentException("Cannot merge crafting jobs with different final outputs");
+        }
+
+        this.remainingAmount = LongMath.saturatedAdd(this.remainingAmount, plan.finalOutput().amount());
+        this.totalFinalOutputAmount = LongMath.saturatedAdd(this.totalFinalOutputAmount, plan.finalOutput().amount());
+        this.finalOutput = new GenericStack(this.finalOutput.what(), this.totalFinalOutputAmount);
+        this.remainingIntermediateFinalOutput = LongMath.saturatedAdd(this.remainingIntermediateFinalOutput,
+            plan.intermediateFinalOutputAmount());
+        this.planBytes = LongMath.saturatedAdd(this.planBytes, plan.bytes());
+
+        if (plan instanceof CraftingPlan craftingPlan) {
+            for (var provider : craftingPlan.temporaryProviders()) {
+                for (var pattern : provider.getAvailablePatterns()) {
+                    var temporaryProvider = provider instanceof TemporaryPseudoCraftingProvider temporary
+                        ? temporary
+                        : new TemporaryPseudoCraftingProvider(pattern);
+                    this.temporaryProviders.put(PseudoPatternDetails.unwrap(pattern).getDefinition(), temporaryProvider);
+                }
+            }
+        }
+
+        for (var entry : plan.emittedItems()) {
+            waitingFor.insert(entry.getKey(), entry.getLongValue(), Actionable.MODULATE);
+            timeTracker.addMaxItems(entry.getLongValue(), entry.getKey().getType());
+        }
+        for (var entry : remainingMissingItems) {
+            waitingFor.insert(entry.getKey(), entry.getLongValue(), Actionable.MODULATE);
+            timeTracker.addMaxItems(entry.getLongValue(), entry.getKey().getType());
+        }
+        for (Object2LongMap.Entry<IPatternDetails> entry : plan.patternTimes().object2LongEntrySet()) {
+            var progress = tasks.computeIfAbsent(entry.getKey(), ignored -> new TaskProgress());
+            progress.value = LongMath.saturatedAdd(progress.value, entry.getLongValue());
+            for (var output : entry.getKey().getOutputs()) {
+                var amount = LongMath.saturatedMultiply(output.amount(),
+                    LongMath.saturatedMultiply(entry.getLongValue(), output.what().getAmountPerUnit()));
+                timeTracker.addMaxItems(amount, output.what().getType());
+            }
+        }
+    }
+
+    long estimateRemainingPlanBytes() {
+        if (this.totalFinalOutputAmount <= 0) {
+            return this.planBytes;
+        }
+
+        long remainingFinalOutputBytes = LongMath.saturatedMultiply(this.planBytes, this.remainingAmount)
+            / this.totalFinalOutputAmount;
+        return Math.max(remainingFinalOutputBytes, this.planBytes > 0 ? 1 : 0);
     }
 
     @FunctionalInterface

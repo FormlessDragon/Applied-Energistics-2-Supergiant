@@ -208,8 +208,9 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
         boolean planIsStartable = plan != null && !plan.simulation();
         boolean hasMissingEntries = plan != null && plan.hasMissingEntries();
         boolean shiftDown = isShiftKeyDown();
+        boolean ctrlDown = isCtrlKeyDown();
         var startButtonState = CraftConfirmStartButtonState.compute(this.container.hasNoCPU(), planIsStartable,
-            hasMissingEntries, shiftDown);
+            hasMissingEntries, shiftDown, this.container.canMerge(), ctrlDown);
         this.start.setMessage(startButtonState.label().text());
         this.start.enabled = startButtonState.clickable();
         this.start.setForceHighlighted(startButtonState.highlighted());
@@ -256,7 +257,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
     }
 
     private void start() {
-        getContainer().startJob(isShiftKeyDown());
+        getContainer().startJob(isShiftKeyDown(), isCtrlKeyDown());
     }
 
     @Override
@@ -269,10 +270,19 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
         }
 
         CraftingPlanSummary plan = container.getPlan();
-        if (plan != null && plan.hasMissingEntries() && this.start.visible
+        if (plan != null && this.start.visible
             && mouseX >= this.start.x && mouseY >= this.start.y
             && mouseX < this.start.x + this.start.width && mouseY < this.start.y + this.start.height) {
-            drawTooltipWithHeader(mouseX, mouseY, List.of(GuiText.ForceStartHoldShift.text()));
+            var tooltip = new ObjectArrayList<ITextComponent>();
+            if (plan.hasMissingEntries()) {
+                tooltip.add(GuiText.ForceStartHoldShift.text());
+            }
+            if (this.container.canMerge()) {
+                tooltip.add(GuiText.StartWithoutMergingHoldCtrl.text());
+            }
+            if (!tooltip.isEmpty()) {
+                drawTooltipWithHeader(mouseX, mouseY, tooltip);
+            }
         }
 
     }

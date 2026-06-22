@@ -222,6 +222,14 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
         return craftingLogic.trySubmitJob(grid, plan, src, requestingMachine);
     }
 
+    public boolean canMergeJob(ICraftingPlan plan) {
+        return craftingLogic.canMergeJob(plan);
+    }
+
+    public ICraftingSubmitResult mergeJob(IGrid grid, ICraftingPlan plan, IActionSource src) {
+        return craftingLogic.tryMergeJob(grid, plan, src);
+    }
+
     @Override
     public boolean isBusy() {
         return craftingLogic.hasJob();

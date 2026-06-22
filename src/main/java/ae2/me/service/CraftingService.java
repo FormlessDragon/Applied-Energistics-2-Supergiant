@@ -327,6 +327,13 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
     public ICraftingSubmitResult submitJob(ICraftingPlan job, @Nullable ICraftingRequester requestingMachine,
                                            @Nullable ICraftingCPU target, boolean prioritizePower, IActionSource src,
                                            boolean forceStart) {
+        return submitJob(job, requestingMachine, target, prioritizePower, src, forceStart, false);
+    }
+
+    @Override
+    public ICraftingSubmitResult submitJob(ICraftingPlan job, @Nullable ICraftingRequester requestingMachine,
+                                           @Nullable ICraftingCPU target, boolean prioritizePower, IActionSource src,
+                                           boolean forceStart, boolean skipMerge) {
         if (job.simulation()) {
             return CraftingSubmitResult.INCOMPLETE_PLAN;
         }
@@ -335,6 +342,13 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         }
         if (!job.missingItems().isEmpty() && job.patternTimes().isEmpty() && job.emittedItems().isEmpty()) {
             return CraftingSubmitResult.NO_CRAFTING_PATTERN;
+        }
+
+        if (requestingMachine == null && target == null && !skipMerge) {
+            var mergeTarget = this.findMergeableCraftingCPU(job, src);
+            if (mergeTarget != null) {
+                return mergeTarget.mergeJob(this.grid, job, src);
+            }
         }
 
         CraftingCPUCluster cpuCluster;
@@ -354,6 +368,11 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         }
 
         return cpuCluster.submitJob(this.grid, job, src, requestingMachine);
+    }
+
+    @Override
+    public boolean canMergeJob(ICraftingPlan job, IActionSource src) {
+        return findMergeableCraftingCPU(job, src) != null;
     }
 
     @Override
@@ -521,6 +540,27 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
             return null;
         }
 
+        return bestCpu;
+    }
+
+    @Nullable
+    private CraftingCPUCluster findMergeableCraftingCPU(ICraftingPlan job, IActionSource src) {
+        if (job.simulation()) {
+            return null;
+        }
+
+        CraftingCPUCluster bestCpu = null;
+        for (var cpu : this.craftingCPUClusters) {
+            if (!cpu.isActive() || cpu.isDestroyed() || !cpu.canBeAutoSelectedFor(src)) {
+                continue;
+            }
+            if (!cpu.canMergeJob(job)) {
+                continue;
+            }
+            if (bestCpu == null || compareCandidateCpu(cpu, bestCpu, true, src) < 0) {
+                bestCpu = cpu;
+            }
+        }
         return bestCpu;
     }
 

@@ -169,6 +169,31 @@ public class CraftingCpuLogic {
         }
     }
 
+    public boolean canMergeJob(ICraftingPlan plan) {
+        if (this.job == null || this.job.suspended || plan.simulation()) {
+            return false;
+        }
+        if (!this.job.finalOutput.what().equals(plan.finalOutput().what())) {
+            return false;
+        }
+
+        long mergedBytes = LongMath.saturatedAdd(this.job.estimateRemainingPlanBytes(), plan.bytes());
+        return cluster.getAvailableStorage() >= mergedBytes;
+    }
+
+    public ICraftingSubmitResult tryMergeJob(IGrid grid, ICraftingPlan plan, IActionSource src) {
+        if (!canMergeJob(plan)) {
+            return CraftingSubmitResult.CPU_BUSY;
+        }
+
+        var remainingMissingItems = CraftingCpuHelper.extractInitialItems(plan, grid, inventory, src);
+        this.job.merge(plan, remainingMissingItems);
+        cluster.updateOutput(new GenericStack(this.job.finalOutput.what(), this.job.remainingAmount));
+        cluster.markDirty();
+        postChange(this.job.finalOutput.what());
+        return CraftingSubmitResult.successful(null);
+    }
+
     public void tickCraftingLogic(IEnergyService eg, CraftingService cc) {
         // Don't tick if we're not active.
         if (!cluster.isActive())

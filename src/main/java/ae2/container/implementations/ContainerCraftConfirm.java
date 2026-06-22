@@ -93,6 +93,8 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     public ITextComponent cpuName;
     @GuiSync(8)
     public SyncableSubmitResult submitError = NO_ERROR;
+    @GuiSync(9)
+    public boolean mergeAvailable;
     @Nullable
     private ICraftingCPU selectedCpu;
     @Nullable
@@ -118,7 +120,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
 
         registerClientAction(ACTION_BACK, this::goBack);
         registerClientAction(ACTION_CYCLE_CPU, Boolean.class, this::cycleSelectedCPU);
-        registerClientAction(ACTION_START_JOB, Boolean.class, this::startJob);
+        registerClientAction(ACTION_START_JOB, StartJobRequest.class, this::startJob);
         registerClientAction(ACTION_REPLAN, this::replan);
     }
 
@@ -207,6 +209,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             this.job.cancel(true);
         }
         this.result = null;
+        this.mergeAvailable = false;
         this.clearError();
         this.whatToCraft = what;
         this.amount = amount;
@@ -227,6 +230,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             this.job.cancel(true);
         }
         this.result = null;
+        this.mergeAvailable = false;
         this.clearError();
         this.whatToCraft = what;
         this.amount = amount;
@@ -279,7 +283,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
                 }
 
                 if (shouldAutoStart(this.result, this.isAutoStart())) {
-                    this.startJob(false);
+                    this.startJob(false, true);
                     return;
                 }
 
@@ -288,6 +292,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
                 }
 
                 this.plan = CraftingPlanSummary.fromJob(this.getGrid(), this.result);
+                this.mergeAvailable = canMergeCurrentResult(grid);
                 sendPacketToClient(new CraftConfirmPlanPacket(this.plan));
             } catch (Throwable e) {
                 ITextComponent error = getCraftingErrorText(e);
@@ -299,6 +304,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
 
             this.job = null;
         }
+        this.mergeAvailable = canMergeCurrentResult(grid);
     }
 
     @Nullable
@@ -321,15 +327,26 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         return cpu.getAvailableStorage() >= this.plan.usedBytes() && !cpu.isBusy();
     }
 
+    private boolean canMergeCurrentResult(IGrid grid) {
+        return this.result != null
+            && !this.result.simulation()
+            && this.selectedCpu == null
+            && grid.getCraftingService().canMergeJob(this.result, this.getActionSrc());
+    }
+
     public void startJob() {
-        startJob(false);
+        startJob(false, false);
     }
 
     public void startJob(boolean forceStart) {
+        startJob(forceStart, false);
+    }
+
+    public void startJob(boolean forceStart, boolean skipMerge) {
         clearError();
 
         if (isClientSide()) {
-            sendClientAction(ACTION_START_JOB, forceStart);
+            sendClientAction(ACTION_START_JOB, new StartJobRequest(forceStart, skipMerge));
             return;
         }
 
@@ -344,7 +361,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             }
             ICraftingService craftingService = grid.getCraftingService();
             ICraftingSubmitResult submitResult = craftingService.submitJob(this.result, null, this.selectedCpu, true,
-                this.getActionSrc(), forceStart);
+                this.getActionSrc(), forceStart, skipMerge);
             this.setAutoStart(false);
             if (submitResult.successful()) {
                 boolean hasQueuedJobs = this.autoCraftingQueue != null && !this.autoCraftingQueue.isEmpty();
@@ -372,6 +389,10 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
                 this.submitError = new SyncableSubmitResult(submitResult);
             }
         }
+    }
+
+    private void startJob(StartJobRequest request) {
+        startJob(request.forceStart, request.skipMerge);
     }
 
     private IActionSource getActionSrc() {
@@ -431,6 +452,10 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
 
     public boolean hasNoCPU() {
         return this.noCPU;
+    }
+
+    public boolean canMerge() {
+        return this.mergeAvailable;
     }
 
     public void setJob(@Nullable Future<ICraftingPlan> job) {
@@ -563,6 +588,17 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             }
         }
 
+    }
+
+    @SuppressWarnings("ClassCanBeRecord")
+    private static final class StartJobRequest {
+        private final boolean forceStart;
+        private final boolean skipMerge;
+
+        private StartJobRequest(boolean forceStart, boolean skipMerge) {
+            this.forceStart = forceStart;
+            this.skipMerge = skipMerge;
+        }
     }
 
     private final class TemporaryPseudoSimulationRequester implements ICraftingSimulationRequester {
