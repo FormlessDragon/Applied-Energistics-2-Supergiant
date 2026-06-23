@@ -99,7 +99,9 @@ public final class GuiIds {
         ADVANCED_MEMORY_CARD,
         CELL_RESTRICTION,
         RENAMER,
-        WORK_INTERVAL;
+        WORK_INTERVAL,
+        PROVIDER_SELECT,
+        ;
 
         private static final GuiKey[] VALUES = values();
 

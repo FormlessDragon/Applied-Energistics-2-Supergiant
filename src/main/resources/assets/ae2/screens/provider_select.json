@@ -1,0 +1,115 @@
+{
+  "$schema": "schema.json",
+  "includes": ["common/common.json"],
+  "generatedBackground": {
+    "width": 260,
+    "height": 220
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2.ProviderSelect"
+      },
+      "position": {
+        "left": 8,
+        "top": 8
+      }
+    }
+  },
+  "tooltips": {
+    "mapping": {
+      "left": 10,
+      "top": 192,
+      "width": 62,
+      "height": 20,
+      "tooltip": [
+        {
+          "translate": "gui.ae2.ProviderSelectMapping"
+        },
+        {
+          "translate": "gui.tooltips.ae2.ProviderSelectMappingBind"
+        },
+        {
+          "translate": "gui.tooltips.ae2.ProviderSelectMappingUnbind"
+        },
+        {
+          "translate": "gui.tooltips.ae2.ProviderSelectMappingBindAndUpload"
+        }
+      ]
+    }
+  },
+  "widgets": {
+    "back": {
+      "left": 236,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "search": {
+      "left": 10,
+      "top": 25,
+      "width": 240,
+      "height": 12
+    },
+    "entry0": {
+      "left": 10,
+      "top": 44,
+      "width": 240,
+      "height": 20
+    },
+    "entry1": {
+      "left": 10,
+      "top": 68,
+      "width": 240,
+      "height": 20
+    },
+    "entry2": {
+      "left": 10,
+      "top": 92,
+      "width": 240,
+      "height": 20
+    },
+    "entry3": {
+      "left": 10,
+      "top": 116,
+      "width": 240,
+      "height": 20
+    },
+    "entry4": {
+      "left": 10,
+      "top": 140,
+      "width": 240,
+      "height": 20
+    },
+    "entry5": {
+      "left": 10,
+      "top": 164,
+      "width": 240,
+      "height": 20
+    },
+    "mapping": {
+      "left": 10,
+      "top": 192,
+      "width": 62,
+      "height": 20
+    },
+    "prev": {
+      "left": 94,
+      "top": 192,
+      "width": 30,
+      "height": 20
+    },
+    "next": {
+      "left": 136,
+      "top": 192,
+      "width": 30,
+      "height": 20
+    },
+    "cancel": {
+      "left": 188,
+      "top": 192,
+      "width": 62,
+      "height": 20
+    }
+  }
+}

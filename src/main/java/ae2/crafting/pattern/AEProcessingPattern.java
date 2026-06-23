@@ -187,6 +187,11 @@ public class AEProcessingPattern implements IPatternDetails {
         return condensedOutputs;
     }
 
+    @Nullable
+    public String getRecipeType() {
+        return Integrations.hei().getRecipeCategoryTitle(recipeTypeUid);
+    }
+
     public List<GenericStack> getSparseInputs() {
         return sparseInputs;
     }
