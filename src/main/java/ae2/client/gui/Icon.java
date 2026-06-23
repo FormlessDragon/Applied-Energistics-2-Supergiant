@@ -205,7 +205,9 @@ public final class Icon {
     public static final Icon S_FLUID_SUBSTITUTION_ENABLED = registerBuiltin("s_fluid_substitution_enabled", 8, 8);
     public static final Icon S_FLUID_SUBSTITUTION_DISABLED = registerBuiltin("s_fluid_substitution_disabled", 8, 8);
     public static final Icon S_STORAGE = registerBuiltin("s_storage", 10, 10);
+    public static final Icon CRAFT_CONFIRM_CPU_LIST_STORAGE = registerBuiltin("craft_confirm_cpu_list_storage", 16, 16);
     public static final Icon S_PROCESSOR = registerBuiltin("s_processor", 10, 10);
+    public static final Icon CRAFT_CONFIRM_CPU_LIST_PROCESSOR = registerBuiltin("craft_confirm_cpu_list_processor", 16, 16);
     public static final Icon S_CRAFT = registerBuiltin("s_craft", 10, 10);
     public static final Icon S_TERMINAL = registerBuiltin("s_terminal", 10, 10);
     public static final Icon S_MACHINE = registerBuiltin("s_machine", 10, 10);

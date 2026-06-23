@@ -72,6 +72,7 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
         this.cableBus.readFromNBT(data);
         if (this.world != null && this.world.isRemote) {
             this.queueClientRenderRefresh();
+            this.refreshLightValue(true);
             this.onVisualStateUpdated();
         }
     }
@@ -93,10 +94,7 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
         boolean changed = super.readFromStream(data);
         changed |= this.cableBus.readFromStream(new PacketBuffer(data));
 
-        int newLightValue = this.cableBus.getLightValue();
-        if (newLightValue != this.oldLightValue && this.world != null) {
-            this.oldLightValue = newLightValue;
-            this.world.checkLight(this.pos);
+        if (this.refreshLightValue(false)) {
             changed = true;
         }
         if (changed) {
@@ -117,6 +115,7 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
             this.cableBus.addToWorld();
             if (this.world != null && this.world.isRemote) {
                 this.queueClientRenderRefresh();
+                this.refreshLightValue(true);
                 this.onVisualStateUpdated();
             }
         }
@@ -213,11 +212,7 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
     @Override
     public void markForUpdate() {
         this.invalidateRenderBoundingBox();
-        int newLightValue = this.cableBus.getLightValue();
-        if (this.world != null && newLightValue != this.oldLightValue) {
-            this.oldLightValue = newLightValue;
-            this.world.checkLight(this.pos);
-        }
+        this.refreshLightValue(false);
 
         super.markForUpdate();
     }
@@ -394,6 +389,7 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
         }
 
         this.pendingClientRenderRefreshTicks--;
+        this.refreshLightValue(true);
         this.onVisualStateUpdated();
     }
 
@@ -424,6 +420,21 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
     private void queueClientRenderRefresh() {
         this.invalidateRenderBoundingBox();
         this.pendingClientRenderRefreshTicks = Math.max(this.pendingClientRenderRefreshTicks, 3);
+    }
+
+    private boolean refreshLightValue(boolean force) {
+        if (this.world == null) {
+            return false;
+        }
+
+        int newLightValue = this.cableBus.getLightValue();
+        if (!force && newLightValue == this.oldLightValue) {
+            return false;
+        }
+
+        this.oldLightValue = newLightValue;
+        this.world.checkLight(this.pos);
+        return true;
     }
 
     private void invalidateRenderBoundingBox() {

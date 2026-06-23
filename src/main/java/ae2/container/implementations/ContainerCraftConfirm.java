@@ -41,6 +41,7 @@ import ae2.container.ISubGui;
 import ae2.container.guisync.GuiSync;
 import ae2.container.guisync.PacketWritable;
 import ae2.container.interfaces.ICraftingGridContainer;
+import ae2.container.me.crafting.CraftConfirmCpuList;
 import ae2.container.me.crafting.CraftingCPUCycler;
 import ae2.container.me.crafting.CraftingCPURecord;
 import ae2.container.me.crafting.CraftingPlanSummary;
@@ -56,6 +57,8 @@ import ae2.crafting.execution.CraftingSubmitResult;
 import ae2.me.helpers.PlayerSource;
 import com.google.common.primitives.Ints;
 import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanMap;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -73,6 +76,7 @@ import java.util.concurrent.Future;
 public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     private static final String ACTION_BACK = "back";
     private static final String ACTION_CYCLE_CPU = "cycleCpu";
+    private static final String ACTION_SELECT_CPU_FROM_LIST = "selectCpuFromList";
     private static final String ACTION_START_JOB = "startJob";
     private static final String ACTION_REPLAN = "replan";
 
@@ -95,6 +99,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     public SyncableSubmitResult submitError = NO_ERROR;
     @GuiSync(9)
     public boolean mergeAvailable;
+    private final Reference2BooleanMap<ICraftingCPU> cachedMergeableCpus = new Reference2BooleanOpenHashMap<>();
     @Nullable
     private ICraftingCPU selectedCpu;
     @Nullable
@@ -112,6 +117,11 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     @Nullable
     private ICraftingCPU cachedMergeCpu;
     private long cachedMergeCpuStateChangeTick = Long.MIN_VALUE;
+    @GuiSync(10)
+    public CraftConfirmCpuList cpuList = CraftConfirmCpuList.EMPTY;
+    @Nullable
+    private ICraftingPlan cachedMergeableCpuResult;
+    private long cachedMergeableCpuStateChangeTick = Long.MIN_VALUE;
     @Nullable
     private List<ICraftingGridContainer.AutoCraftEntry> autoCraftingQueue;
     @Nullable
@@ -125,6 +135,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
 
         registerClientAction(ACTION_BACK, this::goBack);
         registerClientAction(ACTION_CYCLE_CPU, Boolean.class, this::cycleSelectedCPU);
+        registerClientAction(ACTION_SELECT_CPU_FROM_LIST, Integer.class, this::selectCpu);
         registerClientAction(ACTION_START_JOB, StartJobRequest.class, this::startJob);
         registerClientAction(ACTION_REPLAN, this::replan);
     }
@@ -216,6 +227,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         this.result = null;
         this.mergeAvailable = false;
         invalidateMergeCache();
+        invalidateMergeableCpuCache();
         this.clearError();
         this.whatToCraft = what;
         this.amount = amount;
@@ -238,6 +250,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         this.result = null;
         this.mergeAvailable = false;
         invalidateMergeCache();
+        invalidateMergeableCpuCache();
         this.clearError();
         this.whatToCraft = what;
         this.amount = amount;
@@ -259,6 +272,45 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             sendClientAction(ACTION_CYCLE_CPU, next);
         } else {
             this.cpuCycler.cycleCpu(next);
+            IGrid grid = getGrid();
+            if (grid != null) {
+                syncCpuList(grid);
+            }
+        }
+    }
+
+    public void selectCpu(int serial) {
+        if (isClientSide()) {
+            updateSelectedCpuClientSide(serial);
+            this.cpuList = this.cpuList.withSelectedCpu(serial);
+            sendClientAction(ACTION_SELECT_CPU_FROM_LIST, serial);
+        } else {
+            this.cpuCycler.selectCpu(serial);
+            IGrid grid = getGrid();
+            if (grid != null) {
+                this.mergeAvailable = canMergeCurrentResult(grid);
+                syncCpuList(grid);
+            }
+        }
+    }
+
+    private void updateSelectedCpuClientSide(int serial) {
+        if (serial == -1) {
+            this.cpuBytesAvail = 0;
+            this.cpuCoProcessors = 0;
+            this.cpuName = null;
+            return;
+        }
+
+        for (CraftConfirmCpuList.Entry entry : this.cpuList.cpus()) {
+            if (entry.serial() == serial) {
+                this.noCPU = false;
+                this.cpuBytesAvail = entry.storage();
+                this.cpuCoProcessors = entry.coProcessors();
+                this.cpuName = entry.name();
+                this.mergeAvailable = entry.mergeable();
+                return;
+            }
         }
     }
 
@@ -273,9 +325,6 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             this.setValidContainer(false);
             return;
         }
-
-        this.cpuCycler.detectAndSendChanges(grid);
-        super.broadcastChanges();
 
         if (this.job != null && this.job.isDone()) {
             try {
@@ -312,7 +361,19 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
 
             this.job = null;
         }
+        ensureMergeableCpuCache(grid);
+        this.cpuCycler.detectAndSendChanges(grid);
         this.mergeAvailable = canMergeCurrentResult(grid);
+        syncCpuList(grid);
+        super.broadcastChanges();
+    }
+
+    private void syncCpuList(IGrid grid) {
+        ensureMergeableCpuCache(grid);
+        this.cpuList = CraftConfirmCpuList.fromRecords(
+            this.cpuCycler.cpus(),
+            this.cpuCycler.getSelectedCpuSerial(),
+            this::isCachedMergeableCpu);
     }
 
     @Nullable
@@ -332,12 +393,37 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         if (this.plan == null) {
             return true;
         }
-        return cpuMatchesPlan(cpu, this.plan, this.result);
+        return cpu.getAvailableStorage() >= this.plan.usedBytes() && !cpu.isBusy()
+            || isCachedMergeableCpu(cpu);
     }
 
     static boolean cpuMatchesPlan(ICraftingCPU cpu, CraftingPlanSummary plan, @Nullable ICraftingPlan result) {
         return (cpu.getAvailableStorage() >= plan.usedBytes() && !cpu.isBusy())
             || (result != null && cpu.canMergeJob(result));
+    }
+
+    private void ensureMergeableCpuCache(IGrid grid) {
+        ICraftingPlan currentResult = this.result;
+        long cpuStateChangeTick = grid.getCraftingService().getCraftingCpuStateChangeTick();
+        if (this.cachedMergeableCpuResult == currentResult
+            && this.cachedMergeableCpuStateChangeTick == cpuStateChangeTick) {
+            return;
+        }
+
+        this.cachedMergeableCpuResult = currentResult;
+        this.cachedMergeableCpuStateChangeTick = cpuStateChangeTick;
+        this.cachedMergeableCpus.clear();
+    }
+
+    private boolean isCachedMergeableCpu(ICraftingCPU cpu) {
+        ICraftingPlan currentResult = this.cachedMergeableCpuResult;
+        if (currentResult == null || currentResult.simulation()) {
+            return false;
+        }
+        if (!this.cachedMergeableCpus.containsKey(cpu)) {
+            this.cachedMergeableCpus.put(cpu, cpu.canMergeJob(currentResult));
+        }
+        return this.cachedMergeableCpus.getBoolean(cpu);
     }
 
     private boolean canMergeCurrentResult(IGrid grid) {
@@ -365,6 +451,12 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         this.cachedMergeResult = null;
         this.cachedMergeCpu = null;
         this.cachedMergeCpuStateChangeTick = Long.MIN_VALUE;
+    }
+
+    private void invalidateMergeableCpuCache() {
+        this.cachedMergeableCpuResult = null;
+        this.cachedMergeableCpuStateChangeTick = Long.MIN_VALUE;
+        this.cachedMergeableCpus.clear();
     }
 
     public void startJob() {

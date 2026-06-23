@@ -22,6 +22,8 @@ import ae2.api.networking.IGrid;
 import ae2.api.networking.crafting.ICraftingCPU;
 import com.google.common.collect.ImmutableSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.Reference2IntMap;
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import net.minecraft.util.text.TextComponentString;
 
 import java.util.Collections;
@@ -34,7 +36,10 @@ public class CraftingCPUCycler {
     private final Predicate<ICraftingCPU> cpuFilter;
     private final ChangeListener changeListener;
     private final List<CraftingCPURecord> cpus = new ObjectArrayList<>();
+    private final List<CraftingCPURecord> readOnlyCpus = Collections.unmodifiableList(this.cpus);
+    private final Reference2IntMap<ICraftingCPU> cpuSerialMap = new Reference2IntOpenHashMap<>();
     private int selectedCpu = -1;
+    private int nextCpuSerial = 1;
     private boolean initialDataSent;
     private boolean allowNoSelection;
 
@@ -57,7 +62,9 @@ public class CraftingCPUCycler {
             for (CraftingCPURecord cpuRecord : this.cpus) {
                 if (cpuRecord.getCpu() == cpu) {
                     found = true;
-                    if (!Objects.equals(cpuRecord.getRawName(), cpu.getName())) {
+                    if (!Objects.equals(cpuRecord.getRawName(), cpu.getName())
+                        || cpuRecord.getSize() != cpu.getAvailableStorage()
+                        || cpuRecord.getProcessors() != cpu.getCoProcessors()) {
                         changed = true;
                     }
                     break;
@@ -77,7 +84,8 @@ public class CraftingCPUCycler {
             this.cpus.clear();
             for (ICraftingCPU cpu : cpuSet) {
                 if (this.cpuFilter.test(cpu)) {
-                    this.cpus.add(new CraftingCPURecord(cpu.getAvailableStorage(), cpu.getCoProcessors(), cpu));
+                    this.cpus.add(new CraftingCPURecord(getOrAssignCpuSerial(cpu), cpu.getAvailableStorage(),
+                        cpu.getCoProcessors(), cpu));
                 }
             }
 
@@ -102,6 +110,15 @@ public class CraftingCPUCycler {
         }
     }
 
+    private int getOrAssignCpuSerial(ICraftingCPU cpu) {
+        int serial = this.cpuSerialMap.getInt(cpu);
+        if (serial == 0) {
+            serial = this.nextCpuSerial++;
+            this.cpuSerialMap.put(cpu, serial);
+        }
+        return serial;
+    }
+
     public void cycleCpu(boolean next) {
         if (next) {
             this.selectedCpu++;
@@ -117,6 +134,33 @@ public class CraftingCPUCycler {
         }
 
         this.notifyListener();
+    }
+
+    public List<CraftingCPURecord> cpus() {
+        return this.readOnlyCpus;
+    }
+
+    public int getSelectedCpuSerial() {
+        if (this.selectedCpu < 0 || this.selectedCpu >= this.cpus.size()) {
+            return -1;
+        }
+        return this.cpus.get(this.selectedCpu).getSerial();
+    }
+
+    public void selectCpu(int serial) {
+        if (serial == -1 && this.allowNoSelection) {
+            this.selectedCpu = -1;
+            this.notifyListener();
+            return;
+        }
+
+        for (int i = 0; i < this.cpus.size(); i++) {
+            if (this.cpus.get(i).getSerial() == serial) {
+                this.selectedCpu = i;
+                this.notifyListener();
+                return;
+            }
+        }
     }
 
     public void setAllowNoSelection(boolean allowNoSelection) {

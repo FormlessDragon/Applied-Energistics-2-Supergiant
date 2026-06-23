@@ -23,6 +23,7 @@ import ae2.client.gui.style.Blitter;
 final class CraftingScreenBackground {
     private static final int MAIN_WIDTH = 218;
     private static final int SCROLLBAR_WIDTH = CraftingScreenLayout.WIDTH - MAIN_WIDTH;
+    private static final int LAST_ROW_SOURCE_OVERLAP = 7;
 
     private CraftingScreenBackground() {
     }
@@ -47,16 +48,21 @@ final class CraftingScreenBackground {
             } else {
                 currentRowSourceY = rowSourceY;
             }
+            int currentRowSourceHeight = CraftingScreenLayout.TABLE_ROW_HEIGHT;
+            if (row == rows - 1) {
+                currentRowSourceHeight += LAST_ROW_SOURCE_OVERLAP;
+            }
             Blitter.texture(texture)
-                   .src(0, currentRowSourceY, MAIN_WIDTH, CraftingScreenLayout.TABLE_ROW_HEIGHT)
+                   .src(0, currentRowSourceY, MAIN_WIDTH, currentRowSourceHeight)
                    .dest(offsetX, y)
                    .blit();
             y += CraftingScreenLayout.TABLE_ROW_HEIGHT;
         }
 
+        int footerOverlap = Math.min(LAST_ROW_SOURCE_OVERLAP, bottomHeight);
         Blitter.texture(texture)
-               .src(0, bottomSourceY, MAIN_WIDTH, bottomHeight)
-               .dest(offsetX, y)
+               .src(0, bottomSourceY + footerOverlap, MAIN_WIDTH, bottomHeight - footerOverlap)
+               .dest(offsetX, y + footerOverlap)
                .blit();
 
         if (rightFooterHeight > 0) {

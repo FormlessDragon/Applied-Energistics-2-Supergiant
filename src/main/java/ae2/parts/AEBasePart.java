@@ -98,6 +98,8 @@ public abstract class AEBasePart implements IPart, IActionHost, ISegmentedInvent
     protected void onMainNodeStateChanged(IGridNodeListener.State reason) {
         if (reason != IGridNodeListener.State.GRID_BOOT) {
             markForUpdateIfClientFlagsChanged();
+        } else if (this.mainNode.hasGridBooted() && this.getLightLevel() > 0 && this.host != null) {
+            this.host.markForUpdate();
         }
     }
 

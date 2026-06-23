@@ -23,6 +23,7 @@ import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
 public class CraftingCPURecord implements Comparable<CraftingCPURecord> {
+    private final int serial;
     private final ICraftingCPU cpu;
     private final long size;
     private final int processors;
@@ -31,7 +32,8 @@ public class CraftingCPURecord implements Comparable<CraftingCPURecord> {
     @Nullable
     private ITextComponent name;
 
-    public CraftingCPURecord(long size, int processors, ICraftingCPU cpu) {
+    public CraftingCPURecord(int serial, long size, int processors, ICraftingCPU cpu) {
+        this.serial = serial;
         this.size = size;
         this.processors = processors;
         this.cpu = cpu;
@@ -50,6 +52,10 @@ public class CraftingCPURecord implements Comparable<CraftingCPURecord> {
 
     public ICraftingCPU getCpu() {
         return this.cpu;
+    }
+
+    public int getSerial() {
+        return this.serial;
     }
 
     public int getProcessors() {

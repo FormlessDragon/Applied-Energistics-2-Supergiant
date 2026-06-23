@@ -34,7 +34,13 @@
     "selectCpu": {
       "left": 19,
       "bottom": 68,
-      "width": 180,
+      "width": 112,
+      "height": 20
+    },
+    "selectCpuList": {
+      "left": 136,
+      "bottom": 68,
+      "width": 63,
       "height": 20
     },
     "start": {

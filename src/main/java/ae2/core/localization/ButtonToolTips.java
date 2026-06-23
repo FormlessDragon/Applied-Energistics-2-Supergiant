@@ -170,6 +170,8 @@ public enum ButtonToolTips implements LocalizationEnum {
     ShowNonFullProviders,
     ShowVisibleProviders,
     SortBy,
+    SortByCapacity,
+    SortByCoProcessors,
     SortOrder,
     SortOrderAscendingDescription,
     SortOrderDescendingDescription,
@@ -203,6 +205,7 @@ public enum ButtonToolTips implements LocalizationEnum {
     LinkWirelessTerminal,
     PlaceWirelessBooster,
     View,
+    SelectCraftingCPUFromList,
     Write;
 
     private final String translationKey;

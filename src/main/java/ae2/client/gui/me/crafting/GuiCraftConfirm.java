@@ -30,6 +30,7 @@ import ae2.client.gui.me.search.AEKeySearch;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.AETextField;
+import ae2.client.gui.widgets.ITooltip;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.TabButton;
@@ -37,6 +38,7 @@ import ae2.container.implementations.ContainerCraftConfirm;
 import ae2.container.me.crafting.CraftingPlanSummary;
 import ae2.container.me.crafting.CraftingPlanSummaryEntry;
 import ae2.core.AEConfig;
+import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.SwitchCraftingTreePacket;
@@ -48,9 +50,11 @@ import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
+import java.awt.Rectangle;
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
@@ -64,12 +68,13 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
     private static final int FIXED_FOOTER_HEIGHT = 72;
     private static final int ROW_SOURCE_Y = 42;
     private static final int BOTTOM_SOURCE_Y = 134;
-    private static final int RIGHT_FOOTER_HEIGHT = 0;
+    private static final int RIGHT_FOOTER_HEIGHT = 7;
 
     private final CraftConfirmTableRenderer table;
     private final AE2Button start;
     private final AE2Button bookmarkMissing;
     private final AE2Button selectCPU;
+    private final AE2Button selectCPUList;
     private final Scrollbar scrollbar;
     private final AETextField searchField;
     private final SettingToggleButton<TerminalStyle> terminalStyleButton;
@@ -107,6 +112,11 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
 
         this.selectCPU = widgets.addButton("selectCpu", getNextCpuButtonLabel(), this::selectNextCpu);
         this.selectCPU.enabled = false;
+
+        this.selectCPUList = new TooltipButton(GuiText.SelectFromList.text(),
+            ButtonToolTips.SelectCraftingCPUFromList.text(), this::showCpuList);
+        widgets.add("selectCpuList", this.selectCPUList);
+        this.selectCPUList.enabled = false;
 
         widgets.addButton("cancel", GuiText.Cancel.text(), container::goBack);
 
@@ -215,6 +225,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
         this.start.enabled = startButtonState.clickable();
         this.start.setForceHighlighted(startButtonState.highlighted());
         this.selectCPU.enabled = planIsStartable;
+        this.selectCPUList.enabled = planIsStartable && !this.container.cpuList.cpus().isEmpty();
         boolean canBookmarkMissing = Integrations.hei().isEnabled() && hasMissingEntries;
         this.bookmarkMissing.visible = canBookmarkMissing;
         this.bookmarkMissing.enabled = canBookmarkMissing;
@@ -256,6 +267,10 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
 
     private void selectNextCpu() {
         getContainer().cycleSelectedCPU(!isHandlingRightClick());
+    }
+
+    private void showCpuList() {
+        switchToScreen(new GuiCraftConfirmCpuList(this));
     }
 
     private void start() {
@@ -444,5 +459,29 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
 
     private void invalidateSortedPlan() {
         this.filteredPlan = null;
+    }
+
+    private static final class TooltipButton extends AE2Button implements ITooltip {
+        private final List<ITextComponent> tooltip;
+
+        private TooltipButton(ITextComponent message, ITextComponent tooltip, Runnable onPress) {
+            super(message, onPress);
+            this.tooltip = Collections.singletonList(tooltip);
+        }
+
+        @Override
+        public List<ITextComponent> getTooltipMessage() {
+            return this.tooltip;
+        }
+
+        @Override
+        public Rectangle getTooltipArea() {
+            return new Rectangle(this.x, this.y, this.width, this.height);
+        }
+
+        @Override
+        public boolean isTooltipAreaVisible() {
+            return this.visible;
+        }
     }
 }

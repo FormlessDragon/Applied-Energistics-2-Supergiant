@@ -1,0 +1,46 @@
+{
+  "$schema": "schema.json",
+  "includes": ["common/common.json"],
+  "background": {
+    "texture": "guis/craft_confirm_cpu_list.png",
+    "srcRect": [0, 0, 238, 194]
+  },
+  "text": {
+    "dialog_title": {
+      "position": {
+        "left": 8,
+        "top": 7
+      }
+    }
+  },
+  "widgets": {
+    "search": {
+      "left": 121,
+      "top": 16,
+      "width": 90,
+      "height": 12
+    },
+    "scrollbar": {
+      "left": 218,
+      "top": 31,
+      "width": 12
+    },
+    "sort": {
+      "left": 8,
+      "bottom": 25,
+      "width": 16,
+      "height": 16
+    },
+    "back": {
+      "left": 214,
+      "top": -5,
+      "hideEdge": false,
+      "width": 20,
+      "height": 20
+    },
+    "verticalToolbar": {
+      "left": 3,
+      "top": 1
+    }
+  }
+}

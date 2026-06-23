@@ -74,10 +74,6 @@ public class CPUSelectionList implements ICompositeWidget {
     private final IntSupplier visibleRowsSupplier;
     private Rectangle bounds = new Rectangle(0, 0, 0, 0);
 
-    public CPUSelectionList(ContainerCraftingStatus container, Scrollbar scrollbar, GuiStyle style) {
-        this(container, scrollbar, style, () -> 6);
-    }
-
     public CPUSelectionList(ContainerCraftingStatus container, Scrollbar scrollbar, GuiStyle style,
                             IntSupplier visibleRowsSupplier) {
         this.container = container;
