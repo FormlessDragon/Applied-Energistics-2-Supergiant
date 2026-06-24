@@ -31,6 +31,8 @@ import ae2.api.storage.ILinkStatus;
 import ae2.api.upgrades.IUpgradeableObject;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
+import ae2.client.gui.PatternContainerExternalGuiReturnHandler;
+import ae2.client.gui.PreviousExternalGui;
 import ae2.client.gui.me.common.GuiTerminalSettings;
 import ae2.client.gui.me.items.WirelessUniversalTerminalSelectorWindow;
 import ae2.client.gui.style.GuiStyle;
@@ -44,8 +46,11 @@ import ae2.client.gui.widgets.PatternModifierPanelWidget;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
+import ae2.client.gui.widgets.SmallSquareButtonRenderer;
 import ae2.client.gui.widgets.UpgradesPanel;
 import ae2.client.render.overlay.CraftingSupplierHighlightHandler;
+import ae2.client.render.overlay.OverlayHighlightLocation;
+import ae2.client.render.overlay.OverlayHighlightShape;
 import ae2.container.SlotSemantics;
 import ae2.container.implementations.ContainerPatternAccessTerm;
 import ae2.core.AEConfig;
@@ -55,7 +60,6 @@ import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.core.network.serverbound.QuickMovePatternPacket;
-import ae2.crafting.execution.CraftingSupplierLocation;
 import ae2.crafting.execution.CraftingSupplierLocator;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
@@ -104,8 +108,8 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
     private static final ResourceLocation TEXTURE = AppEng.makeId("textures/guis/ex_pattern_access_terminal.png");
 
-    private static final int GUI_WIDTH = 195;
-    private static final int GUI_PADDING_X = 8;
+    private static final int GUI_WIDTH = 213;
+    private static final int GUI_PADDING_X = 17;
     private static final int GUI_PADDING_Y = 6;
     private static final int GUI_HEADER_HEIGHT = 30;
     private static final int GUI_FOOTER_HEIGHT = 99;
@@ -114,9 +118,10 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     private static final int SLOT_SIZE = ROW_HEIGHT;
     private static final int MIN_VISIBLE_ROWS = 2;
     private static final int PATTERN_PROVIDER_NAME_MARGIN_X = 2;
-    private static final int TEXT_MAX_WIDTH = 155;
-    private static final int ROW_ACTION_BUTTON_WIDTH = 6;
-    private static final int ROW_ACTION_BUTTON_HEIGHT = 11;
+    private static final int TEXT_MAX_WIDTH = 173;
+    private static final int ROW_ACTION_BUTTON_WIDTH = 12;
+    private static final int ROW_ACTION_BUTTON_HEIGHT = 12;
+    private static final int ROW_ACTION_BUTTON_X = -14;
     private static final int ROW_ACTION_BUTTON_Y_OFFSET = 3;
     private static final int RENAME_FIELD_X_OFFSET = 10;
     private static final int RENAME_FIELD_Y_OFFSET = 3;
@@ -244,9 +249,11 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     }
 
     private static void highlightProvider(PatternProviderInfo info) {
-        CraftingSupplierHighlightHandler.INSTANCE.showLocations(Minecraft.getMinecraft(), List.of(
-            new CraftingSupplierLocation(info.dimensionId(), info.pos().getX(), info.pos().getY(),
-                info.pos().getZ())));
+        OverlayHighlightShape shape = info.face() == null
+            ? OverlayHighlightShape.WHOLE_BLOCK
+            : OverlayHighlightShape.PATTERN_PROVIDER;
+        CraftingSupplierHighlightHandler.INSTANCE.showHighlightLocations(Minecraft.getMinecraft(), List.of(
+            new OverlayHighlightLocation(info.dimensionId(), info.pos(), info.face(), shape)));
     }
 
     private static void highlightProviderAndClose(PatternProviderInfo info) {
@@ -449,6 +456,10 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
+            return;
+        }
+
         if (this.activeGroupRenameField != null && this.activeGroupRenameField.getVisible()
             && this.activeGroupRenameField.isMouseOver(mouseX, mouseY)) {
             clearSearchFieldOnRightClick(this.activeGroupRenameField, mouseX, mouseY, mouseButton);
@@ -785,13 +796,14 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         refreshVisiblePatternSlots();
     }
 
-    public void postFullUpdate(long inventoryId, long sortBy, boolean canEditTerminalName, PatternContainerGroup group,
+    public void postFullUpdate(long inventoryId, long sortBy, boolean canEditTerminalName,
+                               boolean canModifyTerminalVisibility, PatternContainerGroup group,
                                int inventorySize, Int2ObjectMap<ItemStack> slots) {
         if (group == null) {
             return;
         }
         PatternContainerEntry patternContainer = new PatternContainerEntry(inventoryId, inventorySize, sortBy,
-            canEditTerminalName, group);
+            canEditTerminalName, canModifyTerminalVisibility, group);
         this.byId.put(inventoryId, patternContainer);
 
         AppEngInternalInventory inventory = patternContainer.getInventory();
@@ -937,7 +949,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         clearProviderActionButtons();
 
         int scroll = this.scrollbar.getCurrentScroll();
-        this.providerActionButtons.ensureCapacity(Math.min(this.visibleRows, Math.max(0, this.rows.size() - scroll)));
+        this.providerActionButtons.ensureCapacity(Math.clamp(this.rows.size() - scroll, 0, this.visibleRows));
         boolean renameFieldVisible = false;
         boolean groupRenameFieldVisible = false;
         for (int i = 0; i < this.visibleRows; i++) {
@@ -958,7 +970,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
                     PatternProviderInfo info = this.providerInfo.get(patternContainer.getServerId());
                     if (info != null || isEditable(patternContainer)) {
                         ProviderActionButton button = new ProviderActionButton(patternContainer, info);
-                        button.x = this.guiLeft + GUI_PADDING_X - ROW_ACTION_BUTTON_WIDTH;
+                        button.x = this.guiLeft + GUI_PADDING_X + ROW_ACTION_BUTTON_X;
                         button.y = this.guiTop + GUI_HEADER_HEIGHT + i * ROW_HEIGHT + ROW_ACTION_BUTTON_Y_OFFSET;
                         this.providerActionButtons.add(button);
                         this.buttonList.add(button);
@@ -1201,28 +1213,23 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             return;
         }
 
-        GroupRenameFieldLayout layout = getGroupRenameFieldLayout(group, visibleRow, true);
+        GroupRenameFieldLayout layout = getGroupRenameFieldLayout(group, visibleRow);
         this.activeGroupRenameField.move(layout.x(), layout.y());
         this.activeGroupRenameField.resize(layout.width(), GROUP_RENAME_FIELD_HEIGHT);
         this.activeGroupRenameField.setVisible(true);
     }
 
-    private GroupRenameFieldLayout getGroupRenameFieldLayout(PatternContainerGroup group, int visibleRow,
-                                                             boolean absolute) {
+    private GroupRenameFieldLayout getGroupRenameFieldLayout(PatternContainerGroup group, int visibleRow) {
         int entries = this.byGroup.get(group).size();
         String countText = entries > 1 ? " (" + entries + ")" : "";
         int countWidth = this.fontRenderer.getStringWidth(countText);
-        int x = GUI_PADDING_X + PATTERN_PROVIDER_NAME_MARGIN_X + GROUP_RENAME_FIELD_X_OFFSET;
-        int y = GUI_HEADER_HEIGHT + visibleRow * ROW_HEIGHT + GROUP_RENAME_FIELD_Y_OFFSET;
-        if (absolute) {
-            x += this.guiLeft;
-            y += this.guiTop;
-        }
+        int x = GUI_PADDING_X + PATTERN_PROVIDER_NAME_MARGIN_X + GROUP_RENAME_FIELD_X_OFFSET + this.guiLeft;
+        int y = GUI_HEADER_HEIGHT + visibleRow * ROW_HEIGHT + GROUP_RENAME_FIELD_Y_OFFSET + this.guiTop;
         return new GroupRenameFieldLayout(x, y, Math.max(24, TEXT_MAX_WIDTH - 18 - countWidth));
     }
 
     private Rectangle getGroupRenameFieldBounds(PatternContainerGroup group, int visibleRow) {
-        GroupRenameFieldLayout layout = getGroupRenameFieldLayout(group, visibleRow, true);
+        GroupRenameFieldLayout layout = getGroupRenameFieldLayout(group, visibleRow);
         return new Rectangle(
             layout.x() - 2,
             layout.y() - 2,
@@ -1347,6 +1354,10 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
             this.info = info;
         }
 
+        private boolean canToggleVisibility() {
+            return this.entry.canModifyTerminalVisibility();
+        }
+
         @Override
         public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
             if (super.mousePressed(minecraft, mouseX, mouseY)) {
@@ -1354,7 +1365,13 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
                     openRenameField(this.entry);
                     return true;
                 }
+                if (GuiScreen.isAltKeyDown() && canToggleVisibility()) {
+                    GuiPatternAccessTerm.this.container.togglePatternProviderVisibility(this.entry.getServerId());
+                    return true;
+                }
                 if (GuiScreen.isShiftKeyDown() && this.info != null) {
+                    PreviousExternalGui.capture(GuiPatternAccessTerm.this);
+                    PatternContainerExternalGuiReturnHandler.INSTANCE.expectPatternContainerGui();
                     GuiPatternAccessTerm.this.container.openPatternProvider(this.entry.getServerId());
                     return true;
                 }
@@ -1374,20 +1391,28 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
 
             this.hovered = mouseX >= this.x && mouseY >= this.y && mouseX < this.x + this.width
                 && mouseY < this.y + this.height;
-
-            var blitter = Icon.PATTERN_PROVIDER_RENAME.getBlitter().copy();
-            if (!this.enabled) {
-                blitter.opacity(0.5f);
+            SmallSquareButtonRenderer.drawBackground(this.x, this.y, this.width, this.height, this.hovered);
+            Icon icon;
+            if (GuiScreen.isCtrlKeyDown() && isEditable(this.entry)) {
+                icon = Icon.RENAME;
+            } else if (GuiScreen.isAltKeyDown() && canToggleVisibility()) {
+                icon = Icon.PATTERN_TERMINAL_HIDDEN;
+            } else {
+                icon = Icon.HIGHLIGHT;
             }
-            blitter.dest(this.x, this.y).blit();
+            SmallSquareButtonRenderer.drawIcon(this.x, this.y, this.width, this.height, icon, 0);
         }
 
         @Override
         public List<ITextComponent> getTooltipMessage() {
             boolean editable = isEditable(this.entry);
+            boolean visibilityModifiable = canToggleVisibility();
             int lineCount = 0;
             if (this.info != null) {
                 lineCount += 3;
+            }
+            if (visibilityModifiable) {
+                lineCount++;
             }
             if (editable) {
                 lineCount++;
@@ -1403,6 +1428,9 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
                     this.info.pos().getZ(),
                     dimensionName));
                 tooltip.add(GuiText.PatternAccessTerminalOpenProvider.text());
+            }
+            if (visibilityModifiable) {
+                tooltip.add(GuiText.PatternAccessTerminalToggleVisibility.text());
             }
             if (editable) {
                 tooltip.add(GuiText.PatternAccessTerminalRenameProvider.text());

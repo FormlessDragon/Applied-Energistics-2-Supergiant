@@ -572,6 +572,7 @@ gui.ae2.PatternAccessTerminalOpenProvider=Shift-left-click to open pattern provi
 gui.ae2.PatternAccessTerminalSearchTooltipInput=Search by pattern input.
 gui.ae2.PatternAccessTerminalSearchTooltipOutput=Search by pattern output.
 gui.ae2.PatternAccessTerminalProviderSearchTooltip=Search by pattern provider name.
+gui.ae2.PatternAccessTerminalToggleVisibility=Alt-left-click to show or hide on Pattern Access Terminal
 gui.ae2.PatternAccessTerminalRenameProvider=Ctrl-left-click to rename
 gui.ae2.PatternEncoding=Pattern Encoding
 gui.ae2.PatternEncoding.primary_processing_result_hint=Can be requested through the automated crafting system.

@@ -258,6 +258,10 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
+            return;
+        }
+
         RequestRowWidget clickedInputRow = null;
         for (RequestRowWidget row : this.requestWidgets) {
             if (row.isMouseOverInput(mouseX, mouseY)) {

@@ -122,11 +122,11 @@ import ae2.core.gui.locator.GuiHostLocator;
 import ae2.core.gui.locator.GuiHostLocators;
 import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.core.gui.locator.PartLocator;
+import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.WirelessCraftingTerminalGuiHost;
 import ae2.helpers.WirelessPatternAccessTerminalGuiHost;
 import ae2.helpers.WirelessPatternEncodingTerminalGuiHost;
 import ae2.helpers.WirelessRequesterTerminalGuiHost;
-import ae2.helpers.ICellWorkbenchHost;
 import ae2.items.contents.AdvancedMemoryCardGuiHost;
 import ae2.items.contents.ConfigModifierGuiHost;
 import ae2.items.contents.NetworkToolGuiHost;
@@ -276,7 +276,7 @@ public class AEGuiHandler implements IGuiHandler {
         container.setLocator(locator);
         container.setReturnedFromSubScreen(GuiIds.isReturnedFromSubScreen(guiId));
         container.setGuiTitle(getDefaultGuiTitle(container.getTarget()));
-        return container;
+        return PatternContainerGuiReturnContext.initializeContainer(container);
     }
 
     private static @Nullable ITextComponent getDefaultGuiTitle(Object host) {

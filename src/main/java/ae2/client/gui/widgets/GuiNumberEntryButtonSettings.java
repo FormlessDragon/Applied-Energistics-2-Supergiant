@@ -108,6 +108,10 @@ public class GuiNumberEntryButtonSettings extends AEBaseGui<AEBaseContainer> {
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
+            return;
+        }
+
         clearFieldFocus();
         super.mouseClicked(mouseX, mouseY, mouseButton);
     }

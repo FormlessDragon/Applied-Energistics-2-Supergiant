@@ -346,6 +346,10 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
+            return;
+        }
+
         if (this.searchField.getVisible() && this.searchField.isMouseOver(mouseX, mouseY) && mouseButton == 1) {
             this.searchField.setText("");
             updateSearch();

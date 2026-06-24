@@ -140,6 +140,17 @@ public interface PatternProviderLogicHost
     }
 
     @Override
+    default boolean canModifyTerminalVisibility() {
+        return true;
+    }
+
+    @Override
+    default void setTerminalVisibility(boolean visible) {
+        getLogic().getConfigManager().putSetting(Settings.PATTERN_ACCESS_TERMINAL, visible ? YesNo.YES : YesNo.NO);
+        saveChanges();
+    }
+
+    @Override
     default void setTerminalCustomName(@Nullable String name) {
         setCustomName(name);
         saveChanges();

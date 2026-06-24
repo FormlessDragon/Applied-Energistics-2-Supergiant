@@ -381,6 +381,17 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     }
 
     @Override
+    public boolean canModifyTerminalVisibility() {
+        return true;
+    }
+
+    @Override
+    public void setTerminalVisibility(boolean visible) {
+        this.configManager.putSetting(Settings.PATTERN_ACCESS_TERMINAL, visible ? YesNo.YES : YesNo.NO);
+        saveChanges();
+    }
+
+    @Override
     public void setTerminalCustomName(@Nullable String name) {
         setCustomName(name);
         saveChanges();

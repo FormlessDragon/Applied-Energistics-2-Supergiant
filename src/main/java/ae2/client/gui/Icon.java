@@ -239,7 +239,6 @@ public final class Icon {
     public static final Icon ADVANCED_MEMORY_CARD_STATUS_INPUT = registerBuiltin("advanced_memory_card_status_input");
     public static final Icon ADVANCED_MEMORY_CARD_STATUS_OUTPUT = registerBuiltin("advanced_memory_card_status_output");
     public static final Icon ADVANCED_MEMORY_CARD_STATUS_UNBOUND = registerBuiltin("advanced_memory_card_status_unbound");
-    public static final Icon PATTERN_PROVIDER_RENAME = registerBuiltin("pattern_provider_rename");
     public static final Icon CRAFTING_CPU_MODE_ALL = registerBuiltin("crafting_cpu_mode_all");
     public static final Icon CRAFTING_CPU_ACTIVITY_ALL = registerBuiltin("crafting_cpu_activity_all");
     public static final Icon CRAFTING_CPU_ACTIVITY_ACTIVE = registerBuiltin("crafting_cpu_activity_active");
@@ -247,8 +246,8 @@ public final class Icon {
     public static final Icon CRAFTING_CPU_LIST_ROW_BACKGROUND = registerBuiltin("crafting_cpu_list_row_background");
     public static final Icon CRAFTING_CPU_LIST_ROW_BACKGROUND_FOCUSED = registerBuiltin(
         "crafting_cpu_list_row_background_focused");
-    public static final Icon CRAFTING_CPU_RENAME = registerBuiltin("crafting_cpu_rename");
-    public static final Icon CRAFTING_CPU_HIGHLIGHT = registerBuiltin("crafting_cpu_highlight");
+    public static final Icon RENAME = registerBuiltin("rename");
+    public static final Icon HIGHLIGHT = registerBuiltin("highlight");
     private final Size manualSize;
     public int width;
     private final ResourceLocation id;

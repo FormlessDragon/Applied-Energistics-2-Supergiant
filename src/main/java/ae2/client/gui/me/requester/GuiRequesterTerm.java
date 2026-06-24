@@ -108,6 +108,10 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
+            return;
+        }
+
         if (mouseButton == 1 && this.searchField.isMouseOver(mouseX, mouseY)) {
             this.searchField.setText("");
             refreshList();

@@ -264,6 +264,10 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
+            return;
+        }
+
         if (this.activeRenameField != null && this.activeRenameField.getVisible()
             && this.activeRenameField.isMouseOver(mouseX, mouseY)) {
             if (mouseButton == 1) {

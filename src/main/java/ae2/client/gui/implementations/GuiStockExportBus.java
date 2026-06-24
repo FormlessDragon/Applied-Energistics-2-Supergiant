@@ -86,6 +86,10 @@ public class GuiStockExportBus<T extends ContainerStockExportBus> extends GuiUpg
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
+            return;
+        }
+
         if (mouseButton == 2) {
             Slot slot = findSlot(mouseX, mouseY);
             if (canModifyAmount(slot)) {

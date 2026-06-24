@@ -16,10 +16,11 @@ import ae2.container.implementations.ContainerInscriber;
 import ae2.container.implementations.ContainerOutputSides;
 import ae2.container.implementations.ContainerPriority;
 import ae2.container.implementations.ContainerSetStockAmount;
-import ae2.container.implementations.ContainerWorkInterval;
 import ae2.container.implementations.ContainerWirelessMagnet;
+import ae2.container.implementations.ContainerWorkInterval;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.core.definitions.AEItems;
+import ae2.core.gui.PatternContainerGuiReturnContext;
 import ae2.core.gui.locator.GuiHostLocator;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.ServerboundPacket;
@@ -52,6 +53,7 @@ public class SwitchGuisPacket extends ServerboundPacket {
 
     private GuiIds.@Nullable GuiKey newGui;
     private boolean returnToParentGui;
+    private boolean capturePreviousExternalGui;
 
     public SwitchGuisPacket() {
     }
@@ -75,6 +77,13 @@ public class SwitchGuisPacket extends ServerboundPacket {
 
     public static boolean openSubGui(EntityPlayer player, GuiHostLocator locator, GuiIds.GuiKey guiKey,
                                      @Nullable Container returnToContainerOverride) {
+        return openSubGui(player, locator, guiKey, returnToContainerOverride,
+            isExternalGuiReturn(returnToContainerOverride));
+    }
+
+    public static boolean openSubGui(EntityPlayer player, GuiHostLocator locator, GuiIds.GuiKey guiKey,
+                                     @Nullable Container returnToContainerOverride,
+                                     boolean capturePreviousExternalGui) {
         if (player.getClass() != EntityPlayerMP.class) {
             return false;
         }
@@ -103,14 +112,13 @@ public class SwitchGuisPacket extends ServerboundPacket {
 
         container.setLocator(locator);
         container.setReturnedFromSubScreen(false);
-        boolean externalGuiReturn = isExternalGuiReturn(returnToContainerOverride);
-        container.setExternalGuiReturn(externalGuiReturn);
+        container.setExternalGuiReturn(capturePreviousExternalGui);
         container.setReturnToContainerOverride(returnToContainerOverride);
         container.setGuiTitle(title);
         container.windowId = windowId;
 
         InitNetwork.CHANNEL.sendTo(new OpenGuiPacket(guiKey, locator, false, title,
-            getInitialData(guiKey, host), windowId, externalGuiReturn), serverPlayer);
+            getInitialData(guiKey, host), windowId, capturePreviousExternalGui), serverPlayer);
 
         serverPlayer.openContainer = container;
         serverPlayer.openContainer.windowId = windowId;
@@ -291,6 +299,7 @@ public class SwitchGuisPacket extends ServerboundPacket {
         if (this.newGui != null) {
             data.writeVarInt(this.newGui.getGuiId());
         }
+        data.writeBoolean(this.capturePreviousExternalGui);
     }
 
     @Override
@@ -325,6 +334,7 @@ public class SwitchGuisPacket extends ServerboundPacket {
             this.newGui = null;
             this.returnToParentGui = true;
         }
+        this.capturePreviousExternalGui = data.readBoolean();
         if (data.isReadable()) {
             throw new IllegalArgumentException("Trailing switch GUIs payload bytes: " + data.readableBytes());
         }
@@ -346,12 +356,16 @@ public class SwitchGuisPacket extends ServerboundPacket {
 
         GuiHostLocator locator = openContainer.getLocator();
         if (locator != null) {
-            openSubGui(player, locator, target, openContainer);
+            openSubGui(player, locator, target, openContainer, this.capturePreviousExternalGui);
         }
     }
 
     private void doReturnToParentGui(EntityPlayerMP player) {
         if (restoreExternalGui(player)) {
+            return;
+        }
+
+        if (PatternContainerGuiReturnContext.restoreExternalContainer(player, player)) {
             return;
         }
 

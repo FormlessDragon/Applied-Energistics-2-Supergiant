@@ -23,6 +23,7 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
     private int inventorySize;
     private long sortBy;
     private boolean canEditTerminalName;
+    private boolean canModifyTerminalVisibility;
     private PatternContainerGroup group;
     private Int2ObjectMap<ItemStack> slots = new Int2ObjectOpenHashMap<>();
 
@@ -30,26 +31,29 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
     }
 
     private PatternAccessTerminalPacket(boolean fullUpdate, long inventoryId, int inventorySize, long sortBy,
-                                        boolean canEditTerminalName, PatternContainerGroup group,
+                                        boolean canEditTerminalName, boolean canModifyTerminalVisibility,
+                                        PatternContainerGroup group,
                                         Int2ObjectMap<ItemStack> slots) {
         this.fullUpdate = fullUpdate;
         this.inventoryId = inventoryId;
         this.inventorySize = inventorySize;
         this.sortBy = sortBy;
         this.canEditTerminalName = canEditTerminalName;
+        this.canModifyTerminalVisibility = canModifyTerminalVisibility;
         this.group = group;
         this.slots = slots;
     }
 
     public static PatternAccessTerminalPacket fullUpdate(long inventoryId, int inventorySize, long sortBy,
-                                                         boolean canEditTerminalName, PatternContainerGroup group,
+                                                         boolean canEditTerminalName, boolean canModifyTerminalVisibility,
+                                                         PatternContainerGroup group,
                                                          Int2ObjectMap<ItemStack> slots) {
-        return new PatternAccessTerminalPacket(true, inventoryId, inventorySize, sortBy, canEditTerminalName, group,
-            slots);
+        return new PatternAccessTerminalPacket(true, inventoryId, inventorySize, sortBy, canEditTerminalName,
+            canModifyTerminalVisibility, group, slots);
     }
 
     public static PatternAccessTerminalPacket incrementalUpdate(long inventoryId, Int2ObjectMap<ItemStack> slots) {
-        return new PatternAccessTerminalPacket(false, inventoryId, 0, 0, false, null, slots);
+        return new PatternAccessTerminalPacket(false, inventoryId, 0, 0, false, false, null, slots);
     }
 
     @Override
@@ -65,6 +69,7 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
             }
             this.sortBy = packetBuffer.readVarLong();
             this.canEditTerminalName = packetBuffer.readBoolean();
+            this.canModifyTerminalVisibility = packetBuffer.readBoolean();
             this.group = PatternContainerGroup.readFromPacket(packetBuffer);
         }
 
@@ -95,6 +100,7 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
             packetBuffer.writeVarInt(this.inventorySize);
             packetBuffer.writeVarLong(this.sortBy);
             packetBuffer.writeBoolean(this.canEditTerminalName);
+            packetBuffer.writeBoolean(this.canModifyTerminalVisibility);
             this.group.writeToPacket(packetBuffer);
         }
 
@@ -111,6 +117,7 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
         if (minecraft.currentScreen instanceof GuiPatternAccessTerm<?> patternAccessTerminal) {
             if (this.fullUpdate) {
                 patternAccessTerminal.postFullUpdate(this.inventoryId, this.sortBy, this.canEditTerminalName,
+                    this.canModifyTerminalVisibility,
                     this.group, this.inventorySize, this.slots);
             } else {
                 patternAccessTerminal.postIncrementalUpdate(this.inventoryId, this.slots);

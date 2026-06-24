@@ -50,6 +50,10 @@ public class GuiRenamer extends AEBaseGui<ContainerRenamer> implements ITextFiel
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
+            return;
+        }
+
         if (mouseButton == 1 && this.name.isMouseOver(mouseX, mouseY)) {
             this.name.setTextFromClient("");
             this.name.setFocused(true);

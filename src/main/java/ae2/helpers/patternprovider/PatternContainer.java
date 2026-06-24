@@ -38,5 +38,12 @@ public interface PatternContainer {
     default void setTerminalCustomName(@Nullable String name) {
     }
 
+    default boolean canModifyTerminalVisibility() {
+        return false;
+    }
+
+    default void setTerminalVisibility(boolean visible) {
+    }
+
     PatternContainerGroup getTerminalGroup();
 }

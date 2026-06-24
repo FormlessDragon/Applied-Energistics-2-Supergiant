@@ -90,6 +90,10 @@ public class GuiCellRestriction extends AEBaseGui<ContainerCellRestriction> {
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
+            return;
+        }
+
         if (mouseButton == 1) {
             if (this.amount.isMouseOver(mouseX, mouseY)) {
                 this.amount.setTextFromClient("");

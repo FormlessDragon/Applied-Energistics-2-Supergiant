@@ -22,7 +22,6 @@ import ae2.container.slot.AppEngSlot;
 import ae2.core.AEConfig;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.ButtonToolTips;
-import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;
@@ -189,6 +188,10 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
+            return;
+        }
+
         if (mouseButton == 2) {
             Slot slot = findSlot(mouseX, mouseY);
             if (isAltDown() && slot != null && this.container.isProcessingPatternItemSlot(slot)) {

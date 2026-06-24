@@ -35,6 +35,7 @@ import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
 import ae2.container.guisync.ILinkStatusAwareContainer;
 import ae2.container.slot.RestrictedInputSlot;
+import ae2.core.gui.PatternContainerGuiReturnContext;
 import ae2.core.network.clientbound.ClearPatternAccessTerminalPacket;
 import ae2.core.network.clientbound.PatternAccessTerminalInfoPacket;
 import ae2.core.network.clientbound.PatternAccessTerminalPacket;
@@ -74,6 +75,7 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
     implements ILinkStatusAwareContainer, PatternModifierPanel.Host {
 
     private static final String ACTION_OPEN_PROVIDER = "openProvider";
+    private static final String ACTION_TOGGLE_PROVIDER_VISIBILITY = "toggleProviderVisibility";
     private static final String ACTION_RENAME_GROUP = "renameGroup";
     private static final String ACTION_RENAME_PROVIDER = "renameProvider";
     private static final int MAX_CUSTOM_NAME_LENGTH = 32;
@@ -94,6 +96,7 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
         super(playerInventory, host);
         this.host = host;
         registerClientAction(ACTION_OPEN_PROVIDER, Long.class, this::openPatternProvider);
+        registerClientAction(ACTION_TOGGLE_PROVIDER_VISIBILITY, Long.class, this::togglePatternProviderVisibility);
         registerClientAction(ACTION_RENAME_GROUP, RenamePatternGroupPayload.class, this::renamePatternGroup);
         registerClientAction(ACTION_RENAME_PROVIDER, RenamePatternProviderPayload.class, this::renamePatternProvider);
         if (host instanceof WirelessTerminalGuiHost<?> wirelessHost) {
@@ -127,9 +130,12 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
         }
 
         ContainerTracker inv = this.byId.get(inventoryId);
-        if (inv != null) {
-            inv.container.openTerminalPatternContainerGui(getPlayer());
+        if (inv == null) {
+            return;
         }
+
+        PatternContainerGuiReturnContext.openFromPatternAccessTerminal(getPlayer(), this,
+            () -> inv.container.openTerminalPatternContainerGui(getPlayer()));
     }
 
     public void renamePatternProvider(long inventoryId, String name) {
@@ -138,6 +144,25 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
 
     public void renamePatternGroup(long[] inventoryIds, String name) {
         renamePatternGroup(new RenamePatternGroupPayload(inventoryIds, name));
+    }
+
+    public void togglePatternProviderVisibility(long inventoryId) {
+        if (isClientSide()) {
+            sendClientAction(ACTION_TOGGLE_PROVIDER_VISIBILITY, inventoryId);
+            return;
+        }
+
+        ContainerTracker tracker = this.byId.get(inventoryId);
+        if (tracker == null) {
+            return;
+        }
+        if (!tracker.container.canModifyTerminalVisibility()) {
+            return;
+        }
+
+        boolean visible = tracker.container.isVisibleInTerminal();
+        tracker.container.setTerminalVisibility(!visible);
+        sendFullUpdate(getGrid());
     }
 
     private static boolean isValidCustomName(@Nullable String name) {
@@ -647,7 +672,7 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
             }
 
             return PatternAccessTerminalPacket.fullUpdate(this.serverId, this.server.size(), this.sortBy,
-                this.container.canEditTerminalName(), this.group, slots);
+                this.container.canEditTerminalName(), this.container.canModifyTerminalVisibility(), this.group, slots);
         }
 
         @Nullable

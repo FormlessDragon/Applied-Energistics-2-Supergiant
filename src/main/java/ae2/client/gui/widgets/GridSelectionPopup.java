@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Objects;
 
 public class GridSelectionPopup<T> {
-    private static final int ICONS_PER_ROW = 5;
     private static final int CELL_SIZE = 18;
     private static final int PADDING = 4;
     private static final int BUTTON_GAP = 2;
@@ -62,11 +61,16 @@ public class GridSelectionPopup<T> {
     }
 
     private static int getWidth(int entryCount) {
-        return Math.min(ICONS_PER_ROW, entryCount) * CELL_SIZE + PADDING * 2;
+        return getColumns(entryCount) * CELL_SIZE + PADDING * 2;
     }
 
     private static int getHeight(int entryCount) {
-        return (entryCount + ICONS_PER_ROW - 1) / ICONS_PER_ROW * CELL_SIZE + PADDING * 2;
+        int columns = getColumns(entryCount);
+        return (entryCount + columns - 1) / columns * CELL_SIZE + PADDING * 2;
+    }
+
+    private static int getColumns(int entryCount) {
+        return (int) Math.ceil(Math.sqrt(entryCount));
     }
 
     public static <T> List<Entry<T>> entries() {
@@ -153,11 +157,11 @@ public class GridSelectionPopup<T> {
     }
 
     private int iconX(int index) {
-        return this.x + PADDING + index % ICONS_PER_ROW * CELL_SIZE;
+        return this.x + PADDING + index % getColumns(this.entries.size()) * CELL_SIZE;
     }
 
     private int iconY(int index) {
-        return this.y + PADDING + index / ICONS_PER_ROW * CELL_SIZE;
+        return this.y + PADDING + index / getColumns(this.entries.size()) * CELL_SIZE;
     }
 
     private int width() {

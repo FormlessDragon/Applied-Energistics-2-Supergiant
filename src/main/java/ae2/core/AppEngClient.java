@@ -25,6 +25,7 @@ import ae2.client.Hotkeys;
 import ae2.client.commands.ClientCommands;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
+import ae2.client.gui.PatternContainerExternalGuiReturnHandler;
 import ae2.client.gui.StackTooltipRenderer;
 import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.client.gui.me.common.PendingCraftingJobs;
@@ -174,6 +175,7 @@ public final class AppEngClient extends AppEngServer {
         MinecraftForge.EVENT_BUS.register(CraftingSupplierHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(AdvancedMemoryCardHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(StackTooltipRenderer.INSTANCE);
+        MinecraftForge.EVENT_BUS.register(PatternContainerExternalGuiReturnHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(NetworkRender.INSTANCE);
         MinecraftForge.EVENT_BUS.register(ProfileRender.INSTANCE);
         MinecraftForge.EVENT_BUS.register(BeamFormerBloom.INSTANCE);

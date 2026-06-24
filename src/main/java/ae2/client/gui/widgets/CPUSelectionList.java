@@ -46,7 +46,6 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.MathHelper;
@@ -74,7 +73,6 @@ public class CPUSelectionList implements ICompositeWidget {
     private static final int SCROLLBAR_X = 86;
     private static final int SCROLLBAR_WIDTH = 17;
     private static final int CONTENT_WIDTH = SCROLLBAR_X;
-    private static final int SMALL_SQUARE_BUTTON_SOURCE_SIZE = 16;
     private static final int ROW_SMALL_BUTTON_SIZE = 8;
     private static final int HEADER_BUTTON_SIZE = 12;
     private static final float SMALL_TEXT_SCALE = 0.666f;
@@ -232,80 +230,11 @@ public class CPUSelectionList implements ICompositeWidget {
         GlStateManager.popMatrix();
     }
 
-    private static int scaledDimension(int size, float scale) {
-        return Math.max(1, Math.round(size * scale));
-    }
-
     private static void drawScaledKey(int x, int y, AEKey what) {
         GlStateManager.pushMatrix();
         GlStateManager.translate(x, y, 0);
         GlStateManager.scale(SMALL_TEXT_SCALE, SMALL_TEXT_SCALE, 1.0f);
         AEKeyRendering.drawInGui(Minecraft.getMinecraft(), 0, 0, what);
-        GlStateManager.popMatrix();
-    }
-
-    private static void drawSquareButtonBackground(int x, int y, int width, int height, boolean hovered) {
-        Icon backgroundIcon = hovered
-            ? Icon.SMALL_SQUARE_BUTTON_BACKGROUND_HOVER
-            : Icon.SMALL_SQUARE_BUTTON_BACKGROUND;
-        drawScaledIcon(
-            x,
-            y,
-            backgroundIcon,
-            Math.min(width / (float) SMALL_SQUARE_BUTTON_SOURCE_SIZE, height / (float) SMALL_SQUARE_BUTTON_SOURCE_SIZE),
-            10);
-    }
-
-    private static void drawScaledIcon(int x, int y, Icon icon, float scale, int zOffset) {
-        GlStateManager.pushMatrix();
-        GlStateManager.translate(x, y, 0);
-        GlStateManager.scale(scale, scale, 1.0f);
-        icon.getBlitter().dest(0, 0).zOffset(zOffset).blit();
-        GlStateManager.popMatrix();
-    }
-
-    private static void drawBoxedIcon(int x, int y, int width, int height, Icon icon) {
-        int contentWidth = Math.max(1, width - BUTTON_CONTENT_INSET * 2);
-        int contentHeight = Math.max(1, height - BUTTON_CONTENT_INSET * 2);
-        float scale = Math.min(contentWidth / (float) icon.width, contentHeight / (float) icon.height);
-        int drawWidth = scaledDimension(icon.width, scale);
-        int drawHeight = scaledDimension(icon.height, scale);
-        drawScaledIcon(
-            x + (width - drawWidth) / 2,
-            y + (height - drawHeight) / 2,
-            icon,
-            scale,
-            20);
-    }
-
-    private static void drawBoxedItemStack(int x, int y, int width, int height, ItemStack stack) {
-        int contentWidth = Math.max(1, width - BUTTON_CONTENT_INSET * 2);
-        int contentHeight = Math.max(1, height - BUTTON_CONTENT_INSET * 2);
-        float scale = Math.min(contentWidth / 16.0f, contentHeight / 16.0f);
-        int drawWidth = scaledDimension(16, scale);
-        int drawHeight = scaledDimension(16, scale);
-        drawScaledItemStack(
-            x + (width - drawWidth) / 2,
-            y + (height - drawHeight) / 2,
-            stack,
-            scale);
-    }
-
-    private static void drawScaledItemStack(int x, int y, ItemStack stack, float scale) {
-        GlStateManager.pushMatrix();
-        GlStateManager.translate(x, y, 20);
-        GlStateManager.scale(scale, scale, 1.0f);
-        GlStateManager.enableDepth();
-        RenderHelper.enableGUIStandardItemLighting();
-        Minecraft.getMinecraft().getRenderItem().renderItemAndEffectIntoGUI(stack, 0, 0);
-        Minecraft.getMinecraft().getRenderItem().renderItemOverlayIntoGUI(
-            Minecraft.getMinecraft().fontRenderer,
-            stack,
-            0,
-            0,
-            null);
-        RenderHelper.disableStandardItemLighting();
-        GlStateManager.disableDepth();
         GlStateManager.popMatrix();
     }
 
@@ -761,25 +690,26 @@ public class CPUSelectionList implements ICompositeWidget {
     }
 
     private void drawHeaderButton(int x, int y, boolean hovered) {
-        drawSquareButtonBackground(x, y, HEADER_BUTTON_WIDTH, HEADER_BUTTON_HEIGHT, hovered);
+        SmallSquareButtonRenderer.drawBackground(x, y, HEADER_BUTTON_WIDTH, HEADER_BUTTON_HEIGHT, hovered);
     }
 
     private void drawHeaderButtonContent(int x, int y, HeaderIcon icon) {
         switch (icon.kind()) {
-            case ITEM -> drawBoxedItemStack(x, y, HEADER_BUTTON_WIDTH, HEADER_BUTTON_HEIGHT,
-                Objects.requireNonNull(icon.itemStack(), "itemStack"));
+            case ITEM -> SmallSquareButtonRenderer.drawItemStack(x, y, HEADER_BUTTON_WIDTH, HEADER_BUTTON_HEIGHT,
+                Objects.requireNonNull(icon.itemStack(), "itemStack"), BUTTON_CONTENT_INSET);
             case ICON, SMALL_ICON -> drawHeaderIcon(x, y, Objects.requireNonNull(icon.icon(), "icon"));
         }
     }
 
     private void drawHeaderIcon(int x, int y, Icon icon) {
-        drawBoxedIcon(x, y, HEADER_BUTTON_WIDTH, HEADER_BUTTON_HEIGHT, icon);
+        SmallSquareButtonRenderer.drawIcon(x, y, HEADER_BUTTON_WIDTH, HEADER_BUTTON_HEIGHT, icon, BUTTON_CONTENT_INSET);
     }
 
     private void drawActionButton(int x, int y, boolean hovered) {
-        drawSquareButtonBackground(x, y, RENAME_BUTTON_WIDTH, RENAME_BUTTON_HEIGHT, hovered);
-        Icon icon = GuiScreen.isShiftKeyDown() ? Icon.CRAFTING_CPU_HIGHLIGHT : Icon.CRAFTING_CPU_RENAME;
-        drawBoxedIcon(x, y, RENAME_BUTTON_WIDTH, RENAME_BUTTON_HEIGHT, icon);
+        SmallSquareButtonRenderer.drawBackground(x, y, RENAME_BUTTON_WIDTH, RENAME_BUTTON_HEIGHT, hovered);
+        Icon icon = GuiScreen.isShiftKeyDown() ? Icon.HIGHLIGHT : Icon.RENAME;
+        SmallSquareButtonRenderer.drawIcon(x, y, RENAME_BUTTON_WIDTH, RENAME_BUTTON_HEIGHT, icon,
+            BUTTON_CONTENT_INSET);
     }
 
     private void highlightCpuAndClose(ContainerCraftingStatus.CraftingCpuListEntry cpu) {
@@ -1649,7 +1579,8 @@ public class CPUSelectionList implements ICompositeWidget {
             }
 
             this.hovered = this.hoveredDirect;
-            drawSquareButtonBackground(this.x, this.y, MODE_BUTTON_SIZE, MODE_BUTTON_SIZE, this.hovered);
+            SmallSquareButtonRenderer.drawBackground(this.x, this.y, MODE_BUTTON_SIZE, MODE_BUTTON_SIZE,
+                this.hovered);
 
             var appearance = getAppearance(getCurrentValue());
             if (appearance == null) {
@@ -1659,9 +1590,11 @@ public class CPUSelectionList implements ICompositeWidget {
             }
 
             if (appearance.item() != null) {
-                drawBoxedItemStack(this.x, this.y, MODE_BUTTON_SIZE, MODE_BUTTON_SIZE, new ItemStack(appearance.item()));
+                SmallSquareButtonRenderer.drawItemStack(this.x, this.y, MODE_BUTTON_SIZE, MODE_BUTTON_SIZE,
+                    new ItemStack(appearance.item()), BUTTON_CONTENT_INSET);
             } else if (appearance.icon() != null) {
-                drawBoxedIcon(this.x, this.y, MODE_BUTTON_SIZE, MODE_BUTTON_SIZE, appearance.icon());
+                SmallSquareButtonRenderer.drawIcon(this.x, this.y, MODE_BUTTON_SIZE, MODE_BUTTON_SIZE,
+                    appearance.icon(), BUTTON_CONTENT_INSET);
             } else {
                 String message = "Invalid crafting CPU row mode button appearance for " + getCurrentValue();
                 AELog.error(message);

@@ -68,7 +68,7 @@ public class ContainerMolecularAssembler extends AEBaseContainer
         this.updatePatternSlotState();
     }
 
-    public TileMolecularAssembler getHost() {
+    public TileMolecularAssembler getAssemblerHost() {
         return this.host;
     }
 

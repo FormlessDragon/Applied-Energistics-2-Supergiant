@@ -27,6 +27,7 @@ import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.cells.IStackTooltipDataProvider;
 import ae2.client.Point;
+import ae2.client.gui.implementations.AESubGui;
 import ae2.client.gui.layout.SlotGridLayout;
 import ae2.client.gui.me.common.StackSizeRenderer;
 import ae2.client.gui.style.BackgroundGenerator;
@@ -130,6 +131,10 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     private Slot bl_clicked;
     private boolean handlingRightClick;
     private boolean suppressVanillaSlotHover;
+    private boolean suppressSelectionPopupMouseRelease;
+    private boolean renderingModalSelectionPopup;
+    private int modalSelectionPopupMouseX;
+    private int modalSelectionPopupMouseY;
     @Nullable
     private GridSelectionPopup<?> activeSelectionPopup;
     private final Rectangle rectangle = new Rectangle(guiLeft, guiTop, xSize, ySize);
@@ -326,15 +331,24 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         updateBeforeRender();
         widgets.updateBeforeRender();
-        Point mousePos = getMousePoint(mouseX, mouseY);
-        Slot aeHoveredSlot = widgets.hitTest(mousePos) ? null : findSlot(mouseX, mouseY);
+        boolean modalSelectionPopup = this.activeSelectionPopup != null;
+        int baseMouseX = modalSelectionPopup ? Integer.MIN_VALUE / 4 : mouseX;
+        int baseMouseY = modalSelectionPopup ? Integer.MIN_VALUE / 4 : mouseY;
+        Point mousePos = getMousePoint(baseMouseX, baseMouseY);
+        Slot aeHoveredSlot = modalSelectionPopup ? null : widgets.hitTest(mousePos) ? null : findSlot(mouseX, mouseY);
         this.hoveredSlot = aeHoveredSlot;
+        if (modalSelectionPopup) {
+            this.modalSelectionPopupMouseX = mouseX;
+            this.modalSelectionPopupMouseY = mouseY;
+        }
 
         super.drawDefaultBackground();
         this.suppressVanillaSlotHover = true;
+        this.renderingModalSelectionPopup = modalSelectionPopup;
         try {
-            super.drawScreen(mouseX, mouseY, partialTicks);
+            super.drawScreen(baseMouseX, baseMouseY, partialTicks);
         } finally {
+            this.renderingModalSelectionPopup = false;
             this.suppressVanillaSlotHover = false;
         }
 
@@ -344,10 +358,10 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             renderSlotHighlight(this.hoveredSlot, mouseX, mouseY);
         }
 
-        if (this.activeSelectionPopup == null) {
+        if (!modalSelectionPopup) {
             renderHoveredToolTip(mouseX, mouseY);
         }
-        if (!renderSelectionPopupTooltip(mouseX, mouseY)) {
+        if (!renderSelectionPopupTooltip(mouseX, mouseY) && !modalSelectionPopup) {
             renderWidgetTooltip(mouseX, mouseY);
         }
         renderDebugGuiOverlays();
@@ -359,6 +373,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         super.initGui();
         this.guiLeft += getGuiLeftOffset();
         closeSelectionPopup();
+        this.suppressSelectionPopupMouseRelease = false;
         positionSlots();
         widgets.populateScreen(this::addButton, getBounds(true), this);
         invalidateExclusionZonesCache();
@@ -860,10 +875,21 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
         suppressLockedOffhandSwapKey(keyCode);
+        if (shouldReturnToPreviousGui(keyCode)) {
+            AESubGui.goBack();
+            return;
+        }
         if (widgets.onKeyTyped(typedChar, keyCode)) {
             return;
         }
         super.keyTyped(typedChar, keyCode);
+    }
+
+    private boolean shouldReturnToPreviousGui(int keyCode) {
+        if (!this.container.hasExternalGuiReturn()) {
+            return false;
+        }
+        return keyCode == Keyboard.KEY_ESCAPE || this.mc.gameSettings.keyBindInventory.isActiveAndMatches(keyCode);
     }
 
     private void suppressLockedOffhandSwapKey(int keyCode) {
@@ -956,8 +982,10 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
     @Override
     protected final void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
-        widgets.drawForegroundLayer(getBounds(false), getMousePoint(mouseX, mouseY));
-        drawFG(guiLeft, guiTop, mouseX, mouseY);
+        int baseMouseX = this.renderingModalSelectionPopup ? Integer.MIN_VALUE / 4 : mouseX;
+        int baseMouseY = this.renderingModalSelectionPopup ? Integer.MIN_VALUE / 4 : mouseY;
+        widgets.drawForegroundLayer(getBounds(false), getMousePoint(baseMouseX, baseMouseY));
+        drawFG(guiLeft, guiTop, baseMouseX, baseMouseY);
 
         if (style != null && shouldDrawStyleText()) {
             for (Map.Entry<String, Text> entry : style.getText().entrySet()) {
@@ -969,12 +997,14 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         GlStateManager.pushMatrix();
         GlStateManager.translate(-guiLeft, -guiTop, 0.0F);
         try {
-            widgets.drawTextFields(getMousePoint(mouseX, mouseY));
+            widgets.drawTextFields(getMousePoint(baseMouseX, baseMouseY));
         } finally {
             GlStateManager.popMatrix();
         }
 
-        renderSelectionPopup(mouseX, mouseY);
+        int popupMouseX = this.renderingModalSelectionPopup ? this.modalSelectionPopupMouseX : mouseX;
+        int popupMouseY = this.renderingModalSelectionPopup ? this.modalSelectionPopupMouseY : mouseY;
+        renderSelectionPopup(popupMouseX, popupMouseY);
         restoreStateForVanillaItemRender();
         if (!this.playerInventory.getItemStack().isEmpty()) {
             GlStateManager.depthMask(true);
@@ -1061,11 +1091,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         this.drag_click.clear();
         this.drag_click_sent.clear();
 
-        if (this.activeSelectionPopup != null) {
-            Point mousePos = getMousePoint(mouseX, mouseY);
-            GridSelectionPopup<?> popup = this.activeSelectionPopup;
-            closeSelectionPopup();
-            popup.mousePressed(mousePos.x(), mousePos.y());
+        if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
             return;
         }
 
@@ -1096,6 +1122,21 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return;
         }
         super.mouseClicked(mouseX, mouseY, mouseButton);
+    }
+
+    protected final boolean handleSelectionPopupMouseClicked(int mouseX, int mouseY) {
+        if (this.activeSelectionPopup == null) {
+            return false;
+        }
+
+        this.drag_click.clear();
+        this.drag_click_sent.clear();
+        Point mousePos = getMousePoint(mouseX, mouseY);
+        GridSelectionPopup<?> popup = this.activeSelectionPopup;
+        closeSelectionPopup();
+        this.suppressSelectionPopupMouseRelease = true;
+        popup.mousePressed(mousePos.x(), mousePos.y());
+        return true;
     }
 
     private void writeCarriedItemNameToClickedTextField(int mouseX, int mouseY, int mouseButton) {
@@ -1142,6 +1183,11 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
     @Override
     protected void mouseReleased(int mouseX, int mouseY, int state) {
+        if (this.suppressSelectionPopupMouseRelease) {
+            this.suppressSelectionPopupMouseRelease = false;
+            return;
+        }
+
         if (widgets.onMouseUp(getMousePoint(mouseX, mouseY), state)) {
             return;
         }
@@ -1406,6 +1452,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
     public final void openSelectionPopup(GridSelectionPopup<?> popup) {
         this.activeSelectionPopup = Objects.requireNonNull(popup, "popup");
+        this.suppressSelectionPopupMouseRelease = true;
     }
 
     public final void closeSelectionPopup() {

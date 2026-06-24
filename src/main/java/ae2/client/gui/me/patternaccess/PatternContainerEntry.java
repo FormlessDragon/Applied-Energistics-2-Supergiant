@@ -37,8 +37,10 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
     private final AppEngInternalInventory inventory;
     private final long order;
     private final boolean editableTerminalName;
+    private final boolean terminalVisibilityModifiable;
 
     public PatternContainerEntry(long serverId, int slots, long order, boolean editableTerminalName,
+                                 boolean terminalVisibilityModifiable,
                                  PatternContainerGroup group) {
         this.inventory = new AppEngInternalInventory(Math.clamp(slots, 0, MAX_INVENTORY_SIZE));
         this.group = group;
@@ -46,6 +48,7 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
         this.serverId = serverId;
         this.order = order;
         this.editableTerminalName = editableTerminalName;
+        this.terminalVisibilityModifiable = terminalVisibilityModifiable;
     }
 
     public PatternContainerGroup getGroup() {
@@ -71,5 +74,9 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
 
     public boolean canEditTerminalName() {
         return this.editableTerminalName;
+    }
+
+    public boolean canModifyTerminalVisibility() {
+        return this.terminalVisibilityModifiable;
     }
 }
