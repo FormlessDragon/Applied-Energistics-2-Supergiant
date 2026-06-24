@@ -35,7 +35,7 @@ public class MathExpressionParser {
             if (!wasNumberOrRightBracket && expression.charAt(i) != '-') {
                 var parsedNumber = parseNumber(expression, i, decimalFormat);
                 if (parsedNumber.isPresent()) {
-                    output.add(parsedNumber.get().value());
+                    output.add(parsedNumber.get().Value());
                     i = parsedNumber.get().nextIndex();
                     wasNumberOrRightBracket = true;
                     continue;
@@ -231,6 +231,6 @@ public class MathExpressionParser {
         };
     }
 
-    private record ParsedNumber(BigDecimal value, int nextIndex) {
+    private record ParsedNumber(BigDecimal Value, int nextIndex) {
     }
 }

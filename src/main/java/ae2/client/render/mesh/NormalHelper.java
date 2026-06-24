@@ -31,8 +31,8 @@ public abstract class NormalHelper {
     }
 
     /**
-     * Stores a normal plus an extra value as a quartet of signed bytes. This is the same normal format that vanilla
-     * item rendering expects. The extra value is for use by shaders.
+     * Stores a normal plus an extra Value as a quartet of signed bytes. This is the same normal format that vanilla
+     * item rendering expects. The extra Value is for use by shaders.
      */
     public static int packNormal(float x, float y, float z, float w) {
         x = MathHelper.clamp(x, -1, 1);

@@ -41,7 +41,7 @@ public enum PowerUnit implements LocalizationEnum {
      */
     public final String symbolName;
     /**
-     * please do not edit this value, it is set when AE loads its config files.
+     * please do not edit this Value, it is set when AE loads its config files.
      */
     public final double conversionRatio;
 
@@ -63,8 +63,8 @@ public enum PowerUnit implements LocalizationEnum {
      * will normally returns 64, as it will convert the EU, to AE with AE's power settings.
      *
      * @param target target power unit
-     * @param value  value
-     * @return value converted to target units, from this units.
+     * @param value  Value
+     * @return Value converted to target units, from this units.
      */
     public double convertTo(PowerUnit target, double value) {
         return value * this.conversionRatio / target.conversionRatio;

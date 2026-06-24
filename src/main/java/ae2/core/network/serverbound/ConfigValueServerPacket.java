@@ -30,7 +30,7 @@ public class ConfigValueServerPacket extends ServerboundPacket {
     public <T extends Enum<T>> ConfigValueServerPacket(int windowId, Setting<T> setting, T value) {
         this(windowId, setting.getName(), value.name());
         if (!setting.getValues().contains(value)) {
-            throw new IllegalStateException(value + " not a valid value for " + setting);
+            throw new IllegalStateException(value + " not a valid Value for " + setting);
         }
     }
 
@@ -41,7 +41,7 @@ public class ConfigValueServerPacket extends ServerboundPacket {
         this.name = packetBuffer.readString(MAX_SETTING_NAME_LENGTH);
         this.value = packetBuffer.readString(MAX_SETTING_VALUE_LENGTH);
         if (packetBuffer.isReadable()) {
-            throw new IllegalArgumentException("Trailing config value packet payload bytes: " + packetBuffer.readableBytes());
+            throw new IllegalArgumentException("Trailing config Value packet payload bytes: " + packetBuffer.readableBytes());
         }
     }
 
@@ -78,7 +78,7 @@ public class ConfigValueServerPacket extends ServerboundPacket {
                     setting.setFromString(configManager, this.value);
                 } catch (IllegalArgumentException e) {
                     NetworkPacketHelper.warnFailedPacket(e, getClass().getSimpleName() + ":" + player.getUniqueID(),
-                        "Ignoring invalid config value packet from %s", player.getName());
+                        "Ignoring invalid config Value packet from %s", player.getName());
                 }
                 break;
             }

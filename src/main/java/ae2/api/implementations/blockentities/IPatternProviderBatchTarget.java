@@ -11,7 +11,7 @@ import net.minecraft.util.EnumFacing;
 public interface IPatternProviderBatchTarget {
     /**
      * Returns how many copies of {@code patternDetails} can currently be accepted from {@code ejectionDirection}.
-     * Implementations must return a value in the range {@code 0..maxMultiplier}.
+     * Implementations must return a Value in the range {@code 0..maxMultiplier}.
      */
     int getMaxPatternPushMultiplier(IPatternDetails patternDetails, KeyCounter[] inputs, int maxMultiplier,
                                     EnumFacing ejectionDirection);

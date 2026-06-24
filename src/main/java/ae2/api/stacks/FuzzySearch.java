@@ -13,12 +13,12 @@ final class FuzzySearch {
     @VisibleForTesting
     static final KeyComparator COMPARATOR = new KeyComparator();
     /**
-     * Minecraft reverses the damage values. So anything with a damage value of 0 is undamaged and increases the more
+     * Minecraft reverses the damage values. So anything with a damage Value of 0 is undamaged and increases the more
      * damaged
      * the item is.
      * <p>
      * Further the used subMap follows [MAX_DAMAGE, MIN_DAMAGE), so to include undamaged items, we have to start with a
-     * lower damage value than 0, while it is fine to use {@link ItemStack#getMaxDamage()} for the upper bound.
+     * lower damage Value than 0, while it is fine to use {@link ItemStack#getMaxDamage()} for the upper bound.
      */
     private static final int MIN_DAMAGE_VALUE = -1;
 
@@ -53,7 +53,7 @@ final class FuzzySearch {
      */
     static FuzzyBound makeLowerBound(AEKey key, FuzzyMode fuzzy) {
         int maxValue = key.getFuzzySearchMaxValue();
-        Preconditions.checkState(maxValue > 0, "Cannot use fuzzy search on keys that don't have a fuzzy max value: %s",
+        Preconditions.checkState(maxValue > 0, "Cannot use fuzzy search on keys that don't have a fuzzy max Value: %s",
             key);
 
         int damage;
@@ -73,7 +73,7 @@ final class FuzzySearch {
      */
     static FuzzyBound makeUpperBound(AEKey key, FuzzyMode fuzzy) {
         int maxValue = key.getFuzzySearchMaxValue();
-        Preconditions.checkState(maxValue > 0, "Cannot use fuzzy search on keys that don't have a fuzzy max value: %s",
+        Preconditions.checkState(maxValue > 0, "Cannot use fuzzy search on keys that don't have a fuzzy max Value: %s",
             key);
 
         int damage;
@@ -99,7 +99,7 @@ final class FuzzySearch {
     private static class KeyComparator implements Comparator<Object> {
         @Override
         public int compare(Object a, Object b) {
-            // Either argument can be a bounded damage value or a shared item stack
+            // Either argument can be a bounded damage Value or a shared item stack
             // Since we never put damage bounds into the map as keys, only one
             // of the two arguments can possibly be a bound
             FuzzyBound boundA = null;
@@ -123,7 +123,7 @@ final class FuzzySearch {
                 fuzzyOrderA = stackB.getFuzzySearchValue();
             }
 
-            // When either argument is a bounded damage value, we compare the damage values because that path is used
+            // When either argument is a bounded damage Value, we compare the damage values because that path is used
             // only to get a certain damage range out of the map.
             if (boundA != null || boundB != null) {
                 return Integer.compare(fuzzyOrderA, fuzzyOrderB);

@@ -331,7 +331,6 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         this.hoveredSlot = aeHoveredSlot;
 
         super.drawDefaultBackground();
-        prepareDisplayStacksForVanillaRender();
         this.suppressVanillaSlotHover = true;
         try {
             super.drawScreen(mouseX, mouseY, partialTicks);
@@ -358,10 +357,15 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     @Override
     public void initGui() {
         super.initGui();
+        this.guiLeft += getGuiLeftOffset();
         closeSelectionPopup();
         positionSlots();
         widgets.populateScreen(this::addButton, getBounds(true), this);
         invalidateExclusionZonesCache();
+    }
+
+    protected int getGuiLeftOffset() {
+        return 0;
     }
 
     public final Rectangle getBounds(boolean absolute) {
@@ -560,9 +564,6 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
     public boolean isTooltipForHoveredSlot(ItemStack stack) {
         return this.hoveredSlot != null && !stack.isEmpty() && ItemStack.areItemStacksEqual(this.hoveredSlot.getStack(), stack);
-    }
-
-    private void prepareDisplayStacksForVanillaRender() {
     }
 
     private static List<String> formatTooltipLines(List<ITextComponent> tooltip) {

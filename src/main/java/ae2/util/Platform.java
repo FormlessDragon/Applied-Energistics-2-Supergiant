@@ -91,11 +91,11 @@ public final class Platform {
     }
 
     /**
-     * This displays the value for encoded longs ( double *100 )
+     * This displays the Value for encoded longs ( double *100 )
      *
-     * @param n      to be formatted long value
+     * @param n      to be formatted long Value
      * @param isRate if true it adds a /t to the formatted string
-     * @return formatted long value
+     * @return formatted long Value
      */
     public static String formatPowerLong(long n, boolean isRate) {
         return formatPower((double) n / 100, isRate);

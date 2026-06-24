@@ -6,7 +6,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * A supplier that can cache its resulting value as long as the itemstack returned by an original supplier is the same.
+ * A supplier that can cache its resulting Value as long as the itemstack returned by an original supplier is the same.
  */
 public final class StackDependentSupplier<T> implements Supplier<T> {
     private final Supplier<ItemStack> stackSupplier;

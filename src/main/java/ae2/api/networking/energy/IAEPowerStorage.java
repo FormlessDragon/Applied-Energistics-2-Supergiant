@@ -70,9 +70,9 @@ public interface IAEPowerStorage extends IEnergySource, IGridNodeService {
 
     /**
      * The priority to use this energy storage.
-     * A higher value means it is more likely to be extracted from first, and less likely to be inserted into first.
-     * The value needs to be constant once added to a {@link IGrid}. Should it ever need to be changed, it has to be
-     * removed from the grid, then update the value, and finally added back to the grid.
+     * A higher Value means it is more likely to be extracted from first, and less likely to be inserted into first.
+     * The Value needs to be constant once added to a {@link IGrid}. Should it ever need to be changed, it has to be
+     * removed from the grid, then update the Value, and finally added back to the grid.
      * This should never use {@link Integer#MIN_VALUE} or {@link Integer#MAX_VALUE}.
      *
      * @return the priority for this storage

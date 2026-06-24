@@ -21,12 +21,20 @@ package ae2.client.gui.me.crafting;
 import ae2.client.gui.implementations.AESubGui;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.CPUSelectionList;
+import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.container.implementations.ContainerCraftingStatus;
+import ae2.container.me.crafting.CraftingStatus;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 
-public class GuiCraftingStatus extends GuiCraftingCPU<ContainerCraftingStatus> {
+import java.util.Collection;
+
+public class GuiCraftingStatus extends GuiCraftingCPU<ContainerCraftingStatus> implements ITextFieldGui {
+    private static final int LEFT_CPU_LIST_SCREEN_OFFSET = 32;
+
+    private final CPUSelectionList cpuSelectionList;
 
     public GuiCraftingStatus(ContainerCraftingStatus container, InventoryPlayer playerInventory,
                              ITextComponent title, GuiStyle style) {
@@ -34,12 +42,23 @@ public class GuiCraftingStatus extends GuiCraftingCPU<ContainerCraftingStatus> {
 
         AESubGui.addBackButton(container, "back", widgets);
         var scrollbar = widgets.addScrollBar("selectCpuScrollbar", Scrollbar.BIG);
-        widgets.add("selectCpuList", new CPUSelectionList(container, scrollbar, style, this::getCpuListRows));
+        this.cpuSelectionList = new CPUSelectionList(container, scrollbar, style, this::getCpuListRows);
+        this.cpuSelectionList.setOnSelectionChanged(() -> {
+            if (container.getSelectedCpuSerial() == -1) {
+                postUpdate(CraftingStatus.EMPTY);
+            }
+        });
+        widgets.add("selectCpuList", this.cpuSelectionList);
     }
 
     @Override
     protected ITextComponent getGuiDisplayName(ITextComponent in) {
         return in;
+    }
+
+    @Override
+    protected int getGuiLeftOffset() {
+        return LEFT_CPU_LIST_SCREEN_OFFSET;
     }
 
     @Override
@@ -49,6 +68,19 @@ public class GuiCraftingStatus extends GuiCraftingCPU<ContainerCraftingStatus> {
 
     private int getCpuListRows() {
         return Math.max(1, getCraftingRows() - 1);
+    }
+
+    @Override
+    public Collection<? extends GuiTextField> getTextFields() {
+        return this.cpuSelectionList.getTextFields();
+    }
+
+    @Override
+    public void updateScreen() {
+        super.updateScreen();
+        if (container.getSelectedCpuSerial() == -1) {
+            postUpdate(CraftingStatus.EMPTY);
+        }
     }
 
 }

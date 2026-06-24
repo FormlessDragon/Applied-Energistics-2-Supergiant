@@ -59,8 +59,8 @@ public interface IEnergyService extends IGridService, IEnergySource {
      * that determines the networks "powered state" if the network is considered off-line, your machines should not
      * function.
      * <p>
-     * Nodes are notified via {@link ae2.api.networking.IGridNodeListener#onStateChanged} when this value changes.
-     * Most machines can simply test the value when they are about to perform work, without listening to this event.
+     * Nodes are notified via {@link ae2.api.networking.IGridNodeListener#onStateChanged} when this Value changes.
+     * Most machines can simply test the Value when they are about to perform work, without listening to this event.
      *
      * @return if the network is powered or not.
      */

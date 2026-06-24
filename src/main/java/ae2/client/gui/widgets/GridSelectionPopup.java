@@ -89,7 +89,7 @@ public class GridSelectionPopup<T> {
 
         int index = hoveredIndex(mouseX, mouseY);
         if (index >= 0) {
-            this.selectionHandler.select(this.entries.get(index).value());
+            this.selectionHandler.select(this.entries.get(index).Value());
         }
         return true;
     }
@@ -173,9 +173,9 @@ public class GridSelectionPopup<T> {
         void select(T value);
     }
 
-    public record Entry<T>(T value, @Nullable Icon icon, ItemStack itemStack, List<ITextComponent> tooltipLines) {
+    public record Entry<T>(T Value, @Nullable Icon icon, ItemStack itemStack, List<ITextComponent> tooltipLines) {
         public Entry {
-            Objects.requireNonNull(value, "value");
+            Objects.requireNonNull(Value, "Value");
             Objects.requireNonNull(itemStack, "itemStack");
             tooltipLines = List.copyOf(tooltipLines);
         }

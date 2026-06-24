@@ -87,6 +87,6 @@ public class PatternDetailsTooltip {
         this.outputMethod = Objects.requireNonNull(outputMethod, "outputMethod");
     }
 
-    public record Property(ITextComponent name, @Nullable ITextComponent value) {
+    public record Property(ITextComponent name, @Nullable ITextComponent tooltip) {
     }
 }

@@ -33,6 +33,7 @@ import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.util.IConfigManager;
+import ae2.client.gui.Icon;
 import ae2.crafting.execution.CraftingCpuLogic;
 import ae2.me.cluster.IAECluster;
 import ae2.me.cluster.MBCalculator;
@@ -53,7 +54,6 @@ import java.util.Iterator;
 import java.util.Objects;
 
 public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
-
     public final CraftingCpuLogic craftingLogic = new CraftingCpuLogic(this);
     protected final BlockPos boundsMin;
     protected final BlockPos boundsMax;
@@ -204,6 +204,12 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
                               .filter(ICraftingCPUTileEntity.class::isInstance)
                               .map(ICraftingCPUTileEntity.class::cast)
                               .orElse(null);
+    }
+
+    @Nullable
+    public BlockPos getCorePos() {
+        ICraftingCPUTileEntity core = getCore();
+        return core == null ? null : core.getTileEntity().getPos();
     }
 
     @Nullable
@@ -359,5 +365,41 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
             case PLAYER_ONLY -> source.player().isPresent();
             case MACHINE_ONLY -> source.player().isEmpty();
         };
+    }
+
+    public boolean rename(@Nullable String name) {
+        ICraftingCPUTileEntity core = getCore();
+        String normalizedName = name == null || name.isEmpty() ? null : name;
+
+        if (core == null) {
+            return false;
+        }
+
+        for (ICraftingCPUTileEntity tile : this.blockEntities) {
+            tile.setCustomName(null);
+            tile.onCustomNameChanged();
+        }
+
+        if (normalizedName != null) {
+            core.setCustomName(normalizedName);
+            core.onCustomNameChanged();
+        }
+
+        updateName();
+
+        IGridNode node = core.getActionableNode();
+        if (node != null) {
+            node.grid().postEvent(new GridCraftingCpuChange(node));
+        }
+
+        return true;
+    }
+
+    public Icon getUnfocusedCpuListBackgroundIcon() {
+        return Icon.CRAFTING_CPU_LIST_ROW_BACKGROUND;
+    }
+
+    public Icon getFocusedCpuListBackgroundIcon() {
+        return Icon.CRAFTING_CPU_LIST_ROW_BACKGROUND_FOCUSED;
     }
 }

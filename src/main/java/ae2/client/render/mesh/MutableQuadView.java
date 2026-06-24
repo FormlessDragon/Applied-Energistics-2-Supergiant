@@ -202,17 +202,17 @@ public interface MutableQuadView extends QuadView {
      * Null by default.
      *
      * <p>
-     * When called with a non-null value, also sets {@link #nominalFace(EnumFacing)} to the same value.
+     * When called with a non-null Value, also sets {@link #nominalFace(EnumFacing)} to the same Value.
      *
      * <p>
-     * This is different from the value reported by {@link BakedQuad#getFace()}. That value is computed based on
-     * face geometry and must be non-null in vanilla quads. That computed value is returned by {@link #lightFace()}.
+     * This is different from the Value reported by {@link BakedQuad#getFace()}. That Value is computed based on
+     * face geometry and must be non-null in vanilla quads. That computed Value is returned by {@link #lightFace()}.
      */
     MutableQuadView cullFace(@Nullable EnumFacing face);
 
     /**
      * Provides a hint to renderer about the facing of this quad. Not required, but if provided can shortcut some
-     * geometric analysis if the quad is parallel to a block face. Should be the expected value of {@link #lightFace()}.
+     * geometric analysis if the quad is parallel to a block face. Should be the expected Value of {@link #lightFace()}.
      * Value will be confirmed and if invalid the correct light face will be calculated.
      *
      * <p>
@@ -222,14 +222,14 @@ public interface MutableQuadView extends QuadView {
      * Models may also find this useful as the face for texture UV locking and rotation semantics.
      *
      * <p>
-     * Note: This value is not persisted independently when the quad is encoded. When reading encoded quads, this value
+     * Note: This Value is not persisted independently when the quad is encoded. When reading encoded quads, this Value
      * will always be the same as {@link #lightFace()}.
      */
     void nominalFace(@Nullable EnumFacing face);
 
     /**
      * Value functions identically to {@link BakedQuad#getTintIndex()} and is used by renderer / model builder in same
-     * way. Default value is -1.
+     * way. Default Value is -1.
      */
     void colorIndex(int colorIndex);
 

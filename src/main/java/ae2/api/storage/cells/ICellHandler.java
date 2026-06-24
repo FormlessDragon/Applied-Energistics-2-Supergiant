@@ -49,7 +49,7 @@ public interface ICellHandler {
      *
      * @param is   a storage cell item.
      * @param host anytime the contents of your storage cell changes it should use this to request a save, please note,
-     *             this value can be null. If provided, the host is responsible for persisting the cell content.
+     *             this Value can be null. If provided, the host is responsible for persisting the cell content.
      * @return The cell inventory or null if the stack is not a cell supported by this handler.
      */
     @Nullable

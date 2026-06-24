@@ -154,8 +154,8 @@ public class EncodedPatternItem<T extends IPatternDetails> extends AEBaseItem {
         }
 
         for (var property : tooltip.getProperties()) {
-            if (property.value() != null) {
-                lines.add(formatLine(property.name(), property.value()).getFormattedText());
+            if (property.tooltip() != null) {
+                lines.add(formatLine(property.name(), property.tooltip()).getFormattedText());
             } else {
                 lines.add(property.name().getFormattedText());
             }

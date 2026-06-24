@@ -39,7 +39,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Associates a generic value of type T with AE keys and makes key/value pairs searchable with fuzzy mode semantics.
+ * Associates a generic Value of type T with AE keys and makes key/Value pairs searchable with fuzzy mode semantics.
  */
 public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     // First map contains a mapping from AEKey#primaryKey
@@ -113,7 +113,7 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     }
 
     /**
-     * Subtracts the given amount from the value associated with the given key.
+     * Subtracts the given amount from the Value associated with the given key.
      */
     public void remove(AEKey key, long amount) {
         if (amount == Long.MIN_VALUE) {
@@ -124,7 +124,7 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     }
 
     /**
-     * Removes the given key from this counter, and returns the old value (or 0).
+     * Removes the given key from this counter, and returns the old Value (or 0).
      */
     public void remove(AEKey key) {
         var subIndex = getSubIndex(key);

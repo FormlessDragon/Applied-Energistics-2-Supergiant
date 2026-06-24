@@ -34,7 +34,7 @@ class CraftingPerformanceText {
 
             @Override
             String count(String name, long amount) {
-                return "count=" + name + " value=" + amount
+                return "count=" + name + " Value=" + amount
                     + " | 计数=" + name + " 值=" + amount;
             }
 
@@ -85,7 +85,7 @@ class CraftingPerformanceText {
         if (chinese) {
             return "计数=" + name + " 值=" + amount;
         }
-        return "count=" + name + " value=" + amount;
+        return "count=" + name + " Value=" + amount;
     }
 
     String summary(AEKey output, long amount, long nanos, CraftingCalculation calculation, long stages) {

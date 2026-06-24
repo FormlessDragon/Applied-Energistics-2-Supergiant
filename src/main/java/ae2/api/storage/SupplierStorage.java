@@ -13,7 +13,7 @@ import java.util.function.Supplier;
 
 /**
  * Delegates all calls to a {@link MEStorage} returned by a supplier such that the underlying storage can change
- * dynamically. If the supplier returns a null value, this storage will appear empty and read-only.
+ * dynamically. If the supplier returns a null Value, this storage will appear empty and read-only.
  */
 public final class SupplierStorage implements MEStorage {
     private final Supplier<@Nullable MEStorage> supplier;

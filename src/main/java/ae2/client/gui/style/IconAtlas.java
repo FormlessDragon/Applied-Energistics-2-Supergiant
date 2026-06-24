@@ -2,6 +2,7 @@ package ae2.client.gui.style;
 
 import ae2.client.gui.Icon;
 import ae2.core.AppEng;
+import ae2.core.AppEngBase;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -24,25 +25,30 @@ public final class IconAtlas {
     private static final ResourceLocation TEXTURE = AppEng.makeId("textures/guis/generated/states.png");
     private static final Map<Icon, Position> positions = new Object2ObjectOpenHashMap<>();
     private static ResourceLocation texture;
+    private static long registryVersion = -1;
 
     private IconAtlas() {
     }
 
     public static ResourceLocation getTexture() {
-        if (texture == null) {
+        if (needsRebuild()) {
             rebuild(Minecraft.getMinecraft().getResourceManager());
         }
         return texture;
     }
 
     public static Blitter getBlitter(Icon icon) {
-        if (texture == null) {
+        if (needsRebuild()) {
             rebuild(Minecraft.getMinecraft().getResourceManager());
         }
 
         Position position = positions.get(icon);
         if (position == null) {
-            throw new IllegalStateException("Missing GUI icon atlas position for " + icon.id());
+            rebuild(Minecraft.getMinecraft().getResourceManager());
+            position = positions.get(icon);
+            if (position == null) {
+                throw new IllegalStateException("Missing GUI icon atlas position for " + icon.id());
+            }
         }
 
         return Blitter.texture(texture, TEXTURE_WIDTH, TEXTURE_HEIGHT)
@@ -59,12 +65,14 @@ public final class IconAtlas {
     public static void invalidate() {
         texture = null;
         positions.clear();
+        registryVersion = -1;
     }
 
     private static void rebuild(IResourceManager resourceManager) {
         BufferedImage atlas = new BufferedImage(TEXTURE_WIDTH, TEXTURE_HEIGHT, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics = atlas.createGraphics();
         positions.clear();
+        long rebuiltRegistryVersion = Icon.getRegistryVersion();
 
         try {
             int x = 0;
@@ -72,6 +80,7 @@ public final class IconAtlas {
             int rowHeight = 0;
 
             for (Icon icon : Icon.getRegisteredIcons()) {
+                validateIconSize(icon);
                 BufferedImage image = readIcon(resourceManager, icon);
                 if (x + icon.width > TEXTURE_WIDTH) {
                     y += rowHeight;
@@ -82,7 +91,7 @@ public final class IconAtlas {
                     throw new IllegalStateException("GUI icon atlas is too small for " + icon.id());
                 }
 
-                graphics.drawImage(image, x, y, null);
+                graphics.drawImage(image, x, y, icon.width, icon.height, null);
                 positions.put(icon, new Position(x, y));
                 x += icon.width;
                 rowHeight = Math.max(rowHeight, icon.height);
@@ -93,6 +102,20 @@ public final class IconAtlas {
 
         Minecraft.getMinecraft().getTextureManager().loadTexture(TEXTURE, new DynamicTexture(atlas));
         texture = TEXTURE;
+        registryVersion = rebuiltRegistryVersion;
+    }
+
+    private static boolean needsRebuild() {
+        return texture == null || registryVersion != Icon.getRegistryVersion();
+    }
+
+    private static void validateIconSize(Icon icon) {
+        if (!icon.hasResolvedSize()) {
+            AppEngBase.LOGGER.error("GUI icon {} has unresolved size {}x{}",
+                icon.id(), icon.width, icon.height);
+            throw new IllegalStateException("GUI icon " + icon.id() + " has unresolved size "
+                + icon.width + "x" + icon.height + ". Automatic icon sizes must be resolved during client registration.");
+        }
     }
 
     private static BufferedImage readIcon(IResourceManager resourceManager, Icon icon) {

@@ -12,9 +12,9 @@ import java.util.Comparator;
  */
 public interface AEKey2LongMap extends Object2LongMap<AEKey> {
     /**
-     * Adds an increment to value currently associated with a key.
+     * Adds an increment to Value currently associated with a key.
      *
-     * @return the old value, or the {@linkplain #defaultReturnValue() default return value} if no value was present for
+     * @return the old Value, or the {@linkplain #defaultReturnValue() default return Value} if no Value was present for
      * the given key.
      */
     @SuppressWarnings("UnusedReturnValue")

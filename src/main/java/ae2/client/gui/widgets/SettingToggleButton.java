@@ -18,8 +18,8 @@
 
 package ae2.client.gui.widgets;
 
-import ae2.api.config.AdvancedMemoryCardStatusFilter;
 import ae2.api.config.AccessRestriction;
+import ae2.api.config.AdvancedMemoryCardStatusFilter;
 import ae2.api.config.BlockingMode;
 import ae2.api.config.CondenserOutput;
 import ae2.api.config.CpuSelectionMode;
@@ -48,6 +48,7 @@ import ae2.api.config.ViewItems;
 import ae2.api.config.YesNo;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
+import ae2.core.AELog;
 import ae2.core.definitions.AEParts;
 import ae2.core.definitions.ItemDefinition;
 import ae2.core.localization.ButtonToolTips;
@@ -66,6 +67,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 public class SettingToggleButton<T extends Enum<T>> extends IconButton {
@@ -406,6 +408,32 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
         appearances.put(new EnumPair<>(setting, val), new ButtonAppearance(null, item.item(), lines));
     }
 
+    static <T extends Enum<T>> void registerAppearance(Setting<T> setting, T value, ButtonAppearance appearance) {
+        if (appearances == null) {
+            String message = "Setting toggle appearances must be initialized before registering custom appearances";
+            AELog.error(message);
+            throw new IllegalStateException(message);
+        }
+
+        Objects.requireNonNull(setting, "setting");
+        Objects.requireNonNull(value, "Value");
+        Objects.requireNonNull(appearance, "appearance");
+
+        var key = new EnumPair<>(setting, value);
+        var existing = appearances.putIfAbsent(key, appearance);
+        if (existing != null && !hasSameStableAppearance(existing, appearance)) {
+            String message = "Conflicting setting toggle appearance registration for setting "
+                + setting.getName() + " Value " + value.name();
+            AELog.error(message);
+            throw new IllegalStateException(message);
+        }
+    }
+
+    private static boolean hasSameStableAppearance(ButtonAppearance existing, ButtonAppearance appearance) {
+        return Objects.equals(existing.icon(), appearance.icon())
+            && Objects.equals(existing.item(), appearance.item());
+    }
+
     private static <T extends Enum<T>> void selectWithExistingHandler(SettingToggleButton<T> button, T value) {
         T previousValue = EnumCycler.rotateEnum(value, true, button.validValues);
         button.set(previousValue);
@@ -433,13 +461,30 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
 
     @Override
     public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
+        var currentScreen = Minecraft.getMinecraft().currentScreen;
+        if (currentScreen instanceof AEBaseGui<?> baseGui && baseGui.isHandlingRightClick()) {
+            return mousePressed(minecraft, mouseX, mouseY, true, baseGui);
+        }
+        return mousePressed(minecraft, mouseX, mouseY, false, null);
+    }
+
+    protected boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY, int mouseButton, AEBaseGui<?> gui) {
+        if (mouseButton != 0 && mouseButton != 1) {
+            return false;
+        }
+        return mousePressed(minecraft, mouseX, mouseY, mouseButton == 1, gui);
+    }
+
+    private boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY, boolean backwards, AEBaseGui<?> gui) {
         boolean pressed = super.mousePressed(minecraft, mouseX, mouseY);
         if (pressed) {
-            var currentScreen = Minecraft.getMinecraft().currentScreen;
-            this.pressedBackwards = currentScreen instanceof AEBaseGui<?> baseGui && baseGui.isHandlingRightClick();
+            this.pressedBackwards = backwards;
             if (this.pressedBackwards) {
-                if (this.validValues.size() >= 3 && currentScreen instanceof AEBaseGui<?> baseGui) {
-                    openSelectionPopup(baseGui);
+                if (gui == null) {
+                    throw new IllegalStateException("Right-click setting popup requires an AEBaseGui host");
+                }
+                if (shouldOpenSelectionPopup(gui)) {
+                    openSelectionPopup(gui);
                 } else {
                     triggerPress(true);
                 }
@@ -454,7 +499,11 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
         return pressed;
     }
 
-    private void openSelectionPopup(AEBaseGui<?> gui) {
+    protected boolean shouldOpenSelectionPopup(AEBaseGui<?> gui) {
+        return this.validValues.size() >= 3;
+    }
+
+    protected void openSelectionPopup(AEBaseGui<?> gui) {
         List<GridSelectionPopup.Entry<T>> entries = new ObjectArrayList<>(this.validValues.size());
         for (T value : this.validValues) {
             ButtonAppearance appearance = getAppearance(value);
@@ -475,7 +524,7 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
             bounds.height, entries, this::setValueDirect));
     }
 
-    private void setValueDirect(T value) {
+    protected void setValueDirect(T value) {
         if (value == this.currentValue) {
             return;
         }

@@ -24,6 +24,7 @@ import ae2.client.EffectType;
 import ae2.client.Hotkeys;
 import ae2.client.commands.ClientCommands;
 import ae2.client.gui.AEBaseGui;
+import ae2.client.gui.Icon;
 import ae2.client.gui.StackTooltipRenderer;
 import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.client.gui.me.common.PendingCraftingJobs;
@@ -37,6 +38,7 @@ import ae2.client.render.effects.LightningArcParticleData;
 import ae2.client.render.effects.ParticleTypes;
 import ae2.client.render.model.UVLModelLoader;
 import ae2.client.render.overlay.AdvancedMemoryCardHighlightHandler;
+import ae2.client.render.overlay.CraftingCpuHighlightHandler;
 import ae2.client.render.overlay.CraftingSupplierHighlightHandler;
 import ae2.client.render.overlay.MeteoriteCompassBeaconRenderer;
 import ae2.client.render.overlay.OverlayManager;
@@ -157,6 +159,7 @@ public final class AppEngClient extends AppEngServer {
 
     @Override
     public void init(FMLInitializationEvent event) {
+        Icon.invalidate();
         InitGuis.init();
         InitBlockColors.init();
         InitItemColors.init();
@@ -167,6 +170,7 @@ public final class AppEngClient extends AppEngServer {
         MinecraftForge.EVENT_BUS.register(new WirelessUniversalTerminalClientHandler());
         MinecraftForge.EVENT_BUS.register(new MeteoriteCompassBeaconRenderer());
         MinecraftForge.EVENT_BUS.register(OverlayManager.getInstance());
+        MinecraftForge.EVENT_BUS.register(CraftingCpuHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(CraftingSupplierHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(AdvancedMemoryCardHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(StackTooltipRenderer.INSTANCE);

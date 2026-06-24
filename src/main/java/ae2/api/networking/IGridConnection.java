@@ -46,7 +46,7 @@ public interface IGridConnection {
 
     /**
      * @return True if this connection was established via the grid node host's sides, and
-     * {@link #getDirection(IGridNode)} returns a non-null value.
+     * {@link #getDirection(IGridNode)} returns a non-null Value.
      */
     boolean isInWorld();
 

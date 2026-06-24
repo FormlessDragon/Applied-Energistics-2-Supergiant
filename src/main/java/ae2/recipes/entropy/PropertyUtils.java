@@ -47,7 +47,7 @@ final class PropertyUtils {
                 return value;
             }
         }
-        throw new IllegalArgumentException("Invalid value '" + name + "' for property " + property.getName());
+        throw new IllegalArgumentException("Invalid Value '" + name + "' for property " + property.getName());
     }
 
     static void validatePropertyMatchers(Block block, Map<String, PropertyValueMatcher> properties) {

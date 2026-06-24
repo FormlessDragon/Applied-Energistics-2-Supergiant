@@ -52,7 +52,7 @@ public abstract class GeometryHelper {
     }
 
     /**
-     * Analyzes the quad and returns a value with some combination of {@link #AXIS_ALIGNED_FLAG},
+     * Analyzes the quad and returns a Value with some combination of {@link #AXIS_ALIGNED_FLAG},
      * {@link #LIGHT_FACE_FLAG} and {@link #CUBIC_FLAG}. Intended use is to optimize lighting when the geometry is
      * regular. Expects convex quads with all points co-planar.
      */
@@ -186,7 +186,7 @@ public abstract class GeometryHelper {
     }
 
     /**
-     * Identifies the face to which the quad is most closely aligned. This mimics the value that
+     * Identifies the face to which the quad is most closely aligned. This mimics the Value that
      * {@link BakedQuad#getFace()} returns, and is used in the vanilla renderer for all diffuse lighting.
      *
      * <p>

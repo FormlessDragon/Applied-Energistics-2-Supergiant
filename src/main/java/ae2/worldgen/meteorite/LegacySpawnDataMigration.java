@@ -189,7 +189,7 @@ final class LegacySpawnDataMigration {
         try {
             return OptionalInt.of(Integer.parseInt(value));
         } catch (NumberFormatException e) {
-            AELog.warn("Skipping invalid %s value %s in legacy meteorite spawn data file %s", description, value, file);
+            AELog.warn("Skipping invalid %s Value %s in legacy meteorite spawn data file %s", description, value, file);
             return OptionalInt.empty();
         }
     }

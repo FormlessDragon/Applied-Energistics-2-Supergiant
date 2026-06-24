@@ -25,9 +25,11 @@ import ae2.api.networking.crafting.ICraftingCPU;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.ISubGuiHost;
 import ae2.api.storage.ITerminalHost;
+import ae2.client.gui.Icon;
 import ae2.container.ISubGui;
 import ae2.container.guisync.GuiSync;
 import ae2.container.guisync.PacketWritable;
+import ae2.core.AELog;
 import ae2.core.network.NetworkPacketHelper;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
 import ae2.text.TextComponents;
@@ -38,17 +40,22 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.network.PacketBuffer;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.WeakHashMap;
 
 public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISubGui {
     private static final int MAX_CPU_LIST_ENTRIES = 1024;
-    private static final int MIN_CPU_LIST_ENTRY_BYTES = 17;
+    private static final int MIN_CPU_LIST_ENTRY_BYTES = 47;
+    private static final int MAX_ICON_ID_LENGTH = 128;
 
     private static final CraftingCpuList EMPTY_CPU_LIST = new CraftingCpuList(Collections.emptyList());
 
@@ -59,6 +66,9 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
 
     private static final String ACTION_SELECT_CPU = "selectCpu";
     private static final String ACTION_CYCLE_CPU_MODE = "cycleCpuMode";
+    private static final String ACTION_SET_CPU_MODE = "setCpuMode";
+    private static final String ACTION_RENAME_CPU = "renameCpu";
+    private static final int MAX_CUSTOM_NAME_LENGTH = 32;
 
     private final WeakHashMap<ICraftingCPU, Integer> cpuSerialMap = new WeakHashMap<>();
     private final ITerminalHost host;
@@ -77,6 +87,8 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         this.host = host;
         registerClientAction(ACTION_SELECT_CPU, Integer.class, this::selectCpu);
         registerClientAction(ACTION_CYCLE_CPU_MODE, Integer.class, this::cycleCpuMode);
+        registerClientAction(ACTION_SET_CPU_MODE, SetCpuModePayload.class, this::setCpuMode);
+        registerClientAction(ACTION_RENAME_CPU, RenameCpuPayload.class, this::renameCpu);
     }
 
     @Override
@@ -131,28 +143,98 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         super.detectAndSendChanges();
     }
 
-    private CraftingCpuList createCpuList() {
-        var entries = new ObjectArrayList<CraftingCpuListEntry>(lastCpuSet.size());
-        for (var cpu : lastCpuSet) {
-            int serial = getOrAssignCpuSerial(cpu);
-            var status = cpu.getJobStatus();
-            float progress = 0;
-            if (status != null && status.totalItems() > 0) {
-                progress = (float) (status.progress() / (double) status.totalItems());
-            }
-
-            entries.add(new CraftingCpuListEntry(
-                serial,
-                cpu.getAvailableStorage(),
-                cpu.getCoProcessors(),
-                cpu.getName(),
-                cpu.getSelectionMode(),
-                status != null ? status.crafting() : null,
-                progress,
-                status != null ? status.elapsedTimeNanos() : 0));
+    private static Icon getCpuListBackgroundIcon(CraftingCPUCluster cluster, int serial, boolean focused) {
+        String state = focused ? "focused" : "unfocused";
+        Icon icon;
+        try {
+            icon = focused ? cluster.getFocusedCpuListBackgroundIcon() : cluster.getUnfocusedCpuListBackgroundIcon();
+        } catch (RuntimeException e) {
+            AELog.error(e, String.format(
+                "Failed to get %s crafting CPU list row background icon from %s for serial %d",
+                state,
+                cluster.getClass().getName(),
+                serial));
+            throw e;
         }
-        entries.sort(CPU_COMPARATOR);
-        return new CraftingCpuList(entries);
+
+        if (icon == null) {
+            String message = String.format(
+                "Crafting CPU %s returned null %s list row background icon for serial %d",
+                cluster.getClass().getName(),
+                state,
+                serial);
+            AELog.error(message);
+            throw new IllegalStateException(message);
+        }
+
+        Icon registeredIcon = Icon.byId(icon.id());
+        if (registeredIcon != icon) {
+            String message = String.format(
+                "Crafting CPU %s returned unregistered %s list row background icon %s for serial %d",
+                cluster.getClass().getName(),
+                state,
+                icon.id(),
+                serial);
+            AELog.error(message);
+            throw new IllegalStateException(message);
+        }
+
+        validateIconIdLength(icon.id(), state + " crafting CPU list row background icon");
+        return icon;
+    }
+
+    private static void validateIconIdLength(ResourceLocation iconId, String context) {
+        if (iconId.toString().length() > MAX_ICON_ID_LENGTH) {
+            String message = String.format(
+                "%s id %s exceeds max packet length %d",
+                context,
+                iconId,
+                MAX_ICON_ID_LENGTH);
+            AELog.error(message);
+            throw new IllegalStateException(message);
+        }
+    }
+
+    private static CraftingCPUCluster requireCraftingCpuCluster(ICraftingCPU cpu, int serial, String operation) {
+        if (cpu instanceof CraftingCPUCluster cluster) {
+            return cluster;
+        }
+
+        String message = String.format(
+            "Cannot %s for serial %d because %s is not a CraftingCPUCluster",
+            operation,
+            serial,
+            cpu.getClass().getName());
+        AELog.error(message);
+        throw new IllegalStateException(message);
+    }
+
+    private static World requireCpuWorld(CraftingCPUCluster cluster, int serial) {
+        World world = cluster.getLevel();
+        if (world != null) {
+            return world;
+        }
+
+        String message = String.format(
+            "Cannot create crafting CPU status list entry for serial %d because %s has no level",
+            serial,
+            cluster.getClass().getName());
+        AELog.error(message);
+        throw new IllegalStateException(message);
+    }
+
+    private static BlockPos requireCpuCorePos(CraftingCPUCluster cluster, int serial) {
+        BlockPos corePos = cluster.getCorePos();
+        if (corePos != null) {
+            return corePos;
+        }
+
+        String message = String.format(
+            "Cannot create crafting CPU status list entry for serial %d because %s has no core position",
+            serial,
+            cluster.getClass().getName());
+        AELog.error(message);
+        throw new IllegalStateException(message);
     }
 
     private int getOrAssignCpuSerial(ICraftingCPU cpu) {
@@ -194,8 +276,52 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         return false;
     }
 
+    private CraftingCpuList createCpuList() {
+        var entries = new ObjectArrayList<CraftingCpuListEntry>(lastCpuSet.size());
+        for (var cpu : lastCpuSet) {
+            int serial = getOrAssignCpuSerial(cpu);
+            if (!(cpu instanceof CraftingCPUCluster cluster)) {
+                String message = String.format(
+                    "Cannot create crafting CPU status list entry for serial %d because %s is not a CraftingCPUCluster",
+                    serial,
+                    cpu.getClass().getName());
+                AELog.error(message);
+                throw new IllegalStateException(message);
+            }
+
+            Icon unfocusedBackgroundIcon = getCpuListBackgroundIcon(cluster, serial, false);
+            Icon focusedBackgroundIcon = getCpuListBackgroundIcon(cluster, serial, true);
+            World world = requireCpuWorld(cluster, serial);
+            BlockPos corePos = requireCpuCorePos(cluster, serial);
+            var status = cpu.getJobStatus();
+            float progress = 0;
+            if (status != null && status.totalItems() > 0) {
+                progress = (float) (status.progress() / (double) status.totalItems());
+            }
+
+            entries.add(new CraftingCpuListEntry(
+                serial,
+                cpu.getAvailableStorage(),
+                cpu.getCoProcessors(),
+                cpu.getName(),
+                cpu.getSelectionMode(),
+                status != null ? status.crafting() : null,
+                progress,
+                status != null ? status.elapsedTimeNanos() : 0,
+                unfocusedBackgroundIcon.id(),
+                focusedBackgroundIcon.id(),
+                world.provider.getDimension(),
+                corePos,
+                cluster.getBoundsMin(),
+                cluster.getBoundsMax()));
+        }
+        entries.sort(CPU_COMPARATOR);
+        return new CraftingCpuList(entries);
+    }
+
     public void cycleCpuMode(int serial, boolean backwards) {
         if (serial <= 0) {
+            AELog.warn("Rejected crafting CPU mode cycle for invalid serial %d", serial);
             return;
         }
 
@@ -207,10 +333,11 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
 
         CpuSelectionMode updatedMode = null;
         for (var cpu : lastCpuSet) {
-            if (cpuSerialMap.getOrDefault(cpu, -1) != serial || !(cpu instanceof CraftingCPUCluster cluster)) {
+            if (cpuSerialMap.getOrDefault(cpu, -1) != serial) {
                 continue;
             }
 
+            CraftingCPUCluster cluster = requireCraftingCpuCluster(cpu, serial, "cycle CPU mode");
             updatedMode = EnumCycler.rotateEnum(
                 cluster.getSelectionMode(),
                 backwards,
@@ -228,6 +355,93 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         }
     }
 
+    public void setCpuMode(int serial, CpuSelectionMode mode) {
+        setCpuMode(new SetCpuModePayload(serial, mode));
+    }
+
+    private void setCpuMode(SetCpuModePayload payload) {
+        if (payload.serial() <= 0) {
+            AELog.warn("Rejected crafting CPU mode set for invalid serial %d", payload.serial());
+            return;
+        }
+        if (payload.mode() == null) {
+            AELog.warn("Rejected crafting CPU mode set for serial %d because mode is null", payload.serial());
+            return;
+        }
+
+        if (isClientSide()) {
+            updateCpuModeClientSide(payload.serial(), payload.mode());
+            sendClientAction(ACTION_SET_CPU_MODE, payload);
+            return;
+        }
+
+        for (var cpu : lastCpuSet) {
+            if (cpuSerialMap.getOrDefault(cpu, -1) != payload.serial()) {
+                continue;
+            }
+
+            CraftingCPUCluster cluster = requireCraftingCpuCluster(cpu, payload.serial(), "set CPU mode");
+            if (cluster.getSelectionMode() == payload.mode()) {
+                return;
+            }
+
+            cluster.getConfigManager().putSetting(Settings.CPU_SELECTION_MODE, payload.mode());
+            if (selectedCpuSerial == payload.serial()) {
+                this.schedulingMode = payload.mode();
+            }
+            this.cpuList = createCpuList();
+            this.lastUpdate = 0;
+            return;
+        }
+
+        AELog.warn("Failed to set mode for unknown crafting CPU serial %d", payload.serial());
+    }
+
+    public void renameCpu(int serial, String name) {
+        renameCpu(new RenameCpuPayload(serial, name));
+    }
+
+    private void renameCpu(RenameCpuPayload payload) {
+        if (payload.serial() <= 0) {
+            AELog.warn("Rejected crafting CPU rename for invalid serial %d", payload.serial());
+            return;
+        }
+        if (payload.name() != null && payload.name().length() > MAX_CUSTOM_NAME_LENGTH) {
+            AELog.warn(
+                "Rejected crafting CPU rename for serial %d because name length %d exceeds max %d",
+                payload.serial(),
+                payload.name().length(),
+                MAX_CUSTOM_NAME_LENGTH);
+            return;
+        }
+
+        if (isClientSide()) {
+            sendClientAction(ACTION_RENAME_CPU, payload);
+            return;
+        }
+
+        for (var cpu : lastCpuSet) {
+            if (cpuSerialMap.getOrDefault(cpu, -1) != payload.serial()) {
+                continue;
+            }
+
+            CraftingCPUCluster cluster = requireCraftingCpuCluster(cpu, payload.serial(), "rename CPU");
+            if (!cluster.rename(payload.name())) {
+                AELog.warn("Failed to rename crafting CPU %d because its core is unavailable", payload.serial());
+                return;
+            }
+
+            this.cpuList = createCpuList();
+            this.lastUpdate = 0;
+            if (selectedCpuSerial == payload.serial()) {
+                setCPU(cluster);
+            }
+            return;
+        }
+
+        AELog.warn("Failed to rename unknown crafting CPU serial %d", payload.serial());
+    }
+
     private void cycleCpuMode(int encodedSerial) {
         cycleCpuMode(Math.abs(encodedSerial), encodedSerial < 0);
     }
@@ -239,19 +453,8 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
 
         for (var cpu : cpuList.cpus()) {
             if (cpu.serial() == serial) {
-                CpuSelectionMode updatedMode = EnumCycler.rotateEnum(
-                    cpu.mode(),
-                    backwards,
-                    Settings.CPU_SELECTION_MODE.getValues());
-                updatedCpus.add(new CraftingCpuListEntry(
-                    cpu.serial(),
-                    cpu.storage(),
-                    cpu.coProcessors(),
-                    cpu.name(),
-                    updatedMode,
-                    cpu.currentJob(),
-                    cpu.progress(),
-                    cpu.elapsedTimeNanos()));
+                CpuSelectionMode updatedMode = EnumCycler.rotateEnum(cpu.mode(), backwards, Settings.CPU_SELECTION_MODE.getValues());
+                updatedCpus.add(withUpdatedCpuMode(cpu, updatedMode));
                 changed = true;
                 if (selectedCpuSerial == serial) {
                     selectedUpdatedMode = updatedMode;
@@ -267,6 +470,47 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
                 this.schedulingMode = selectedUpdatedMode;
             }
         }
+    }
+
+    private void updateCpuModeClientSide(int serial, CpuSelectionMode mode) {
+        Objects.requireNonNull(mode, "mode");
+
+        ObjectList<CraftingCpuListEntry> updatedCpus = new ObjectArrayList<>(cpuList.cpus().size());
+        boolean changed = false;
+
+        for (var cpu : cpuList.cpus()) {
+            if (cpu.serial() == serial) {
+                updatedCpus.add(withUpdatedCpuMode(cpu, mode));
+                changed = true;
+            } else {
+                updatedCpus.add(cpu);
+            }
+        }
+
+        if (changed) {
+            this.cpuList = new CraftingCpuList(updatedCpus);
+            if (selectedCpuSerial == serial) {
+                this.schedulingMode = mode;
+            }
+        }
+    }
+
+    private static CraftingCpuListEntry withUpdatedCpuMode(CraftingCpuListEntry cpu, CpuSelectionMode mode) {
+        return new CraftingCpuListEntry(
+            cpu.serial(),
+            cpu.storage(),
+            cpu.coProcessors(),
+            cpu.name(),
+            mode,
+            cpu.currentJob(),
+            cpu.progress(),
+            cpu.elapsedTimeNanos(),
+            cpu.unfocusedBackgroundIcon(),
+            cpu.focusedBackgroundIcon(),
+            cpu.dimensionId(),
+            cpu.corePos(),
+            cpu.boundsMin(),
+            cpu.boundsMax());
     }
 
     public int getSelectedCpuSerial() {
@@ -311,7 +555,22 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         CpuSelectionMode mode,
         @Nullable GenericStack currentJob,
         float progress,
-        long elapsedTimeNanos) {
+        long elapsedTimeNanos,
+        ResourceLocation unfocusedBackgroundIcon,
+        ResourceLocation focusedBackgroundIcon,
+        int dimensionId,
+        BlockPos corePos,
+        BlockPos boundsMin,
+        BlockPos boundsMax) {
+
+        public CraftingCpuListEntry {
+            Objects.requireNonNull(mode, "mode");
+            Objects.requireNonNull(unfocusedBackgroundIcon, "unfocusedBackgroundIcon");
+            Objects.requireNonNull(focusedBackgroundIcon, "focusedBackgroundIcon");
+            Objects.requireNonNull(corePos, "corePos");
+            Objects.requireNonNull(boundsMin, "boundsMin");
+            Objects.requireNonNull(boundsMax, "boundsMax");
+        }
 
         public static CraftingCpuListEntry readFromPacket(PacketBuffer buffer) {
             int serial = buffer.readInt();
@@ -322,6 +581,12 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
             if (mode == null) {
                 throw new IllegalArgumentException("Invalid crafting CPU selection mode");
             }
+            ResourceLocation unfocusedBackgroundIcon = readIconId(buffer, "unfocused");
+            ResourceLocation focusedBackgroundIcon = readIconId(buffer, "focused");
+            int dimensionId = buffer.readInt();
+            BlockPos corePos = buffer.readBlockPos();
+            BlockPos boundsMin = buffer.readBlockPos();
+            BlockPos boundsMax = buffer.readBlockPos();
             return new CraftingCpuListEntry(
                 serial,
                 storage,
@@ -330,7 +595,27 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
                 mode,
                 GenericStack.readBuffer(buffer),
                 buffer.readFloat(),
-                buffer.readVarLong());
+                buffer.readVarLong(),
+                unfocusedBackgroundIcon,
+                focusedBackgroundIcon,
+                dimensionId,
+                corePos,
+                boundsMin,
+                boundsMax);
+        }
+
+        private static ResourceLocation readIconId(PacketBuffer buffer, String state) {
+            try {
+                return new ResourceLocation(buffer.readString(MAX_ICON_ID_LENGTH));
+            } catch (RuntimeException e) {
+                throw new IllegalArgumentException("Invalid " + state
+                    + " crafting CPU list row background icon id", e);
+            }
+        }
+
+        private static void writeIconId(PacketBuffer buffer, ResourceLocation iconId) {
+            validateIconIdLength(iconId, "crafting CPU list row background icon");
+            buffer.writeString(iconId.toString());
         }
 
         public void writeToPacket(PacketBuffer buffer) {
@@ -339,9 +624,21 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
             buffer.writeInt(this.coProcessors);
             TextComponents.writeToPacket(buffer, this.name);
             buffer.writeEnumValue(this.mode);
+            writeIconId(buffer, this.unfocusedBackgroundIcon);
+            writeIconId(buffer, this.focusedBackgroundIcon);
+            buffer.writeInt(this.dimensionId);
+            buffer.writeBlockPos(this.corePos);
+            buffer.writeBlockPos(this.boundsMin);
+            buffer.writeBlockPos(this.boundsMax);
             GenericStack.writeBuffer(this.currentJob, buffer);
             buffer.writeFloat(this.progress);
             buffer.writeVarLong(this.elapsedTimeNanos);
         }
+    }
+
+    public record RenameCpuPayload(int serial, @Nullable String name) {
+    }
+
+    public record SetCpuModePayload(int serial, CpuSelectionMode mode) {
     }
 }

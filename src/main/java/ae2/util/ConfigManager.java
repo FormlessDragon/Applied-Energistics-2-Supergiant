@@ -84,7 +84,7 @@ public final class ConfigManager implements IConfigManager {
     }
 
     private static void warnFailedSettingLoad(Setting<?> setting, String value, IllegalArgumentException e) {
-        LOG.warn("Failed to load setting {} from value '{}': {}", setting, value, e.getMessage());
+        LOG.warn("Failed to load setting {} from Value '{}': {}", setting, value, e.getMessage());
     }
 
     @Override

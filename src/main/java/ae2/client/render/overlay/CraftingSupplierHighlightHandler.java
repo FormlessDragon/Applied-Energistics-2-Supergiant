@@ -19,6 +19,12 @@ import java.util.List;
 public class CraftingSupplierHighlightHandler {
     public static final CraftingSupplierHighlightHandler INSTANCE = new CraftingSupplierHighlightHandler();
     private static final long DURATION_MS = 20_000L;
+    private static final float HIGHLIGHT_LINE_WIDTH = 3.0F;
+    private static final double HIGHLIGHT_GROW = 0.03D;
+    private static final float HIGHLIGHT_RED = 1.0F;
+    private static final float HIGHLIGHT_GREEN = 0.35F;
+    private static final float HIGHLIGHT_BLUE = 0.35F;
+    private static final float HIGHLIGHT_ALPHA = 0.95F;
 
     private final ObjectArrayList<OverlayHighlightLocation> currentDimensionLocations = new ObjectArrayList<>();
     private long expiresAt;
@@ -96,14 +102,18 @@ public class CraftingSupplierHighlightHandler {
         GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA,
             GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE,
             GlStateManager.DestFactor.ZERO);
-        GlStateManager.glLineWidth(2.0F);
+        GlStateManager.glLineWidth(HIGHLIGHT_LINE_WIDTH);
         GlStateManager.disableTexture2D();
         GlStateManager.disableDepth();
         GlStateManager.depthMask(false);
 
         for (var location : this.currentDimensionLocations) {
             for (AxisAlignedBB box : OverlayHighlightBoxes.create(location.shape(), location.pos(), location.side())) {
-                RenderGlobal.drawSelectionBoundingBox(box.grow(0.01D), 1.0F, 0.0F, 0.0F, 0.85F);
+                RenderGlobal.drawSelectionBoundingBox(box.grow(HIGHLIGHT_GROW),
+                    HIGHLIGHT_RED,
+                    HIGHLIGHT_GREEN,
+                    HIGHLIGHT_BLUE,
+                    HIGHLIGHT_ALPHA);
             }
         }
 

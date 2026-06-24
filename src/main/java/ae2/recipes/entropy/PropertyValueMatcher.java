@@ -38,7 +38,7 @@ public abstract class PropertyValueMatcher {
             List<String> values = new ObjectArrayList<>();
             int index = 0;
             for (JsonElement element : json.getAsJsonArray()) {
-                values.add(JsonUtils.getString(element, "property value " + index));
+                values.add(JsonUtils.getString(element, "property Value " + index));
                 index++;
             }
             return new MultiValue(values);
@@ -78,7 +78,7 @@ public abstract class PropertyValueMatcher {
         @Override
         public void validate(IProperty<? extends Comparable<?>> property) {
             if (!hasValue(property, this.value)) {
-                throw new IllegalStateException("Property " + property.getName() + " does not have value '" + this.value + "'");
+                throw new IllegalStateException("Property " + property.getName() + " does not have Value '" + this.value + "'");
             }
         }
 
@@ -99,7 +99,7 @@ public abstract class PropertyValueMatcher {
         public void validate(IProperty<? extends Comparable<?>> property) {
             for (String value : this.values) {
                 if (!hasValue(property, value)) {
-                    throw new IllegalStateException("Property " + property.getName() + " does not have value '" + value + "'");
+                    throw new IllegalStateException("Property " + property.getName() + " does not have Value '" + value + "'");
                 }
             }
         }
@@ -128,10 +128,10 @@ public abstract class PropertyValueMatcher {
         @Override
         public void validate(IProperty<? extends Comparable<?>> property) {
             if (!hasValue(property, this.min)) {
-                throw new IllegalStateException("Property " + property.getName() + " does not have value '" + this.min + "'");
+                throw new IllegalStateException("Property " + property.getName() + " does not have Value '" + this.min + "'");
             }
             if (!hasValue(property, this.max)) {
-                throw new IllegalStateException("Property " + property.getName() + " does not have value '" + this.max + "'");
+                throw new IllegalStateException("Property " + property.getName() + " does not have Value '" + this.max + "'");
             }
         }
 

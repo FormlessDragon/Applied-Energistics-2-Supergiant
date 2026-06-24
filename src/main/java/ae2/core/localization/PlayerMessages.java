@@ -137,6 +137,8 @@ public enum PlayerMessages implements LocalizationEnum {
     CubeGeneratorSpawningIn,
     CubeGeneratorSize,
     CommandRequiresServerWorld,
+    CraftingCpuCoreLocation,
+    CraftingCpuCoreLocationInDimension,
     CraftingSupplierLocation,
     CraftingSupplierLocationInDimension,
     ConfigModifierSuccess,

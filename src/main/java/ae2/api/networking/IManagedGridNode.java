@@ -183,7 +183,7 @@ public interface IManagedGridNode {
 
     /**
      * Tell the node who was responsible for placing it. Failure to do this may result in incompatibility with the
-     * security system. Called instead of loadFromNBT when initially placed, once set never required again, the value is
+     * security system. Called instead of loadFromNBT when initially placed, once set never required again, the Value is
      * saved with the node NBT.
      *
      * @param ownerPlayerId ME player id of the owner. See {@link ae2.api.features.IPlayerRegistry}.

@@ -69,7 +69,7 @@ public final class Setting<T extends Enum<T>> {
             }
         }
 
-        throw new IllegalArgumentException("Received invalid value '" + value + "' for setting '" + name + "'");
+        throw new IllegalArgumentException("Received invalid Value '" + value + "' for setting '" + name + "'");
     }
 
     public void copy(IConfigManager from, IConfigManager to) {

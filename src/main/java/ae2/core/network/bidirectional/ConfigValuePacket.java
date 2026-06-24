@@ -34,7 +34,7 @@ public class ConfigValuePacket implements IMessage {
     public <T extends Enum<T>> ConfigValuePacket(Setting<T> setting, T value) {
         this(setting.getName(), value.name());
         if (!setting.getValues().contains(value)) {
-            throw new IllegalStateException(value + " not a valid value for " + setting);
+            throw new IllegalStateException(value + " not a valid Value for " + setting);
         }
     }
 
@@ -51,7 +51,7 @@ public class ConfigValuePacket implements IMessage {
         } catch (RuntimeException e) {
             this.invalid = true;
             NetworkPacketHelper.warnMalformedPacket(e, getClass().getSimpleName(),
-                "Ignoring malformed config value packet");
+                "Ignoring malformed config Value packet");
         }
     }
 

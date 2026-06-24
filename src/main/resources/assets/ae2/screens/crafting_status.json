@@ -15,7 +15,7 @@
     "cpuListTitle": {
       "position": {
         "top": 7,
-        "left": -81
+        "left": -90
       },
       "text": {
         "translate": "gui.ae2.CraftingCPUs"
@@ -54,13 +54,13 @@
       "height": 20
     },
     "selectCpuList": {
-      "left": -88,
+      "left": -97,
       "top": 0,
-      "width": 94
+      "width": 103
     },
     "selectCpuScrollbar": {
       "left": -11,
-      "top": 19,
+      "top": 31,
       "width": 12
     },
     "verticalToolbar": {
@@ -68,8 +68,8 @@
       "top": 0
     },
     "terminalStyle": {
-      "left": -22,
-      "bottom": 24,
+      "left": -25,
+      "bottom": 26,
       "width": 20,
       "height": 20
     }
@@ -79,19 +79,7 @@
       "texture": "guis/cpu_selector.png",
       "textureWidth": 256,
       "textureHeight": 256,
-      "srcRect": [0, 0, 94, 164]
-    },
-    "cpuListButton": {
-      "texture": "guis/cpu_selector.png",
-      "textureWidth": 256,
-      "textureHeight": 256,
-      "srcRect": [100, 0, 67, 22]
-    },
-    "cpuListButtonSelected": {
-      "texture": "guis/cpu_selector.png",
-      "textureWidth": 256,
-      "textureHeight": 256,
-      "srcRect": [100, 22, 67, 22]
+      "srcRect": [0, 0, 103, 176]
     }
   }
 }

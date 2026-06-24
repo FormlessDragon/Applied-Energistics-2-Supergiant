@@ -52,7 +52,7 @@ public interface SpriteFinder {
      * <p>
      * Coordinates must be in the sprite interior for reliable results. Generally will be easier to use
      * {@link #find(QuadView)} unless you know the vertex centroid will somehow not be in the quad interior. This
-     * method will be slightly faster if you already have the centroid or another appropriate value.
+     * method will be slightly faster if you already have the centroid or another appropriate Value.
      */
     TextureAtlasSprite find(float u, float v);
 }

@@ -27,7 +27,7 @@ public enum PowerMultiplier {
     ONE, CONFIG;
 
     /**
-     * please do not edit this value, it is set when AE loads its config files.
+     * please do not edit this Value, it is set when AE loads its config files.
      */
     public final double multiplier = 1.0;
 

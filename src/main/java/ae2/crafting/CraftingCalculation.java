@@ -90,7 +90,6 @@ public class CraftingCalculation {
     private boolean done = false;
     private int time = 5;
     private int incTime = Integer.MAX_VALUE;
-    private boolean synchronousCalculation = false;
     private int maxRequestDepth = 0;
     private long intermediateFinalOutputAmount = 0;
     private int recursiveMissingSeedSuppression = 0;
@@ -250,22 +249,6 @@ public class CraftingCalculation {
         }
     }
 
-    ICraftingPlan runSynchronouslyForTest() {
-        try {
-            this.synchronousCalculation = true;
-            startPerformanceListener();
-            var plan = timed("compute-plan", this::computePlan);
-            this.logCraftingJob(plan);
-            return plan;
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(ex);
-        } finally {
-            this.finish();
-            this.synchronousCalculation = false;
-        }
-    }
-
     private void startPerformanceListener() {
         if (this.performanceListener.isEnabled()) {
             this.performanceListener.start(this.output, this.requestedAmount);
@@ -389,10 +372,6 @@ public class CraftingCalculation {
     }
 
     void handlePausing() throws InterruptedException {
-        if (this.synchronousCalculation) {
-            return;
-        }
-
         if (this.incTime > 100) {
             this.incTime = 0;
 
@@ -677,7 +656,7 @@ public class CraftingCalculation {
                 return new RecursivePatternBatch(1, directOutput);
             }
 
-            if (!recursiveUse.value()) {
+            if (!recursiveUse.get()) {
                 return new RecursivePatternBatch(1, directOutput);
             }
 
@@ -977,7 +956,7 @@ public class CraftingCalculation {
             }
 
             if (selectedPattern == null) {
-                return recursiveUse.value() && netByKey.get(target) > 0;
+                return recursiveUse.get() && netByKey.get(target) > 0;
             }
 
             if (getPatternInputCount(selectedPattern, target) > 0) {
@@ -1348,18 +1327,18 @@ public class CraftingCalculation {
     }
 
     private static final class RecursiveUse {
-        private boolean value;
+        private boolean aBoolean;
 
-        private RecursiveUse(boolean value) {
-            this.value = value;
+        private RecursiveUse(boolean aBoolean) {
+            this.aBoolean = aBoolean;
         }
 
-        private boolean value() {
-            return this.value;
+        private boolean get() {
+            return this.aBoolean;
         }
 
         private void set() {
-            this.value = true;
+            this.aBoolean = true;
         }
     }
 

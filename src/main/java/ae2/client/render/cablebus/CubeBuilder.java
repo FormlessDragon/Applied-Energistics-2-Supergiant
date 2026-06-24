@@ -430,7 +430,7 @@ public class CubeBuilder {
     }
 
     /**
-     * Sets the vertex color for future vertices to the given RGB value, and forces the alpha component to 255.
+     * Sets the vertex color for future vertices to the given RGB Value, and forces the alpha component to 255.
      */
     public void setColorRGB(int color) {
         this.setColor(color | 0xFF000000);

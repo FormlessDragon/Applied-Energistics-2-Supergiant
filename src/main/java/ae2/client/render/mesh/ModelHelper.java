@@ -69,9 +69,9 @@ public abstract class ModelHelper {
     }
 
     /**
-     * Use to decode a result from {@link #toFaceIndex(EnumFacing)}. Return value will be null if encoded value was null.
+     * Use to decode a result from {@link #toFaceIndex(EnumFacing)}. Return Value will be null if encoded Value was null.
      * Can also be used for no-allocation iteration of {@link EnumFacing#values()}, optionally including the null face.
-     * (Use &lt; or &lt;= {@link #NULL_FACE_ID} to exclude or include the null value, respectively.)
+     * (Use &lt; or &lt;= {@link #NULL_FACE_ID} to exclude or include the null Value, respectively.)
      */
     public static EnumFacing faceFromIndex(int faceIndex) {
         return FACES[faceIndex];

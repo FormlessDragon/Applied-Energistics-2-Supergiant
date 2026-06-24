@@ -199,7 +199,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
             Grid.create(this);
             // Note that the node can be moved immediately to a new grid when
             // it triggers adjacent connections due to block updates emitted while it joins the grid.
-            // That means the return value of Grid.create is not necessarily the new grid,
+            // That means the return Value of Grid.create is not necessarily the new grid,
             // but myGrid will already have been updated by the Grid calling setGrid on this node.
             return Objects.requireNonNull(this.myGrid);
         }
@@ -505,7 +505,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
 
     /**
      * tell the node who was responsible for placing it, failure to do this may result in in-compatibility with the
-     * security system. Called instead of loadFromNBT when initially placed, once set never required again, the value is
+     * security system. Called instead of loadFromNBT when initially placed, once set never required again, the Value is
      * saved with the Node NBT.
      *
      * @param ownerPlayerId ME player id of the owner. See {@link IPlayerRegistry}.

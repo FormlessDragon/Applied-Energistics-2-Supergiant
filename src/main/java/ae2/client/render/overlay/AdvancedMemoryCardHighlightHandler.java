@@ -20,8 +20,10 @@ import java.util.List;
 public class AdvancedMemoryCardHighlightHandler {
     public static final AdvancedMemoryCardHighlightHandler INSTANCE = new AdvancedMemoryCardHighlightHandler();
     private static final MemoryCardColors UNHIGHLIGHTED_COLORS = MemoryCardColors.DEFAULT;
-    private static final HighlightColor INPUT_COLOR = new HighlightColor(0.0F, 0.85F, 1.0F, 0.85F);
-    private static final HighlightColor OUTPUT_COLOR = new HighlightColor(1.0F, 0.55F, 0.0F, 0.85F);
+    private static final float HIGHLIGHT_LINE_WIDTH = 3.0F;
+    private static final double HIGHLIGHT_GROW = 0.03D;
+    private static final HighlightColor INPUT_COLOR = new HighlightColor(0.35F, 1.0F, 1.0F, 0.95F);
+    private static final HighlightColor OUTPUT_COLOR = new HighlightColor(1.0F, 0.75F, 0.2F, 0.95F);
 
     private final ObjectSet<P2PHighlight> currentDimensionHighlights = new ObjectLinkedOpenHashSet<>();
     private int highlightedDimension = Integer.MIN_VALUE;
@@ -104,7 +106,7 @@ public class AdvancedMemoryCardHighlightHandler {
         GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA,
             GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE,
             GlStateManager.DestFactor.ZERO);
-        GlStateManager.glLineWidth(2.0F);
+        GlStateManager.glLineWidth(HIGHLIGHT_LINE_WIDTH);
         GlStateManager.disableTexture2D();
         GlStateManager.disableDepth();
         GlStateManager.depthMask(false);
@@ -113,7 +115,7 @@ public class AdvancedMemoryCardHighlightHandler {
             OverlayHighlightLocation location = highlight.location();
             HighlightColor color = highlight.color();
             for (AxisAlignedBB box : OverlayHighlightBoxes.create(location.shape(), location.pos(), location.side())) {
-                RenderGlobal.drawSelectionBoundingBox(box.grow(0.01D), color.red(), color.green(), color.blue(),
+                RenderGlobal.drawSelectionBoundingBox(box.grow(HIGHLIGHT_GROW), color.red(), color.green(), color.blue(),
                     color.alpha());
             }
         }

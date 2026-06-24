@@ -24,7 +24,7 @@ public class CowMap<K, V> {
     }
 
     /**
-     * Add the value to the map, or throw an IllegalArgumentException if it is already present.
+     * Add the Value to the map, or throw an IllegalArgumentException if it is already present.
      */
     public void putIfAbsent(K key, V value) throws IllegalArgumentException {
         Objects.requireNonNull(key, "Key may not be null");
@@ -32,7 +32,7 @@ public class CowMap<K, V> {
 
         synchronized (this) {
             if (map.containsKey(key)) {
-                throw new IllegalArgumentException("Map already contains a value for the following key: " + key);
+                throw new IllegalArgumentException("Map already contains a Value for the following key: " + key);
             }
             var newMap = mapSupplier.apply(map.size() + 1);
             newMap.putAll(map);

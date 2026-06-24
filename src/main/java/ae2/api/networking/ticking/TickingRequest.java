@@ -29,7 +29,7 @@ import ae2.core.settings.TickRates;
  * Describes how your grid node ticking is executed.
  *
  * @param minTickRate the minimum number of ticks that must pass between ticks. Valid Values are : 1+ Suggested is 5-20
- * @param maxTickRate the maximum number of ticks that can pass between ticks, if this value is exceeded the grid node
+ * @param maxTickRate the maximum number of ticks that can pass between ticks, if this Value is exceeded the grid node
  *                    must tick. Valid Values are 1+ Suggested is 20-40
  * @param isSleeping  Determines the current expected state of your node, if your node expects to be sleeping, then
  *                    return true.

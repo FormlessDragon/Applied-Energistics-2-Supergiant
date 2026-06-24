@@ -131,7 +131,7 @@ public interface IConfigManager {
      * Get Value of a particular setting
      *
      * @param setting the setting
-     * @return value of setting
+     * @return Value of setting
      * @throws UnsupportedSettingException if setting has not been registered before
      */
     <T extends Enum<T>> T getSetting(Setting<T> setting);
@@ -140,7 +140,7 @@ public interface IConfigManager {
      * Change setting
      *
      * @param setting  to be changed setting
-     * @param newValue new value for setting
+     * @param newValue new Value for setting
      * @throws UnsupportedSettingException if setting has not been registered before
      */
     <T extends Enum<T>> void putSetting(Setting<T> setting, T newValue);

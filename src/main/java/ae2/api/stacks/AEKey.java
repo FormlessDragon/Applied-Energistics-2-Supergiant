@@ -179,7 +179,7 @@ public abstract class AEKey {
     public abstract Object getPrimaryKey();
 
     /**
-     * @return If {@link #getFuzzySearchMaxValue()} is greater than 0, this is the value in the range of
+     * @return If {@link #getFuzzySearchMaxValue()} is greater than 0, this is the Value in the range of
      * [0,getFuzzyModeMaxValue] used to index keys by. Used by fuzzy mode search with percentage ranges.
      */
     public int getFuzzySearchValue() {

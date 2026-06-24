@@ -108,7 +108,7 @@ public final class JsonRecipeUtils {
 
             String type = JsonUtils.getString(condition, "type");
             if ("neoforge:not".equals(type)) {
-                JsonObject value = JsonUtils.getJsonObject(condition, "value");
+                JsonObject value = JsonUtils.getJsonObject(condition, "Value");
                 if (value != null && value.has("type") && "neoforge:tag_empty".equals(JsonUtils.getString(value, "type"))) {
                     ResourceLocation tagId = parseId(JsonUtils.getString(value, "tag"));
                     if (OreDictionary.getOres(toOreDictionaryName(tagId)).isEmpty()) {

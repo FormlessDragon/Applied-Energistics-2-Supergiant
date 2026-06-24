@@ -38,12 +38,12 @@ final class FullBlockVariant {
 
         EnumFacing facing = EnumFacing.byName(facingName);
         if (facing == null) {
-            throw new IllegalArgumentException("Unknown facing value: " + facingName);
+            throw new IllegalArgumentException("Unknown facing Value: " + facingName);
         }
 
         int spin = Integer.parseInt(spinText);
         if (spin < 0 || spin > 3) {
-            throw new IllegalArgumentException("Unsupported spin value: " + spinText);
+            throw new IllegalArgumentException("Unsupported spin Value: " + spinText);
         }
 
         return new FullBlockVariant(facing, spin, properties);

@@ -26,7 +26,7 @@ package ae2.api.networking.events;
 import ae2.api.networking.IGridNode;
 
 /**
- * Implementers of a IGridBlock must post this event when your getIdlePowerUsage starts returning a new value, if you do
+ * Implementers of a IGridBlock must post this event when your getIdlePowerUsage starts returning a new Value, if you do
  * not post this event the network will not change the idle draw.
  * you do not need to send this event when your node is added / removed from the grid.
  */

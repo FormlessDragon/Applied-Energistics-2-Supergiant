@@ -139,7 +139,7 @@ public class NumberEntryWidget implements ICompositeWidget {
             }
         });
         this.textField.setOnConfirm(() -> {
-            if (this.focused && this.onConfirm != null && getCachedValidation().value().externalValue().isPresent()) {
+            if (this.focused && this.onConfirm != null && getCachedValidation().Value().externalValue().isPresent()) {
                 this.onConfirm.run();
                 setFocused(false);
             }
@@ -393,8 +393,8 @@ public class NumberEntryWidget implements ICompositeWidget {
     }
 
     /**
-     * Returns the integer value currently in the text-field, if it is a valid number and is within the allowed min/max
-     * value.
+     * Returns the integer Value currently in the text-field, if it is a valid number and is within the allowed min/max
+     * Value.
      */
     public OptionalInt getIntValue() {
         var value = getLongValue();
@@ -409,11 +409,11 @@ public class NumberEntryWidget implements ICompositeWidget {
     }
 
     /**
-     * Returns the long value currently in the text-field, if it is a valid number and is within the allowed min/max
-     * value.
+     * Returns the long Value currently in the text-field, if it is a valid number and is within the allowed min/max
+     * Value.
      */
     public OptionalLong getLongValue() {
-        var value = getCachedValidation().value().externalValue();
+        var value = getCachedValidation().Value().externalValue();
         if (value.isEmpty()) {
             return OptionalLong.empty();
         }
@@ -485,10 +485,10 @@ public class NumberEntryWidget implements ICompositeWidget {
     }
 
     /**
-     * Retrieves the numeric representation of the value entered by the user, if it is convertible.
+     * Retrieves the numeric representation of the Value entered by the user, if it is convertible.
      */
     private Optional<BigDecimal> getValueInternal() {
-        return getCachedValidation().value().internalValue();
+        return getCachedValidation().Value().internalValue();
     }
 
     private Optional<BigDecimal> getOperableValue() {
@@ -499,7 +499,7 @@ public class NumberEntryWidget implements ICompositeWidget {
     }
 
     /**
-     * Changes the value displayed to the user.
+     * Changes the Value displayed to the user.
      */
     private void setValueInternal(BigDecimal value) {
         invalidateValidationCache();
@@ -514,7 +514,7 @@ public class NumberEntryWidget implements ICompositeWidget {
     }
 
     /*
-     * Return true if the value entered by the user is a single numeric number and not a mathematical expression
+     * Return true if the Value entered by the user is a single numeric number and not a mathematical expression
      */
     private boolean isNumber(String textValue) {
         var position = new ParsePosition(0);
@@ -834,7 +834,7 @@ public class NumberEntryWidget implements ICompositeWidget {
                                   boolean notAnInteger) {
     }
 
-    private record CachedValidation(ValidatedValue value, boolean valid, List<ITextComponent> tooltip,
+    private record CachedValidation(ValidatedValue Value, boolean valid, List<ITextComponent> tooltip,
                                     String previewText) {
     }
 

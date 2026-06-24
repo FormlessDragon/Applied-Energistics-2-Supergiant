@@ -468,6 +468,19 @@ public class WidgetContainer {
      * @see ICompositeWidget#addExclusionZones(List, Rectangle)
      */
     public void addExclusionZones(List<Rectangle> exclusionZones, Rectangle bounds) {
+        for (GuiButton widget : widgets.values()) {
+            if (!widget.visible) {
+                continue;
+            }
+
+            if (widget.x < bounds.x
+                || widget.y < bounds.y
+                || widget.x + widget.width > bounds.x + bounds.width
+                || widget.y + widget.height > bounds.y + bounds.height) {
+                exclusionZones.add(new Rectangle(widget.x, widget.y, widget.width, widget.height));
+            }
+        }
+
         for (ICompositeWidget widget : compositeWidgets.values()) {
             if (widget.isVisible()) {
                 widget.addExclusionZones(exclusionZones, bounds);
