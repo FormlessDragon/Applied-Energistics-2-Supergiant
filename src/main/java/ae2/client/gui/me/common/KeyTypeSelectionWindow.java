@@ -1,6 +1,7 @@
-package ae2.client.gui.me.items;
+package ae2.client.gui.me.common;
 
-import ae2.api.implementations.items.WirelessTerminalDefinition;
+import ae2.api.stacks.AEKeyType;
+import ae2.api.stacks.AEKeyTypes;
 import ae2.client.Point;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.ICompositeWidget;
@@ -11,40 +12,41 @@ import ae2.client.gui.style.GeneratedBackground;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.style.WidgetStyle;
+import ae2.client.gui.widgets.AECheckbox;
 import ae2.client.gui.widgets.ITooltip;
 import ae2.client.gui.widgets.IconButton;
-import ae2.client.gui.widgets.ItemStackButton;
-import ae2.container.AEBaseContainer;
+import ae2.container.me.common.ContainerMEStorage;
 import ae2.core.localization.GuiText;
-import ae2.core.network.InitNetwork;
-import ae2.core.network.serverbound.SelectWirelessTerminalPacket;
-import ae2.helpers.WirelessTerminalGuiHost;
-import ae2.items.tools.powered.WirelessTerminalRegistry;
-import ae2.items.tools.powered.WirelessUniversalTerminalItem;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.item.ItemStack;
+import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Mouse;
 
 import java.awt.Rectangle;
+import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 
-public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget {
-    private static final GuiStyle STYLE = GuiStyleManager.loadStyleDoc("/screens/wireless_universal_terminal_selector.json");
+final class KeyTypeSelectionWindow implements ICompositeWidget {
+    private static final GuiStyle STYLE = GuiStyleManager.loadStyleDoc("/screens/key_type_selection.json");
     private static final String BACK_WIDGET = "back";
-    private static final String FIRST_TERMINAL_WIDGET = "terminal0";
-    private static final String SECOND_TERMINAL_WIDGET = "terminal1";
-    private static final String LAST_TERMINAL_WIDGET = "terminal5";
+    private static final String KEY_TYPES_WIDGET = "keytypes";
     private static final int DEFAULT_WIDTH = 200;
-    private static final int DEFAULT_HEIGHT = 82;
+    private static final int DEFAULT_HEIGHT = 66;
     private static final int TITLE_X = 8;
     private static final int TITLE_Y = 7;
+    private static final int PADDING = 6;
+    private static final int KEY_TYPE_SPACING = AECheckbox.SIZE + PADDING;
 
-    private final AEBaseGui<? extends AEBaseContainer> parent;
+    private final GuiMEStorage<? extends ContainerMEStorage> parent;
+    private final ITextComponent title;
     private final ObjectArrayList<GuiButton> buttons = new ObjectArrayList<>();
+    private final Object2ObjectLinkedOpenHashMap<AEKeyType, AECheckbox> checkboxes =
+        new Object2ObjectLinkedOpenHashMap<>();
     private Rectangle bounds = new Rectangle(0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
     private Point screenOrigin = Point.ZERO;
     private boolean visible;
@@ -52,8 +54,9 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
     private Point dragOffset = Point.ZERO;
     private boolean resetPositionOnOpen = true;
 
-    public WirelessUniversalTerminalSelectorWindow(AEBaseGui<? extends AEBaseContainer> parent) {
+    KeyTypeSelectionWindow(GuiMEStorage<? extends ContainerMEStorage> parent, ITextComponent title) {
         this.parent = parent;
+        this.title = title;
     }
 
     private static boolean contains(Rectangle area, int mouseX, int mouseY) {
@@ -68,47 +71,20 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
         return background != null ? background.getWidth() : DEFAULT_WIDTH;
     }
 
-    private static int getWindowHeight() {
-        GeneratedBackground background = STYLE.getGeneratedBackground();
-        return background != null ? background.getHeight() : DEFAULT_HEIGHT;
+    private static int getWindowHeight(int keyTypeCount) {
+        WidgetStyle keyTypesStyle = STYLE.getWidget(KEY_TYPES_WIDGET);
+        int top = requireCoordinate(keyTypesStyle.getTop(), "top");
+        return top + keyTypeCount * KEY_TYPE_SPACING + PADDING;
     }
 
-    private static int getWindowHeight(int terminalCount) {
-        TerminalLayout layout = getTerminalLayout();
-        int rows = Math.max(1, (terminalCount + layout.columns() - 1) / layout.columns());
-        return layout.baseHeight() + Math.max(0, rows - 1) * layout.stepY();
-    }
-
-    private static TerminalLayout getTerminalLayout() {
-        WidgetStyle first = STYLE.getWidget(FIRST_TERMINAL_WIDGET);
-        WidgetStyle second = STYLE.getWidget(SECOND_TERMINAL_WIDGET);
-        WidgetStyle last = STYLE.getWidget(LAST_TERMINAL_WIDGET);
-        int firstLeft = requireCoordinate(first.getLeft(), FIRST_TERMINAL_WIDGET, "left");
-        int firstTop = requireCoordinate(first.getTop(), FIRST_TERMINAL_WIDGET, "top");
-        int secondLeft = requireCoordinate(second.getLeft(), SECOND_TERMINAL_WIDGET, "left");
-        int lastLeft = requireCoordinate(last.getLeft(), LAST_TERMINAL_WIDGET, "left");
-        int stepX = secondLeft - firstLeft;
-        int stepY = first.getHeight() + 10;
-        int columns = Math.max(1, ((lastLeft - firstLeft) / Math.max(1, stepX)) + 1);
-        return new TerminalLayout(
-            firstLeft,
-            firstTop,
-            stepX,
-            stepY,
-            columns,
-            first.getWidth(),
-            first.getHeight(),
-            getWindowHeight());
-    }
-
-    private static int requireCoordinate(@Nullable Integer coordinate, String widgetId, String axis) {
+    private static int requireCoordinate(@Nullable Integer coordinate, String axis) {
         if (coordinate == null) {
-            throw new IllegalStateException("Missing " + axis + " for widget " + widgetId);
+            throw new IllegalStateException("Missing " + axis + " for widget " + KEY_TYPES_WIDGET);
         }
         return coordinate;
     }
 
-    public void open() {
+    void open() {
         this.visible = true;
         this.dragging = false;
         this.resetPositionOnOpen = true;
@@ -116,13 +92,14 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
         rebuildButtons();
     }
 
-    public void close() {
+    void close() {
         this.visible = false;
         this.dragging = false;
         this.buttons.clear();
+        this.checkboxes.clear();
     }
 
-    public void toggle() {
+    void toggle() {
         if (this.visible) {
             close();
         } else {
@@ -165,6 +142,7 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
         }
 
         applyPendingOpenPositionReset();
+        syncCheckboxes();
 
         if (!this.dragging) {
             return;
@@ -195,7 +173,7 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
         GlStateManager.translate(0, 0, 350);
         BackgroundGenerator.draw(this.bounds.width, this.bounds.height, x, y);
         this.parent.getMinecraft().fontRenderer.drawString(
-            GuiText.WirelessTerminalSelector.getLocal(),
+            this.title.getFormattedText(),
             x + TITLE_X,
             y + TITLE_Y,
             0x404040);
@@ -289,10 +267,12 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
 
     private void rebuildButtons() {
         this.buttons.clear();
+        this.checkboxes.clear();
         if (!this.visible) {
             return;
         }
-        this.buttons.ensureCapacity(getInstalledTerminalCount() + 1);
+
+        this.buttons.ensureCapacity(this.parent.getContainer().getClientKeyTypeSelection().keyTypes().size() + 1);
 
         IconButton closeButton = new IconButton(this::close) {
             @Override
@@ -304,42 +284,51 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
         moveCloseButton(closeButton);
         this.buttons.add(closeButton);
 
-        WirelessTerminalGuiHost<?> wirelessHost = getWirelessHost();
-        if (wirelessHost == null) {
-            return;
-        }
-        ItemStack stack = wirelessHost.getItemStack();
-        if (!(stack.getItem() instanceof WirelessUniversalTerminalItem universalTerminal)) {
-            return;
-        }
+        WidgetStyle keyTypesStyle = STYLE.getWidget(KEY_TYPES_WIDGET);
+        int x = requireCoordinate(keyTypesStyle.getLeft(), "left");
+        int y = requireCoordinate(keyTypesStyle.getTop(), "top");
+        int width = keyTypesStyle.getWidth();
 
-        var terminalLayout = getTerminalLayout();
-        int index = 0;
-        for (WirelessTerminalDefinition definition : WirelessTerminalRegistry.allDefinitions()) {
-            if (!universalTerminal.hasTerminal(stack, definition.item())) {
-                continue;
+        for (AEKeyType keyType : this.parent.getContainer().getClientKeyTypeSelection().keyTypes().keySet()) {
+            ITextComponent text = keyType.getDescription();
+            int checkboxWidth = width != 0 ? width
+                : 24 + Minecraft.getMinecraft().fontRenderer.getStringWidth(text.getFormattedText());
+            AECheckbox checkbox = new AECheckbox(
+                this.screenOrigin.x() + this.bounds.x + x,
+                this.screenOrigin.y() + this.bounds.y + y,
+                checkboxWidth,
+                AECheckbox.SIZE,
+                Objects.requireNonNull(this.parent.getStyle(), "GUI style has not been initialized"),
+                text);
+            checkbox.setChangeListener(() -> this.parent.getContainer().selectKeyType(
+                this.parent.getContainer().windowId,
+                keyType,
+                checkbox.isSelected()));
+            this.buttons.add(checkbox);
+            this.checkboxes.put(keyType, checkbox);
+            y += KEY_TYPE_SPACING;
+        }
+        syncCheckboxes();
+    }
+
+    private void syncCheckboxes() {
+        int selectedEntryCount = 0;
+        AECheckbox selectedEntry = null;
+
+        for (Map.Entry<AEKeyType, AECheckbox> entry : this.checkboxes.entrySet()) {
+            boolean selected = this.parent.getContainer().getClientKeyTypeSelection().keyTypes().getBoolean(entry.getKey());
+            entry.getValue().setSelected(selected);
+            entry.getValue().enabled = true;
+
+            if (selected) {
+                selectedEntryCount++;
+                selectedEntry = entry.getValue();
             }
-            ItemStackButton button = new ItemStackButton(
-                definition.icon(),
-                definition.displayName(),
-                () -> selectTerminal(definition.id()));
-            moveTerminalButton(button, terminalLayout, index);
-            this.buttons.add(button);
-            index++;
         }
-    }
 
-    private void selectTerminal(String id) {
-        close();
-        InitNetwork.sendToServer(new SelectWirelessTerminalPacket(
-            this.parent.getContainer().windowId,
-            id));
-    }
-
-    @Nullable
-    private WirelessTerminalGuiHost<?> getWirelessHost() {
-        return this.parent.getContainer().getItemGuiHost() instanceof WirelessTerminalGuiHost<?> wirelessHost
-            ? wirelessHost : null;
+        if (selectedEntryCount == 1 && selectedEntry != null) {
+            selectedEntry.enabled = false;
+        }
     }
 
     private void moveCloseButton(GuiButton button) {
@@ -349,15 +338,6 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
         button.y = this.screenOrigin.y() + this.bounds.y + pos.y();
         button.width = widgetStyle.getWidth() != 0 ? widgetStyle.getWidth() : button.width;
         button.height = widgetStyle.getHeight() != 0 ? widgetStyle.getHeight() : button.height;
-    }
-
-    private void moveTerminalButton(GuiButton button, TerminalLayout layout, int index) {
-        int column = index % layout.columns();
-        int row = index / layout.columns();
-        button.x = this.screenOrigin.x() + this.bounds.x + layout.originX() + column * layout.stepX();
-        button.y = this.screenOrigin.y() + this.bounds.y + layout.originY() + row * layout.stepY();
-        button.width = layout.buttonWidth();
-        button.height = layout.buttonHeight();
     }
 
     private boolean canStartDrag(Point mousePos) {
@@ -387,14 +367,14 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
     }
 
     private void centerInScreen() {
-        updateWindowHeight(getInstalledTerminalCount());
+        updateWindowSize();
         this.bounds.x = (this.parent.width - this.bounds.width) / 2 - this.parent.getGuiLeft();
         this.bounds.y = (this.parent.height - this.bounds.height) / 2 - this.parent.getGuiTop();
         clampToScreen();
     }
 
     private void clampToScreen() {
-        updateWindowHeight(getInstalledTerminalCount());
+        updateWindowSize();
         int minX = -this.parent.getGuiLeft();
         int minY = -this.parent.getGuiTop();
         int maxX = this.parent.width - this.parent.getGuiLeft() - this.bounds.width;
@@ -403,31 +383,11 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
         this.bounds.y = Math.clamp(this.bounds.y, minY, Math.max(minY, maxY));
     }
 
-    private void updateWindowHeight(int terminalCount) {
+    private void updateWindowSize() {
         this.bounds.width = getWindowWidth();
-        this.bounds.height = getWindowHeight(terminalCount);
-    }
-
-    private int getInstalledTerminalCount() {
-        WirelessTerminalGuiHost<?> wirelessHost = getWirelessHost();
-        if (wirelessHost == null) {
-            return 0;
-        }
-        ItemStack stack = wirelessHost.getItemStack();
-        if (!(stack.getItem() instanceof WirelessUniversalTerminalItem universalTerminal)) {
-            return 0;
-        }
-
-        int count = 0;
-        for (WirelessTerminalDefinition definition : WirelessTerminalRegistry.allDefinitions()) {
-            if (universalTerminal.hasTerminal(stack, definition.item())) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    private record TerminalLayout(int originX, int originY, int stepX, int stepY, int columns,
-                                  int buttonWidth, int buttonHeight, int baseHeight) {
+        int keyTypeCount = Math.max(
+            AEKeyTypes.getAll().size(),
+            this.parent.getContainer().getClientKeyTypeSelection().keyTypes().size());
+        this.bounds.height = Math.max(DEFAULT_HEIGHT, getWindowHeight(keyTypeCount));
     }
 }

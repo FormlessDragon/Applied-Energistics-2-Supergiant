@@ -133,6 +133,8 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     private boolean suppressVanillaSlotHover;
     private boolean suppressSelectionPopupMouseRelease;
     private boolean renderingModalSelectionPopup;
+    @Nullable
+    private ICompositeWidget mouseInteractionBlocker;
     private int modalSelectionPopupMouseX;
     private int modalSelectionPopupMouseY;
     @Nullable
@@ -332,12 +334,15 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         updateBeforeRender();
         widgets.updateBeforeRender();
         boolean modalSelectionPopup = this.activeSelectionPopup != null;
-        int baseMouseX = modalSelectionPopup ? Integer.MIN_VALUE / 4 : mouseX;
-        int baseMouseY = modalSelectionPopup ? Integer.MIN_VALUE / 4 : mouseY;
-        Point mousePos = getMousePoint(baseMouseX, baseMouseY);
-        Slot aeHoveredSlot = modalSelectionPopup ? null : widgets.hitTest(mousePos) ? null : findSlot(mouseX, mouseY);
+        Point realMousePos = getMousePoint(mouseX, mouseY);
+        ICompositeWidget blockedByWidget = widgets.getMouseInteractionBlocker(realMousePos);
+        boolean blockedByWidgetMouse = blockedByWidget != null;
+        int baseMouseX = modalSelectionPopup || blockedByWidgetMouse ? Integer.MIN_VALUE / 4 : mouseX;
+        int baseMouseY = modalSelectionPopup || blockedByWidgetMouse ? Integer.MIN_VALUE / 4 : mouseY;
+        Slot aeHoveredSlot = modalSelectionPopup || blockedByWidgetMouse ? null
+            : widgets.hitTest(realMousePos) ? null : findSlot(mouseX, mouseY);
         this.hoveredSlot = aeHoveredSlot;
-        if (modalSelectionPopup) {
+        if (modalSelectionPopup || blockedByWidgetMouse) {
             this.modalSelectionPopupMouseX = mouseX;
             this.modalSelectionPopupMouseY = mouseY;
         }
@@ -345,9 +350,11 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         super.drawDefaultBackground();
         this.suppressVanillaSlotHover = true;
         this.renderingModalSelectionPopup = modalSelectionPopup;
+        this.mouseInteractionBlocker = blockedByWidget;
         try {
             super.drawScreen(baseMouseX, baseMouseY, partialTicks);
         } finally {
+            this.mouseInteractionBlocker = null;
             this.renderingModalSelectionPopup = false;
             this.suppressVanillaSlotHover = false;
         }
@@ -997,7 +1004,10 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         GlStateManager.pushMatrix();
         GlStateManager.translate(-guiLeft, -guiTop, 0.0F);
         try {
-            widgets.drawTextFields(getMousePoint(baseMouseX, baseMouseY));
+            Point mouse = this.mouseInteractionBlocker == null
+                ? getMousePoint(baseMouseX, baseMouseY)
+                : getMousePoint(this.modalSelectionPopupMouseX, this.modalSelectionPopupMouseY);
+            widgets.drawTextFields(mouse, this.mouseInteractionBlocker);
         } finally {
             GlStateManager.popMatrix();
         }
@@ -1090,12 +1100,18 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
         this.drag_click.clear();
         this.drag_click_sent.clear();
+        Point mousePos = getMousePoint(mouseX, mouseY);
 
         if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
             return;
         }
 
-        if (widgets.onMouseDownBeforeButtons(getMousePoint(mouseX, mouseY), mouseButton)) {
+        if (widgets.blocksMouseInteraction(mousePos)) {
+            widgets.onMouseDown(mousePos, mouseButton);
+            return;
+        }
+
+        if (widgets.onMouseDownBeforeButtons(mousePos, mouseButton)) {
             return;
         }
 

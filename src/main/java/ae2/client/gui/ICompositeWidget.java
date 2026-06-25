@@ -119,4 +119,8 @@ public interface ICompositeWidget {
         return false;
     }
 
+    default boolean blocksMouseInteraction(int mouseX, int mouseY) {
+        return false;
+    }
+
 }

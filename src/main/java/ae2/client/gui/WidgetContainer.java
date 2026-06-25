@@ -62,6 +62,7 @@ import java.util.function.Consumer;
  * screen's JSON file and the widget using a string id.
  */
 public class WidgetContainer {
+    private static final Point OFFSCREEN_MOUSE = new Point(Integer.MIN_VALUE / 4, Integer.MIN_VALUE / 4);
     @Nullable
     private final GuiStyle style;
     private final Object2ObjectLinkedOpenHashMap<String, GuiButton> widgets = new Object2ObjectLinkedOpenHashMap<>();
@@ -360,19 +361,24 @@ public class WidgetContainer {
         }
     }
 
-    public void drawTextFields(Point mouse) {
+    public void drawTextFields(Point mouse, @Nullable ICompositeWidget mouseInteractionBlocker) {
         for (AETextField textField : textFields.values()) {
             if (textField.getVisible()) {
                 textField.drawTextBox();
             }
         }
 
+        boolean blockedByLowerWidget = mouseInteractionBlocker != null;
         for (ICompositeWidget widget : compositeWidgets.values()) {
             if (widget.isVisible()) {
+                if (widget == mouseInteractionBlocker) {
+                    blockedByLowerWidget = false;
+                }
 
+                Point widgetMouse = blockedByLowerWidget ? OFFSCREEN_MOUSE : mouse;
                 widget.drawAbsoluteLayer(currentBounds, new Point(
-                    currentBounds.x + mouse.x(),
-                    currentBounds.y + mouse.y()));
+                    currentBounds.x + widgetMouse.x(),
+                    currentBounds.y + widgetMouse.y()));
             }
         }
     }
@@ -381,7 +387,8 @@ public class WidgetContainer {
      * @see ICompositeWidget#onMouseDown(Point, int)
      */
     public boolean onMouseDown(Point mousePos, int btn) {
-        for (ICompositeWidget widget : compositeWidgets.values()) {
+        for (int i = this.compositeWidgetOrder.size() - 1; i >= 0; i--) {
+            ICompositeWidget widget = this.compositeWidgetOrder.get(i);
             if (widget.isVisible()
                 && (widget.wantsAllMouseDownEvents() || mousePos.isIn(widget.getBounds()))
                 && widget.onMouseDown(mousePos, btn)) {
@@ -401,7 +408,8 @@ public class WidgetContainer {
     }
 
     public boolean onMouseDownBeforeButtons(Point mousePos, int btn) {
-        for (ICompositeWidget widget : compositeWidgets.values()) {
+        for (int i = this.compositeWidgetOrder.size() - 1; i >= 0; i--) {
+            ICompositeWidget widget = this.compositeWidgetOrder.get(i);
             if (widget.isVisible()
                 && widget.wantsAllMouseDownEvents()
                 && widget.onMouseDown(mousePos, btn)) {
@@ -412,11 +420,27 @@ public class WidgetContainer {
         return false;
     }
 
+    public boolean blocksMouseInteraction(Point mousePos) {
+        return getMouseInteractionBlocker(mousePos) != null;
+    }
+
+    @Nullable
+    public ICompositeWidget getMouseInteractionBlocker(Point mousePos) {
+        for (int i = this.compositeWidgetOrder.size() - 1; i >= 0; i--) {
+            ICompositeWidget widget = this.compositeWidgetOrder.get(i);
+            if (widget.isVisible() && widget.blocksMouseInteraction(mousePos.x(), mousePos.y())) {
+                return widget;
+            }
+        }
+        return null;
+    }
+
     /**
      * @see ICompositeWidget#onMouseUp(Point, int)
      */
     public boolean onMouseUp(Point mousePos, int btn) {
-        for (ICompositeWidget widget : compositeWidgets.values()) {
+        for (int i = this.compositeWidgetOrder.size() - 1; i >= 0; i--) {
+            ICompositeWidget widget = this.compositeWidgetOrder.get(i);
             if (widget.isVisible()
                 && (widget.wantsAllMouseUpEvents() || mousePos.isIn(widget.getBounds()))
                 && widget.onMouseUp(mousePos, btn)) {
@@ -431,7 +455,8 @@ public class WidgetContainer {
      * @see ICompositeWidget#onMouseDrag(Point, int)
      */
     public boolean onMouseDrag(Point mousePos, int btn) {
-        for (ICompositeWidget widget : compositeWidgets.values()) {
+        for (int i = this.compositeWidgetOrder.size() - 1; i >= 0; i--) {
+            ICompositeWidget widget = this.compositeWidgetOrder.get(i);
             if (widget.isVisible() && widget.onMouseDrag(mousePos, btn)) {
                 return true;
             }
@@ -515,7 +540,8 @@ public class WidgetContainer {
 
     @Nullable
     public Tooltip getTooltip(int mouseX, int mouseY) {
-        for (ICompositeWidget widget : compositeWidgets.values()) {
+        for (int i = this.compositeWidgetOrder.size() - 1; i >= 0; i--) {
+            ICompositeWidget widget = this.compositeWidgetOrder.get(i);
             if (!widget.isVisible()) {
                 continue;
             }

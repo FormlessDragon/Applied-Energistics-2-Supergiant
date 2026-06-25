@@ -49,7 +49,6 @@ import ae2.client.gui.widgets.ISortSource;
 import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.ItemStackButton;
-import ae2.client.gui.widgets.KeyTypeSelectionButton;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.TabButton;
@@ -58,6 +57,7 @@ import ae2.client.gui.widgets.UpgradesPanel;
 import ae2.client.gui.widgets.ViewCellsPanel;
 import ae2.container.GuiIds;
 import ae2.container.SlotSemantics;
+import ae2.container.interfaces.IKeyTypeSelectionContainer;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.me.common.GridInventoryEntry;
 import ae2.core.AEConfig;
@@ -108,6 +108,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.StringJoiner;
 
 public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> implements ISortSource, ITextFieldGui {
     private static final String TEXT_ID_ENTRIES_SHOWN = "entriesShown";
@@ -198,8 +199,10 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         }
 
         if (this.container.canConfigureTypeFilter()) {
-            this.addToLeftToolbar(
-                KeyTypeSelectionButton.create(this, container.getHost(), GuiText.ConfigureVisibleTypes.text()));
+            KeyTypeSelectionWindow keyTypeSelectionWindow =
+                new KeyTypeSelectionWindow(this, GuiText.ConfigureVisibleTypes.text());
+            this.widgets.add("keyTypeSelectionWindow", keyTypeSelectionWindow);
+            this.addToLeftToolbar(new TerminalKeyTypeSelectionButton(keyTypeSelectionWindow));
         }
 
         this.sortDirToggle = this.addToLeftToolbar(
@@ -1226,6 +1229,47 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         updateScrollbar();
     }
 
+    private void cycleVisibleKeyTypes() {
+        Set<AEKeyType> newSelection = getNextKeyTypeSelection(this.container.getClientKeyTypeSelection());
+
+        for (AEKeyType keyType : newSelection) {
+            this.container.selectKeyType(this.container.windowId, keyType, true);
+        }
+        for (AEKeyType keyType : this.container.getClientKeyTypeSelection().enabledSet()) {
+            if (!newSelection.contains(keyType)) {
+                this.container.selectKeyType(this.container.windowId, keyType, false);
+            }
+        }
+        this.repo.updateView();
+        updateScrollbar();
+    }
+
+    private Set<AEKeyType> getNextKeyTypeSelection(IKeyTypeSelectionContainer.SyncedKeyTypes keyTypes) {
+        int totalCount = keyTypes.keyTypes().size();
+        int enabledCount = keyTypes.enabledSet().size();
+
+        if (totalCount == enabledCount) {
+            return Collections.singleton(keyTypes.keyTypes().keySet().iterator().next());
+        } else if (enabledCount > 1) {
+            return new ObjectLinkedOpenHashSet<>(keyTypes.keyTypes().keySet());
+        } else {
+            ObjectLinkedOpenHashSet<AEKeyType> enabledKeys = new ObjectLinkedOpenHashSet<>(keyTypes.enabledSet());
+            AEKeyType currentKey = enabledKeys.getFirst();
+            boolean foundCurrent = false;
+
+            for (AEKeyType keyType : keyTypes.keyTypes().keySet()) {
+                if (foundCurrent) {
+                    return Collections.singleton(keyType);
+                }
+                if (keyType == currentKey) {
+                    foundCurrent = true;
+                }
+            }
+
+            return new ObjectLinkedOpenHashSet<>(keyTypes.keyTypes().keySet());
+        }
+    }
+
     @Override
     public SortOrder getSortBy() {
         return this.configSrc.getSetting(Settings.SORT_BY);
@@ -1316,6 +1360,33 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         @Override
         protected Icon getIcon() {
             return Icon.PLAYER_PIN;
+        }
+    }
+
+    private final class TerminalKeyTypeSelectionButton extends IconButton {
+        private TerminalKeyTypeSelectionButton(KeyTypeSelectionWindow keyTypeSelectionWindow) {
+            super(() -> {
+                if (isShiftKeyDown()) {
+                    cycleVisibleKeyTypes();
+                } else {
+                    keyTypeSelectionWindow.toggle();
+                }
+            });
+            setMessage(GuiText.ConfigureVisibleTypes.text());
+        }
+
+        @Override
+        public List<ITextComponent> getTooltipMessage() {
+            StringJoiner joiner = new StringJoiner(", ");
+            for (AEKeyType keyType : container.getClientKeyTypeSelection().enabledSet()) {
+                joiner.add(keyType.getDescription().getFormattedText());
+            }
+            return List.of(GuiText.ConfigureVisibleTypes.text(), new TextComponentString(joiner.toString()));
+        }
+
+        @Override
+        protected Icon getIcon() {
+            return Icon.TYPE_FILTER_ALL;
         }
     }
 }
