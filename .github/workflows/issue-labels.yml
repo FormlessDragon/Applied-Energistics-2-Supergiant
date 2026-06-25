@@ -1,0 +1,36 @@
+name: Issue labels
+
+on:
+  issues:
+    types:
+      - closed
+
+permissions:
+  issues: write
+
+jobs:
+  complete-closed-issue:
+    if: contains(github.event.issue.labels.*.name, '处理中')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Move closed issue to completed
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            await github.rest.issues.removeLabel({
+              owner,
+              repo,
+              issue_number,
+              name: '处理中',
+            });
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number,
+              labels: ['已完成'],
+            });
