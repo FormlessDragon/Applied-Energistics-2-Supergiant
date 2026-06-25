@@ -15,6 +15,7 @@ import ae2.api.storage.StorageHelper;
 import ae2.container.GuiIds;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
+import ae2.container.implementations.ContainerProviderSelect;
 import ae2.container.implementations.PatternModifierPanel;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.slot.FakeSlot;
@@ -23,6 +24,7 @@ import ae2.container.slot.RestrictedInputSlot;
 import ae2.container.slot.SlotBackgroundIcon;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.PlayerMessages;
+import ae2.core.network.serverbound.SwitchGuisPacket;
 import ae2.crafting.pattern.AECraftingPattern;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.helpers.IPatternTerminalGuiHost;
@@ -39,6 +41,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.shorts.ShortSet;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.InventoryCrafting;
@@ -439,20 +442,34 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         }
 
         IPatternDetails details = PatternDetailsHelper.decodePattern(encodedPattern, getPlayer().world);
+        IGrid grid = getGridNode() == null ? null : getGridNode().grid();
+        if (this.mode == EncodingMode.PROCESSING) {
+            if (!(details instanceof AEProcessingPattern processingPattern)) {
+                getPlayer().sendStatusMessage(PlayerMessages.PatternUploadProcessingOnly.text(), false);
+                return;
+            }
+
+            uploadProcessingPattern(encodedPattern, processingPattern, grid);
+            return;
+        }
+
         if (!(details instanceof IAssemblerPattern)) {
             getPlayer().sendStatusMessage(PlayerMessages.PatternUploadAssemblerOnly.text(), false);
             return;
         }
 
-        AEItemKey patternKey = AEItemKey.of(encodedPattern);
-        if (patternKey == null) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoEncodedPattern.text(), false);
+        if (grid == null) {
+            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoTarget.text(), false);
             return;
         }
 
-        IGrid grid = getGridNode() == null ? null : getGridNode().grid();
-        if (grid == null) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoTarget.text(), false);
+        uploadAssemblerPattern(encodedPattern, grid, shiftDown);
+    }
+
+    private void uploadAssemblerPattern(ItemStack encodedPattern, IGrid grid, boolean shiftDown) {
+        AEItemKey patternKey = AEItemKey.of(encodedPattern);
+        if (patternKey == null) {
+            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoEncodedPattern.text(), false);
             return;
         }
 
@@ -483,6 +500,51 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         }
 
         getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoTarget.text(), false);
+    }
+
+    private void uploadProcessingPattern(ItemStack encodedPattern, AEProcessingPattern processingPattern,
+                                         @Nullable IGrid grid) {
+        String recipeType = processingPattern.getRecipeType();
+        if (recipeType == null || recipeType.trim().isEmpty()) {
+            openProviderSelect("", false);
+            return;
+        }
+        recipeType = recipeType.trim();
+
+        if (grid == null) {
+            openProviderSelect(recipeType, true);
+            return;
+        }
+
+        List<PatternContainer> uploadTargets = ContainerProviderSelect.findProcessingPatternUploadTargets(
+            getPlayer().world, grid, recipeType);
+        if (uploadTargets.isEmpty()) {
+            if (!ContainerProviderSelect.hasAvailableProvider(grid)) {
+                getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
+                return;
+            }
+            openProviderSelect(recipeType, true);
+            return;
+        }
+
+        ContainerProviderSelect.tryUploadProcessingPatternToProvider(getPlayer(),
+            (IPatternTerminalGuiHost) getHost(), grid, uploadTargets.getFirst(), encodedPattern);
+    }
+
+    private void openProviderSelect(@Nullable String initialSearchText, boolean mappingMode) {
+        if (!(getPlayer() instanceof EntityPlayerMP serverPlayer) || getLocator() == null) {
+            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
+            return;
+        }
+
+        if (!SwitchGuisPacket.openSubGui(serverPlayer, getLocator(), GuiIds.GuiKey.PROVIDER_SELECT, this)) {
+            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
+            return;
+        }
+        if (serverPlayer.openContainer instanceof ContainerProviderSelect providerSelect) {
+            providerSelect.setInitialState(initialSearchText, mappingMode);
+            providerSelect.broadcastChanges();
+        }
     }
 
     private List<PatternContainer> collectAssemblerPatternContainers(IGrid grid) {

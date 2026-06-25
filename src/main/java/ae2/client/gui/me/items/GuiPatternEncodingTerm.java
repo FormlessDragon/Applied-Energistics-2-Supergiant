@@ -36,6 +36,7 @@ import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
+import java.awt.*;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -58,7 +59,6 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
             {
                 setHalfSize(true);
                 setIconScale(0.5F);
-                setMessage(ButtonToolTips.PatternUpload.text());
                 setVisibility(false);
             }
 
@@ -69,6 +69,11 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
 
             @Override
             public List<ITextComponent> getTooltipMessage() {
+                if(container.mode == EncodingMode.PROCESSING) {
+                    return Arrays.asList(
+                            ButtonToolTips.PatternUpload.text(),
+                            ButtonToolTips.PatternUploadProcessingHint.text());
+                }
                 return Arrays.asList(
                     ButtonToolTips.PatternUpload.text(),
                     ButtonToolTips.PatternUploadHint.text(),
@@ -77,8 +82,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
         };
         widgets.add("uploadPattern", this.uploadPatternButton);
         widgets.add("encodePattern", new ActionButton(ActionItems.ENCODE,
-            () -> container.encode(Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)
-                || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT))));
+            () -> container.encode(isShiftDown())));
         if (Integrations.hei().isEnabled()) {
             addToLeftToolbar(new ActionButton(ActionItems.PATTERN_IMPORT_PRIORITIES,
                 this::openImportPrioritySettings));
@@ -131,7 +135,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
                 panel.setVisible(selected);
             }
         }
-        updateUploadPatternButton();
+        this.uploadPatternButton.setVisibility(true);
         this.patternModifierPanel.update();
     }
 
@@ -168,16 +172,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     }
 
     private void uploadPattern() {
-        if (this.container.getMode() != EncodingMode.CRAFTING) {
-            return;
-        }
-        this.container.uploadPattern(Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)
-            || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT));
-    }
-
-    private void updateUploadPatternButton() {
-        boolean visible = this.container.getMode() == EncodingMode.CRAFTING;
-        this.uploadPatternButton.setVisibility(visible);
+        this.container.uploadPattern(isShiftDown());
     }
 
     @Override
@@ -212,6 +207,10 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
 
     private static boolean isAltDown() {
         return Keyboard.isKeyDown(Keyboard.KEY_LMENU) || Keyboard.isKeyDown(Keyboard.KEY_RMENU);
+    }
+
+    private static boolean isShiftDown() {
+        return Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
     }
 
     @Override
