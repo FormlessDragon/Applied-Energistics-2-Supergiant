@@ -18,13 +18,16 @@
 
 package ae2.parts;
 
+import ae2.api.implementations.parts.ICablePart;
 import ae2.api.parts.IPart;
 import ae2.api.parts.IPartHost;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.PartHelper;
 import ae2.api.util.ICustomName;
+import ae2.core.AEConfig;
 import ae2.core.PlayerState;
 import ae2.parts.networking.CablePart;
+import ae2.parts.reporting.AbstractReportingPart;
 import ae2.util.CustomNameUtil;
 import ae2.util.Platform;
 import ae2.util.SettingsFrom;
@@ -102,6 +105,10 @@ public final class PartPlacement {
             return null;
         }
 
+        if (!canPlacePartWithCableBlockingRule(player, partItem, host, side)) {
+            return null;
+        }
+
         IPart addedPart = host.addPart(partItem, side, player);
         if (addedPart == null) {
             if (host.isEmpty()) {
@@ -139,9 +146,11 @@ public final class PartPlacement {
     @Nullable
     public static Placement getPartPlacement(@Nullable EntityPlayer player, World world, ItemStack partStack,
                                              BlockPos pos, EnumFacing side, Vec3d clickLocation) {
-        EnumFacing replaceCablePlacement = tryReplaceCableSegment(world, partStack, pos, clickLocation);
-        if (replaceCablePlacement != null) {
-            side = replaceCablePlacement;
+        if (player != null && player.isSneaking()) {
+            EnumFacing replaceCablePlacement = tryReplaceCableSegment(world, partStack, pos, clickLocation);
+            if (replaceCablePlacement != null) {
+                side = replaceCablePlacement;
+            }
         }
 
         if (player != null && PlayerState.isHoldingCtrl(player)) {
@@ -200,12 +209,32 @@ public final class PartPlacement {
 
     public static boolean canPlacePartOnBlock(@Nullable EntityPlayer player, World world, ItemStack partStack,
                                               BlockPos pos, EnumFacing side) {
+        if (!(partStack.getItem() instanceof IPartItem<?> partItem)) {
+            return false;
+        }
+
         IPartHost host = PartHelper.getPartHost(world, pos);
         if (host == null && !PartHelper.canPlacePartHost(player, world, pos)) {
             return false;
         }
 
-        return host == null || host.canAddPart(partStack, side);
+        if (host == null || !host.canAddPart(partStack, side)) {
+            return host == null;
+        }
+
+        return canPlacePartWithCableBlockingRule(player, partItem, host, side);
+    }
+
+    private static boolean canPlacePartWithCableBlockingRule(@Nullable EntityPlayer player, IPartItem<?> partItem,
+                                                             IPartHost host, @Nullable EnumFacing side) {
+        if (!AEConfig.instance().isRequireSneakForCableBlockingPanelPlacement()
+            || (player != null && player.isSneaking())
+            || side == null
+            || !AbstractReportingPart.class.isAssignableFrom(partItem.getPartClass())) {
+            return true;
+        }
+
+        return !(host.getPart(null) instanceof ICablePart cablePart) || !cablePart.isConnected(side);
     }
 
     private static boolean hasEntityCollision(World world, BlockPos pos, Object collisionShape) {

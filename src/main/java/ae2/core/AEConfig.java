@@ -273,6 +273,10 @@ public class AEConfig {
         return GENERAL.tinyTntBlockDamage;
     }
 
+    public boolean isRequireSneakForCableBlockingPanelPlacement() {
+        return GENERAL.requireSneakForCableBlockingPanelPlacement;
+    }
+
     public boolean isEnableEffects() {
         return CLIENT.enableEffects;
     }
@@ -542,6 +546,10 @@ public class AEConfig {
         @Config.Name("channels")
         @Config.Comment("Changes the channel capacity that cables provide in AE2.")
         public ChannelMode channels = ChannelMode.DEFAULT;
+
+        @Config.Name("requireSneakForCableBlockingPanelPlacement")
+        @Config.Comment("If enabled, panel-type parts can only be placed on a cable side with an existing cable connection while sneaking.")
+        public boolean requireSneakForCableBlockingPanelPlacement = true;
     }
 
     public static final class Debug {
