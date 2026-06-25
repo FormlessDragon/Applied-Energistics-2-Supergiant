@@ -214,6 +214,32 @@ public final class PinnedKeys {
         return playerPinRows;
     }
 
+    public static boolean setPlayerPinRows(int rows, int rowSize) {
+        ensurePlayerPinsLoaded();
+        if (rowSize <= 0 || rowSize > MAX_PINNED) {
+            throw new IllegalArgumentException("Invalid player pin row size: " + rowSize);
+        }
+
+        int clampedRows = Math.clamp(rows, 0, MAX_PLAYER_PIN_ROWS);
+        if (clampedRows < playerPinRows) {
+            int maxSlotIndex = clampedRows * rowSize;
+            for (int i = playerPins.size() - 1; i >= 0; i--) {
+                PlayerPin pin = playerPins.get(i);
+                if (pin.slotIndex() >= maxSlotIndex) {
+                    removePlayerPin(pin);
+                }
+            }
+        }
+
+        if (playerPinRows == clampedRows) {
+            return false;
+        }
+
+        playerPinRows = clampedRows;
+        savePlayerPins();
+        return true;
+    }
+
     public static void addPlayerPinRow() {
         ensurePlayerPinsLoaded();
         if (playerPinRows < MAX_PLAYER_PIN_ROWS) {

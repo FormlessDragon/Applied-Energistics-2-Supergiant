@@ -20,8 +20,11 @@ package ae2.client.gui.me.common;
 
 import ae2.api.config.ActionItems;
 import ae2.api.config.PinDisplayMode;
+import ae2.api.config.Settings;
+import ae2.api.config.YesNo;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
+import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.AECheckbox;
@@ -38,6 +41,7 @@ import ae2.core.AEConfig;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
+import ae2.core.network.serverbound.ConfigValueServerPacket;
 import ae2.core.network.serverbound.SetRecursiveIngredientReserveAmountPacket;
 import ae2.core.network.serverbound.SwitchGuisPacket;
 import ae2.core.network.serverbound.WirelessTerminalSettingsPacket;
@@ -57,14 +61,19 @@ import java.io.IOException;
 import java.util.List;
 
 public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
+    private static final int GENERAL_PAGE_COUNT = 2;
+    private static final long MAX_RECURSIVE_INGREDIENT_RESERVE = 1000;
     private final AEBaseGui<?> parent;
     private final Runnable beforeReturn;
     private final boolean wirelessOnly;
+    private final boolean supportsPlayerPinRows;
     private final AECheckbox pinAutoCraftedItemsCheckbox;
     private final AECheckbox pinDisplaySortTopRadio;
     private final AECheckbox pinDisplayLockedGridRadio;
     private final AECheckbox notifyForFinishedCraftingJobsCheckbox;
     private final AECheckbox clearGridOnCloseCheckbox;
+    @Nullable
+    private final AECheckbox autoFillPatternsCheckbox;
     private final AECheckbox useInternalSearchRadio;
     private final AECheckbox useExternalSearchRadio;
     private final AECheckbox rememberCheckbox;
@@ -72,6 +81,9 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     private final AECheckbox syncWithExternalCheckbox;
     private final AECheckbox clearExternalCheckbox;
     private final AETextField recursiveReserveField;
+    private final AETextField playerPinRowsField;
+    private final AE2Button previousPageButton;
+    private final AE2Button nextPageButton;
     private final IconButton generalPageButton;
     private final IconButton wirelessPageButton;
     @Nullable
@@ -89,8 +101,12 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     @Nullable
     private final AE2Button magnetSettingsButton;
     private Page page = Page.GENERAL;
+    private int generalPage;
     private long displayedRecursiveReserveAmount = -1;
     private boolean recursiveReserveFieldFocused;
+    private boolean playerPinRowsDirty;
+    private boolean closing;
+    private int pendingPlayerPinRows;
 
     public GuiTerminalSettings(GuiMEStorage<? extends ContainerMEStorage> parent) {
         this(parent, parent.getContainer(),
@@ -109,6 +125,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         this.beforeReturn = beforeReturn;
         this.wirelessOnly = wirelessOnly;
         this.wirelessHost = wirelessHost;
+        this.supportsPlayerPinRows = parent instanceof GuiMEStorage<?>;
 
         ITextComponent externalSearchName = new TextComponentString(
             ItemListMod.isEnabled() ? ItemListMod.getShortName() : "HEI");
@@ -121,6 +138,8 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
             new ActionButton(ActionItems.TERMINAL_SETTINGS, () -> switchPage(Page.GENERAL)));
         this.wirelessPageButton = new WirelessSettingsPageButton(() -> switchPage(Page.WIRELESS));
         addToLeftToolbar(this.wirelessPageButton);
+        this.previousPageButton = widgets.addButton("previousPage", new TextComponentString("<"), this::previousGeneralPage);
+        this.nextPageButton = widgets.addButton("nextPage", new TextComponentString(">"), this::nextGeneralPage);
 
         this.pinAutoCraftedItemsCheckbox = widgets.addCheckbox("pinAutoCraftedItemsCheckbox",
             GuiText.TerminalSettingsPinAutoCraftedItems.text(), this::save);
@@ -137,6 +156,12 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
             GuiText.TerminalSettingsNotifyForFinishedJobs.text(), this::save);
         this.clearGridOnCloseCheckbox = widgets.addCheckbox("clearGridOnCloseCheckbox",
             GuiText.TerminalSettingsClearGridOnClose.text(), this::save);
+        if (this.container instanceof ContainerPatternEncodingTerm) {
+            this.autoFillPatternsCheckbox = widgets.addCheckbox("autoFillPatternsCheckbox",
+                GuiText.TerminalSettingsAutoFillBlankPatterns.text(), this::savePatternAutoFill);
+        } else {
+            this.autoFillPatternsCheckbox = null;
+        }
         this.useInternalSearchRadio = widgets.addCheckbox("useInternalSearchRadio",
             GuiText.SearchSettingsUseInternalSearch.text(), this::switchToAeSearch);
         this.useInternalSearchRadio.setRadio(true);
@@ -152,8 +177,13 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         this.clearExternalCheckbox = widgets.addCheckbox("clearExternalCheckbox",
             GuiText.SearchSettingsClearExternal.text(externalSearchName), this::save);
         this.recursiveReserveField = widgets.addTextField("recursiveReserveField");
-        this.recursiveReserveField.setMaxStringLength(18);
-        this.recursiveReserveField.setResponder(ignored -> validateRecursiveReserveField());
+        this.recursiveReserveField.setMaxStringLength(4);
+        this.recursiveReserveField.setKeyFilter(this::isRecursiveReserveInput);
+        this.recursiveReserveField.setResponder(ignored -> sanitizeRecursiveReserveField());
+        this.playerPinRowsField = widgets.addTextField("playerPinRowsField");
+        this.playerPinRowsField.setMaxStringLength(2);
+        this.playerPinRowsField.setKeyFilter(this::isPlayerPinRowsInput);
+        this.playerPinRowsField.setResponder(ignored -> sanitizePlayerPinRowsField());
         if (this.wirelessHost != null) {
             this.pickBlockCheckbox = widgets.addCheckbox("pickBlockCheckbox",
                 GuiText.WirelessTerminalSettingsPickBlock.text(), this::save);
@@ -180,7 +210,9 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
             wirelessOnly ? GuiText.WirelessTerminalSettingsTitle.text() : GuiText.TerminalSettingsTitle.text());
         setTextContent("search_settings_title", GuiText.SearchSettingsTitle.text());
         setTextContent("recursive_reserve_label", GuiText.TerminalSettingsRecursiveIngredientReserve.text());
+        setTextContent("player_pin_rows_label", GuiText.TerminalSettingsPlayerPinRows.text());
         setTextContent("wireless_settings_title", GuiText.WirelessTerminalSettingsTitle.text());
+        this.pendingPlayerPinRows = PinnedKeys.getPlayerPinRows();
         if (wirelessOnly) {
             this.page = Page.WIRELESS;
         } else {
@@ -201,16 +233,45 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
-        if (this.recursiveReserveField.isFocused()
+        if (this.playerPinRowsField.isFocused() && handlePlayerPinRowsKeyTyped(typedChar, keyCode)) {
+            return;
+        }
+        if ((this.recursiveReserveField.isFocused() || this.playerPinRowsField.isFocused())
             && (keyCode == Keyboard.KEY_RETURN || keyCode == Keyboard.KEY_NUMPADENTER)) {
-            submitRecursiveReserveField();
+            if (this.recursiveReserveField.isFocused()) {
+                submitRecursiveReserveField();
+            } else {
+                sanitizePlayerPinRowsField();
+                this.playerPinRowsField.setFocused(false);
+            }
             this.recursiveReserveField.setFocused(false);
             return;
         }
         super.keyTyped(typedChar, keyCode);
     }
 
+    private boolean handlePlayerPinRowsKeyTyped(char typedChar, int keyCode) {
+        if (Character.isDigit(typedChar)) {
+            this.playerPinRowsField.setText(Character.toString(typedChar));
+            sanitizePlayerPinRowsField();
+            this.playerPinRowsField.setCursorPositionEnd();
+            this.playerPinRowsField.setSelectionPos(this.playerPinRowsField.getCursorPosition());
+            return true;
+        }
+
+        if (keyCode == Keyboard.KEY_BACK || keyCode == Keyboard.KEY_DELETE) {
+            this.playerPinRowsField.setText("0");
+            sanitizePlayerPinRowsField();
+            this.playerPinRowsField.setCursorPositionEnd();
+            this.playerPinRowsField.setSelectionPos(this.playerPinRowsField.getCursorPosition());
+            return true;
+        }
+
+        return false;
+    }
+
     private void returnToParent() {
+        commitPendingPlayerPinRowsOnce();
         this.beforeReturn.run();
         switchToScreen(parent);
         parent.returnFromSubScreen(this);
@@ -222,6 +283,20 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         }
         this.page = page;
         updateState();
+    }
+
+    private void previousGeneralPage() {
+        if (this.generalPage > 0) {
+            this.generalPage--;
+            updateVisibility();
+        }
+    }
+
+    private void nextGeneralPage() {
+        if (this.generalPage + 1 < GENERAL_PAGE_COUNT) {
+            this.generalPage++;
+            updateVisibility();
+        }
     }
 
     private void switchToAeSearch() {
@@ -310,12 +385,19 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     private void updateState() {
         AEConfig config = AEConfig.instance();
         updateRecursiveReserveFromContainer();
+        if (this.supportsPlayerPinRows && !this.playerPinRowsField.isFocused()) {
+            this.playerPinRowsField.setText(Integer.toString(this.pendingPlayerPinRows));
+        }
+        this.playerPinRowsField.setTooltipMessage(List.of(GuiText.TerminalSettingsPlayerPinRowsTooltip.text()));
         pinAutoCraftedItemsCheckbox.setSelected(config.isPinAutoCraftedItems());
         PinDisplayMode pinDisplayMode = config.getPinDisplayMode();
         pinDisplaySortTopRadio.setSelected(pinDisplayMode == PinDisplayMode.SORT_TOP);
         pinDisplayLockedGridRadio.setSelected(pinDisplayMode == PinDisplayMode.LOCKED_GRID);
         notifyForFinishedCraftingJobsCheckbox.setSelected(config.isNotifyForFinishedCraftingJobs());
         clearGridOnCloseCheckbox.setSelected(config.isClearGridOnClose());
+        if (this.autoFillPatternsCheckbox != null && this.container instanceof ContainerPatternEncodingTerm patternEncodingTerm) {
+            this.autoFillPatternsCheckbox.setSelected(patternEncodingTerm.getAutoFillPatterns() == YesNo.YES);
+        }
         boolean hasExternalSearch = hasExternalSearch();
         if (!hasExternalSearch && config.isUseExternalSearch()) {
             config.setUseExternalSearch(false);
@@ -373,10 +455,27 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         }
         try {
             long amount = Long.parseLong(text);
-            return amount >= 0 ? amount : -1;
+            return amount >= 0 && amount <= MAX_RECURSIVE_INGREDIENT_RESERVE ? amount : -1;
         } catch (NumberFormatException ignored) {
             return -1;
         }
+    }
+
+    private boolean isRecursiveReserveInput(char typedChar, int keyCode) {
+        return keyCode == Keyboard.KEY_BACK || keyCode == Keyboard.KEY_DELETE || keyCode == Keyboard.KEY_LEFT
+            || keyCode == Keyboard.KEY_RIGHT || keyCode == Keyboard.KEY_HOME || keyCode == Keyboard.KEY_END
+            || Character.isDigit(typedChar);
+    }
+
+    private void sanitizeRecursiveReserveField() {
+        String text = this.recursiveReserveField.getText().trim();
+        if (!text.isEmpty()) {
+            long amount = Long.parseLong(text);
+            if (amount > MAX_RECURSIVE_INGREDIENT_RESERVE) {
+                this.recursiveReserveField.setText(Long.toString(MAX_RECURSIVE_INGREDIENT_RESERVE));
+            }
+        }
+        validateRecursiveReserveField();
     }
 
     private void submitRecursiveReserveOnFocusLoss() {
@@ -429,29 +528,42 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     private void updateVisibility() {
         boolean general = !this.wirelessOnly && this.page == Page.GENERAL;
         boolean wireless = this.page == Page.WIRELESS && this.wirelessHost != null;
+        boolean generalTerminalPage = general && this.generalPage == 0;
+        boolean generalSearchPage = general && this.generalPage == 1;
         setTextContent(TEXT_ID_DIALOG_TITLE,
             wireless ? GuiText.WirelessTerminalSettingsTitle.text() : GuiText.TerminalSettingsTitle.text());
+        setTextContent("page_info", new TextComponentString((this.generalPage + 1) + " / " + GENERAL_PAGE_COUNT));
 
         this.generalPageButton.visible = !this.wirelessOnly;
         this.generalPageButton.setFocused(general);
         this.wirelessPageButton.setFocused(wireless);
         this.wirelessPageButton.visible = !this.wirelessOnly && this.wirelessHost != null;
+        this.previousPageButton.visible = general;
+        this.nextPageButton.visible = general;
+        this.previousPageButton.enabled = general && this.generalPage > 0;
+        this.nextPageButton.enabled = general && this.generalPage + 1 < GENERAL_PAGE_COUNT;
 
-        setTextHidden("search_settings_title", !general);
+        setTextHidden("search_settings_title", !generalSearchPage);
+        setTextHidden("page_info", !general);
         setTextHidden("wireless_settings_title", true);
-        this.pinAutoCraftedItemsCheckbox.visible = general;
-        this.pinDisplaySortTopRadio.visible = general;
-        this.pinDisplayLockedGridRadio.visible = general;
-        this.notifyForFinishedCraftingJobsCheckbox.visible = general;
-        this.clearGridOnCloseCheckbox.visible = general;
-        this.useInternalSearchRadio.visible = general;
-        this.useExternalSearchRadio.visible = general;
-        this.rememberCheckbox.visible = general && this.useInternalSearchRadio.isSelected();
-        this.autoFocusCheckbox.visible = general && this.useInternalSearchRadio.isSelected();
-        this.syncWithExternalCheckbox.visible = general && this.useInternalSearchRadio.isSelected();
-        this.clearExternalCheckbox.visible = general && this.useExternalSearchRadio.isSelected();
-        setTextHidden("recursive_reserve_label", !general);
-        this.recursiveReserveField.setVisible(general);
+        this.pinAutoCraftedItemsCheckbox.visible = generalTerminalPage;
+        this.pinDisplaySortTopRadio.visible = generalTerminalPage;
+        this.pinDisplayLockedGridRadio.visible = generalTerminalPage;
+        this.notifyForFinishedCraftingJobsCheckbox.visible = generalTerminalPage;
+        this.clearGridOnCloseCheckbox.visible = generalTerminalPage;
+        if (this.autoFillPatternsCheckbox != null) {
+            this.autoFillPatternsCheckbox.visible = generalTerminalPage;
+        }
+        this.useInternalSearchRadio.visible = generalSearchPage;
+        this.useExternalSearchRadio.visible = generalSearchPage;
+        this.rememberCheckbox.visible = generalSearchPage && this.useInternalSearchRadio.isSelected();
+        this.autoFocusCheckbox.visible = generalSearchPage && this.useInternalSearchRadio.isSelected();
+        this.syncWithExternalCheckbox.visible = generalSearchPage && this.useInternalSearchRadio.isSelected();
+        this.clearExternalCheckbox.visible = generalSearchPage && this.useExternalSearchRadio.isSelected();
+        setTextHidden("recursive_reserve_label", !generalTerminalPage);
+        setTextHidden("player_pin_rows_label", !(generalTerminalPage && this.supportsPlayerPinRows));
+        this.recursiveReserveField.setVisible(generalTerminalPage);
+        this.playerPinRowsField.setVisible(generalTerminalPage && this.supportsPlayerPinRows);
 
         if (this.pickBlockCheckbox != null) {
             this.pickBlockCheckbox.visible = wireless;
@@ -474,8 +586,80 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         }
     }
 
+    private void savePatternAutoFill() {
+        if (this.autoFillPatternsCheckbox == null) {
+            return;
+        }
+
+        YesNo value = this.autoFillPatternsCheckbox.isSelected() ? YesNo.YES : YesNo.NO;
+        if (this.container instanceof ContainerPatternEncodingTerm patternEncodingTerm) {
+            patternEncodingTerm.getConfigManager().putSetting(Settings.PATTERN_AUTO_FILL, value);
+        }
+        InitNetwork.sendToServer(new ConfigValueServerPacket(this.container.windowId, Settings.PATTERN_AUTO_FILL, value));
+    }
+
     private boolean hasExternalSearch() {
         return ItemListMod.isEnabled();
+    }
+
+    @Override
+    public void onGuiClosed() {
+        commitPendingPlayerPinRowsOnce();
+        super.onGuiClosed();
+    }
+
+    private boolean isPlayerPinRowsInput(char typedChar, int keyCode) {
+        return keyCode == Keyboard.KEY_BACK || keyCode == Keyboard.KEY_DELETE || keyCode == Keyboard.KEY_LEFT
+            || keyCode == Keyboard.KEY_RIGHT || keyCode == Keyboard.KEY_HOME || keyCode == Keyboard.KEY_END
+            || Character.isDigit(typedChar);
+    }
+
+    private void sanitizePlayerPinRowsField() {
+        updatePendingPlayerPinRows(true);
+    }
+
+    private void updatePendingPlayerPinRows(boolean markDirty) {
+        String text = this.playerPinRowsField.getText().trim();
+        int rows = 0;
+        if (!text.isEmpty()) {
+            rows = Math.clamp(Integer.parseInt(text), 0, PinnedKeys.MAX_PLAYER_PIN_ROWS);
+        }
+        String sanitized = Integer.toString(rows);
+        if (!sanitized.equals(this.playerPinRowsField.getText())) {
+            this.playerPinRowsField.setText(sanitized);
+        }
+        this.pendingPlayerPinRows = rows;
+        if (markDirty) {
+            this.playerPinRowsDirty = true;
+        }
+    }
+
+    private void commitPendingPlayerPinRowsOnce() {
+        if (this.closing) {
+            return;
+        }
+        this.closing = true;
+        commitPendingPlayerPinRows();
+    }
+
+    private void commitPendingPlayerPinRows() {
+        if (!this.supportsPlayerPinRows) {
+            this.playerPinRowsDirty = false;
+            return;
+        }
+        updatePendingPlayerPinRows(false);
+        if (!(this.parent instanceof GuiMEStorage<?> meStorage)) {
+            this.playerPinRowsDirty = false;
+            return;
+        }
+        if (this.playerPinRowsDirty) {
+            GuiStyle style = meStorage.getStyle();
+            if (style == null || style.getTerminalStyle() == null) {
+                throw new IllegalStateException("ME terminal settings require a terminal style");
+            }
+            PinnedKeys.setPlayerPinRows(this.pendingPlayerPinRows, style.getTerminalStyle().getSlotsPerRow());
+            this.playerPinRowsDirty = false;
+        }
     }
 
     private enum Page {

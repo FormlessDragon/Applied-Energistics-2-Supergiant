@@ -34,6 +34,7 @@ public class ContainerMolecularAssembler extends AEBaseContainer
     private final TileMolecularAssembler host;
     private final List<AppEngSlot> patternSlots = new ObjectArrayList<>();
     private final PatternModifierPanel patternModifierPanel;
+    private boolean patternModifierPanelVisible;
 
     @GuiSync(4)
     public int craftProgress;
@@ -176,6 +177,7 @@ public class ContainerMolecularAssembler extends AEBaseContainer
     }
 
     public void updatePatternModifierPanelVisibleSlots(boolean visible) {
+        this.patternModifierPanelVisible = visible;
         this.patternModifierPanel.updateSlotState(visible && this.patternModifierPanelAvailable);
     }
 
@@ -200,7 +202,7 @@ public class ContainerMolecularAssembler extends AEBaseContainer
             slot.setSlotEnabled(enabled);
             slot.setActive(enabled);
         }
-        this.patternModifierPanel.updateSlotState(this.patternModifierPanelAvailable);
+        this.patternModifierPanel.updateSlotState(this.patternModifierPanelVisible && this.patternModifierPanelAvailable);
     }
 
     private boolean isPatternSlotVisible(AppEngSlot slot) {

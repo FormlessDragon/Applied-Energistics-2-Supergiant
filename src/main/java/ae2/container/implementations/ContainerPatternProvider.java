@@ -45,6 +45,7 @@ public class ContainerPatternProvider extends AEBaseContainer
     private final PatternProviderLogic logic;
     private final List<AppEngSlot> patternSlots = new ObjectArrayList<>();
     private final PatternModifierPanel patternModifierPanel;
+    private boolean patternModifierPanelVisible;
     @GuiSync(3)
     public BlockingMode blockingMode = BlockingMode.NO;
     @GuiSync(4)
@@ -254,10 +255,11 @@ public class ContainerPatternProvider extends AEBaseContainer
             slot.setSlotEnabled(enabled);
             slot.setActive(enabled);
         }
-        this.patternModifierPanel.updateSlotState(this.patternModifierPanelAvailable);
+        this.patternModifierPanel.updateSlotState(this.patternModifierPanelVisible && this.patternModifierPanelAvailable);
     }
 
     public void updatePatternModifierPanelVisibleSlots(boolean visible) {
+        this.patternModifierPanelVisible = visible;
         this.patternModifierPanel.updateSlotState(visible && this.patternModifierPanelAvailable);
     }
 

@@ -81,6 +81,7 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
         this.widgets.add("nextPage", this.nextPageButton);
         this.patternModifierPanel = new PatternModifierPanelWidget(this, new PatternProviderPanelHost());
         this.patternModifierPanel.addButtons();
+        addToLeftToolbar(this.patternModifierPanel.getToolbarButton());
     }
 
     @Override
@@ -163,6 +164,13 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
         @Override
         public boolean isPatternModifierPanelAvailable() {
             return container.isPatternModifierPanelAvailable();
+        }
+
+        @Override
+        public ae2.client.Point getPatternModifierPanelOffset() {
+            return new ae2.client.Point(
+                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_LEFT_OFFSET + 6,
+                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_TOP_OFFSET - 22);
         }
 
         @Override

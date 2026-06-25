@@ -207,7 +207,6 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
         this.sortDirToggle = this.addToLeftToolbar(
             new SettingToggleButton<>(Settings.SORT_DIRECTION, getSortDir(), this::toggleServerSetting));
-        this.addToLeftToolbar(new PlayerPinButton());
         this.addToLeftToolbar(new ActionButton(ActionItems.TERMINAL_SETTINGS, this::showSettings));
         this.addToLeftToolbar(new SettingToggleButton<>(
             Settings.TERMINAL_STYLE, AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
@@ -398,6 +397,8 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     }
 
     void onCloseTerminalSettings() {
+        this.repo.updateView();
+        updateScrollbar();
         updateSearch();
         if (!isExternalSearchActive()) {
             setSearchText(this.searchField.getText());
@@ -1316,51 +1317,6 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     @Override
     public Collection<? extends GuiTextField> getTextFields() {
         return ObjectLists.singleton(this.searchField);
-    }
-
-    private final class PlayerPinButton extends IconButton {
-        private PlayerPinButton() {
-            super(() -> {
-                if (canInteractWithRepo() && PinnedKeys.getPlayerPinRows() < PinnedKeys.MAX_PLAYER_PIN_ROWS) {
-                    PinnedKeys.addPlayerPinRow();
-                    repo.updateView();
-                    updateScrollbar();
-                }
-            });
-        }
-
-        @Override
-        public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
-            if (isHandlingRightClick()) {
-                boolean pressed = this.enabled && this.visible
-                    && mouseX >= this.x
-                    && mouseY >= this.y
-                    && mouseX < this.x + this.width
-                    && mouseY < this.y + this.height;
-                if (pressed) {
-                    if (canInteractWithRepo()
-                        && PinnedKeys.removeEmptyPlayerPinRow(terminalStyle.getSlotsPerRow())) {
-                        repo.updateView();
-                        updateScrollbar();
-                    }
-                }
-                return pressed;
-            }
-            return super.mousePressed(minecraft, mouseX, mouseY);
-        }
-
-        @Override
-        public List<ITextComponent> getTooltipMessage() {
-            return Arrays.asList(
-                ButtonToolTips.PlayerPin.text(),
-                ButtonToolTips.PlayerPinAddRow.text(),
-                ButtonToolTips.PlayerPinRemoveRow.text());
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return Icon.PLAYER_PIN;
-        }
     }
 
     private final class TerminalKeyTypeSelectionButton extends IconButton {

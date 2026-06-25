@@ -18,7 +18,7 @@
     "search_settings_title": {
       "position": {
         "left": 8,
-        "top": 124
+        "top": 25
       },
       "text": {
         "translate": "gui.ae2.SearchSettingsTitle"
@@ -27,10 +27,28 @@
     "recursive_reserve_label": {
       "position": {
         "left": 10,
-        "top": 108
+        "top": 130
       },
       "text": {
         "translate": "gui.ae2.TerminalSettingsRecursiveIngredientReserve"
+      }
+    },
+    "player_pin_rows_label": {
+      "position": {
+        "left": 10,
+        "top": 152
+      },
+      "text": {
+        "translate": "gui.ae2.TerminalSettingsPlayerPinRows"
+      }
+    },
+    "page_info": {
+      "position": {
+        "left": 86,
+        "top": 194
+      },
+      "text": {
+        "text": "1 / 2"
       }
     },
     "wireless_settings_title": {
@@ -75,6 +93,23 @@
       "top": 85,
       "width": 180
     },
+    "autoFillPatternsCheckbox": {
+      "left": 10,
+      "top": 105,
+      "width": 180
+    },
+    "recursiveReserveField": {
+      "left": 154,
+      "top": 127,
+      "width": 36,
+      "height": 12
+    },
+    "playerPinRowsField": {
+      "left": 154,
+      "top": 149,
+      "width": 36,
+      "height": 12
+    },
     "pickBlockCheckbox": {
       "left": 10,
       "top": 25,
@@ -108,39 +143,45 @@
     },
     "useInternalSearchRadio": {
       "left": 10,
-      "top": 139,
+      "top": 45,
       "width": 75
     },
     "useExternalSearchRadio": {
       "left": 95,
-      "top": 139,
+      "top": 45,
       "width": 75
     },
     "rememberCheckbox": {
       "left": 10,
-      "top": 159,
+      "top": 67,
       "width": 150
     },
     "autoFocusCheckbox": {
       "left": 10,
-      "top": 179,
+      "top": 89,
       "width": 150
     },
     "syncWithExternalCheckbox": {
       "left": 10,
-      "top": 199,
+      "top": 111,
       "width": 150
     },
     "clearExternalCheckbox": {
       "left": 10,
-      "top": 194,
+      "top": 67,
       "width": 180
     },
-    "recursiveReserveField": {
-      "left": 142,
-      "top": 105,
-      "width": 48,
-      "height": 12
+    "previousPage": {
+      "left": 10,
+      "top": 190,
+      "width": 22,
+      "height": 20
+    },
+    "nextPage": {
+      "left": 168,
+      "top": 190,
+      "width": 22,
+      "height": 20
     }
   }
 }

@@ -3,7 +3,6 @@ package ae2.client.gui.me.items;
 import ae2.api.behaviors.ContainerItemStrategies;
 import ae2.api.behaviors.EmptyingAction;
 import ae2.api.config.ActionItems;
-import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AmountFormat;
@@ -14,8 +13,6 @@ import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.PatternModifierPanelWidget;
-import ae2.client.gui.widgets.ServerSettingToggleButton;
-import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.TabButton;
 import ae2.container.me.items.ContainerPatternEncodingTerm;
 import ae2.container.slot.AppEngSlot;
@@ -49,15 +46,12 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     private static final EncodingMode[] ENCODING_MODES = EncodingMode.values();
     private final Map<EncodingMode, EncodingModePanel> modePanels = new EnumMap<>(EncodingMode.class);
     private final Map<EncodingMode, TabButton> modeTabButtons = new EnumMap<>(EncodingMode.class);
-    private final SettingToggleButton<YesNo> autoFillPatternsButton;
     private final PatternModifierPanelWidget patternModifierPanel;
     private final IconButton uploadPatternButton;
 
     public GuiPatternEncodingTerm(ContainerPatternEncodingTerm container, InventoryPlayer playerInventory,
                                   @Nullable ITextComponent title, GuiStyle style) {
         super(container, playerInventory, resolveTitle(container, title), style);
-        this.autoFillPatternsButton = addToLeftToolbar(
-            new ServerSettingToggleButton<>(Settings.PATTERN_AUTO_FILL, YesNo.NO));
         addMode(EncodingMode.CRAFTING, new CraftingEncodingPanel(this, widgets), 0);
         addMode(EncodingMode.PROCESSING, new ProcessingEncodingPanel(this, widgets), 1);
         this.uploadPatternButton = new IconButton(this::uploadPattern) {
@@ -91,6 +85,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
         }
         this.patternModifierPanel = new PatternModifierPanelWidget(this, new EncodingTerminalPanelHost());
         this.patternModifierPanel.addButtons();
+        addToLeftToolbar(this.patternModifierPanel.getToolbarButton());
     }
 
     private static ITextComponent resolveTitle(ContainerPatternEncodingTerm container, @Nullable ITextComponent title) {
@@ -125,7 +120,6 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
-        this.autoFillPatternsButton.set(this.container.getAutoFillPatterns());
         for (var mode : ENCODING_MODES) {
             boolean selected = this.container.getMode() == mode;
             var tabButton = this.modeTabButtons.get(mode);
@@ -266,6 +260,13 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
         @Override
         public boolean isPatternModifierPanelAvailable() {
             return container.isPatternModifierPanelAvailable();
+        }
+
+        @Override
+        public ae2.client.Point getPatternModifierPanelOffset() {
+            return new ae2.client.Point(
+                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_LEFT_OFFSET - 4,
+                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_TOP_OFFSET - 50);
         }
 
         @Override

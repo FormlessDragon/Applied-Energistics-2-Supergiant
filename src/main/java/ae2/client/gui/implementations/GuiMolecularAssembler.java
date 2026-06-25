@@ -61,6 +61,7 @@ public class GuiMolecularAssembler extends AEBaseGui<ContainerMolecularAssembler
         this.widgets.add("progressBar", this.progressBar);
         this.patternModifierPanel = new PatternModifierPanelWidget(this, new AssemblerPanelHost());
         this.patternModifierPanel.addButtons();
+        addToLeftToolbar(this.patternModifierPanel.getToolbarButton());
     }
 
     @Override
@@ -144,6 +145,13 @@ public class GuiMolecularAssembler extends AEBaseGui<ContainerMolecularAssembler
         @Override
         public boolean isPatternModifierPanelAvailable() {
             return container.isPatternModifierPanelAvailable();
+        }
+
+        @Override
+        public ae2.client.Point getPatternModifierPanelOffset() {
+            return new ae2.client.Point(
+                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_LEFT_OFFSET + 6,
+                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_TOP_OFFSET - 22);
         }
 
         @Override

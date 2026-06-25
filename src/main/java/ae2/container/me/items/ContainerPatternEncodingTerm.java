@@ -105,6 +105,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     private final ConfigInventory encodedInputsInv;
     private final ConfigInventory encodedOutputsInv;
     private final PatternModifierPanel patternModifierPanel;
+    private boolean patternModifierPanelVisible;
     @GuiSync(97)
     public EncodingMode mode;
     @GuiSync(96)
@@ -288,7 +289,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         for (FakeSlot slot : this.processingOutputSlots) {
             slot.setActive(processing);
         }
-        this.patternModifierPanel.updateSlotState(this.patternModifierPanelAvailable);
+        this.patternModifierPanel.updateSlotState(this.patternModifierPanelVisible && this.patternModifierPanelAvailable);
     }
 
     private ItemStack getAndUpdateOutput() {
@@ -917,6 +918,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     }
 
     public void updatePatternModifierPanelVisibleSlots(boolean visible) {
+        this.patternModifierPanelVisible = visible;
         this.patternModifierPanel.updateSlotState(visible && this.patternModifierPanelAvailable);
     }
 

@@ -1533,6 +1533,10 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         this.exclusionZonesDirty = true;
     }
 
+    public final void requestExclusionZonesUpdate() {
+        invalidateExclusionZonesCache();
+    }
+
     private TextOverride getOrCreateTextOverride(String id) {
         return textOverrides.computeIfAbsent(id, ignored -> new TextOverride());
     }

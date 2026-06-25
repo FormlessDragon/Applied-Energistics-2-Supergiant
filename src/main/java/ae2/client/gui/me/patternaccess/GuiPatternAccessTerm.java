@@ -210,6 +210,7 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
                 upgradeableObject));
         }
         addWirelessUniversalTerminalButton();
+        addToLeftToolbar(this.patternModifierPanel.getToolbarButton());
 
         this.xSize = GUI_WIDTH;
         this.ySize = GUI_HEADER_HEIGHT + GUI_FOOTER_HEIGHT + MIN_VISIBLE_ROWS * ROW_HEIGHT;
@@ -1453,6 +1454,13 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         @Override
         public boolean isPatternModifierPanelAvailable() {
             return container.isPatternModifierPanelAvailable();
+        }
+
+        @Override
+        public ae2.client.Point getPatternModifierPanelOffset() {
+            return new ae2.client.Point(
+                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_LEFT_OFFSET + 8,
+                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_TOP_OFFSET - 52);
         }
 
         @Override
