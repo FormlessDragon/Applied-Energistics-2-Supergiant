@@ -146,9 +146,11 @@ public final class PartPlacement {
     @Nullable
     public static Placement getPartPlacement(@Nullable EntityPlayer player, World world, ItemStack partStack,
                                              BlockPos pos, EnumFacing side, Vec3d clickLocation) {
-        EnumFacing replaceCablePlacement = tryReplaceCableSegment(world, partStack, pos, clickLocation);
-        if (replaceCablePlacement != null) {
-            side = replaceCablePlacement;
+        if (player != null && player.isSneaking()) {
+            EnumFacing replaceCablePlacement = tryReplaceCableSegment(world, partStack, pos, clickLocation);
+            if (replaceCablePlacement != null) {
+                side = replaceCablePlacement;
+            }
         }
 
         if (player != null && PlayerState.isHoldingCtrl(player)) {
