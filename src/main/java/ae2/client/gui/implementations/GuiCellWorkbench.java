@@ -54,6 +54,11 @@ public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
     private final CellRestrictionButton cellRestrictionButton;
     private final PageButton previousPageButton;
     private final PageButton nextPageButton;
+    private ItemStack cachedWorkbenchItem = ItemStack.EMPTY;
+    private boolean cachedFuzzyVisible;
+    private boolean cachedRestrictionVisible;
+    private boolean cachedPreviousPageVisible;
+    private boolean cachedNextPageVisible;
 
     public GuiCellWorkbench(ContainerCellWorkbench container, InventoryPlayer playerInventory, ITextComponent title,
                             GuiStyle style) {
@@ -82,11 +87,31 @@ public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
         super.updateBeforeRender();
         this.copyMode.setState(this.container.getCopyMode() == CopyMode.CLEAR_ON_REMOVE);
         this.fuzzyMode.set(this.container.getFuzzyMode());
-        this.fuzzyMode.setVisibility(container.getUpgrades().isInstalled(AEItems.FUZZY_CARD.item()));
-        this.cellRestrictionButton.setVisibility(canRestrictCell());
-        this.previousPageButton.setVisibility(this.container.getPageCount() > 1 && this.container.getCurrentPage() > 0);
-        this.nextPageButton.setVisibility(this.container.getPageCount() > 1
-            && this.container.getCurrentPage() + 1 < this.container.getPageCount());
+        boolean fuzzyVisible = container.getUpgrades().isInstalled(AEItems.FUZZY_CARD.item());
+        boolean restrictionVisible = canRestrictCell();
+        boolean previousPageVisible = this.container.getPageCount() > 1 && this.container.getCurrentPage() > 0;
+        boolean nextPageVisible = this.container.getPageCount() > 1
+            && this.container.getCurrentPage() + 1 < this.container.getPageCount();
+
+        this.fuzzyMode.setVisibility(fuzzyVisible);
+        this.cellRestrictionButton.setVisibility(restrictionVisible);
+        this.previousPageButton.setVisibility(previousPageVisible);
+        this.nextPageButton.setVisibility(nextPageVisible);
+
+        ItemStack workbenchItem = this.container.getWorkbenchItem();
+        if (!ItemStack.areItemStacksEqual(this.cachedWorkbenchItem, workbenchItem)
+            || !ItemStack.areItemStackTagsEqual(this.cachedWorkbenchItem, workbenchItem)
+            || this.cachedFuzzyVisible != fuzzyVisible
+            || this.cachedRestrictionVisible != restrictionVisible
+            || this.cachedPreviousPageVisible != previousPageVisible
+            || this.cachedNextPageVisible != nextPageVisible) {
+            this.cachedWorkbenchItem = workbenchItem.isEmpty() ? ItemStack.EMPTY : workbenchItem.copy();
+            this.cachedFuzzyVisible = fuzzyVisible;
+            this.cachedRestrictionVisible = restrictionVisible;
+            this.cachedPreviousPageVisible = previousPageVisible;
+            this.cachedNextPageVisible = nextPageVisible;
+            requestExclusionZonesUpdate();
+        }
     }
 
     private void toggleFuzzyMode(SettingToggleButton<FuzzyMode> button, boolean backwards) {

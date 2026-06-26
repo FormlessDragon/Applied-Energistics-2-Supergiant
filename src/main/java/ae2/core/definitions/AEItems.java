@@ -48,6 +48,7 @@ import ae2.items.misc.WrappedGenericStack;
 import ae2.items.parts.FacadeItem;
 import ae2.items.storage.BasicStorageCell;
 import ae2.items.storage.CreativeCellItem;
+import ae2.items.storage.PortableVoidCellItem;
 import ae2.items.storage.SpatialStorageCellItem;
 import ae2.items.storage.StorageTier;
 import ae2.items.storage.ViewCellItem;
@@ -270,6 +271,8 @@ public final class AEItems {
         new CreativeCellItem());
     public static final ItemDefinition<VoidCellItem> VOID_CELL = new ItemDefinition<>(AEItemIds.VOID_CELL,
         new VoidCellItem());
+    public static final ItemDefinition<PortableVoidCellItem> PORTABLE_VOID_CELL = new ItemDefinition<>(
+        AEItemIds.PORTABLE_VOID_CELL, new PortableVoidCellItem());
     public static final ItemDefinition<BasicStorageCell> ITEM_CELL_1K = new ItemDefinition<>(AEItemIds.ITEM_CELL_1K,
         new BasicStorageCell(StorageTier.SIZE_1K, 63, AEKeyType.items()));
     public static final ItemDefinition<BasicStorageCell> ITEM_CELL_4K = new ItemDefinition<>(AEItemIds.ITEM_CELL_4K,
@@ -500,6 +503,7 @@ public final class AEItems {
         SPATIAL_CELL128,
         CREATIVE_CELL,
         VOID_CELL,
+        PORTABLE_VOID_CELL,
         ITEM_CELL_1K,
         ITEM_CELL_4K,
         ITEM_CELL_16K,

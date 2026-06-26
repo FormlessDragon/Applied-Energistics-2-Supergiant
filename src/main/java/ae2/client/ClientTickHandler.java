@@ -1,5 +1,7 @@
 package ae2.client;
 
+import ae2.items.tools.powered.PortableItemCellAutoPickup;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
@@ -12,7 +14,7 @@ public final class ClientTickHandler {
     private ClientTickHandler() {
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onClientTickEnd(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) {
             return;
@@ -20,6 +22,7 @@ public final class ClientTickHandler {
 
         TASKS.forEach(Runnable::run);
         TASKS.clear();
+        PortableItemCellAutoPickup.clearTickCaches();
     }
 
     public static void addTask(Runnable task) {

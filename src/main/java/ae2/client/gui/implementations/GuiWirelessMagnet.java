@@ -39,7 +39,7 @@ public class GuiWirelessMagnet extends AEBaseGui<ContainerWirelessMagnet> {
             container::copyInsertToPickup));
         widgets.add("copy_down", new MagnetActionButton(Icon.ARROW_DOWN, GuiText.WirelessMagnetCopyInsert.text(),
             container::copyPickupToInsert));
-        widgets.add("switch", new MagnetActionButton(Icon.S_CYCLE, GuiText.WirelessMagnetSwap.text(),
+        widgets.add("switch", new MagnetActionButton(Icon.CYCLE, GuiText.WirelessMagnetSwap.text(),
             container::swapConfigs));
         updateModeButtons();
     }
@@ -104,7 +104,7 @@ public class GuiWirelessMagnet extends AEBaseGui<ContainerWirelessMagnet> {
 
         @Override
         protected Icon getIcon() {
-            return this.mode == IncludeExclude.WHITELIST ? Icon.BLOCKING_MODE_YES : Icon.BLOCKING_MODE_NO;
+            return this.mode == IncludeExclude.WHITELIST ? Icon.WHITELIST : Icon.BLACKLIST;
         }
 
         @Override

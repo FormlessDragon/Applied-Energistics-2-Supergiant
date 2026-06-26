@@ -1,6 +1,7 @@
 package ae2.hooks;
 
 import ae2.helpers.WirelessTerminalActions;
+import ae2.items.tools.powered.PortableItemCellAutoPickup;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -82,6 +83,14 @@ public class WirelessTerminalEventHandler {
         }
     }
 
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void onServerTick(TickEvent.ServerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
+        PortableItemCellAutoPickup.clearTickCaches();
+    }
+
     @SubscribeEvent
     public void onItemPickup(EntityItemPickupEvent event) {
         EntityPlayer playerEntity = event.getEntityPlayer();
@@ -90,6 +99,11 @@ public class WirelessTerminalEventHandler {
             return;
         }
         if (WirelessTerminalActions.tryPickupToME(player, event.getItem()) && event.getItem().isDead) {
+            event.setCanceled(true);
+            return;
+        }
+        PortableItemCellAutoPickup.PickupResult result = PortableItemCellAutoPickup.tryPickup(player, event.getItem());
+        if (result == PortableItemCellAutoPickup.PickupResult.COMPLETE) {
             event.setCanceled(true);
         }
     }

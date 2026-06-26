@@ -95,6 +95,8 @@ public enum PlayerMessages implements LocalizationEnum {
     GridDataSaved,
     WirelessRestockEnabled,
     WirelessRestockDisabled,
+    PortableItemCellAutoPickupEnabled,
+    PortableItemCellAutoPickupDisabled,
     WirelessMagnetOff,
     WirelessMagnetInventory,
     WirelessMagnetME,

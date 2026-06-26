@@ -82,6 +82,12 @@ public final class Settings {
     public static final Setting<SchedulingMode> SCHEDULING_MODE = register("scheduling_mode", SchedulingMode.class);
     public static final Setting<YesNo> OVERLAY_MODE = register("overlay_mode", YesNo.YES, YesNo.NO);
     public static final Setting<YesNo> FILTER_ON_EXTRACT = register("filter_on_extract", YesNo.YES, YesNo.NO);
+    public static final Setting<YesNo> PORTABLE_CELL_PICKUP_MATCH_NBT = register("portable_cell_pickup_match_nbt",
+        YesNo.YES, YesNo.NO);
+    public static final Setting<YesNo> PORTABLE_CELL_PICKUP_MATCH_DAMAGE = register("portable_cell_pickup_match_damage",
+        YesNo.YES, YesNo.NO);
+    public static final Setting<YesNo> PORTABLE_CELL_PICKUP_MATCH_ORE_DICTIONARY = register(
+        "portable_cell_pickup_match_ore_dictionary", YesNo.NO, YesNo.YES);
     public static final Setting<YesNo> PATTERN_AUTO_FILL = register("pattern_auto_fill", YesNo.NO, YesNo.YES);
     public static final Setting<CpuSelectionMode> CPU_SELECTION_MODE = register("crafting_scheduling_mode",
         CpuSelectionMode.class);

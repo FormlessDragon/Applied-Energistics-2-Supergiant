@@ -1,0 +1,45 @@
+{
+  "$schema": "schema.json",
+  "includes": ["common/common.json", "common/player_inventory.json"],
+  "background": {
+    "texture": "guis/portable_void_cell_condenser.png",
+    "srcRect": [0, 0, 176, 199]
+  },
+  "slots": {
+    "MACHINE_INPUT": {
+      "left": 51,
+      "top": 52
+    },
+    "MACHINE_OUTPUT": {
+      "left": 105,
+      "top": 52
+    }
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2.PortableVoidCell"
+      },
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    }
+  },
+  "images": {
+    "progressBar": {
+      "texture": "guis/portable_void_cell_condenser.png",
+      "srcRect": [176, 0, 6, 18]
+    }
+  },
+  "widgets": {
+    "mode": {
+      "left": 129,
+      "top": 53
+    },
+    "progressBar": {
+      "left": 120,
+      "top": 25
+    }
+  }
+}

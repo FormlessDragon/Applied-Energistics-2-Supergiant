@@ -49,6 +49,7 @@ import ae2.client.gui.widgets.ISortSource;
 import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.ItemStackButton;
+import ae2.client.gui.widgets.PortableCellPickupFilterButton;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.TabButton;
@@ -72,7 +73,9 @@ import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.integration.Integrations;
 import ae2.integration.abstraction.ItemListMod;
+import ae2.items.contents.PortableCellGuiHost;
 import ae2.items.storage.ViewCellItem;
+import ae2.items.tools.powered.PortableCellItem;
 import ae2.items.tools.powered.WirelessUniversalTerminalItem;
 import ae2.text.TextComponentItemStack;
 import ae2.util.Platform;
@@ -210,6 +213,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         this.addToLeftToolbar(new ActionButton(ActionItems.TERMINAL_SETTINGS, this::showSettings));
         this.addToLeftToolbar(new SettingToggleButton<>(
             Settings.TERMINAL_STYLE, AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
+        addPortableCellPickupFilterButton();
         addWirelessUniversalTerminalButton();
 
         this.searchField = this.widgets.addTextField("search");
@@ -344,6 +348,29 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
     private void showSettings() {
         switchToScreen(new GuiTerminalSettings(this));
+    }
+
+    private void addPortableCellPickupFilterButton() {
+        if (!isItemPortableCellTerminal()) {
+            return;
+        }
+        this.addToLeftToolbar(new PortableCellPickupFilterButton(this::showPortableCellPickupFilter));
+    }
+
+    private boolean isItemPortableCellTerminal() {
+        if (this.container.getGuiKey() != GuiIds.GuiKey.PORTABLE_ITEM_CELL) {
+            return false;
+        }
+        if (!(this.container.getHost() instanceof PortableCellGuiHost<?> portableCellHost)) {
+            return false;
+        }
+        ItemStack stack = portableCellHost.getItemStack();
+        return stack.getItem() instanceof PortableCellItem portableCellItem
+            && portableCellItem.getKeyType() == AEKeyType.items();
+    }
+
+    private void showPortableCellPickupFilter() {
+        InitNetwork.sendToServer(SwitchGuisPacket.openSubGui(GuiIds.GuiKey.PORTABLE_CELL_PICKUP_FILTER));
     }
 
     private void addWirelessUniversalTerminalButton() {

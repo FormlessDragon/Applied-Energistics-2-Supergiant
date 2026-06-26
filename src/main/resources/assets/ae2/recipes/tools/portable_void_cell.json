@@ -1,0 +1,18 @@
+{
+  "type": "forge:ore_shapeless",
+  "ingredients": [
+    {
+      "item": "ae2:chest"
+    },
+    {
+      "item": "ae2:void_storage_cell"
+    },
+    {
+      "item": "ae2:energy_cell"
+    }
+  ],
+  "result": {
+    "item": "ae2:portable_void_cell",
+    "count": 1
+  }
+}

@@ -24,10 +24,10 @@ import ae2.api.implementations.items.IStorageComponent;
 import ae2.api.inventories.BaseInternalInventory;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.stacks.AEFluidKey;
+import ae2.api.stacks.AEItemKey;
 import ae2.api.storage.MEStorage;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigurableObject;
-import ae2.core.definitions.AEItems;
 import ae2.tile.AEBaseInvTile;
 import ae2.util.ConfigManager;
 import ae2.util.inv.AppEngInternalInventory;
@@ -37,7 +37,6 @@ import ae2.util.inv.filter.AEItemFilters;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
-import net.minecraft.util.math.MathHelper;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidStack;
@@ -49,7 +48,7 @@ import net.minecraftforge.items.IItemHandler;
 
 import org.jetbrains.annotations.Nullable;
 
-public class TileCondenser extends AEBaseInvTile implements IConfigurableObject {
+public class TileCondenser extends AEBaseInvTile implements IConfigurableObject, CondenserLogicHost {
 
     public static final int BYTE_MULTIPLIER = 8;
 
@@ -103,41 +102,59 @@ public class TileCondenser extends AEBaseInvTile implements IConfigurableObject 
     }
 
     public void addPower(double rawPower) {
-        this.setStoredPower(this.getStoredPower() + rawPower);
-        this.setStoredPower(MathHelper.clamp(this.getStoredPower(), 0.0, this.getStorage()));
-        fillOutput();
+        CondenserLogic.addPower(this, rawPower);
     }
 
     private void fillOutput() {
-        var requiredPower = this.getRequiredPower();
-        while (requiredPower <= this.getStoredPower() && !getOutput().isEmpty() && requiredPower > 0) {
-            if (this.canAddOutput()) {
-                this.setStoredPower(this.getStoredPower() - requiredPower);
-                this.addOutput();
-            } else {
-                break;
-            }
-        }
+        CondenserLogic.fillOutput(this);
     }
 
     boolean canAddOutput() {
-        return this.outputSlot.insertItem(0, getOutput(), true).isEmpty();
+        AEItemKey output = CondenserLogic.getOutputKey(this.cm.getSetting(Settings.CONDENSER_OUTPUT));
+        return output == null || getAvailableCondenserOutputSpace(output) > 0;
     }
 
-    private void addOutput() {
-        this.outputSlot.insertItem(0, getOutput(), false);
+    @Override
+    public CondenserOutput getCondenserOutput() {
+        return this.cm.getSetting(Settings.CONDENSER_OUTPUT);
+    }
+
+    @Override
+    public double getStoredCondenserPower() {
+        return this.getStoredPower();
+    }
+
+    @Override
+    public void setStoredCondenserPower(double storedPower) {
+        this.setStoredPower(storedPower);
+    }
+
+    @Override
+    public double getCondenserStorageLimit() {
+        return this.getStorage();
+    }
+
+    @Override
+    public long getAvailableCondenserOutputSpace(AEItemKey output) {
+        ItemStack remaining = this.outputSlot.insertItem(0, output.toStack(output.getMaxStackSize()), true);
+        return output.getMaxStackSize() - remaining.getCount();
+    }
+
+    @Override
+    public void addCondenserOutput(AEItemKey output, long amount) {
+        int count = (int) Math.min(amount, output.getMaxStackSize());
+        if (count > 0) {
+            this.outputSlot.insertItem(0, output.toStack(count), false);
+        }
+    }
+
+    @Override
+    public void saveCondenserChanges() {
+        this.markDirty();
     }
 
     InternalInventory getOutputSlot() {
         return this.outputSlot;
-    }
-
-    private ItemStack getOutput() {
-        return switch (this.cm.getSetting(Settings.CONDENSER_OUTPUT)) {
-            case MATTER_BALLS -> AEItems.MATTER_BALL.stack();
-            case SINGULARITY -> AEItems.SINGULARITY.stack();
-            default -> ItemStack.EMPTY;
-        };
     }
 
     public double getRequiredPower() {

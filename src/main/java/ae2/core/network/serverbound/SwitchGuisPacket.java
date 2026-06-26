@@ -1,6 +1,8 @@
 package ae2.core.network.serverbound;
 
 import ae2.api.config.YesNo;
+import ae2.api.implementations.guiobjects.ItemGuiHost;
+import ae2.api.stacks.AEKeyType;
 import ae2.api.storage.ISubGuiHost;
 import ae2.api.storage.ITerminalHost;
 import ae2.container.AEBaseContainer;
@@ -14,6 +16,8 @@ import ae2.container.implementations.ContainerCraftingStatus;
 import ae2.container.implementations.ContainerCrystalAssembler;
 import ae2.container.implementations.ContainerInscriber;
 import ae2.container.implementations.ContainerOutputSides;
+import ae2.container.implementations.ContainerPortableCellPickupFilter;
+import ae2.container.implementations.ContainerPortableVoidCell;
 import ae2.container.implementations.ContainerPriority;
 import ae2.container.implementations.ContainerProviderSelect;
 import ae2.container.implementations.ContainerSetStockAmount;
@@ -35,6 +39,10 @@ import ae2.helpers.IPriorityHost;
 import ae2.helpers.IWorkIntervalHost;
 import ae2.helpers.InterfaceLogicHost;
 import ae2.helpers.WirelessTerminalGuiHost;
+import ae2.items.contents.PortableCellGuiHost;
+import ae2.items.contents.PortableVoidCellGuiHost;
+import ae2.items.tools.powered.PortableCellItem;
+import ae2.items.tools.powered.PortableItemCellAutoPickup;
 import ae2.parts.AEBasePart;
 import ae2.tile.AEBaseTile;
 import ae2.util.EmptyArrays;
@@ -203,6 +211,9 @@ public class SwitchGuisPacket extends ServerboundPacket {
         if (guiKey == GuiIds.GuiKey.WIRELESS_MAGNET) {
             return WirelessTerminalGuiHost.class;
         }
+        if (guiKey == GuiIds.GuiKey.PORTABLE_CELL_PICKUP_FILTER) {
+            return ItemGuiHost.class;
+        }
         if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
             return ICellWorkbenchHost.class;
         }
@@ -237,6 +248,9 @@ public class SwitchGuisPacket extends ServerboundPacket {
         }
         if (guiKey == GuiIds.GuiKey.WIRELESS_MAGNET && host instanceof WirelessTerminalGuiHost<?> wirelessTerminalHost) {
             return new ContainerWirelessMagnet(inventory, wirelessTerminalHost);
+        }
+        if (guiKey == GuiIds.GuiKey.PORTABLE_CELL_PICKUP_FILTER && host instanceof ItemGuiHost<?> itemGuiHost) {
+            return new ContainerPortableCellPickupFilter(inventory, itemGuiHost);
         }
         if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION && host instanceof ICellWorkbenchHost cellWorkbench) {
             return new ContainerCellRestriction(inventory, cellWorkbench);
@@ -292,9 +306,16 @@ public class SwitchGuisPacket extends ServerboundPacket {
                 && assembler.getAutoExport() == YesNo.YES;
             case PRIORITY -> source.getTarget() instanceof IPriorityHost;
             case WORK_INTERVAL -> source.getTarget() instanceof IWorkIntervalHost;
-            case WIRELESS_MAGNET -> source instanceof ContainerMEStorage
-                && source.getTarget() instanceof WirelessTerminalGuiHost<?> wirelessHost
+            case WIRELESS_MAGNET -> source.getTarget() instanceof WirelessTerminalGuiHost<?> wirelessHost
                 && wirelessHost.getUpgrades().isInstalled(AEItems.MAGNET_CARD.item());
+            case PORTABLE_CELL_PICKUP_FILTER -> (source instanceof ContainerMEStorage meStorage
+                && meStorage.getGuiKey() == GuiIds.GuiKey.PORTABLE_ITEM_CELL
+                && source.getTarget() instanceof PortableCellGuiHost<?> portableCellHost
+                && portableCellHost.getItemStack().getItem() instanceof PortableCellItem portableCellItem
+                && portableCellItem.getKeyType() == AEKeyType.items())
+                || (source instanceof ContainerPortableVoidCell
+                && source.getTarget() instanceof PortableVoidCellGuiHost portableVoidCellHost
+                && PortableItemCellAutoPickup.isSupported(portableVoidCellHost.getItemStack()));
             case CELL_RESTRICTION -> source instanceof ContainerCellWorkbench cellWorkbench
                 && cellWorkbench.canRestrictCell();
             case PROVIDER_SELECT -> source instanceof ContainerPatternEncodingTerm

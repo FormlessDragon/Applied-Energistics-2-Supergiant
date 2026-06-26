@@ -19,6 +19,7 @@
 package ae2.me.cells;
 
 import ae2.api.config.Actionable;
+import ae2.api.config.IncludeExclude;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKey2LongMap;
@@ -31,6 +32,8 @@ import ae2.api.storage.cells.ISaveProvider;
 import ae2.api.storage.cells.StorageCell;
 import ae2.core.definitions.AEItems;
 import ae2.text.TextComponentItemStack;
+import ae2.util.CellWorkbenchFilter;
+import ae2.util.prioritylist.IPartitionList;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
@@ -63,6 +66,10 @@ public class BasicCellInventory implements StorageCell {
     private final int amountPerByte;
     private final long amountLimit;
     private final long maxItemsPerType;
+    private final boolean partitionInverted;
+    private final boolean partitionFuzzy;
+    private final IncludeExclude partitionMode;
+    private final IPartitionList partitionList;
     private long storedItemCount;
     private long storedItems;
     private boolean persisted = true;
@@ -72,6 +79,10 @@ public class BasicCellInventory implements StorageCell {
         this.itemStack = itemStack;
         this.cellType = cellType;
         this.saveProvider = saveProvider;
+        this.partitionInverted = cellType.isPartitionInverted(itemStack);
+        this.partitionFuzzy = cellType.isPartitionFuzzy(itemStack);
+        this.partitionMode = CellWorkbenchFilter.getMode(this.partitionInverted);
+        this.partitionList = CellWorkbenchFilter.createPartitionList(itemStack, cellType, this.partitionFuzzy);
         loadCellItems();
         var restriction = cellType.getCellRestrictionOrNull(itemStack);
         this.bytesPerType = cellType.getBytesPerType(itemStack);
@@ -257,11 +268,10 @@ public class BasicCellInventory implements StorageCell {
             return false;
         }
 
-        var config = cellType.getConfigInventory(itemStack);
-        if (config.isEmpty()) {
+        if (this.partitionList.isEmpty()) {
             return cellItems.containsKey(what);
         }
-        return cellType.isAllowedByCellWorkbench(itemStack, what);
+        return isAllowedByCellWorkbench(what);
     }
 
     @Override
@@ -332,7 +342,7 @@ public class BasicCellInventory implements StorageCell {
         if (key == null || amount <= 0 || !cellType.getKeyType().contains(key)) {
             return;
         }
-        if (!cellType.isAllowedByCellWorkbench(itemStack, key)) {
+        if (!isAllowedByCellWorkbench(key)) {
             return;
         }
         long currentAmount = cellItems.getLong(key);
@@ -345,7 +355,7 @@ public class BasicCellInventory implements StorageCell {
         if (what == null || amount <= 0 || !cellType.getKeyType().contains(what)) {
             return 0;
         }
-        if (!cellType.isAllowedByCellWorkbench(itemStack, what)) {
+        if (!isAllowedByCellWorkbench(what)) {
             return 0;
         }
 
@@ -407,9 +417,8 @@ public class BasicCellInventory implements StorageCell {
         }
 
         long maxTypes = getTotalItemTypes();
-        var config = cellType.getConfigInventory(itemStack);
-        if (!cellType.isPartitionFuzzy(itemStack) && !cellType.isPartitionInverted(itemStack) && !config.isEmpty()) {
-            maxTypes = Math.min(maxTypes, config.keySet().size());
+        if (!this.partitionFuzzy && !this.partitionInverted && !this.partitionList.isEmpty()) {
+            maxTypes = Math.min(maxTypes, getPartitionedTypeCount());
         }
         if (maxTypes <= 0) {
             return 0;
@@ -418,6 +427,21 @@ public class BasicCellInventory implements StorageCell {
         long typeBytes = saturatedMultiply(getBytesPerType(), maxTypes);
         long storageForAmounts = Math.max(getTotalBytes() - typeBytes, 0);
         return saturatedCeilDividedMultiply(storageForAmounts, this.amountPerByte, maxTypes);
+    }
+
+    private long getPartitionedTypeCount() {
+        long count = 0;
+        for (AEKey ignored : this.partitionList.getItems()) {
+            count++;
+        }
+        return count;
+    }
+
+    private boolean isAllowedByCellWorkbench(AEKey requestedAddition) {
+        if (cellType.isBlackListed(itemStack, requestedAddition)) {
+            return false;
+        }
+        return this.partitionList.matchesFilter(requestedAddition, this.partitionMode);
     }
 
     public long getTotalBytes() {

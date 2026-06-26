@@ -125,6 +125,11 @@ public class VoidCellItem extends AEBaseItem implements ICellWorkbenchItem, ISta
         }
     }
 
+    public double getStoredVoidEnergy(ItemStack stack) {
+        NBTTagCompound tag = stack.getTagCompound();
+        return tag != null ? tag.getDouble(VOID_CELL_ENERGY) : 0;
+    }
+
     @Override
     public ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, EnumHand hand) {
         if (!world.isRemote) {

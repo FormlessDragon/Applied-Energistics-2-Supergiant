@@ -61,6 +61,8 @@ public final class Icon {
     public static final Icon BLOCKING_MODE_STRONG = registerBuiltin("blocking_mode_strong");
     public static final Icon BLOCKING_MODE_TYPE_NORMAL = registerBuiltin("blocking_mode_type_normal");
     public static final Icon BLOCKING_MODE_TYPE_SMART = registerBuiltin("blocking_mode_type_smart");
+    public static final Icon WHITELIST = registerBuiltin("whitelist");
+    public static final Icon BLACKLIST = registerBuiltin("blacklist");
 
 
     public static final Icon BACK = registerBuiltin("back");
@@ -199,6 +201,7 @@ public final class Icon {
     public static final Icon OVERLAY_OFF = registerBuiltin("overlay_off");
     public static final Icon OVERLAY_ON = registerBuiltin("overlay_on");
 
+    public static final Icon CYCLE = registerBuiltin("cycle");
     public static final Icon S_ARROW_UP = registerBuiltin("s_arrow_up");
     public static final Icon S_ARROW_DOWN = registerBuiltin("s_arrow_down");
     public static final Icon S_CLEAR = registerBuiltin("s_clear");
@@ -248,6 +251,18 @@ public final class Icon {
         "crafting_cpu_list_row_background_focused");
     public static final Icon RENAME = registerBuiltin("rename");
     public static final Icon HIGHLIGHT = registerBuiltin("highlight");
+    public static final Icon PORTABLE_CELL_PICKUP_MATCH_NBT_ENABLED = registerBuiltin(
+        "portable_cell_pickup_match_nbt_enabled");
+    public static final Icon PORTABLE_CELL_PICKUP_MATCH_NBT_DISABLED = registerBuiltin(
+        "portable_cell_pickup_match_nbt_disabled");
+    public static final Icon PORTABLE_CELL_PICKUP_MATCH_DAMAGE_ENABLED = registerBuiltin(
+        "portable_cell_pickup_match_damage_enabled");
+    public static final Icon PORTABLE_CELL_PICKUP_MATCH_DAMAGE_DISABLED = registerBuiltin(
+        "portable_cell_pickup_match_damage_disabled");
+    public static final Icon PORTABLE_CELL_PICKUP_MATCH_ORE_DICTIONARY_ENABLED = registerBuiltin(
+        "portable_cell_pickup_match_ore_dictionary_enabled");
+    public static final Icon PORTABLE_CELL_PICKUP_MATCH_ORE_DICTIONARY_DISABLED = registerBuiltin(
+        "portable_cell_pickup_match_ore_dictionary_disabled");
     private final Size manualSize;
     public int width;
     private final ResourceLocation id;

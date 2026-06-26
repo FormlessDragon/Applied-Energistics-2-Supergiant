@@ -92,6 +92,7 @@ public final class GuiIds {
         BASIC_CELL_CHEST,
         CRAFTING_TREE,
         VOID_CELL,
+        PORTABLE_VOID_CELL,
         ANNIHILATION_PLANE,
         THRESHOLD_LEVEL_EMITTER,
         CONFIG_MODIFIER,
@@ -101,7 +102,7 @@ public final class GuiIds {
         RENAMER,
         WORK_INTERVAL,
         PROVIDER_SELECT,
-        ;
+        PORTABLE_CELL_PICKUP_FILTER;
 
         private static final GuiKey[] VALUES = values();
 

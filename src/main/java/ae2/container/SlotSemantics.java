@@ -20,6 +20,7 @@ public final class SlotSemantics {
     public static final SlotSemantic VIEW_CELL = register("VIEW_CELL", false);
     public static final SlotSemantic MAGNET_PICKUP_CONFIG = register("MAGNET_PICKUP_CONFIG", false);
     public static final SlotSemantic MAGNET_INSERT_CONFIG = register("MAGNET_INSERT_CONFIG", false);
+    public static final SlotSemantic PORTABLE_CELL_PICKUP_FILTER = register("PORTABLE_CELL_PICKUP_FILTER", false);
     public static final SlotSemantic WIRELESS_SINGULARITY = register("WIRELESS_SINGULARITY", false);
     public static final SlotSemantic UPGRADE = register("UPGRADE", false, 100);
     public static final SlotSemantic STORAGE_CELL = register("STORAGE_CELL", false);

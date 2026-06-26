@@ -20,8 +20,11 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.World;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 public class PortableCellItem extends AbstractPortableCell implements IBasicCellItem {
@@ -59,7 +62,7 @@ public class PortableCellItem extends AbstractPortableCell implements IBasicCell
 
     @Override
     public ResourceLocation getRecipeId() {
-        return AppEng.makeId("tools/" + getRegistryName().getPath());
+        return AppEng.makeId("tools/" + Objects.requireNonNull(getRegistryName()).getPath());
     }
 
     @Override
@@ -67,6 +70,16 @@ public class PortableCellItem extends AbstractPortableCell implements IBasicCell
                                          final ITooltipFlag advancedTooltips) {
         super.addCheckedInformation(stack, world, lines, advancedTooltips);
         addCellInformationToTooltip(stack, lines);
+        addAutoPickupInformationToTooltip(stack, lines);
+    }
+
+    @SideOnly(Side.CLIENT)
+    private void addAutoPickupInformationToTooltip(ItemStack stack, List<String> lines) {
+        if (this.keyType != AEKeyType.items()) {
+            return;
+        }
+
+        PortableItemCellAutoPickup.addInformationToTooltip(stack, lines);
     }
 
     @Override

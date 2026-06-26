@@ -2,6 +2,7 @@ package ae2.me.cells;
 
 import ae2.api.config.Actionable;
 import ae2.api.config.CondenserOutput;
+import ae2.api.config.IncludeExclude;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
@@ -14,7 +15,11 @@ import ae2.api.storage.cells.StorageCell;
 import ae2.core.definitions.AEItems;
 import ae2.items.storage.VoidCellItem;
 import ae2.text.TextComponentItemStack;
+import ae2.tile.misc.CondenserLogic;
+import ae2.tile.misc.CondenserLogicHost;
 import ae2.util.CellWorkbenchFilter;
+import ae2.util.prioritylist.DefaultPriorityList;
+import ae2.util.prioritylist.IPartitionList;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.text.ITextComponent;
@@ -22,13 +27,15 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 
-public class VoidCellInventory implements StorageCell {
+public class VoidCellInventory implements StorageCell, CondenserLogicHost {
     private static final String STORED_STACKS = "void_cell_stored_stacks";
 
     private final ItemStack stack;
     @Nullable
     private final ISaveProvider host;
     private final CondenserOutput mode;
+    private final IncludeExclude partitionMode;
+    private final IPartitionList partitionList;
     private AEKey2LongMap storedAmounts;
     private double voidEnergy;
     private boolean persisted = true;
@@ -36,9 +43,16 @@ public class VoidCellInventory implements StorageCell {
     public VoidCellInventory(ItemStack stack, @Nullable ISaveProvider host) {
         this.stack = stack;
         this.host = host;
-        this.mode = stack.getItem() instanceof VoidCellItem voidCellItem
-            ? voidCellItem.getMode(stack)
-            : CondenserOutput.TRASH;
+        if (stack.getItem() instanceof VoidCellItem voidCellItem) {
+            boolean fuzzy = CellWorkbenchFilter.isFuzzy(stack, voidCellItem);
+            this.mode = voidCellItem.getMode(stack);
+            this.partitionMode = CellWorkbenchFilter.getMode(CellWorkbenchFilter.isInverted(stack, voidCellItem));
+            this.partitionList = CellWorkbenchFilter.createPartitionList(stack, voidCellItem, fuzzy);
+        } else {
+            this.mode = CondenserOutput.TRASH;
+            this.partitionMode = IncludeExclude.WHITELIST;
+            this.partitionList = DefaultPriorityList.INSTANCE;
+        }
         NBTTagCompound tag = stack.getTagCompound();
         this.voidEnergy = tag != null ? tag.getDouble(VoidCellItem.VOID_CELL_ENERGY) : 0;
         if (!Double.isFinite(this.voidEnergy) || this.voidEnergy < 0) {
@@ -52,12 +66,7 @@ public class VoidCellInventory implements StorageCell {
             return 0;
         }
         if (mode == Actionable.MODULATE) {
-            this.voidEnergy += (double) amount / what.getAmountPerUnit();
-            if (!Double.isFinite(this.voidEnergy) || this.voidEnergy < 0) {
-                this.voidEnergy = getMaxVoidEnergy();
-            }
-            fillOutput();
-            saveChanges();
+            CondenserLogic.addPower(this, (double) amount / what.getAmountPerUnit());
         }
         return amount;
     }
@@ -167,33 +176,6 @@ public class VoidCellInventory implements StorageCell {
         return this.storedAmounts;
     }
 
-    private void fillOutput() {
-        AEItemKey output = switch (this.mode) {
-            case MATTER_BALLS -> AEItemKey.of(AEItems.MATTER_BALL.item());
-            case SINGULARITY -> AEItemKey.of(AEItems.SINGULARITY.item());
-            case TRASH -> null;
-        };
-        if (output == null || this.mode.requiredPower <= 0) {
-            this.voidEnergy = 0;
-            return;
-        }
-
-        long amount = this.voidEnergy >= getMaxVoidEnergy()
-            ? Long.MAX_VALUE
-            : (long) (this.voidEnergy / this.mode.requiredPower);
-        if (amount > 0) {
-            addStoredAmount(output, amount);
-            this.voidEnergy -= (double) amount * this.mode.requiredPower;
-            if (!Double.isFinite(this.voidEnergy) || this.voidEnergy < 0) {
-                this.voidEnergy = 0;
-            }
-        }
-    }
-
-    private double getMaxVoidEnergy() {
-        return this.mode.requiredPower > 0 ? Long.MAX_VALUE * (double) this.mode.requiredPower : 0;
-    }
-
     private void addStoredAmount(AEKey what, long amount) {
         if (what == null || amount <= 0) {
             return;
@@ -236,11 +218,42 @@ public class VoidCellInventory implements StorageCell {
             return false;
         }
 
-        return CellWorkbenchFilter.matches(
-            stack,
-            voidCellItem,
-            key,
-            CellWorkbenchFilter.isInverted(stack, voidCellItem),
-            CellWorkbenchFilter.isFuzzy(stack, voidCellItem));
+        return this.partitionList.matchesFilter(key, this.partitionMode);
+    }
+
+    @Override
+    public CondenserOutput getCondenserOutput() {
+        return this.mode;
+    }
+
+    @Override
+    public double getStoredCondenserPower() {
+        return this.voidEnergy;
+    }
+
+    @Override
+    public void setStoredCondenserPower(double storedPower) {
+        this.voidEnergy = storedPower;
+    }
+
+    @Override
+    public double getCondenserStorageLimit() {
+        return this.mode.requiredPower > 0 ? Long.MAX_VALUE * (double) this.mode.requiredPower : 0;
+    }
+
+    @Override
+    public long getAvailableCondenserOutputSpace(AEItemKey output) {
+        long currentAmount = getCellItems().getLong(output);
+        return Long.MAX_VALUE - currentAmount;
+    }
+
+    @Override
+    public void addCondenserOutput(AEItemKey output, long amount) {
+        addStoredAmount(output, amount);
+    }
+
+    @Override
+    public void saveCondenserChanges() {
+        saveChanges();
     }
 }

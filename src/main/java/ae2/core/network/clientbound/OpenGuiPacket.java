@@ -18,15 +18,17 @@
 
 package ae2.core.network.clientbound;
 
+import ae2.api.implementations.guiobjects.ItemGuiHost;
 import ae2.api.storage.ISubGuiHost;
 import ae2.api.storage.ITerminalHost;
 import ae2.client.gui.PreviousExternalGui;
 import ae2.client.gui.implementations.GuiCellRestriction;
 import ae2.client.gui.implementations.GuiOutputSides;
+import ae2.client.gui.implementations.GuiPortableCellPickupFilter;
 import ae2.client.gui.implementations.GuiPriority;
 import ae2.client.gui.implementations.GuiProviderSelect;
-import ae2.client.gui.implementations.GuiWorkInterval;
 import ae2.client.gui.implementations.GuiWirelessMagnet;
+import ae2.client.gui.implementations.GuiWorkInterval;
 import ae2.client.gui.me.crafting.GuiCraftAmount;
 import ae2.client.gui.me.crafting.GuiCraftConfirm;
 import ae2.client.gui.me.crafting.GuiCraftingStatus;
@@ -39,11 +41,12 @@ import ae2.container.implementations.ContainerCraftAmount;
 import ae2.container.implementations.ContainerCraftConfirm;
 import ae2.container.implementations.ContainerCraftingStatus;
 import ae2.container.implementations.ContainerOutputSides;
+import ae2.container.implementations.ContainerPortableCellPickupFilter;
 import ae2.container.implementations.ContainerPriority;
 import ae2.container.implementations.ContainerProviderSelect;
 import ae2.container.implementations.ContainerSetStockAmount;
-import ae2.container.implementations.ContainerWorkInterval;
 import ae2.container.implementations.ContainerWirelessMagnet;
+import ae2.container.implementations.ContainerWorkInterval;
 import ae2.core.AELog;
 import ae2.core.gui.locator.GuiHostLocator;
 import ae2.core.gui.locator.GuiHostLocators;
@@ -55,6 +58,8 @@ import ae2.helpers.IPriorityHost;
 import ae2.helpers.IWorkIntervalHost;
 import ae2.helpers.InterfaceLogicHost;
 import ae2.helpers.WirelessTerminalGuiHost;
+import ae2.items.contents.PortableCellGuiHost;
+import ae2.items.contents.PortableVoidCellGuiHost;
 import ae2.text.TextComponents;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -126,6 +131,9 @@ public class OpenGuiPacket extends ClientboundPacket {
         }
         if (guiKey == GuiIds.GuiKey.WIRELESS_MAGNET) {
             return WirelessTerminalGuiHost.class;
+        }
+        if (guiKey == GuiIds.GuiKey.PORTABLE_CELL_PICKUP_FILTER) {
+            return ItemGuiHost.class;
         }
         if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
             return ICellWorkbenchHost.class;
@@ -285,6 +293,10 @@ public class OpenGuiPacket extends ClientboundPacket {
         if (this.guiKey == GuiIds.GuiKey.WIRELESS_MAGNET && host instanceof WirelessTerminalGuiHost<?> wirelessTerminalGuiHost) {
             return new ContainerWirelessMagnet(inventory, wirelessTerminalGuiHost);
         }
+        if (this.guiKey == GuiIds.GuiKey.PORTABLE_CELL_PICKUP_FILTER
+            && (host instanceof PortableCellGuiHost<?> || host instanceof PortableVoidCellGuiHost)) {
+            return new ContainerPortableCellPickupFilter(inventory, (ItemGuiHost<?>) host);
+        }
         if (this.guiKey == GuiIds.GuiKey.CELL_RESTRICTION && host instanceof ICellWorkbenchHost cellWorkbench) {
             return new ContainerCellRestriction(inventory, cellWorkbench);
         }
@@ -327,6 +339,10 @@ public class OpenGuiPacket extends ClientboundPacket {
         }
         if (this.guiKey == GuiIds.GuiKey.WIRELESS_MAGNET) {
             return new GuiWirelessMagnet((ContainerWirelessMagnet) container, inventory,
+                this.guiTitle != null ? this.guiTitle : container.getGuiTitle());
+        }
+        if (this.guiKey == GuiIds.GuiKey.PORTABLE_CELL_PICKUP_FILTER) {
+            return new GuiPortableCellPickupFilter((ContainerPortableCellPickupFilter) container, inventory,
                 this.guiTitle != null ? this.guiTitle : container.getGuiTitle());
         }
         if (this.guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {

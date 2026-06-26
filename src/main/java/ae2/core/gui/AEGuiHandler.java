@@ -32,6 +32,8 @@ import ae2.client.gui.implementations.GuiODFilterBus;
 import ae2.client.gui.implementations.GuiODStorageBus;
 import ae2.client.gui.implementations.GuiPatternModifier;
 import ae2.client.gui.implementations.GuiPatternProvider;
+import ae2.client.gui.implementations.GuiPortableCellPickupFilter;
+import ae2.client.gui.implementations.GuiPortableVoidCell;
 import ae2.client.gui.implementations.GuiPreciseStorageBus;
 import ae2.client.gui.implementations.GuiQNB;
 import ae2.client.gui.implementations.GuiQuartzKnife;
@@ -95,6 +97,8 @@ import ae2.container.implementations.ContainerODStorageBus;
 import ae2.container.implementations.ContainerPatternAccessTerm;
 import ae2.container.implementations.ContainerPatternModifier;
 import ae2.container.implementations.ContainerPatternProvider;
+import ae2.container.implementations.ContainerPortableCellPickupFilter;
+import ae2.container.implementations.ContainerPortableVoidCell;
 import ae2.container.implementations.ContainerQNB;
 import ae2.container.implementations.ContainerQuartzKnife;
 import ae2.container.implementations.ContainerRenamer;
@@ -131,7 +135,9 @@ import ae2.items.contents.AdvancedMemoryCardGuiHost;
 import ae2.items.contents.ConfigModifierGuiHost;
 import ae2.items.contents.NetworkToolGuiHost;
 import ae2.items.contents.PatternModifierGuiHost;
+import ae2.items.contents.PortableVoidCellGuiHost;
 import ae2.items.contents.VoidCellGuiHost;
+import ae2.items.tools.powered.PortableItemCellAutoPickup;
 import ae2.items.tools.powered.WirelessTerminalRegistry;
 import ae2.items.tools.powered.WirelessUniversalTerminalItem;
 import ae2.parts.AEBasePart;
@@ -209,8 +215,10 @@ public class AEGuiHandler implements IGuiHandler {
             || bridge == GuiIds.GuiKey.ADVANCED_MEMORY_CARD
             || bridge == GuiIds.GuiKey.NETWORK_STATUS
             || bridge == GuiIds.GuiKey.PORTABLE_ITEM_CELL
+            || bridge == GuiIds.GuiKey.PORTABLE_CELL_PICKUP_FILTER
             || bridge == GuiIds.GuiKey.PORTABLE_CELL_WORKBENCH
             || bridge == GuiIds.GuiKey.VOID_CELL
+            || bridge == GuiIds.GuiKey.PORTABLE_VOID_CELL
             || bridge == GuiIds.GuiKey.PORTABLE_FLUID_CELL
             || bridge == GuiIds.GuiKey.WIRELESS_TERMINAL
             || bridge == GuiIds.GuiKey.WIRELESS_CRAFTING_TERMINAL
@@ -598,8 +606,14 @@ public class AEGuiHandler implements IGuiHandler {
             case PORTABLE_ITEM_CELL -> {
                 return createPortableItemCellContainer(player, x, ID);
             }
+            case PORTABLE_CELL_PICKUP_FILTER -> {
+                return createPortableCellPickupFilterContainer(player, x, ID);
+            }
             case PORTABLE_CELL_WORKBENCH -> {
                 return createPortableCellWorkbenchContainer(player, x, ID);
+            }
+            case PORTABLE_VOID_CELL -> {
+                return createPortableVoidCellContainer(player, x, ID);
             }
             case VOID_CELL -> {
                 return createVoidCellContainer(player, x, ID);
@@ -1153,6 +1167,14 @@ public class AEGuiHandler implements IGuiHandler {
                 }
                 return null;
             }
+            case PORTABLE_CELL_PICKUP_FILTER -> {
+                ContainerPortableCellPickupFilter portableCellPickupFilterContainer =
+                    createPortableCellPickupFilterContainer(player, x, ID);
+                if (portableCellPickupFilterContainer != null) {
+                    return new GuiPortableCellPickupFilter(portableCellPickupFilterContainer, player.inventory, null);
+                }
+                return null;
+            }
             case PORTABLE_CELL_WORKBENCH -> {
                 ContainerCellWorkbench container = createPortableCellWorkbenchContainer(player, x, ID);
                 if (container != null) {
@@ -1166,6 +1188,14 @@ public class AEGuiHandler implements IGuiHandler {
                 if (container != null) {
                     return new GuiVoidCell(container, player.inventory, null,
                         GuiStyleManager.loadStyleDoc("/screens/void_cell.json"));
+                }
+                return null;
+            }
+            case PORTABLE_VOID_CELL -> {
+                ContainerPortableVoidCell container = createPortableVoidCellContainer(player, x, ID);
+                if (container != null) {
+                    return new GuiPortableVoidCell(container, player.inventory, null,
+                        GuiStyleManager.loadStyleDoc("/screens/portable_void_cell_condenser.json"));
                 }
                 return null;
             }
@@ -1272,7 +1302,7 @@ public class AEGuiHandler implements IGuiHandler {
     private @Nullable ContainerAdvancedMemoryCard createAdvancedMemoryCardContainer(EntityPlayer player, int x, int y,
                                                                                     int z, int guiId) {
         int encodedSlot = (y >> 8) & 0xFF;
-        if (encodedSlot <= 0) {
+        if (encodedSlot == 0) {
             return null;
         }
         RayTraceResult hitResult = unpackItemUseHitResult(x, y, z);
@@ -1298,6 +1328,32 @@ public class AEGuiHandler implements IGuiHandler {
 
         return initContainer(new ContainerMEStorage(GuiIds.GuiKey.PORTABLE_ITEM_CELL, player.inventory, host),
             locator, guiId);
+    }
+
+    private @Nullable ContainerPortableCellPickupFilter createPortableCellPickupFilterContainer(EntityPlayer player,
+                                                                                                int slot,
+                                                                                                int guiId) {
+        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+        ItemGuiHost<?> host = createItemGuiHost(player, locator);
+        if (host == null) {
+            return null;
+        }
+        if (!PortableItemCellAutoPickup.isSupported(host.getItemStack())) {
+            return null;
+        }
+
+        return initContainer(new ContainerPortableCellPickupFilter(player.inventory, host), locator, guiId);
+    }
+
+    private @Nullable ContainerPortableVoidCell createPortableVoidCellContainer(EntityPlayer player, int slot,
+                                                                                int guiId) {
+        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+        ItemGuiHost<?> host = createItemGuiHost(player, locator, GuiIds.GuiKey.PORTABLE_VOID_CELL);
+        if (!(host instanceof PortableVoidCellGuiHost portableVoidCellHost)) {
+            return null;
+        }
+
+        return initContainer(new ContainerPortableVoidCell(player.inventory, portableVoidCellHost), locator, guiId);
     }
 
     private @Nullable ContainerVoidCell createVoidCellContainer(EntityPlayer player, int slot, int guiId) {

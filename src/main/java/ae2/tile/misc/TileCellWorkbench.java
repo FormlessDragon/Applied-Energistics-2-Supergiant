@@ -32,6 +32,7 @@ import ae2.core.definitions.AEBlocks;
 import ae2.core.gui.GuiOpener;
 import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.externalstorage.GenericStackInv;
+import ae2.items.tools.powered.PortableItemCellAutoPickup;
 import ae2.tile.AEBaseTile;
 import ae2.util.ConfigInventory;
 import ae2.util.ConfigManager;
@@ -53,6 +54,7 @@ public class TileCellWorkbench extends AEBaseTile
     private IUpgradeInventory cacheUpgrades;
     @Nullable
     private ConfigInventory cacheConfig;
+    private ItemStack lastCellStack = ItemStack.EMPTY;
     private boolean locked;
     private ConfigInventory config = createConfigInventory(63);
 
@@ -105,6 +107,7 @@ public class TileCellWorkbench extends AEBaseTile
     public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
         this.cell.readFromNBT(data, "cell");
+        this.lastCellStack = this.cell.getStackInSlot(0);
         this.manager.readFromNBT(data);
         ensureConfigSizeForCurrentCell();
         this.config.readFromChildTag(data, "config");
@@ -125,12 +128,18 @@ public class TileCellWorkbench extends AEBaseTile
 
     @Override
     public void saveChangedInventory(AppEngInternalInventory inv) {
+        if (inv == this.cell) {
+            PortableItemCellAutoPickup.invalidateCachedState(this.cell.getStackInSlot(0));
+        }
         saveChanges();
     }
 
     @Override
     public void onChangeInventory(AppEngInternalInventory inv, int slot) {
         if (inv == this.cell && !this.locked) {
+            PortableItemCellAutoPickup.invalidateCachedState(this.lastCellStack);
+            this.lastCellStack = this.cell.getStackInSlot(0);
+            PortableItemCellAutoPickup.invalidateCachedState(this.lastCellStack);
             this.locked = true;
             try {
                 this.cacheUpgrades = null;

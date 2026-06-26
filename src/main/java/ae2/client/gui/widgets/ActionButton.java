@@ -127,6 +127,11 @@ public class ActionButton extends IconButton {
                 title = GuiText.PatternImportPrioritiesTitle;
                 detail = null;
             }
+            case PORTABLE_CELL_PICKUP_FILTER_CLEAR -> {
+                this.icon = Icon.CLEAR;
+                title = GuiText.PortableCellPickupFilterClear;
+                detail = null;
+            }
             default -> throw new IllegalArgumentException("Unknown ActionItem: " + action);
         }
 

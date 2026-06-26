@@ -40,7 +40,6 @@ import com.google.common.base.Stopwatch;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Reference2LongMap;
 import it.unimi.dsi.fastutil.objects.Reference2LongOpenHashMap;
@@ -75,7 +74,7 @@ public class CraftingCalculation {
     private final Set<AEKey> realRecursiveSeeds = new ObjectOpenHashSet<>();
     private final Set<AEKey> realSeededRecursiveKeys = new ObjectOpenHashSet<>();
     private final Set<AEKey> recursiveFinalOutputInputs = new ObjectOpenHashSet<>();
-    private final Set<AEKey> recursiveReserveCandidates = new ObjectLinkedOpenHashSet<>();
+    private final KeyCounter recursiveReserveCandidates = new KeyCounter();
     private final Reference2LongMap<CraftingTreeNode> recursiveDisplayRequests = new Reference2LongOpenHashMap<>();
     private final List<ICraftingProvider> temporaryProviders;
     private final long recursiveIngredientReserveAmount;
@@ -545,7 +544,7 @@ public class CraftingCalculation {
         if (seed != null) {
             this.realSeededRecursiveRequests.add(getRecursiveRootKey(recursiveNet.requestIndex()));
             this.realRecursiveSeeds.add(seed.what());
-            addRecursiveReserveCandidates(recursiveNet.netByKey());
+            addRecursiveReserveCandidates(recursiveNet);
             addRealSeededRecursiveKeys(recursiveNet.netByKey());
             var missingSeed = getMissingRecursiveSeed(recursiveNet, what);
             if (missingSeed != null && recursiveNet.netByKey().get(missingSeed.what()) >= 0) {
@@ -567,7 +566,7 @@ public class CraftingCalculation {
             if (!this.realSeededRecursiveRequests.contains(recursiveRoot)) {
                 addRecursiveMissingSeed(missingSeed.what(), missingSeed.amount());
             }
-            addRecursiveReserveCandidates(recursiveNet.netByKey());
+            addRecursiveReserveCandidates(recursiveNet);
             return new RecursiveResolution(null, true, missingSeed);
         }
 
@@ -745,12 +744,23 @@ public class CraftingCalculation {
         this.reserveProtectedMissingSeeds = protectedMissingSeeds;
         this.applyingRecursiveIngredientReserve = true;
         try {
-            for (AEKey what : List.copyOf(this.recursiveReserveCandidates)) {
+            var reserveCandidates = new ObjectArrayList<AEKey>();
+            for (var entry : this.recursiveReserveCandidates) {
+                reserveCandidates.add(entry.getKey());
+            }
+            for (AEKey what : reserveCandidates) {
                 if (protectedMissingSeeds.get(what) > 0) {
                     continue;
                 }
 
-                long targetReserve = Math.min(this.recursiveIngredientReserveAmount, inv.getOriginalAmount(what));
+                long reservePerBatch = this.recursiveReserveCandidates.get(what);
+                if (reservePerBatch <= 0) {
+                    continue;
+                }
+
+                long targetReserve = Math.min(
+                    LongMath.saturatedMultiply(this.recursiveIngredientReserveAmount, reservePerBatch),
+                    inv.getOriginalAmount(what));
                 if (targetReserve <= 0) {
                     continue;
                 }
@@ -897,10 +907,24 @@ public class CraftingCalculation {
         }
     }
 
-    private void addRecursiveReserveCandidates(KeyCounter netByKey) {
-        for (var entry : netByKey) {
-            if (entry.getLongValue() >= 0 && !isReserveProtectedMissingSeed(entry.getKey())) {
-                this.recursiveReserveCandidates.add(entry.getKey());
+    private void addRecursiveReserveCandidates(RecursiveNet recursiveNet) {
+        for (var entry : recursiveNet.netByKey()) {
+            AEKey key = entry.getKey();
+            if (entry.getLongValue() < 0 || isReserveProtectedMissingSeed(key)) {
+                continue;
+            }
+
+            long reservePerBatch = entry.getLongValue();
+            if (reservePerBatch <= 0 && recursiveNet.inputKeys().contains(key)) {
+                reservePerBatch = getRecursiveSeedAmount(key, recursiveNet.requestIndex());
+            }
+            if (reservePerBatch <= 0) {
+                continue;
+            }
+
+            long existing = this.recursiveReserveCandidates.get(key);
+            if (existing < reservePerBatch) {
+                this.recursiveReserveCandidates.add(key, reservePerBatch - existing);
             }
         }
     }

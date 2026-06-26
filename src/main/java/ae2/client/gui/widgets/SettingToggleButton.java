@@ -357,6 +357,24 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
                 ButtonToolTips.FilterOnExtract, ButtonToolTips.FilterOnExtractEnabled);
             registerApp(Icon.FILTER_ON_EXTRACT_DISABLED, Settings.FILTER_ON_EXTRACT, YesNo.NO,
                 ButtonToolTips.FilterOnExtract, ButtonToolTips.FilterOnExtractDisabled);
+            registerApp(Icon.PORTABLE_CELL_PICKUP_MATCH_NBT_ENABLED, Settings.PORTABLE_CELL_PICKUP_MATCH_NBT, YesNo.YES,
+                ButtonToolTips.PortableCellPickupMatchNbt, ButtonToolTips.PortableCellPickupMatchNbtEnabled);
+            registerApp(Icon.PORTABLE_CELL_PICKUP_MATCH_NBT_DISABLED, Settings.PORTABLE_CELL_PICKUP_MATCH_NBT, YesNo.NO,
+                ButtonToolTips.PortableCellPickupMatchNbt, ButtonToolTips.PortableCellPickupMatchNbtDisabled);
+            registerApp(Icon.PORTABLE_CELL_PICKUP_MATCH_DAMAGE_ENABLED, Settings.PORTABLE_CELL_PICKUP_MATCH_DAMAGE,
+                YesNo.YES,
+                ButtonToolTips.PortableCellPickupMatchDamage, ButtonToolTips.PortableCellPickupMatchDamageEnabled);
+            registerApp(Icon.PORTABLE_CELL_PICKUP_MATCH_DAMAGE_DISABLED, Settings.PORTABLE_CELL_PICKUP_MATCH_DAMAGE,
+                YesNo.NO,
+                ButtonToolTips.PortableCellPickupMatchDamage, ButtonToolTips.PortableCellPickupMatchDamageDisabled);
+            registerApp(Icon.PORTABLE_CELL_PICKUP_MATCH_ORE_DICTIONARY_ENABLED,
+                Settings.PORTABLE_CELL_PICKUP_MATCH_ORE_DICTIONARY, YesNo.YES,
+                ButtonToolTips.PortableCellPickupMatchOreDictionary,
+                ButtonToolTips.PortableCellPickupMatchOreDictionaryEnabled);
+            registerApp(Icon.PORTABLE_CELL_PICKUP_MATCH_ORE_DICTIONARY_DISABLED,
+                Settings.PORTABLE_CELL_PICKUP_MATCH_ORE_DICTIONARY, YesNo.NO,
+                ButtonToolTips.PortableCellPickupMatchOreDictionary,
+                ButtonToolTips.PortableCellPickupMatchOreDictionaryDisabled);
 
             registerApp(Icon.CRAFT_HAMMER, Settings.CPU_SELECTION_MODE, CpuSelectionMode.ANY,
                 ButtonToolTips.CpuSelectionMode, ButtonToolTips.CpuSelectionModeAny);

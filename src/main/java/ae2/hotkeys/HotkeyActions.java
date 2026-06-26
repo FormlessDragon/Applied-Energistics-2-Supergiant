@@ -20,6 +20,7 @@ import java.util.Objects;
 import static ae2.api.features.HotkeyAction.PATTERN_MODIFIER;
 import static ae2.api.features.HotkeyAction.PORTABLE_FLUID_CELL;
 import static ae2.api.features.HotkeyAction.PORTABLE_ITEM_CELL;
+import static ae2.items.tools.powered.PortableItemCellAutoPickup.HOTKEY_ID;
 
 /**
  * Registry of {@link HotkeyAction}
@@ -53,6 +54,7 @@ public final class HotkeyActions {
         register(new RestockHotkeyAction(), WIRELESS_RESTOCK);
         register(new StowHotkeyAction(), WIRELESS_STOW);
         register(new MagnetHotkeyAction(), WIRELESS_MAGNET);
+        register(new PortableItemCellAutoPickupHotkeyAction(), HOTKEY_ID);
         register(Objects.requireNonNull(AEItems.PATTERN_MODIFIER.item()),
             (player, locator) -> GuiOpener.openItemGui(player, GuiIds.GuiKey.PATTERN_MODIFIER, locator),
             PATTERN_MODIFIER);
