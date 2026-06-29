@@ -35,6 +35,7 @@ import ae2.client.gui.implementations.GuiPatternProvider;
 import ae2.client.gui.implementations.GuiPortableCellPickupFilter;
 import ae2.client.gui.implementations.GuiPortableVoidCell;
 import ae2.client.gui.implementations.GuiPreciseStorageBus;
+import ae2.client.gui.implementations.GuiPriorityTuner;
 import ae2.client.gui.implementations.GuiQNB;
 import ae2.client.gui.implementations.GuiQuartzKnife;
 import ae2.client.gui.implementations.GuiRenamer;
@@ -99,6 +100,7 @@ import ae2.container.implementations.ContainerPatternModifier;
 import ae2.container.implementations.ContainerPatternProvider;
 import ae2.container.implementations.ContainerPortableCellPickupFilter;
 import ae2.container.implementations.ContainerPortableVoidCell;
+import ae2.container.implementations.ContainerPriorityTuner;
 import ae2.container.implementations.ContainerQNB;
 import ae2.container.implementations.ContainerQuartzKnife;
 import ae2.container.implementations.ContainerRenamer;
@@ -136,6 +138,7 @@ import ae2.items.contents.ConfigModifierGuiHost;
 import ae2.items.contents.NetworkToolGuiHost;
 import ae2.items.contents.PatternModifierGuiHost;
 import ae2.items.contents.PortableVoidCellGuiHost;
+import ae2.items.contents.PriorityTunerGuiHost;
 import ae2.items.contents.VoidCellGuiHost;
 import ae2.items.tools.powered.PortableItemCellAutoPickup;
 import ae2.items.tools.powered.WirelessTerminalRegistry;
@@ -211,6 +214,7 @@ public class AEGuiHandler implements IGuiHandler {
             || bridge == GuiIds.GuiKey.NETWORK_ANALYSER
             || bridge == GuiIds.GuiKey.TICK_ANALYSER
             || bridge == GuiIds.GuiKey.CONFIG_MODIFIER
+            || bridge == GuiIds.GuiKey.PRIORITY_TUNER
             || bridge == GuiIds.GuiKey.PATTERN_MODIFIER
             || bridge == GuiIds.GuiKey.ADVANCED_MEMORY_CARD
             || bridge == GuiIds.GuiKey.NETWORK_STATUS
@@ -593,6 +597,9 @@ public class AEGuiHandler implements IGuiHandler {
             }
             case CONFIG_MODIFIER -> {
                 return createConfigModifierContainer(player, x, ID);
+            }
+            case PRIORITY_TUNER -> {
+                return createPriorityTunerContainer(player, x, ID);
             }
             case PATTERN_MODIFIER -> {
                 return createPatternModifierContainer(player, x, y, z, ID);
@@ -1141,6 +1148,11 @@ public class AEGuiHandler implements IGuiHandler {
                 return container == null ? null : new GuiConfigModifier(container, player.inventory,
                     GuiStyleManager.loadStyleDoc("/screens/config_modifier.json"));
             }
+            case PRIORITY_TUNER -> {
+                ContainerPriorityTuner container = createPriorityTunerContainer(player, x, ID);
+                return container == null ? null : new GuiPriorityTuner(container, player.inventory,
+                    GuiStyleManager.loadStyleDoc("/screens/priority_tuner.json"));
+            }
             case PATTERN_MODIFIER -> {
                 ContainerPatternModifier container = createPatternModifierContainer(player, x, y, z, ID);
                 return container == null ? null : new GuiPatternModifier(container, player.inventory,
@@ -1263,6 +1275,16 @@ public class AEGuiHandler implements IGuiHandler {
         }
 
         return initContainer(new ContainerConfigModifier(player.inventory, configModifierHost), locator, guiId);
+    }
+
+    private @Nullable ContainerPriorityTuner createPriorityTunerContainer(EntityPlayer player, int slot, int guiId) {
+        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+        ItemGuiHost<?> host = createItemGuiHost(player, locator, GuiIds.GuiKey.PRIORITY_TUNER);
+        if (!(host instanceof PriorityTunerGuiHost priorityTunerHost)) {
+            return null;
+        }
+
+        return initContainer(new ContainerPriorityTuner(player.inventory, priorityTunerHost), locator, guiId);
     }
 
     private @Nullable ContainerPatternModifier createPatternModifierContainer(EntityPlayer player, int x, int y, int z,

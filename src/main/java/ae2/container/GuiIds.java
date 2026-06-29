@@ -96,6 +96,7 @@ public final class GuiIds {
         ANNIHILATION_PLANE,
         THRESHOLD_LEVEL_EMITTER,
         CONFIG_MODIFIER,
+        PRIORITY_TUNER,
         PATTERN_MODIFIER,
         ADVANCED_MEMORY_CARD,
         CELL_RESTRICTION,

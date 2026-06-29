@@ -40,6 +40,7 @@ public final class AEItemIds {
     public static final ResourceLocation ME_PACKING_TAPE = id("me_packing_tape");
     public static final ResourceLocation PACKAGE = id("package");
     public static final ResourceLocation CONFIG_MODIFIER = id("config_modifier");
+    public static final ResourceLocation PRIORITY_TUNER = id("priority_tuner");
     public static final ResourceLocation PATTERN_MODIFIER = id("pattern_modifier");
     public static final ResourceLocation VIEW_CELL = id("view_cell");
     public static final ResourceLocation MEMORY_CARD = id("memory_card");
