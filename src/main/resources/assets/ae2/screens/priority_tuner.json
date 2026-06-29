@@ -4,8 +4,8 @@
     "common/common.json"
   ],
   "background": {
-    "texture": "guis/config_modifier.png",
-    "srcRect": [0, 0, 191, 60]
+    "texture": "guis/priority.png",
+    "srcRect": [0, 0, 176, 125]
   },
   "text": {
     "dialog_title": {
@@ -13,27 +13,27 @@
         "translate": "gui.ae2.PriorityTuner"
       },
       "position": {
-        "left": 5,
+        "left": 8,
         "top": 6
       }
     }
   },
   "widgets": {
     "mode": {
-      "left": 12,
-      "top": 22,
+      "left": 60,
+      "top": 95,
       "width": 62,
       "height": 20
     },
     "priority": {
-      "left": 84,
-      "top": 18,
-      "width": 88,
-      "height": 30
+      "left": 20,
+      "top": 25,
+      "width": 138,
+      "height": 62
     },
     "priorityInput": {
-      "left": 98,
-      "top": 26,
+      "left": 60,
+      "top": 50,
       "width": 61,
       "height": 12
     }

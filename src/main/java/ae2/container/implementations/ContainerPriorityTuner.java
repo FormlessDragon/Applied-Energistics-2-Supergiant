@@ -20,6 +20,9 @@ public class ContainerPriorityTuner extends AEBaseContainer {
     public ContainerPriorityTuner(InventoryPlayer ip, PriorityTunerGuiHost host) {
         super(ip, host);
         this.host = host;
+        PriorityTunerItem.Settings settings = this.host.getSettings();
+        this.mode = settings.mode();
+        this.priority = settings.priority();
         registerClientAction(ACTION_SET_MODE, PriorityTunerItem.Mode.class, this::setMode);
         registerClientAction(ACTION_SET_PRIORITY, Integer.class, this::setPriority);
     }
