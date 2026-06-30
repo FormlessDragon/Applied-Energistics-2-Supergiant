@@ -13,6 +13,7 @@ import ae2.core.localization.GuiText;
 import ae2.helpers.patternmodifier.PatternModifierToolboxLayout;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
@@ -250,7 +251,11 @@ public final class PatternModifierPanelWidget implements ICompositeWidget {
         @Override
         public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
             setMessage(getMessageComponent());
-            super.drawButton(minecraft, mouseX, mouseY, partialTicks);
+            try {
+                super.drawButton(minecraft, mouseX, mouseY, partialTicks);
+            } finally {
+                GlStateManager.disableDepth();
+            }
         }
 
         @Override

@@ -1,0 +1,132 @@
+{
+  "$schema": "../../schema.json",
+  "slots": {
+    "PROCESSING_INPUTS": {
+      "left": 33,
+      "bottom": 158,
+      "grid": "BREAK_AFTER_3COLS"
+    },
+    "PROCESSING_OUTPUTS": {
+      "left": 118,
+      "bottom": 158,
+      "grid": "VERTICAL"
+    }
+  },
+  "tooltips": {
+    "processing-primary-output": {
+      "left": 118,
+      "bottom": 158,
+      "width": 18,
+      "height": 18,
+      "tooltip": [
+        {
+          "translate": "gui.ae2.PatternEncoding.primary_processing_result_tooltip"
+        },
+        {
+          "translate": "gui.ae2.PatternEncoding.primary_processing_result_hint",
+          "color": "#666666"
+        }
+      ]
+    },
+    "processing-optional-output1": {
+      "left": 118,
+      "bottom": 158,
+      "width": 18,
+      "height": 18,
+      "tooltip": [
+        {
+          "translate": "gui.ae2.PatternEncoding.secondary_processing_result_tooltip"
+        },
+        {
+          "translate": "gui.ae2.PatternEncoding.secondary_processing_result_hint",
+          "color": "#666666"
+        }
+      ]
+    },
+    "processing-optional-output2": {
+      "left": 118,
+      "bottom": 141,
+      "width": 18,
+      "height": 18,
+      "tooltip": [
+        {
+          "translate": "gui.ae2.PatternEncoding.secondary_processing_result_tooltip"
+        },
+        {
+          "translate": "gui.ae2.PatternEncoding.secondary_processing_result_hint",
+          "color": "#666666"
+        }
+      ]
+    },
+    "processing-optional-output3": {
+      "left": 118,
+      "bottom": 123,
+      "width": 18,
+      "height": 18,
+      "tooltip": [
+        {
+          "translate": "gui.ae2.PatternEncoding.secondary_processing_result_tooltip"
+        },
+        {
+          "translate": "gui.ae2.PatternEncoding.secondary_processing_result_hint",
+          "color": "#666666"
+        }
+      ]
+    }
+  },
+  "widgets": {
+    "processingPatternModeScrollbar": {
+      "left": 24,
+      "bottom": 158,
+      "height": 52
+    },
+    "processingCycleOutput": {
+      "left": 98,
+      "bottom": 159
+    },
+    "processingClearSecondaryOutputs": {
+      "left": 98,
+      "bottom": 149
+    },
+    "processingClearPattern": {
+      "left": 88,
+      "bottom": 159
+    },
+    "processingAmountButton0": {
+      "left": 108,
+      "bottom": 158,
+      "width": 8,
+      "height": 8
+    },
+    "processingAmountButton1": {
+      "left": 137,
+      "bottom": 158,
+      "width": 8,
+      "height": 8
+    },
+    "processingAmountButton2": {
+      "left": 108,
+      "bottom": 148,
+      "width": 8,
+      "height": 8
+    },
+    "processingAmountButton3": {
+      "left": 137,
+      "bottom": 148,
+      "width": 8,
+      "height": 8
+    },
+    "processingAmountButton4": {
+      "left": 108,
+      "bottom": 123,
+      "width": 8,
+      "height": 8
+    },
+    "processingAmountButton5": {
+      "left": 137,
+      "bottom": 123,
+      "width": 8,
+      "height": 8
+    }
+  }
+}

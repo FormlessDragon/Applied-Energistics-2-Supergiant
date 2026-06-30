@@ -39,10 +39,10 @@ dependencies {
 * [NovaEngineering-Source/AE2CT-Legacy](https://github.com/NovaEngineering-Source/AE2CT-Legacy): integrated AE2CT-Legacy under the LGPL-3.0 License.
 * [GlodBlock/ExtendedAE](https://github.com/GlodBlock/ExtendedAE): ported selected EAE machines, tools, recipes, GUIs, and resources into the `ae2` namespace under the LGPL-3.0 License.
 * [GlodBlock/AE2 Network Analyser](https://github.com/GlodBlock/ExtendedAE/tree/analyser/1.21.1-neoforge): integrated AE2 Network Analyser under LGPL-3.0 license.
-* [pedroksl/AdvancedAE](https://github.com/pedroksl/AdvancedAE): ported selected AdvancedAE parts, recipes, GUIs, and behavior into the `ae2` namespace under the LGPL-3.0 License;
+* [pedroksl/AdvancedAE](https://github.com/pedroksl/AdvancedAE): ported selected AdvancedAE parts, recipes, GUIs, and behavior into the `ae2` namespace under the LGPL-3.0 License.
 * [AlmostReliable/merequester](https://github.com/AlmostReliable/merequester): integrated ME Requester under LGPL-3.0 license.
 * [62832/MEGACells](https://github.com/62832/MEGACells): integrated Portable Cell Workbench assets under CC BY-NC-SA 3.0;
-
+* [yuuki1293/AE2PatternEncodingAccessTerminal](https://github.com/yuuki1293/AE2PatternEncodingAccessTerminal): integrated AE2PatternEncodingAccessTerminal with partial code reuse and assets, all under the MIT license.
 ## Native Additions
 
 * Advanced Memory Card: in-network P2P management with filtering, binding, unbinding, renaming, and world highlights.

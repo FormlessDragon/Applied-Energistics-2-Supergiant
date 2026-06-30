@@ -48,6 +48,7 @@ import ae2.parts.automation.special.PreciseExportBusPart;
 import ae2.parts.automation.special.PreciseStorageBusPart;
 import ae2.parts.automation.special.ThresholdExportBusPart;
 import ae2.parts.crafting.PatternProviderPart;
+import ae2.parts.encoding.PEATerminalPart;
 import ae2.parts.encoding.PatternEncodingTerminalPart;
 import ae2.parts.misc.CableAnchorPart;
 import ae2.parts.misc.InterfacePart;
@@ -199,6 +200,8 @@ public final class AEParts {
         AEPartIds.PATTERN_ENCODING_TERMINAL, PatternEncodingTerminalPart.class, PatternEncodingTerminalPart::new);
     public static final ItemDefinition<PartItem<PatternAccessTerminalPart>> PATTERN_ACCESS_TERMINAL = createPart(
         AEPartIds.PATTERN_ACCESS_TERMINAL, PatternAccessTerminalPart.class, PatternAccessTerminalPart::new);
+    public static final ItemDefinition<PartItem<PEATerminalPart>> PEA_TERMINAL = createPart(
+        AEPartIds.PEA_TERMINAL, PEATerminalPart.class, PEATerminalPart::new);
     public static final ItemDefinition<PartItem<RequesterTerminalPart>> REQUESTER_TERMINAL = createPart(
         AEPartIds.REQUESTER_TERMINAL, RequesterTerminalPart.class, RequesterTerminalPart::new);
     public static final ItemDefinition<P2PPartItem<MEP2PTunnelPart>> ME_P2P_TUNNEL = createP2PPart(
@@ -257,6 +260,7 @@ public final class AEParts {
         ENERGY_ACCEPTOR,
         PATTERN_ENCODING_TERMINAL,
         PATTERN_ACCESS_TERMINAL,
+        PEA_TERMINAL,
         REQUESTER_TERMINAL,
         ME_P2P_TUNNEL,
         REDSTONE_P2P_TUNNEL,

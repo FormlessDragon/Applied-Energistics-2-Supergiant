@@ -1,7 +1,8 @@
-package ae2.client.gui.me.items;
+package ae2.client.gui.me.patternencode;
 
 import ae2.api.config.ActionItems;
 import ae2.client.Point;
+import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.WidgetContainer;
 import ae2.client.gui.style.Blitter;
@@ -9,6 +10,7 @@ import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.ITooltip;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.container.SlotSemantics;
+import ae2.container.me.items.ContainerPatternEncodingTerm;
 import ae2.core.localization.GuiText;
 import ae2.parts.encoding.ProcessingPatternAmountHelper;
 import net.minecraft.client.Minecraft;
@@ -31,7 +33,7 @@ public class ProcessingEncodingPanel extends EncodingModePanel {
     private final Scrollbar scrollbar;
     private final ProcessingAmountButton[] amountButtons;
 
-    public ProcessingEncodingPanel(GuiPatternEncodingTerm screen, WidgetContainer widgets) {
+    public ProcessingEncodingPanel(AEBaseGui<? extends ContainerPatternEncodingTerm> screen, WidgetContainer widgets) {
         super(screen, widgets);
         this.clearBtn = new ActionButton(ActionItems.S_CLOSE, this.container::clear);
         this.clearBtn.setHalfSize(true);

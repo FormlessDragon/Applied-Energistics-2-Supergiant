@@ -1,7 +1,7 @@
 package ae2.core.gui;
 
 import ae2.container.AEBaseContainer;
-import ae2.container.implementations.ContainerPatternAccessTerm;
+import ae2.container.implementations.IPatternAccess;
 import ae2.core.AELog;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.clientbound.RestorePreviousGuiPacket;
@@ -18,14 +18,15 @@ import java.util.Map;
 import java.util.UUID;
 
 public final class PatternContainerGuiReturnContext {
-    private static final ThreadLocal<ContainerPatternAccessTerm> ACTIVE_RETURN_CONTAINER = new ThreadLocal<>();
+    private static final ThreadLocal<AEBaseContainer> ACTIVE_RETURN_CONTAINER = new ThreadLocal<>();
     private static final Map<UUID, Int2ObjectMap<Container>> EXTERNAL_RETURN_CONTAINERS = new HashMap<>();
 
     private PatternContainerGuiReturnContext() {
     }
 
-    public static void openFromPatternAccessTerminal(EntityPlayer player, ContainerPatternAccessTerm returnContainer,
-                                                     Runnable openAction) {
+    public static <C extends AEBaseContainer & IPatternAccess> void openFromPatternAccessTerminal(
+        EntityPlayer player, C returnContainer, Runnable openAction
+    ) {
         if (!(player instanceof EntityPlayerMP serverPlayer)) {
             AELog.warn("Cannot open pattern container GUI for non-server player {}", player);
             return;
@@ -48,7 +49,7 @@ public final class PatternContainerGuiReturnContext {
     }
 
     public static <C extends AEBaseContainer> C initializeContainer(C container) {
-        ContainerPatternAccessTerm returnContainer = ACTIVE_RETURN_CONTAINER.get();
+        AEBaseContainer returnContainer = ACTIVE_RETURN_CONTAINER.get();
         if (returnContainer != null) {
             container.setReturnToContainerOverride(returnContainer);
             container.setExternalGuiReturn(true);
@@ -82,8 +83,8 @@ public final class PatternContainerGuiReturnContext {
         return containersByWindowId != null && containersByWindowId.containsKey(windowId);
     }
 
-    private static void attachReturnContainer(EntityPlayerMP player, @Nullable Container openedContainer,
-                                              ContainerPatternAccessTerm returnContainer) {
+    private static <C extends AEBaseContainer & IPatternAccess> void attachReturnContainer(EntityPlayerMP player, @Nullable Container openedContainer,
+                                               C returnContainer) {
         if (openedContainer == null) {
             AELog.warn("Pattern container GUI open action cleared the player's open container");
             return;

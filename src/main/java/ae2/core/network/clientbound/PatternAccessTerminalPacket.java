@@ -1,7 +1,7 @@
 package ae2.core.network.clientbound;
 
 import ae2.api.implementations.blockentities.PatternContainerGroup;
-import ae2.client.gui.me.patternaccess.GuiPatternAccessTerm;
+import ae2.client.gui.me.patternaccess.IPatternProviderDisplay;
 import ae2.core.network.ClientboundPacket;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -114,13 +114,13 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
     @Override
     @SideOnly(Side.CLIENT)
     public void handleClient(Minecraft minecraft) {
-        if (minecraft.currentScreen instanceof GuiPatternAccessTerm<?> patternAccessTerminal) {
+        if (minecraft.currentScreen instanceof IPatternProviderDisplay display) {
             if (this.fullUpdate) {
-                patternAccessTerminal.postFullUpdate(this.inventoryId, this.sortBy, this.canEditTerminalName,
+                display.postFullUpdate(this.inventoryId, this.sortBy, this.canEditTerminalName,
                     this.canModifyTerminalVisibility,
                     this.group, this.inventorySize, this.slots);
             } else {
-                patternAccessTerminal.postIncrementalUpdate(this.inventoryId, this.slots);
+                display.postIncrementalUpdate(this.inventoryId, this.slots);
             }
         }
     }

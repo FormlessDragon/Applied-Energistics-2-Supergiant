@@ -58,15 +58,29 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
-    private static final int GENERAL_PAGE_COUNT = 2;
+
+    public enum GeneralSetting {
+        PINNED_ITEMS,
+        CRAFTING_JOB_NOTIFICATIONS,
+        CLEAR_GRID_ON_CLOSE,
+        PATTERN_AUTO_FILL,
+        RECURSIVE_INGREDIENT_RESERVE,
+        PLAYER_PIN_ROWS,
+        SEARCH
+    }
+
     private static final long MAX_RECURSIVE_INGREDIENT_RESERVE = 1000;
     private final AEBaseGui<?> parent;
     private final Runnable beforeReturn;
     private final boolean wirelessOnly;
     private final boolean supportsPlayerPinRows;
+    private final EnumSet<GeneralSetting> generalSettings;
     private final AECheckbox pinAutoCraftedItemsCheckbox;
     private final AECheckbox pinDisplaySortTopRadio;
     private final AECheckbox pinDisplayLockedGridRadio;
@@ -119,6 +133,14 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     public GuiTerminalSettings(AEBaseGui<?> parent, AEBaseContainer container,
                                @Nullable WirelessTerminalGuiHost<?> wirelessHost,
                                ItemStack parentIcon, Runnable beforeReturn, boolean wirelessOnly) {
+        this(parent, container, wirelessHost, parentIcon, beforeReturn, wirelessOnly,
+            EnumSet.allOf(GeneralSetting.class));
+    }
+
+    public GuiTerminalSettings(AEBaseGui<?> parent, AEBaseContainer container,
+                               @Nullable WirelessTerminalGuiHost<?> wirelessHost,
+                               ItemStack parentIcon, Runnable beforeReturn, boolean wirelessOnly,
+                               Set<GeneralSetting> generalSettings) {
         super(container, container.getPlayerInventory(),
             GuiStyleManager.loadStyleDoc("/screens/terminals/terminal_settings.json"));
         this.parent = parent;
@@ -126,6 +148,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         this.wirelessOnly = wirelessOnly;
         this.wirelessHost = wirelessHost;
         this.supportsPlayerPinRows = parent instanceof GuiMEStorage<?>;
+        this.generalSettings = copyGeneralSettings(generalSettings);
 
         ITextComponent externalSearchName = new TextComponentString(
             ItemListMod.isEnabled() ? ItemListMod.getShortName() : "HEI");
@@ -224,6 +247,14 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         updateState();
     }
 
+    private static EnumSet<GeneralSetting> copyGeneralSettings(Set<GeneralSetting> generalSettings) {
+        Set<GeneralSetting> checkedSettings = Objects.requireNonNull(generalSettings, "generalSettings");
+        if (checkedSettings.isEmpty()) {
+            throw new IllegalArgumentException("generalSettings must not be empty");
+        }
+        return EnumSet.copyOf(checkedSettings);
+    }
+
     @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
@@ -293,7 +324,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     }
 
     private void nextGeneralPage() {
-        if (this.generalPage + 1 < GENERAL_PAGE_COUNT) {
+        if (this.generalPage + 1 < getGeneralPageCount()) {
             this.generalPage++;
             updateVisibility();
         }
@@ -525,34 +556,71 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         magnetSettingsButton.visible = magnetCardInstalled;
     }
 
+    private boolean hasGeneralSetting(GeneralSetting setting) {
+        return this.generalSettings.contains(setting);
+    }
+
+    private boolean hasGeneralTerminalPage() {
+        return hasGeneralSetting(GeneralSetting.PINNED_ITEMS)
+            || hasGeneralSetting(GeneralSetting.CRAFTING_JOB_NOTIFICATIONS)
+            || hasGeneralSetting(GeneralSetting.CLEAR_GRID_ON_CLOSE)
+            || hasGeneralSetting(GeneralSetting.PATTERN_AUTO_FILL)
+            || hasGeneralSetting(GeneralSetting.RECURSIVE_INGREDIENT_RESERVE)
+            || hasGeneralSetting(GeneralSetting.PLAYER_PIN_ROWS);
+    }
+
+    private int getGeneralPageCount() {
+        int pageCount = 0;
+        if (hasGeneralTerminalPage()) {
+            pageCount++;
+        }
+        if (hasGeneralSetting(GeneralSetting.SEARCH)) {
+            pageCount++;
+        }
+        return Math.max(1, pageCount);
+    }
+
     private void updateVisibility() {
+        int generalPageCount = getGeneralPageCount();
+        if (this.generalPage >= generalPageCount) {
+            this.generalPage = generalPageCount - 1;
+        }
         boolean general = !this.wirelessOnly && this.page == Page.GENERAL;
         boolean wireless = this.page == Page.WIRELESS && this.wirelessHost != null;
-        boolean generalTerminalPage = general && this.generalPage == 0;
-        boolean generalSearchPage = general && this.generalPage == 1;
+        boolean hasGeneralTerminalPage = hasGeneralTerminalPage();
+        boolean generalTerminalPage = general && hasGeneralTerminalPage && this.generalPage == 0;
+        boolean generalSearchPage = general && hasGeneralSetting(GeneralSetting.SEARCH)
+            && this.generalPage == (hasGeneralTerminalPage ? 1 : 0);
+        boolean showGeneralPageControls = general && generalPageCount > 1;
         setTextContent(TEXT_ID_DIALOG_TITLE,
             wireless ? GuiText.WirelessTerminalSettingsTitle.text() : GuiText.TerminalSettingsTitle.text());
-        setTextContent("page_info", new TextComponentString((this.generalPage + 1) + " / " + GENERAL_PAGE_COUNT));
+        setTextContent("page_info", new TextComponentString((this.generalPage + 1) + " / " + generalPageCount));
 
         this.generalPageButton.visible = !this.wirelessOnly;
         this.generalPageButton.setFocused(general);
         this.wirelessPageButton.setFocused(wireless);
         this.wirelessPageButton.visible = !this.wirelessOnly && this.wirelessHost != null;
-        this.previousPageButton.visible = general;
-        this.nextPageButton.visible = general;
-        this.previousPageButton.enabled = general && this.generalPage > 0;
-        this.nextPageButton.enabled = general && this.generalPage + 1 < GENERAL_PAGE_COUNT;
+        this.previousPageButton.visible = showGeneralPageControls;
+        this.nextPageButton.visible = showGeneralPageControls;
+        this.previousPageButton.enabled = showGeneralPageControls && this.generalPage > 0;
+        this.nextPageButton.enabled = showGeneralPageControls && this.generalPage + 1 < generalPageCount;
 
         setTextHidden("search_settings_title", !generalSearchPage);
-        setTextHidden("page_info", !general);
+        setTextHidden("page_info", !showGeneralPageControls);
         setTextHidden("wireless_settings_title", true);
-        this.pinAutoCraftedItemsCheckbox.visible = generalTerminalPage;
-        this.pinDisplaySortTopRadio.visible = generalTerminalPage;
-        this.pinDisplayLockedGridRadio.visible = generalTerminalPage;
-        this.notifyForFinishedCraftingJobsCheckbox.visible = generalTerminalPage;
-        this.clearGridOnCloseCheckbox.visible = generalTerminalPage;
+        this.pinAutoCraftedItemsCheckbox.visible = generalTerminalPage
+            && hasGeneralSetting(GeneralSetting.PINNED_ITEMS);
+        this.pinDisplaySortTopRadio.visible = generalTerminalPage
+            && hasGeneralSetting(GeneralSetting.PINNED_ITEMS);
+        this.pinDisplayLockedGridRadio.visible = generalTerminalPage
+            && hasGeneralSetting(GeneralSetting.PINNED_ITEMS);
+        this.notifyForFinishedCraftingJobsCheckbox.visible = generalTerminalPage
+            && hasGeneralSetting(GeneralSetting.CRAFTING_JOB_NOTIFICATIONS);
+        this.clearGridOnCloseCheckbox.visible = generalTerminalPage
+            && hasGeneralSetting(GeneralSetting.CLEAR_GRID_ON_CLOSE);
         if (this.autoFillPatternsCheckbox != null) {
-            this.autoFillPatternsCheckbox.visible = generalTerminalPage;
+            this.autoFillPatternsCheckbox.visible = generalTerminalPage
+                && hasGeneralSetting(GeneralSetting.PATTERN_AUTO_FILL);
         }
         this.useInternalSearchRadio.visible = generalSearchPage;
         this.useExternalSearchRadio.visible = generalSearchPage;
@@ -560,10 +628,15 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         this.autoFocusCheckbox.visible = generalSearchPage && this.useInternalSearchRadio.isSelected();
         this.syncWithExternalCheckbox.visible = generalSearchPage && this.useInternalSearchRadio.isSelected();
         this.clearExternalCheckbox.visible = generalSearchPage && this.useExternalSearchRadio.isSelected();
-        setTextHidden("recursive_reserve_label", !generalTerminalPage);
-        setTextHidden("player_pin_rows_label", !(generalTerminalPage && this.supportsPlayerPinRows));
-        this.recursiveReserveField.setVisible(generalTerminalPage);
-        this.playerPinRowsField.setVisible(generalTerminalPage && this.supportsPlayerPinRows);
+        setTextHidden("recursive_reserve_label",
+            !(generalTerminalPage && hasGeneralSetting(GeneralSetting.RECURSIVE_INGREDIENT_RESERVE)));
+        setTextHidden("player_pin_rows_label",
+            !(generalTerminalPage && this.supportsPlayerPinRows
+                && hasGeneralSetting(GeneralSetting.PLAYER_PIN_ROWS)));
+        this.recursiveReserveField.setVisible(generalTerminalPage
+            && hasGeneralSetting(GeneralSetting.RECURSIVE_INGREDIENT_RESERVE));
+        this.playerPinRowsField.setVisible(generalTerminalPage && this.supportsPlayerPinRows
+            && hasGeneralSetting(GeneralSetting.PLAYER_PIN_ROWS));
 
         if (this.pickBlockCheckbox != null) {
             this.pickBlockCheckbox.visible = wireless;

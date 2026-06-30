@@ -354,6 +354,7 @@ public enum GuiText implements LocalizationEnum {
     PatternAccessTerminal,
     PatternAccessTerminalHint,
     PatternAccessTerminalShort,
+    PatternEncodingAccessTerminalShort,
     PatternAccessTerminalHighlightProvider,
     PatternAccessTerminalOpenProvider,
     PatternAccessTerminalSearchTooltipInput,

@@ -8,7 +8,9 @@ import ae2.api.stacks.GenericStack;
 import ae2.api.upgrades.IUpgradeableItem;
 import ae2.api.upgrades.Upgrades;
 import ae2.client.gui.Icon;
+import ae2.container.implementations.ContainerPEATerm;
 import ae2.container.me.items.ContainerCraftingTerm;
+import ae2.container.me.items.ContainerPatternEncodingTerm;
 import ae2.container.me.items.ContainerWirelessCraftingTerm;
 import ae2.core.AEConfig;
 import ae2.core.AELog;
@@ -365,8 +367,11 @@ public class HeiPlugin implements IModPlugin {
             VanillaRecipeCategoryUid.CRAFTING);
         registry.getRecipeTransferRegistry().addUniversalRecipeTransferHandler(
             new CraftingRecipeTransferHandler<>(ContainerWirelessCraftingTerm.class, transferHelper));
-        PatternEncodingRecipeTransferHandler patternTransferHandler = new PatternEncodingRecipeTransferHandler();
-        registry.getRecipeTransferRegistry().addUniversalRecipeTransferHandler(patternTransferHandler);
+        registry.getRecipeTransferRegistry().addUniversalRecipeTransferHandler(
+            new PatternEncodingRecipeTransferHandler<>(ContainerPatternEncodingTerm.class));
+        registry.getRecipeTransferRegistry().addUniversalRecipeTransferHandler(
+            new PatternEncodingRecipeTransferHandler<>(ContainerPEATerm.class)
+        );
         registry.addAdvancedGuiHandlers(GUI_HANDLER);
         registry.addGhostIngredientHandler(GUI_HANDLER.getGuiContainerClass(), GUI_HANDLER);
     }

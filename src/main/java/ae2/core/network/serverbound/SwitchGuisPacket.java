@@ -351,7 +351,8 @@ public class SwitchGuisPacket extends ServerboundPacket {
                  PATTERN_ENCODING_TERMINAL,
                  WIRELESS_TERMINAL,
                  WIRELESS_CRAFTING_TERMINAL,
-                 WIRELESS_PATTERN_ENCODING_TERMINAL -> true;
+                 WIRELESS_PATTERN_ENCODING_TERMINAL,
+                 WIRELESS_PEA_TERMINAL -> true;
             default -> false;
         };
     }

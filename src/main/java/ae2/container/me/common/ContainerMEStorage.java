@@ -239,6 +239,10 @@ public class ContainerMEStorage extends AEBaseContainer
             this.updateRecursiveIngredientReserveAmount();
 
             for (Setting<?> set : this.serverCM.getSettings()) {
+                if (!canSyncSetting(this.serverCM, this.clientCM, set)) {
+                    continue;
+                }
+
                 Enum<?> sideLocal = this.serverCM.getSetting(set);
                 Enum<?> sideRemote = this.clientCM.getSetting(set);
 
@@ -372,6 +376,10 @@ public class ContainerMEStorage extends AEBaseContainer
         if (this.getGui() != null) {
             this.getGui().run();
         }
+    }
+
+    static boolean canSyncSetting(IConfigManager serverConfig, IConfigManager clientConfig, Setting<?> setting) {
+        return serverConfig.hasSetting(setting) && clientConfig.hasSetting(setting);
     }
 
     @Override

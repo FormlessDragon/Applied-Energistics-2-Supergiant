@@ -1,12 +1,14 @@
 package ae2.core.network.serverbound;
 
-import ae2.container.implementations.ContainerPatternAccessTerm;
+import ae2.container.implementations.IPatternAccess;
 import ae2.core.network.ServerboundPacket;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongLists;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.inventory.Container;
+import net.minecraft.inventory.Slot;
 import net.minecraft.network.PacketBuffer;
 
 public class QuickMovePatternPacket extends ServerboundPacket {
@@ -76,15 +78,20 @@ public class QuickMovePatternPacket extends ServerboundPacket {
         if (this.invalidTargetCount) {
             return;
         }
-        if (!(player.openContainer instanceof ContainerPatternAccessTerm container)) {
+        Container openContainer = player.openContainer;
+        if (!(openContainer instanceof IPatternAccess container)) {
             return;
         }
-        if (container.windowId != this.windowId) {
+        if (openContainer.windowId != this.windowId) {
             return;
         }
+        if (this.clickedSlot < 0 || this.clickedSlot >= openContainer.inventorySlots.size()) {
+            return;
+        }
+        Slot sourceSlot = openContainer.getSlot(this.clickedSlot);
         container.quickMovePattern(
             player,
-            this.clickedSlot,
+            sourceSlot,
             this.allowedPatternContainerIds,
             this.allowedPatternSlots);
     }

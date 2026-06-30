@@ -1,0 +1,142 @@
+{
+	"$schema": "../schema.json",
+	"includes": [
+		"../common/common.json",
+		"../common/player_inventory.json",
+		"accessEncoding/crafting.json",
+		"accessEncoding/processing.json"
+	],
+	"text": {
+		"crafting_grid_title": {
+			"text": {
+				"translate": "gui.ae2.PatternEncoding"
+			},
+			"position": {
+				"left": 17,
+				"bottom": 177
+			}
+		}
+	},
+	"widgets": {
+		"scrollbar": {
+			"left": 193,
+			"top": 31
+		},
+		"search": {
+			"left": 17,
+			"top": 17,
+			"width": 65,
+			"height": 10
+		},
+		"inputSearch": {
+			"left": 114,
+			"top": 4,
+			"width": 65,
+			"height": 10
+		},
+		"outputSearch": {
+			"left": 114,
+			"top": 17,
+			"width": 65,
+			"height": 10
+		},
+		"patternModifierPanel": {
+			"left": -126,
+			"top": 59,
+			"width": 86,
+			"height": 180
+		},
+		"patternModifierPanelAmount0": {
+			"left": -63,
+			"top": 67,
+			"width": 18,
+			"height": 20
+		},
+		"patternModifierPanelAmount1": {
+			"left": -63,
+			"top": 89,
+			"width": 18,
+			"height": 20
+		},
+		"patternModifierPanelAmount2": {
+			"left": -63,
+			"top": 111,
+			"width": 18,
+			"height": 20
+		},
+		"patternModifierPanelAmount3": {
+			"left": -63,
+			"top": 133,
+			"width": 18,
+			"height": 20
+		},
+		"patternModifierPanelAmount4": {
+			"left": -63,
+			"top": 155,
+			"width": 18,
+			"height": 20
+		},
+		"patternModifierPanelAmount5": {
+			"left": -63,
+			"top": 177,
+			"width": 18,
+			"height": 20
+		},
+		"patternModifierPanelClear": {
+			"left": -63,
+			"top": 199,
+			"width": 18,
+			"height": 20
+		},
+		"modeTabButton0": {
+			"left": 191,
+			"bottom": 174,
+			"width": 22,
+			"height": 22
+		},
+		"modeTabButton1": {
+			"left": 191,
+			"bottom": 153,
+			"width": 22,
+			"height": 22
+		},
+		"modePanel0": {
+			"left": 18,
+			"bottom": 166
+		},
+		"modePanel1": {
+			"left": 18,
+			"bottom": 166
+		},
+		"encodePattern": {
+			"left": 156,
+			"bottom": 145
+		},
+		"uploadPattern": {
+			"left": 174,
+			"bottom": 140,
+			"width": 8,
+			"height": 8
+		}
+	},
+	"slots": {
+		"PLAYER_INVENTORY": {
+			"left": 17,
+			"bottom": 84,
+			"grid": "BREAK_AFTER_9COLS"
+		},
+		"PLAYER_HOTBAR": {
+			"left": 17,
+			"bottom": 26,
+			"grid": "HORIZONTAL"
+		},
+		"BLANK_PATTERN": {
+			"left": 156,
+			"bottom": 165
+		},
+		"ENCODED_PATTERN": {
+			"left": 156,
+			"bottom": 118
+		}
+	}
+}

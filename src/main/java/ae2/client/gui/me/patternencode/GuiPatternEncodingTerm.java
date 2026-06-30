@@ -1,4 +1,4 @@
-package ae2.client.gui.me.items;
+package ae2.client.gui.me.patternencode;
 
 import ae2.api.behaviors.ContainerItemStrategies;
 import ae2.api.behaviors.EmptyingAction;
@@ -10,6 +10,9 @@ import ae2.api.stacks.GenericStack;
 import ae2.client.Point;
 import ae2.client.gui.Icon;
 import ae2.client.gui.me.common.GuiMEStorage;
+import ae2.client.gui.me.items.GuiPatternImportPrioritySettings;
+import ae2.client.gui.me.items.GuiPatternItemRenamer;
+import ae2.client.gui.me.items.GuiSetProcessingPatternAmount;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.IconButton;
@@ -48,8 +51,8 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     private static final EncodingMode[] ENCODING_MODES = EncodingMode.values();
     private final Map<EncodingMode, EncodingModePanel> modePanels = new EnumMap<>(EncodingMode.class);
     private final Map<EncodingMode, TabButton> modeTabButtons = new EnumMap<>(EncodingMode.class);
-    private final PatternModifierPanelWidget patternModifierPanel;
     private final IconButton uploadPatternButton;
+    private final PatternModifierPanelWidget patternModifierPanel;
 
     public GuiPatternEncodingTerm(ContainerPatternEncodingTerm container, InventoryPlayer playerInventory,
                                   @Nullable ITextComponent title, GuiStyle style) {
@@ -110,7 +113,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     }
 
     private void openImportPrioritySettings() {
-        switchToScreen(new GuiPatternImportPrioritySettings(this));
+        switchToScreen(new GuiPatternImportPrioritySettings<>(this));
     }
 
     private void addMode(EncodingMode mode, EncodingModePanel panel, int index) {
@@ -185,7 +188,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
         if (mouseButton == 2) {
             Slot slot = findSlot(mouseX, mouseY);
             if (isAltDown() && slot != null && this.container.isProcessingPatternItemSlot(slot)) {
-                switchToScreen(new GuiPatternItemRenamer(this, slot,
+                switchToScreen(new GuiPatternItemRenamer<>(this, slot,
                     TextComponentItemStack.of(this.container.getHost().getMainContainerIcon())));
                 return;
             }
