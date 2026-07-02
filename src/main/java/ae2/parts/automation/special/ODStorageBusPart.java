@@ -7,9 +7,12 @@ import ae2.core.AppEng;
 import ae2.items.parts.PartModels;
 import ae2.parts.PartModel;
 import ae2.parts.storagebus.StorageBusPart;
+import ae2.util.SettingsFrom;
 import ae2.util.prioritylist.IPartitionList;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
 public class ODStorageBusPart extends StorageBusPart implements ODFilterHost {
     private static final ResourceLocation MODEL_BASE = AppEng.makeId("part/od_storage_bus_base");
@@ -42,6 +45,22 @@ public class ODStorageBusPart extends StorageBusPart implements ODFilterHost {
         super.writeToNBT(data);
         data.setString("odWhite", this.whiteExpression);
         data.setString("odBlack", this.blackExpression);
+    }
+
+    @Override
+    public void exportSettings(SettingsFrom mode, NBTTagCompound output) {
+        super.exportSettings(mode, output);
+        if (mode == SettingsFrom.MEMORY_CARD) {
+            exportODFilterMemoryCardSettings(output);
+        }
+    }
+
+    @Override
+    public void importSettings(SettingsFrom mode, NBTTagCompound input, @Nullable EntityPlayer player) {
+        super.importSettings(mode, input, player);
+        if (mode == SettingsFrom.MEMORY_CARD) {
+            importODFilterMemoryCardSettings(input);
+        }
     }
 
     @Override

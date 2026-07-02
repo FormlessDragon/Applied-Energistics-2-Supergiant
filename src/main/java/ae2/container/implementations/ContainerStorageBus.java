@@ -12,14 +12,13 @@ import ae2.container.guisync.GuiSync;
 import ae2.core.definitions.AEItems;
 import ae2.parts.storagebus.StorageBusPart;
 import ae2.util.ConfigInventory;
-import com.google.common.collect.Iterators;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.Map;
 
 public class ContainerStorageBus extends UpgradeableContainer<StorageBusPart> {
 
@@ -95,16 +94,17 @@ public class ContainerStorageBus extends UpgradeableContainer<StorageBusPart> {
         ConfigInventory inv = getHost().getConfig();
         MEStorage cellInv = getHost().getInternalHandler();
 
-        Iterator<AEKey> i = Collections.emptyIterator();
+        Iterator<Object2LongMap.Entry<AEKey>> i = Collections.emptyIterator();
         if (cellInv != null) {
-            i = Iterators.transform(cellInv.getAvailableStacks().iterator(), Map.Entry::getKey);
+            i = cellInv.getAvailableStacks().iterator();
         }
 
         inv.beginBatch();
         try {
             for (int x = 0; x < inv.size(); x++) {
                 if (i.hasNext() && this.isSlotEnabled(x / 9 - 2)) {
-                    inv.setStack(x, new GenericStack(i.next(), 1));
+                    Object2LongMap.Entry<AEKey> entry = i.next();
+                    inv.setStack(x, new GenericStack(entry.getKey(), getPartitionAmount(entry)));
                 } else {
                     inv.setStack(x, null);
                 }
@@ -114,6 +114,10 @@ public class ContainerStorageBus extends UpgradeableContainer<StorageBusPart> {
         }
 
         this.broadcastChanges();
+    }
+
+    private long getPartitionAmount(Object2LongMap.Entry<AEKey> entry) {
+        return Math.max(1, entry.getLongValue());
     }
 
     public AccessRestriction getReadWriteMode() {

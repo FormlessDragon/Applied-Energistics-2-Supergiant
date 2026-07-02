@@ -6,9 +6,12 @@ import ae2.container.GuiIds.GuiKey;
 import ae2.core.AppEng;
 import ae2.items.parts.PartModels;
 import ae2.parts.PartModel;
+import ae2.util.SettingsFrom;
 import ae2.util.prioritylist.IPartitionList;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
 public class ModExportBusPart extends SpecialExportBusPart implements ModFilterHost {
     private static final ResourceLocation MODEL_BASE = AppEng.makeId("part/mod_export_bus_base");
@@ -38,6 +41,22 @@ public class ModExportBusPart extends SpecialExportBusPart implements ModFilterH
     public void writeToNBT(NBTTagCompound extra) {
         super.writeToNBT(extra);
         extra.setString("modid", this.modExpression);
+    }
+
+    @Override
+    public void exportSettings(SettingsFrom mode, NBTTagCompound output) {
+        super.exportSettings(mode, output);
+        if (mode == SettingsFrom.MEMORY_CARD) {
+            exportModFilterMemoryCardSettings(output);
+        }
+    }
+
+    @Override
+    public void importSettings(SettingsFrom mode, NBTTagCompound input, @Nullable EntityPlayer player) {
+        super.importSettings(mode, input, player);
+        if (mode == SettingsFrom.MEMORY_CARD) {
+            importModFilterMemoryCardSettings(input);
+        }
     }
 
     @Override

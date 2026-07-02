@@ -209,6 +209,30 @@ public final class WirelessTerminalActions {
         player.inventoryContainer.detectAndSendChanges();
     }
 
+    public static ItemStack extractStack(EntityPlayerMP player, ItemStack template, int amount) {
+        if (amount <= 0 || template.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+        AEItemKey key = AEItemKey.of(template);
+        if (key == null) {
+            return ItemStack.EMPTY;
+        }
+        TerminalContext context = findUsableTerminal(player, ignored -> true);
+        if (context == null) {
+            return ItemStack.EMPTY;
+        }
+
+        long extracted = StorageHelper.poweredExtraction(context.energySource, context.host.getInventory(), key,
+            amount, new PlayerSource(player, context.actionHost));
+        if (extracted <= 0) {
+            return ItemStack.EMPTY;
+        }
+
+        ItemStack result = template.copy();
+        result.setCount((int) Math.min(extracted, Integer.MAX_VALUE));
+        return result;
+    }
+
     public static void tryMagnetPickup(EntityPlayerMP player, EntityItem entityItem) {
         tryPickup(player, entityItem, true);
     }

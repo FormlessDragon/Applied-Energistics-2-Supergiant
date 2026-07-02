@@ -18,6 +18,7 @@
 
 package ae2.helpers.patternprovider;
 
+import ae2.api.AECapabilities;
 import ae2.api.config.Actionable;
 import ae2.api.config.BlockingMode;
 import ae2.api.config.LockCraftingMode;
@@ -31,7 +32,6 @@ import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.IPatternDetails.IInput;
 import ae2.api.crafting.PatternDetailsHelper;
-import ae2.api.AECapabilities;
 import ae2.api.implementations.blockentities.ICraftingMachine;
 import ae2.api.implementations.blockentities.IPatternProviderBatchTarget;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
@@ -59,12 +59,14 @@ import ae2.api.upgrades.IUpgradeInventory;
 import ae2.api.upgrades.Upgrades;
 import ae2.api.util.IConfigManager;
 import ae2.core.AEConfig;
+import ae2.core.AELog;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.PlayerMessages;
 import ae2.core.settings.TickRates;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.helpers.InterfaceLogicHost;
+import ae2.helpers.WirelessTerminalActions;
 import ae2.helpers.patternprovider.PatternProviderMergeHelper.ExternalTarget;
 import ae2.helpers.patternprovider.PatternProviderMergeHelper.TargetMatch;
 import ae2.me.helpers.MachineSource;
@@ -86,6 +88,7 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -1123,6 +1126,17 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         this.patternInventory.writeToNBT(output, MEMORY_CARD_PATTERNS);
     }
 
+    private static void returnToPlayer(EntityPlayer player, ItemStack stack) {
+        if (stack.isEmpty()) {
+            return;
+        }
+        ItemStack remainder = stack.copy();
+        if (!player.inventory.addItemStackToInventory(remainder) && !remainder.isEmpty()) {
+            AELog.warn("Failed to return %s after %s; dropping it at the player", remainder, "memory card pattern restore");
+            player.dropItem(remainder, false);
+        }
+    }
+
     public void importSettings(NBTTagCompound input, @Nullable EntityPlayer player) {
         if (input.hasKey(MEMORY_CARD_SETTINGS, Constants.NBT.TAG_COMPOUND)) {
             var settings = readSettings(input.getCompoundTag(MEMORY_CARD_SETTINGS));
@@ -1158,6 +1172,10 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
                 continue;
             }
 
+            if (tryInstallPatternFromWirelessNetwork(player, desiredPattern)) {
+                continue;
+            }
+
             ++blankPatternsUsed;
             if (blankPatternsAvailable >= blankPatternsUsed) {
                 if (!this.terminalPatternInventory.addItems(pattern.getDefinition().toStack()).isEmpty()) {
@@ -1177,6 +1195,28 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
         this.updatePatterns();
         this.saveChanges();
+    }
+
+    private boolean tryInstallPatternFromWirelessNetwork(EntityPlayer player, ItemStack desiredPattern) {
+        if (!(player instanceof EntityPlayerMP serverPlayer)) {
+            return false;
+        }
+        if (!this.terminalPatternInventory.addItems(desiredPattern, true).isEmpty()) {
+            return false;
+        }
+
+        ItemStack extracted = WirelessTerminalActions.extractStack(serverPlayer, desiredPattern, 1);
+        if (extracted.isEmpty()) {
+            return false;
+        }
+
+        ItemStack overflow = this.terminalPatternInventory.addItems(extracted);
+        if (overflow.isEmpty()) {
+            return true;
+        }
+
+        returnToPlayer(player, overflow);
+        return false;
     }
 
     private void migrateLegacyBlockingMode(NBTTagCompound tag) {

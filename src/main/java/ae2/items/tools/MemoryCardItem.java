@@ -27,10 +27,12 @@ import ae2.api.upgrades.IUpgradeableObject;
 import ae2.api.util.AEColor;
 import ae2.api.util.IConfigurableObject;
 import ae2.block.AEBaseTileBlock;
+import ae2.core.AELog;
 import ae2.core.localization.InGameTooltip;
 import ae2.core.localization.PlayerMessages;
 import ae2.helpers.IConfigInvHost;
 import ae2.helpers.IPriorityHost;
+import ae2.helpers.WirelessTerminalActions;
 import ae2.items.AEBaseItem;
 import ae2.items.contents.NetworkToolGuiHost;
 import ae2.text.TextComponentItemStack;
@@ -46,6 +48,7 @@ import net.minecraft.block.Block;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTBase;
@@ -336,10 +339,31 @@ public class MemoryCardItem extends AEBaseItem implements IMemoryCard {
                 }
             }
 
+            if (missing > 0 && player instanceof EntityPlayerMP serverPlayer) {
+                ItemStack extracted = WirelessTerminalActions.extractStack(serverPlayer, desired, missing);
+                if (!extracted.isEmpty()) {
+                    overflow = upgrades.addItems(extracted);
+                    int inserted = extracted.getCount() - overflow.getCount();
+                    missing -= inserted;
+                    returnToPlayer(player, overflow);
+                }
+            }
+
             if (missing > 0 && !player.world.isRemote) {
                 player.sendStatusMessage(PlayerMessages.MissingUpgrades.text(TextComponentItemStack.of(new ItemStack(entry.getKey())), missing),
                     true);
             }
+        }
+    }
+
+    private static void returnToPlayer(EntityPlayer player, ItemStack stack) {
+        if (stack.isEmpty()) {
+            return;
+        }
+        ItemStack remainder = stack.copy();
+        if (!player.inventory.addItemStackToInventory(remainder) && !remainder.isEmpty()) {
+            AELog.warn("Failed to return %s after %s; dropping it at the player", remainder, "memory card upgrade restore");
+            player.dropItem(remainder, false);
         }
     }
 
