@@ -1,7 +1,12 @@
 name: Runtime test
 
 on:
-  [workflow_dispatch, push]
+  workflow_dispatch:
+  workflow_call:
+  merge_group:
+
+permissions:
+  contents: read
 
 jobs:
   runtime-test:
