@@ -20,6 +20,7 @@ package ae2.core;
 
 import ae2.api.implementations.items.AddWirelessTerminalEvent;
 import ae2.capabilities.Capabilities;
+import ae2.cellterminal.internal.InitCellTerminalApi;
 import ae2.core.definitions.AEBlockEntities;
 import ae2.core.definitions.AEEntities;
 import ae2.core.gui.AEGuiHandler;
@@ -210,6 +211,7 @@ public final class AppEngBase implements AppEng {
         InitVillager.init();
         Integrations.initOptionalIntegrations();
         AddWirelessTerminalEvent.run();
+        InitCellTerminalApi.init();
         HotkeyActions.init();
         this.commonSetupInitialized = true;
     }

@@ -7,6 +7,7 @@ import ae2.api.config.YesNo;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
+import ae2.client.Point;
 import ae2.client.gui.Icon;
 import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.client.gui.style.GuiStyle;
@@ -23,6 +24,7 @@ import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.helpers.InventoryAction;
+import ae2.helpers.patternmodifier.PatternModifierToolboxLayout;
 import ae2.integration.Integrations;
 import ae2.parts.encoding.EncodingMode;
 import ae2.text.TextComponentItemStack;
@@ -36,7 +38,6 @@ import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
-import java.awt.*;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -262,10 +263,10 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
         }
 
         @Override
-        public ae2.client.Point getPatternModifierPanelOffset() {
-            return new ae2.client.Point(
-                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_LEFT_OFFSET - 4,
-                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_TOP_OFFSET - 50);
+        public Point getPatternModifierPanelOffset() {
+            return new Point(
+                PatternModifierToolboxLayout.PANEL_LEFT_OFFSET - 4,
+                PatternModifierToolboxLayout.PANEL_TOP_OFFSET - 50);
         }
 
         @Override

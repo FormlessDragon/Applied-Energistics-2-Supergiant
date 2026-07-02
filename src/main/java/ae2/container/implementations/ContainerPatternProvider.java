@@ -130,7 +130,9 @@ public class ContainerPatternProvider extends AEBaseContainer
     public ItemStack transferStackInSlot(EntityPlayer player, int index) {
         if (!isClientSide() && index >= 0 && index < this.inventorySlots.size()) {
             Slot sourceSlot = this.inventorySlots.get(index);
-            if (sourceSlot != null && isPlayerSideSlot(sourceSlot) && isProviderPattern(sourceSlot.getStack())) {
+            if (isValidQuickMoveSource(sourceSlot, player)
+                && isPlayerSideSlot(sourceSlot)
+                && isProviderPattern(sourceSlot.getStack())) {
                 return moveSinglePatternFromPlayerSlot(sourceSlot, player);
             }
         }

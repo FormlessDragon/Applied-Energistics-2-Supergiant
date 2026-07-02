@@ -1,6 +1,5 @@
 package ae2.parts.automation.special;
 
-import ae2.api.config.IncludeExclude;
 import ae2.api.stacks.AEKey;
 import ae2.util.Platform;
 import ae2.util.prioritylist.IPartitionList;
@@ -41,10 +40,5 @@ final class ModPriorityList implements IPartitionList {
     @Override
     public Iterable<AEKey> getItems() {
         return List.of();
-    }
-
-    @Override
-    public boolean matchesFilter(AEKey key, IncludeExclude mode) {
-        return isEmpty() || isListed(key);
     }
 }

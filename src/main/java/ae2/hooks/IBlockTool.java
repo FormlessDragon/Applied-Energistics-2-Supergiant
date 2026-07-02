@@ -31,6 +31,4 @@ public interface IBlockTool {
     EnumActionResult onItemUse(ItemStack is, EntityPlayer p, World w, BlockPos pos, EnumHand hand, EnumFacing side,
                                float hitX, float hitY, float hitZ);
 
-    EnumActionResult onItemUse(EntityPlayer p, World w, BlockPos pos, EnumHand hand, EnumFacing side, float hitX,
-                               float hitY, float hitZ);
 }

@@ -73,6 +73,7 @@ import ae2.items.tools.powered.ColorApplicatorItem;
 import ae2.items.tools.powered.EntropyManipulatorItem;
 import ae2.items.tools.powered.MatterCannonItem;
 import ae2.items.tools.powered.PortableCellItem;
+import ae2.items.tools.powered.WirelessCellTerminalItem;
 import ae2.items.tools.powered.WirelessCraftingTerminalItem;
 import ae2.items.tools.powered.WirelessPatternAccessTerminalItem;
 import ae2.items.tools.powered.WirelessPatternEncodingTerminalItem;
@@ -363,6 +364,8 @@ public final class AEItems {
             getPortableCellBattery(), 0x80caff));
     public static final ItemDefinition<WirelessTerminalItem> WIRELESS_TERMINAL = new ItemDefinition<>(
         AEItemIds.WIRELESS_TERMINAL, new WirelessTerminalItem(getWirelessTerminalBattery()));
+    public static final ItemDefinition<WirelessCellTerminalItem> WIRELESS_CELL_TERMINAL = new ItemDefinition<>(
+        AEItemIds.WIRELESS_CELL_TERMINAL, new WirelessCellTerminalItem(getWirelessTerminalBattery()));
     public static final ItemDefinition<WirelessCraftingTerminalItem> WIRELESS_CRAFTING_TERMINAL = new ItemDefinition<>(
         AEItemIds.WIRELESS_CRAFTING_TERMINAL, new WirelessCraftingTerminalItem(getWirelessTerminalBattery()));
     public static final ItemDefinition<WirelessPatternEncodingTerminalItem> WIRELESS_PATTERN_ENCODING_TERMINAL =
@@ -538,6 +541,7 @@ public final class AEItems {
         PORTABLE_FLUID_CELL64K,
         PORTABLE_FLUID_CELL256K,
         WIRELESS_TERMINAL,
+        WIRELESS_CELL_TERMINAL,
         WIRELESS_CRAFTING_TERMINAL,
         WIRELESS_PATTERN_ENCODING_TERMINAL,
         WIRELESS_PATTERN_ACCESS_TERMINAL,

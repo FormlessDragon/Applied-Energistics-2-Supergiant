@@ -12,6 +12,8 @@ public final class WirelessTerminalDefinitionBuilder {
     private final WirelessTerminalItem item;
     private final WirelessTerminalDefinition.GuiOpener guiOpener;
     private final WirelessTerminalDefinition.HostFactory hostFactory;
+    private final WirelessTerminalDefinition.ContainerFactory containerFactory;
+    private final WirelessTerminalDefinition.ScreenFactory screenFactory;
     private final Function<WirelessTerminalItem, ItemStack> iconFactory;
     private String hotkeyName;
     private int upgradeSlots = 2;
@@ -19,12 +21,16 @@ public final class WirelessTerminalDefinitionBuilder {
     WirelessTerminalDefinitionBuilder(AddWirelessTerminalEvent event, String id, WirelessTerminalItem item,
                                       WirelessTerminalDefinition.GuiOpener guiOpener,
                                       WirelessTerminalDefinition.HostFactory hostFactory,
+                                      WirelessTerminalDefinition.ContainerFactory containerFactory,
+                                      WirelessTerminalDefinition.ScreenFactory screenFactory,
                                       Function<WirelessTerminalItem, ItemStack> iconFactory) {
         this.event = Objects.requireNonNull(event, "event");
         this.id = Objects.requireNonNull(id, "id");
         this.item = Objects.requireNonNull(item, "item");
         this.guiOpener = Objects.requireNonNull(guiOpener, "guiOpener");
         this.hostFactory = Objects.requireNonNull(hostFactory, "hostFactory");
+        this.containerFactory = Objects.requireNonNull(containerFactory, "containerFactory");
+        this.screenFactory = Objects.requireNonNull(screenFactory, "screenFactory");
         this.iconFactory = Objects.requireNonNull(iconFactory, "iconFactory");
         this.hotkeyName = "wireless_" + id + "_terminal";
     }
@@ -52,7 +58,8 @@ public final class WirelessTerminalDefinitionBuilder {
     @SuppressWarnings("UnusedReturnValue")
     public WirelessTerminalDefinition addTerminal() {
         WirelessTerminalDefinition definition = new WirelessTerminalDefinition(this.id, this.item, this.guiOpener,
-            this.iconFactory, this.hostFactory, this.hotkeyName, this.upgradeSlots);
+            this.iconFactory, this.hostFactory, this.containerFactory, this.screenFactory, this.hotkeyName,
+            this.upgradeSlots);
         this.event.add(definition);
         return definition;
     }

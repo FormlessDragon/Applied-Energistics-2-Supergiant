@@ -9,6 +9,7 @@ import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.core.localization.GuiText;
 import ae2.items.contents.PortableVoidCellGuiHost;
 import ae2.items.tools.powered.PortableItemCellAutoPickup;
+import ae2.me.cells.VoidCellHandler;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -83,6 +84,7 @@ public class PortableVoidCellItem extends VoidCellItem {
             + GuiText.voidCellMode(getMode(stack)).getLocal());
         lines.add(createUsageLine());
         lines.add(createTypesLine());
+        VoidCellHandler.INSTANCE.addPartitionInformation(stack, lines);
         PortableItemCellAutoPickup.addInformationToTooltip(stack, lines);
     }
 }

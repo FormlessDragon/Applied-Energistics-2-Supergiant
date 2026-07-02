@@ -70,8 +70,8 @@ public class GuiInterface extends GuiUpgradeable<ContainerInterface> {
 
         this.fuzzyMode.set(container.getFuzzyMode());
         this.fuzzyMode.setVisibility(container.hasUpgrade(AEItems.FUZZY_CARD.item()));
-        setTextContent("interface_config",
-            GuiText.InterfaceConfigPage.text(new TextComponentString(Integer.toString(container.getCurrentPage() + 1))));
+        if (container.getPageCount() > 1)
+            setTextContent("interface_config", GuiText.InterfaceConfigPage.text(new TextComponentString(Integer.toString(container.getCurrentPage() + 1))));
         this.previousPageButton.setVisibility(container.getPageCount() > 1 && container.getCurrentPage() > 0);
         this.nextPageButton.setVisibility(container.getPageCount() > 1
             && container.getCurrentPage() + 1 < container.getPageCount());

@@ -12,7 +12,10 @@ public class WirelessRequesterTerminalItem extends WirelessTerminalItem {
             GuiIds.GuiKey.WIRELESS_REQUESTER_TERMINAL,
             ItemStack::new,
             WirelessRequesterTerminalGuiHost::new,
+            WirelessTerminalDefinitionFactories.requesterContainer(),
+            WirelessTerminalDefinitionFactories.requesterScreen(),
             "wireless_requester_terminal",
-            2);
+            2,
+            true);
     }
 }

@@ -16,6 +16,10 @@ public class AppEngCellInventory extends AppEngInternalInventory {
         this.handlers[slot] = handler;
     }
 
+    public void replaceHandlerWithoutPersisting(int slot, StorageCell handler) {
+        this.handlers[slot] = handler;
+    }
+
     @Override
     public void setItemDirect(int slot, ItemStack stack) {
         persist(slot);

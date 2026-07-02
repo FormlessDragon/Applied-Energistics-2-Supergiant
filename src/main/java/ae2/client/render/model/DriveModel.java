@@ -58,7 +58,7 @@ public class DriveModel implements BasicUnbakedModel {
         Map<Item, IBakedModel> cellModels = new Reference2ObjectOpenHashMap<>();
 
         try {
-            for (Map.Entry<Item, ResourceLocation> entry : StorageCellModels.models().entrySet()) {
+            for (var entry : StorageCellModels.models().entrySet()) {
                 cellModels.put(entry.getKey(),
                     ModelLoaderRegistry.getModel(entry.getValue()).bake(state, format, bakedTextureGetter));
             }

@@ -155,6 +155,10 @@ public abstract class IconButton extends GuiButton implements ITooltip {
         return item == null ? ItemStack.EMPTY : new ItemStack(item);
     }
 
+    protected boolean shouldRenderItemStackOverlay() {
+        return true;
+    }
+
     public void setMessage(ITextComponent message) {
         this.message = message == null ? new TextComponentString("") : message;
         this.displayString = this.message.getFormattedText();
@@ -287,7 +291,9 @@ public abstract class IconButton extends GuiButton implements ITooltip {
         GlStateManager.enableDepth();
         RenderHelper.enableGUIStandardItemLighting();
         this.itemRenderer.renderItemAndEffectIntoGUI(itemStack, 0, 0);
-        this.itemRenderer.renderItemOverlayIntoGUI(minecraft.fontRenderer, itemStack, 0, 0, null);
+        if (shouldRenderItemStackOverlay()) {
+            this.itemRenderer.renderItemOverlayIntoGUI(minecraft.fontRenderer, itemStack, 0, 0, null);
+        }
         RenderHelper.disableStandardItemLighting();
         GlStateManager.disableDepth();
         GlStateManager.popMatrix();

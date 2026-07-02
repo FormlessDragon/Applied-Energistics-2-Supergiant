@@ -35,6 +35,7 @@ import ae2.items.tools.advancedmemorycard.AdvancedMemoryCardP2PIdentity;
 import ae2.items.tools.advancedmemorycard.AdvancedMemoryCardP2PSnapshot;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.renderer.GlStateManager;
@@ -128,7 +129,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     private boolean initialFocusApplied;
     private int rows = DEFAULT_ROWS;
     private AdvancedMemoryCardAction.Mode mode = AdvancedMemoryCardAction.Mode.BIND_OUTPUT;
-    private final Set<ResourceLocation> selectedTunnelTypes = new it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet<>();
+    private final Set<ResourceLocation> selectedTunnelTypes = new ObjectLinkedOpenHashSet<>();
     private AdvancedMemoryCardStatusFilter statusFilter = AdvancedMemoryCardStatusFilter.ANY;
     private AdvancedMemoryCardP2PSnapshot cachedFilteredSnapshot;
     private AdvancedMemoryCardStatusFilter cachedStatusFilter = AdvancedMemoryCardStatusFilter.ANY;

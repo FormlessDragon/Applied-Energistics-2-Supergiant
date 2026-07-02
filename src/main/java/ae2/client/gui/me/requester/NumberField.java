@@ -26,7 +26,7 @@ import java.text.ParsePosition;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.function.Consumer;
+import java.util.function.LongConsumer;
 
 public class NumberField extends ConfirmableTextField {
 
@@ -53,7 +53,7 @@ public class NumberField extends ConfirmableTextField {
     private NumberEntryType previewCacheType = this.type;
     private String previewCacheValue = PREVIEW_ERROR;
 
-    NumberField(int x, int y, GuiText label, GuiStyle style, long minValue, Consumer<Long> onConfirm) {
+    NumberField(int x, int y, GuiText label, GuiStyle style, long minValue, LongConsumer onConfirm) {
         super(style, Minecraft.getMinecraft().fontRenderer, x, y, WIDTH, HEIGHT);
         this.label = label;
         this.minValue = minValue;

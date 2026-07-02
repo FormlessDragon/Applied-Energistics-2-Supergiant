@@ -1,10 +1,12 @@
 package ae2.core.gui;
 
+import ae2.api.implementations.items.WirelessTerminalDefinition;
 import ae2.api.parts.IPartHost;
 import ae2.container.GuiIds;
 import ae2.core.AppEngBase;
 import ae2.core.gui.locator.BaublesItemLocator;
 import ae2.core.gui.locator.ItemGuiHostLocator;
+import ae2.items.tools.powered.WirelessTerminalRegistry;
 import ae2.parts.AEBasePart;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntity;
@@ -88,6 +90,19 @@ public final class GuiOpener {
         }
 
         player.openGui(AppEngBase.instance(), GuiIds.getGuiId(key, returnedFromSubScreen), player.world, slot, 0, 0);
+        return true;
+    }
+
+    public static boolean openWirelessTerminalGui(EntityPlayer player, WirelessTerminalDefinition definition,
+                                                  ItemGuiHostLocator locator, boolean returnedFromSubScreen) {
+        Integer slot = locator.getPlayerInventorySlot();
+        if (slot == null) {
+            return false;
+        }
+        int terminalIndex = WirelessTerminalRegistry.indexOf(definition);
+        player.openGui(AppEngBase.instance(),
+            GuiIds.getGuiId(GuiIds.GuiKey.WIRELESS_TERMINAL_DYNAMIC, returnedFromSubScreen),
+            player.world, slot, terminalIndex, 0);
         return true;
     }
 

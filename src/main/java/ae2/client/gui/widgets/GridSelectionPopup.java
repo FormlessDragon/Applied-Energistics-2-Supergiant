@@ -22,6 +22,7 @@ public class GridSelectionPopup<T> {
     private static final int BUTTON_GAP = 2;
     private static final int BACKGROUND_COLOR = 0xAA000000;
     private static final int HOVER_COLOR = 0xFF00FF00;
+    private static final int TEXT_COLOR = 0xFFFFFFFF;
 
     private final List<Entry<T>> entries;
     private final ISelectionHandler<T> selectionHandler;
@@ -126,10 +127,23 @@ public class GridSelectionPopup<T> {
             return;
         }
 
+        String text = entry.text();
+        if (text != null) {
+            drawText(minecraft, text, iconX, iconY);
+            return;
+        }
+
         Icon icon = entry.icon();
         if (icon != null) {
             icon.getBlitter().dest(iconX + 1, iconY + 1).blit();
         }
+    }
+
+    private void drawText(Minecraft minecraft, String text, int x, int y) {
+        int textWidth = minecraft.fontRenderer.getStringWidth(text);
+        int textX = x + (CELL_SIZE - textWidth) / 2;
+        int textY = y + (CELL_SIZE - minecraft.fontRenderer.FONT_HEIGHT) / 2;
+        minecraft.fontRenderer.drawStringWithShadow(text, textX, textY, TEXT_COLOR);
     }
 
     private void renderItem(Minecraft minecraft, ItemStack itemStack, int x, int y) {
@@ -177,7 +191,8 @@ public class GridSelectionPopup<T> {
         void select(T value);
     }
 
-    public record Entry<T>(T Value, @Nullable Icon icon, ItemStack itemStack, List<ITextComponent> tooltipLines) {
+    public record Entry<T>(T Value, @Nullable Icon icon, @Nullable String text, ItemStack itemStack,
+                           List<ITextComponent> tooltipLines) {
         public Entry {
             Objects.requireNonNull(Value, "Value");
             Objects.requireNonNull(itemStack, "itemStack");
@@ -185,11 +200,15 @@ public class GridSelectionPopup<T> {
         }
 
         public static <T> Entry<T> icon(T value, Icon icon, List<ITextComponent> tooltipLines) {
-            return new Entry<>(value, icon, ItemStack.EMPTY, tooltipLines);
+            return new Entry<>(value, icon, null, ItemStack.EMPTY, tooltipLines);
+        }
+
+        public static <T> Entry<T> text(T value, String text, List<ITextComponent> tooltipLines) {
+            return new Entry<>(value, null, Objects.requireNonNull(text, "text"), ItemStack.EMPTY, tooltipLines);
         }
 
         public static <T> Entry<T> item(T value, ItemStack itemStack, List<ITextComponent> tooltipLines) {
-            return new Entry<>(value, null, itemStack, tooltipLines);
+            return new Entry<>(value, null, null, itemStack, tooltipLines);
         }
     }
 }

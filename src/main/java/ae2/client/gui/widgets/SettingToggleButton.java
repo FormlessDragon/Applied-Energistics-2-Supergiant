@@ -21,6 +21,10 @@ package ae2.client.gui.widgets;
 import ae2.api.config.AccessRestriction;
 import ae2.api.config.AdvancedMemoryCardStatusFilter;
 import ae2.api.config.BlockingMode;
+import ae2.api.config.CellTerminalContentFilter;
+import ae2.api.config.CellTerminalSearchMode;
+import ae2.api.config.CellTerminalSlotLimit;
+import ae2.api.config.CellTerminalSubnetVisibility;
 import ae2.api.config.CondenserOutput;
 import ae2.api.config.CpuSelectionMode;
 import ae2.api.config.CraftingPlanSortMode;
@@ -382,6 +386,59 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
                 ButtonToolTips.CpuSelectionMode, ButtonToolTips.CpuSelectionModePlayersOnly);
             registerApp(AEParts.EXPORT_BUS, Settings.CPU_SELECTION_MODE, CpuSelectionMode.MACHINE_ONLY,
                 ButtonToolTips.CpuSelectionMode, ButtonToolTips.CpuSelectionModeAutomationOnly);
+
+            registerApp(Icon.CELL_TERMINAL_SEARCH_MODE_INVENTORY, Settings.CELL_TERMINAL_SEARCH_MODE,
+                CellTerminalSearchMode.INVENTORY,
+                ButtonToolTips.CellTerminalSearchMode, ButtonToolTips.CellTerminalSearchModeInventory);
+            registerApp(Icon.CELL_TERMINAL_SEARCH_MODE_PARTITION, Settings.CELL_TERMINAL_SEARCH_MODE,
+                CellTerminalSearchMode.PARTITION,
+                ButtonToolTips.CellTerminalSearchMode, ButtonToolTips.CellTerminalSearchModePartition);
+            registerApp(Icon.CELL_TERMINAL_SEARCH_MODE_MIXED, Settings.CELL_TERMINAL_SEARCH_MODE,
+                CellTerminalSearchMode.MIXED,
+                ButtonToolTips.CellTerminalSearchMode, ButtonToolTips.CellTerminalSearchModeMixed);
+
+            registerApp(Icon.CELL_TERMINAL_CONTENT_FILTER_SHOW_ALL, Settings.CELL_TERMINAL_CONTENT_FILTER,
+                CellTerminalContentFilter.SHOW_ALL,
+                ButtonToolTips.CellTerminalContentFilter, ButtonToolTips.CellTerminalContentFilterShowAll);
+            registerApp(Icon.CELL_TERMINAL_CONTENT_FILTER_SHOW_ONLY, Settings.CELL_TERMINAL_CONTENT_FILTER,
+                CellTerminalContentFilter.SHOW_ONLY,
+                ButtonToolTips.CellTerminalContentFilter, ButtonToolTips.CellTerminalContentFilterShowOnly);
+            registerApp(Icon.CELL_TERMINAL_CONTENT_FILTER_HIDE, Settings.CELL_TERMINAL_CONTENT_FILTER,
+                CellTerminalContentFilter.HIDE,
+                ButtonToolTips.CellTerminalContentFilter, ButtonToolTips.CellTerminalContentFilterHide);
+
+            registerApp(Icon.CELL_TERMINAL_PARTITION_FILTER_SHOW_ALL, Settings.CELL_TERMINAL_PARTITION_FILTER,
+                CellTerminalContentFilter.SHOW_ALL,
+                ButtonToolTips.CellTerminalPartitionFilter, ButtonToolTips.CellTerminalPartitionFilterShowAll);
+            registerApp(Icon.CELL_TERMINAL_PARTITION_FILTER_SHOW_ONLY, Settings.CELL_TERMINAL_PARTITION_FILTER,
+                CellTerminalContentFilter.SHOW_ONLY,
+                ButtonToolTips.CellTerminalPartitionFilter, ButtonToolTips.CellTerminalPartitionFilterShowOnly);
+            registerApp(Icon.CELL_TERMINAL_PARTITION_FILTER_HIDE, Settings.CELL_TERMINAL_PARTITION_FILTER,
+                CellTerminalContentFilter.HIDE,
+                ButtonToolTips.CellTerminalPartitionFilter, ButtonToolTips.CellTerminalPartitionFilterHide);
+
+            registerApp(Icon.CELL_TERMINAL_SUBNET_VISIBILITY_SHOW_ALL, Settings.CELL_TERMINAL_SUBNET_VISIBILITY,
+                CellTerminalSubnetVisibility.SHOW_ALL,
+                ButtonToolTips.CellTerminalSubnetVisibility, ButtonToolTips.CellTerminalSubnetVisibilityShowAll);
+            registerApp(Icon.CELL_TERMINAL_SUBNET_VISIBILITY_SHOW_FAVORITES, Settings.CELL_TERMINAL_SUBNET_VISIBILITY,
+                CellTerminalSubnetVisibility.SHOW_FAVORITES,
+                ButtonToolTips.CellTerminalSubnetVisibility, ButtonToolTips.CellTerminalSubnetVisibilityShowFavorites);
+            registerApp(Icon.CELL_TERMINAL_SUBNET_VISIBILITY_DONT_SHOW, Settings.CELL_TERMINAL_SUBNET_VISIBILITY,
+                CellTerminalSubnetVisibility.DONT_SHOW,
+                ButtonToolTips.CellTerminalSubnetVisibility, ButtonToolTips.CellTerminalSubnetVisibilityDontShow);
+
+            registerAppWithoutVisual(Settings.CELL_TERMINAL_SLOT_LIMIT,
+                CellTerminalSlotLimit.LIMIT_8,
+                ButtonToolTips.CellTerminalSlotLimit, ButtonToolTips.CellTerminalSlotLimit8.text());
+            registerAppWithoutVisual(Settings.CELL_TERMINAL_SLOT_LIMIT,
+                CellTerminalSlotLimit.LIMIT_32,
+                ButtonToolTips.CellTerminalSlotLimit, ButtonToolTips.CellTerminalSlotLimit32.text());
+            registerAppWithoutVisual(Settings.CELL_TERMINAL_SLOT_LIMIT,
+                CellTerminalSlotLimit.LIMIT_64,
+                ButtonToolTips.CellTerminalSlotLimit, ButtonToolTips.CellTerminalSlotLimit64.text());
+            registerAppWithoutVisual(Settings.CELL_TERMINAL_SLOT_LIMIT,
+                CellTerminalSlotLimit.UNLIMITED,
+                ButtonToolTips.CellTerminalSlotLimit, ButtonToolTips.CellTerminalSlotLimitUnlimited.text());
         }
     }
 
@@ -405,6 +462,16 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
         Collections.addAll(lines, tooltipLines);
 
         appearances.put(new EnumPair<>(setting, val), new ButtonAppearance(icon, null, lines));
+    }
+
+    private static <T extends Enum<T>> void registerAppWithoutVisual(Setting<T> setting, T val,
+                                                                     LocalizationEnum title,
+                                                                     ITextComponent... tooltipLines) {
+        var lines = new ObjectArrayList<ITextComponent>(tooltipLines.length + 1);
+        lines.add(title.text());
+        Collections.addAll(lines, tooltipLines);
+
+        appearances.put(new EnumPair<>(setting, val), new ButtonAppearance(null, null, lines));
     }
 
     private static <T extends Enum<T>> void registerApp(ItemDefinition<?> item, Setting<T> setting, T val,

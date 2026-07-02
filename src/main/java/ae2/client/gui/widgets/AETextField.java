@@ -48,13 +48,15 @@ import java.util.function.Consumer;
 public class AETextField extends GuiTextField implements IResizableWidget, ITooltip {
     private static final Blitter BLITTER = Blitter.texture("guis/text_field.png", 128, 128);
     private static final int PADDING = 2;
-    private static final long KEY_REPEAT_DELAY_MS = 2000;
-    private static final long KEY_REPEAT_INTERVAL_MS = 200;
+    private static final long KEY_REPEAT_DELAY_MS = 400;
+    private static final long KEY_REPEAT_INTERVAL_MS = 40;
 
     private final FontRenderer fontRenderer;
     private final int fontPad;
     private final GuiStyle style;
     private boolean enabled = true;
+    private int textColor;
+    private int disabledTextColor;
     private List<ITextComponent> tooltipMessage = ObjectLists.emptyList();
     @Nullable
     private Consumer<String> responder;
@@ -150,25 +152,29 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
             return;
         }
 
-        String oldValue = this.getText();
-        if (super.textboxKeyTyped(this.repeatingChar, this.repeatingKeyCode)) {
-            this.lastRepeatMillis = now;
-            if (this.responder != null && !oldValue.equals(this.getText())) {
-                this.responder.accept(this.getText());
-            }
+        if (!repeatCurrentKey()) {
+            this.clearKeyRepeat();
             return;
         }
 
-        if (oldValue.equals(this.getText())
-            && (this.repeatingKeyCode == Keyboard.KEY_BACK || this.repeatingKeyCode == Keyboard.KEY_DELETE)) {
-            this.clearKeyRepeat();
-        } else {
-            this.lastRepeatMillis = now;
-        }
+        this.lastRepeatMillis = now;
     }
 
     public void setResponder(@Nullable Consumer<String> responder) {
         this.responder = responder;
+    }
+
+    public GuiStyle getStyle() {
+        return this.style;
+    }
+
+    public int getCurrentTextColor() {
+        return this.enabled ? this.textColor : this.disabledTextColor;
+    }
+
+    @Nullable
+    public String getPlaceholder() {
+        return this.placeholder;
     }
 
     public void selectAll() {
@@ -331,6 +337,18 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
     }
 
     @Override
+    public void setTextColor(int color) {
+        super.setTextColor(color);
+        this.textColor = color;
+    }
+
+    @Override
+    public void setDisabledTextColour(int color) {
+        super.setDisabledTextColour(color);
+        this.disabledTextColor = color;
+    }
+
+    @Override
     public void setFocused(boolean focused) {
         super.setFocused(focused);
         if (!focused) {
@@ -366,6 +384,20 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
         }
 
         return typedChar >= 32 && keyCode != Keyboard.KEY_RETURN && keyCode != Keyboard.KEY_NUMPADENTER;
+    }
+
+    private boolean repeatCurrentKey() {
+        String oldValue = this.getText();
+        int oldCursor = this.getCursorPosition();
+        int oldSelection = this.getSelectionEnd();
+        if (!super.textboxKeyTyped(this.repeatingChar, this.repeatingKeyCode)) {
+            return this.getCursorPosition() != oldCursor || this.getSelectionEnd() != oldSelection;
+        }
+
+        if (this.responder != null && !oldValue.equals(this.getText())) {
+            this.responder.accept(this.getText());
+        }
+        return true;
     }
 
     private void clearKeyRepeat() {

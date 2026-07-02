@@ -209,6 +209,10 @@ public abstract class AEBaseContainer extends Container {
         return this.lockedPlayerInventorySlots.contains(inventorySlot);
     }
 
+    public final boolean isPlayerInventorySlotLocked(@Nullable Slot slot) {
+        return isLockedPlayerInventorySlot(slot);
+    }
+
     private int getOffhandPlayerInventorySlot() {
         return getOffhandPlayerInventorySlot(this.playerInventory.mainInventory.size(), this.playerInventory.armorInventory.size());
     }
@@ -393,7 +397,7 @@ public abstract class AEBaseContainer extends Container {
         }
 
         Slot clickSlot = inventorySlots.get(index);
-        if (clickSlot == null || !clickSlot.canTakeStack(player) || isLockedPlayerInventorySlot(clickSlot)) {
+        if (!isValidQuickMoveSource(clickSlot, player)) {
             return ItemStack.EMPTY;
         }
 
@@ -517,7 +521,11 @@ public abstract class AEBaseContainer extends Container {
         return false;
     }
 
-    private boolean isLockedPlayerInventorySlot(@Nullable Slot slot) {
+    protected final boolean isValidQuickMoveSource(@Nullable Slot slot, @Nullable EntityPlayer player) {
+        return slot != null && slot.canTakeStack(player) && !isLockedPlayerInventorySlot(slot);
+    }
+
+    protected final boolean isLockedPlayerInventorySlot(@Nullable Slot slot) {
         return slot != null && slot.inventory == this.playerInventory && isPlayerInventorySlotLocked(slot.getSlotIndex());
     }
 
@@ -672,9 +680,12 @@ public abstract class AEBaseContainer extends Container {
             if (slotSemantic != null) {
                 List<Slot> slotsToMove = new ObjectArrayList<>(getSlots(slotSemantic));
                 for (Slot slotToMove : slotsToMove) {
+                    if (!isValidQuickMoveSource(slotToMove, player)) {
+                        continue;
+                    }
                     transferStackInSlot(player, slotToMove.slotNumber);
                 }
-            } else {
+            } else if (isValidQuickMoveSource(targetSlot, player)) {
                 transferStackInSlot(player, targetSlot.slotNumber);
             }
         }

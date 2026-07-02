@@ -30,6 +30,9 @@ private String gitOutput(List<String> args, String fallback) {
 
 private String defaultModVersion() {
     def previousTag = gitOutput(['describe', '--tags', '--abbrev=0', '--exclude=dev'], '0.0.0')
+    if (previousTag.startsWith('v')) {
+        previousTag = previousTag.substring(1)
+    }
     def shortHash = gitOutput(['rev-parse', '--short', 'HEAD'], 'unknown')
     return "${previousTag}+${shortHash}"
 }

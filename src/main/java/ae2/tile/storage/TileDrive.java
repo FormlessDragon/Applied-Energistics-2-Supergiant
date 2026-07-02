@@ -274,6 +274,34 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
         return invBySlot[slot] != null ? invBySlot[slot].getCell() : null;
     }
 
+    public void invalidateCellInventory(int slot) {
+        if (!isValidCellSlot(slot)) {
+            throw new IllegalArgumentException("Invalid drive cell slot: " + slot);
+        }
+
+        this.isCached = false;
+        updateState();
+        IStorageProvider.requestUpdate(getMainNode());
+        saveChanges();
+        markForUpdate();
+    }
+
+    public void rebuildCellInventoryCache(int slot) {
+        if (!isValidCellSlot(slot)) {
+            throw new IllegalArgumentException("Invalid drive cell slot: " + slot);
+        }
+
+        rebuildStateForSlot(slot);
+        double power = 2.0;
+        for (var handler : invBySlot) {
+            if (handler != null) {
+                power += handler.getCell().getIdleDrain();
+            }
+        }
+        getMainNode().setIdlePowerUsage(power);
+        this.isCached = true;
+    }
+
     @Override
     public ItemStack getMainContainerIcon() {
         return AEBlocks.DRIVE.stack();
@@ -303,6 +331,19 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
             }
         }
         return 0;
+    }
+
+    private void rebuildStateForSlot(int slot) {
+        inv.replaceHandlerWithoutPersisting(slot, null);
+        invBySlot[slot] = null;
+        ItemStack stack = inv.getStackInSlot(slot);
+        if (!stack.isEmpty()) {
+            StorageCell cell = StorageCells.getCellInventory(stack, this::onCellContentChanged);
+            if (cell != null) {
+                inv.replaceHandlerWithoutPersisting(slot, cell);
+                invBySlot[slot] = new DriveWatcher(cell, stack, this::updateVisualState);
+            }
+        }
     }
 
     private void onCellContentChanged() {

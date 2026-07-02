@@ -52,6 +52,19 @@ public interface ICellWorkbenchItem extends IUpgradeableItem {
     }
 
     /**
+     * Determines whether automatic "partition from content" actions are allowed for this item.
+     * <p>
+     * This only controls automatic population of the partition inventory. Manual partition editing still depends on
+     * the exposed config inventory itself.
+     *
+     * @param is item
+     * @return true when automatic partitioning from existing content is supported.
+     */
+    default boolean supportsAutoPartition(ItemStack is) {
+        return true;
+    }
+
+    /**
      * @return the current fuzzy status.
      */
     FuzzyMode getFuzzyMode(ItemStack is);

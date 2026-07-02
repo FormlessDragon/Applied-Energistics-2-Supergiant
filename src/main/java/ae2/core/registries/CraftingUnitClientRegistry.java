@@ -9,6 +9,7 @@ import ae2.core.AELog;
 import ae2.core.AppEng;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraft.client.renderer.block.model.IBakedModel;
+import net.minecraft.client.renderer.block.model.ModelRotation;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.util.ResourceLocation;
@@ -40,7 +41,7 @@ public final class CraftingUnitClientRegistry implements ICraftingUnitClientRegi
         this.initialized = true;
         this.registerModelProvider(DEFAULT_CUBE_PROVIDER_ID,
             (definition, format, textureGetter) -> new CraftingCubeModel(definition.getVisualDefinition()).bake(
-                net.minecraft.client.renderer.block.model.ModelRotation.X0_Y0, format, textureGetter));
+                ModelRotation.X0_Y0, format, textureGetter));
     }
 
     @Override

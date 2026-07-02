@@ -1,5 +1,6 @@
 package ae2.api.implementations.items;
 
+import ae2.core.gui.GuiOpener;
 import ae2.items.tools.powered.WirelessTerminalItem;
 import ae2.items.tools.powered.WirelessTerminalRegistry;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -43,8 +44,23 @@ public final class AddWirelessTerminalEvent {
     public WirelessTerminalDefinitionBuilder builder(String id, WirelessTerminalItem item,
                                                      WirelessTerminalDefinition.GuiOpener guiOpener,
                                                      WirelessTerminalDefinition.HostFactory hostFactory,
+                                                     WirelessTerminalDefinition.ContainerFactory containerFactory,
+                                                     WirelessTerminalDefinition.ScreenFactory screenFactory,
                                                      Function<WirelessTerminalItem, ItemStack> iconFactory) {
-        return new WirelessTerminalDefinitionBuilder(this, id, item, guiOpener, hostFactory, iconFactory);
+        return new WirelessTerminalDefinitionBuilder(this, id, item, guiOpener, hostFactory, containerFactory,
+            screenFactory, iconFactory);
+    }
+
+    public WirelessTerminalDefinitionBuilder builder(String id, WirelessTerminalItem item,
+                                                     WirelessTerminalDefinition.HostFactory hostFactory,
+                                                     WirelessTerminalDefinition.ContainerFactory containerFactory,
+                                                     WirelessTerminalDefinition.ScreenFactory screenFactory,
+                                                     Function<WirelessTerminalItem, ItemStack> iconFactory) {
+        return builder(id, item,
+            (definition, player, locator, stack, returningFromSubmenu) ->
+                !stack.isEmpty() && GuiOpener.openWirelessTerminalGui(player, definition, locator,
+                    returningFromSubmenu),
+            hostFactory, containerFactory, screenFactory, iconFactory);
     }
 
     void add(WirelessTerminalDefinition definition) {

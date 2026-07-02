@@ -73,6 +73,8 @@ import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.integration.Integrations;
 import ae2.integration.abstraction.ItemListMod;
+import ae2.integration.modules.hei.target.HeiGhostTargetSupport;
+import ae2.integration.modules.hei.target.ManualPinTarget;
 import ae2.items.contents.PortableCellGuiHost;
 import ae2.items.storage.ViewCellItem;
 import ae2.items.tools.powered.PortableCellItem;
@@ -83,6 +85,7 @@ import ae2.util.prioritylist.IPartitionList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
+import mezz.jei.api.gui.IGhostIngredientHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.renderer.BufferBuilder;
@@ -98,6 +101,7 @@ import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
+import net.minecraftforge.fml.common.Optional;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -202,8 +206,8 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         }
 
         if (this.container.canConfigureTypeFilter()) {
-            KeyTypeSelectionWindow keyTypeSelectionWindow =
-                new KeyTypeSelectionWindow(this, GuiText.ConfigureVisibleTypes.text());
+            KeyTypeSelectionWindow<C> keyTypeSelectionWindow =
+                new KeyTypeSelectionWindow<>(this, GuiText.ConfigureVisibleTypes.text());
             this.widgets.add("keyTypeSelectionWindow", keyTypeSelectionWindow);
             this.addToLeftToolbar(new TerminalKeyTypeSelectionButton(keyTypeSelectionWindow));
         }
@@ -637,6 +641,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     protected void drawSlot(Slot slot) {
         if (slot instanceof RepoSlot repoSlot) {
             drawRepoSlot(repoSlot);
+            renderHoveredSlotOverlayIfNeeded(slot);
             return;
         }
 
@@ -946,6 +951,24 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             return false;
         }
         return manualPin(key, repoSlot.getUserPinSlotIndex());
+    }
+
+    @Override
+    @Optional.Method(modid = "jei")
+    public <I> List<IGhostIngredientHandler.Target<I>> getHEITargets(I ingredient, int ghostMouseButton) {
+        List<IGhostIngredientHandler.Target<I>> targets = super.getHEITargets(ingredient, ghostMouseButton);
+
+        GenericStack leftClickStack = HeiGhostTargetSupport.toManualPinStack(ingredient, 0);
+        GenericStack rightClickStack = HeiGhostTargetSupport.toManualPinStack(ingredient, 1);
+        if (leftClickStack != null || rightClickStack != null) {
+            for (var slot : getContainer().inventorySlots) {
+                if (slot instanceof RepoSlot repoSlot && repoSlot.isEmptyUserPinSlot()) {
+                    targets.add(new ManualPinTarget<>(this, repoSlot, ghostMouseButton, leftClickStack,
+                        rightClickStack));
+                }
+            }
+        }
+        return targets;
     }
 
     public void acceptAutoPin(AEKey key) {
@@ -1347,7 +1370,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     }
 
     private final class TerminalKeyTypeSelectionButton extends IconButton {
-        private TerminalKeyTypeSelectionButton(KeyTypeSelectionWindow keyTypeSelectionWindow) {
+        private TerminalKeyTypeSelectionButton(KeyTypeSelectionWindow<C> keyTypeSelectionWindow) {
             super(() -> {
                 if (isShiftKeyDown()) {
                     cycleVisibleKeyTypes();

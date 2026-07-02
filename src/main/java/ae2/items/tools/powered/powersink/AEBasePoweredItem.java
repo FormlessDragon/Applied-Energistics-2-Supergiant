@@ -21,7 +21,7 @@ package ae2.items.tools.powered.powersink;
 import ae2.api.config.AccessRestriction;
 import ae2.api.config.Actionable;
 import ae2.api.implementations.items.IAEItemPowerStorage;
-import ae2.core.localization.ItemModText;
+import ae2.core.localization.Tooltips;
 import ae2.items.AEBaseItem;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.creativetab.CreativeTabs;
@@ -57,8 +57,7 @@ public abstract class AEBasePoweredItem extends AEBaseItem implements IAEItemPow
     protected void addCheckedInformation(final ItemStack stack, final World world, final List<String> lines,
                                          final ITooltipFlag advancedTooltips) {
         super.addCheckedInformation(stack, world, lines, advancedTooltips);
-        lines.add(ItemModText.StoredEnergy.getLocal(
-            (long) this.getAECurrentPower(stack) + " / " + (long) this.getAEMaxPower(stack) + " AE"));
+        lines.add(Tooltips.energyStorageTooltip(getAECurrentPower(stack), getAEMaxPower(stack)));
     }
 
     @Override

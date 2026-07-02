@@ -25,6 +25,7 @@ package ae2.api.client;
 
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMaps;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.item.Item;
 import net.minecraft.util.ResourceLocation;
@@ -58,7 +59,7 @@ public final class StorageCellModels {
     }
 
     public static synchronized Map<Item, ResourceLocation> models() {
-        return new Reference2ObjectOpenHashMap<>(registry);
+        return Reference2ObjectMaps.unmodifiable(registry);
     }
 
     public static ResourceLocation getDefaultModel() {

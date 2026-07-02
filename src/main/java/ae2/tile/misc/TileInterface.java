@@ -38,12 +38,14 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.common.util.Constants;
 
 import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 public class TileInterface extends AENetworkedInvTile
     implements InterfaceLogicHost, IPriorityHost, IUpgradeableObject, IConfigurableObject {
+    private static final String CELL_TERMINAL_SUBNET_ID_TAG = "cellTerminalSubnetId";
 
     private static final IGridNodeListener<TileInterface> NODE_LISTENER = new IGridNodeListener<>() {
         @Override
@@ -63,6 +65,8 @@ public class TileInterface extends AENetworkedInvTile
     };
 
     private final InterfaceLogic logic = new InterfaceLogic(this.getMainNode(), this, AEBlocks.INTERFACE.item());
+    @Nullable
+    private String cellTerminalSubnetId;
 
     @Override
     protected IManagedGridNode createMainNode() {
@@ -80,12 +84,18 @@ public class TileInterface extends AENetworkedInvTile
     public void saveAdditional(NBTTagCompound data) {
         super.saveAdditional(data);
         this.logic.writeToNBT(data);
+        if (this.cellTerminalSubnetId != null && !this.cellTerminalSubnetId.isEmpty()) {
+            data.setString(CELL_TERMINAL_SUBNET_ID_TAG, this.cellTerminalSubnetId);
+        }
     }
 
     @Override
     public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
         this.logic.readFromNBT(data);
+        this.cellTerminalSubnetId = data.hasKey(CELL_TERMINAL_SUBNET_ID_TAG, Constants.NBT.TAG_STRING)
+            ? data.getString(CELL_TERMINAL_SUBNET_ID_TAG)
+            : null;
     }
 
     @Override
@@ -103,6 +113,22 @@ public class TileInterface extends AENetworkedInvTile
     @Override
     public InterfaceLogic getInterfaceLogic() {
         return this.logic;
+    }
+
+    @Override
+    public @Nullable String getCellTerminalSubnetId() {
+        return this.cellTerminalSubnetId;
+    }
+
+    @Override
+    public void setCellTerminalSubnetId(String subnetId) {
+        if (subnetId == null || subnetId.isEmpty()) {
+            throw new IllegalArgumentException("subnetId must not be empty");
+        }
+        if (!subnetId.equals(this.cellTerminalSubnetId)) {
+            this.cellTerminalSubnetId = subnetId;
+            this.saveChanges();
+        }
     }
 
     @Override

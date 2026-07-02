@@ -45,7 +45,22 @@ public class CraftingSupplierHighlightHandler {
         showHighlightLocations(minecraft, highlightLocations);
     }
 
+    public void showCellTerminalHighlightLocations(Minecraft minecraft, List<OverlayHighlightLocation> locations) {
+        showHighlightLocations(minecraft, locations,
+            PlayerMessages.CellTerminalTargetLocation,
+            PlayerMessages.CellTerminalTargetLocationInDimension);
+    }
+
     public void showHighlightLocations(Minecraft minecraft, List<OverlayHighlightLocation> locations) {
+        showHighlightLocations(minecraft, locations,
+            PlayerMessages.CraftingSupplierLocation,
+            PlayerMessages.CraftingSupplierLocationInDimension);
+    }
+
+    private void showHighlightLocations(Minecraft minecraft,
+                                        List<OverlayHighlightLocation> locations,
+                                        PlayerMessages sameDimensionMessage,
+                                        PlayerMessages otherDimensionMessage) {
         if (minecraft.player == null || minecraft.world == null) {
             return;
         }
@@ -58,7 +73,7 @@ public class CraftingSupplierHighlightHandler {
 
         for (var location : locations) {
             BlockPos pos = location.pos();
-            ITextComponent base = PlayerMessages.CraftingSupplierLocation.text(
+            ITextComponent base = sameDimensionMessage.text(
                 pos.getX(), pos.getY(), pos.getZ());
             if (location.dimensionId() == currentDimension) {
                 minecraft.player.sendStatusMessage(base.createCopy(), true);
@@ -66,7 +81,7 @@ public class CraftingSupplierHighlightHandler {
                 this.currentDimensionLocations.add(location);
             } else {
                 String dimensionName = CraftingSupplierLocator.getDimensionName(location.dimensionId());
-                ITextComponent otherDim = PlayerMessages.CraftingSupplierLocationInDimension.text(
+                ITextComponent otherDim = otherDimensionMessage.text(
                     pos.getX(), pos.getY(), pos.getZ(), location.dimensionId(), dimensionName);
                 minecraft.player.sendStatusMessage(otherDim.createCopy(), true);
                 minecraft.player.sendMessage(otherDim);

@@ -146,6 +146,8 @@ public enum PlayerMessages implements LocalizationEnum {
     CraftingCpuCoreLocationInDimension,
     CraftingSupplierLocation,
     CraftingSupplierLocationInDimension,
+    CellTerminalTargetLocation,
+    CellTerminalTargetLocationInDimension,
     ConfigModifierSuccess,
     CraftingSupplierNotFound,
     ReplicatorCardReplications,

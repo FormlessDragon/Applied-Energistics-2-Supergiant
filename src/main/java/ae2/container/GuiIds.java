@@ -102,7 +102,10 @@ public final class GuiIds {
         RENAMER,
         WORK_INTERVAL,
         PROVIDER_SELECT,
-        PORTABLE_CELL_PICKUP_FILTER;
+        PORTABLE_CELL_PICKUP_FILTER,
+        CELL_TERMINAL,
+        WIRELESS_CELL_TERMINAL,
+        WIRELESS_TERMINAL_DYNAMIC;
 
         private static final GuiKey[] VALUES = values();
 

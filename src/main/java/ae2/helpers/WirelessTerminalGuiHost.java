@@ -4,6 +4,7 @@
  */
 package ae2.helpers;
 
+import ae2.api.cellterminal.CellTerminalContainerHost;
 import ae2.api.config.Actionable;
 import ae2.api.config.PowerMultiplier;
 import ae2.api.features.Locatables;
@@ -23,6 +24,7 @@ import ae2.api.storage.SupplierStorage;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.KeyTypeSelection;
 import ae2.api.util.KeyTypeSelectionHost;
+import ae2.cellterminal.internal.CellTerminalTempCells;
 import ae2.container.ISubGui;
 import ae2.core.AEConfig;
 import ae2.core.definitions.AEItems;
@@ -52,7 +54,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.function.BiConsumer;
 
 public class WirelessTerminalGuiHost<T extends WirelessTerminalItem> extends ItemGuiHost<T>
-    implements IPortableTerminal, IActionHost, KeyTypeSelectionHost, IViewCellStorage, InternalInventoryHost {
+    implements IPortableTerminal, IActionHost, KeyTypeSelectionHost, IViewCellStorage, InternalInventoryHost,
+    CellTerminalContainerHost {
 
     private static final String ENTANGLED_SINGULARITY_ID = "entangled_singularity_id";
     private static final double QUANTUM_BRIDGE_DRAIN_PER_TICK = 22.5;
@@ -61,6 +64,7 @@ public class WirelessTerminalGuiHost<T extends WirelessTerminalItem> extends Ite
     private final WirelessTerminalItem terminalItem;
     private final MEStorage storage;
     private final SupplierInternalInventory<InternalInventory> viewCellStorage;
+    private final SupplierInternalInventory<InternalInventory> tempCellStorage;
     private final SupplierInternalInventory<InternalInventory> singularityStorage;
     private final StackDependentSupplier<WirelessTerminalMagnetHost> magnetHost;
     protected double currentDistanceFromGrid = Double.MAX_VALUE;
@@ -87,6 +91,8 @@ public class WirelessTerminalGuiHost<T extends WirelessTerminalItem> extends Ite
         this.storage = new SupplierStorage(new StackDependentSupplier<>(this::getItemStack, this::getStorageFromStack));
         this.viewCellStorage = new SupplierInternalInventory<>(
             new StackDependentSupplier<>(this::getItemStack, stack -> createViewCellStorage(player, stack, terminalItem)));
+        this.tempCellStorage = new SupplierInternalInventory<>(
+            new StackDependentSupplier<>(this::getItemStack, stack -> createTempCellStorage(player, stack, terminalItem)));
         this.singularityStorage = new SupplierInternalInventory<>(
             new StackDependentSupplier<>(this::getItemStack, stack -> createSingularityStorage(player, stack)));
         this.magnetHost = new StackDependentSupplier<>(
@@ -113,6 +119,26 @@ public class WirelessTerminalGuiHost<T extends WirelessTerminalItem> extends Ite
             viewCellStorage.readFromNBT(tag, WirelessTerminals.TAG_VIEW_CELLS);
         }
         return viewCellStorage;
+    }
+
+    private static InternalInventory createTempCellStorage(EntityPlayer player, ItemStack stack,
+                                                           WirelessTerminalItem terminal) {
+        var tempCellStorage = new AppEngInternalInventory(new InternalInventoryHost() {
+            @Override
+            public void saveChangedInventory(AppEngInternalInventory inv) {
+                inv.writeToNBT(WirelessTerminals.getTerminalData(stack, terminal), WirelessTerminals.TAG_TEMP_CELLS);
+            }
+
+            @Override
+            public boolean isClientSide() {
+                return player.world.isRemote;
+            }
+        }, CellTerminalTempCells.SLOT_COUNT, 1);
+        NBTTagCompound tag = WirelessTerminals.getExistingTerminalData(stack, terminal);
+        if (tag != null) {
+            tempCellStorage.readFromNBT(tag, WirelessTerminals.TAG_TEMP_CELLS);
+        }
+        return tempCellStorage;
     }
 
     private static InternalInventory createSingularityStorage(EntityPlayer player, ItemStack stack) {
@@ -202,6 +228,25 @@ public class WirelessTerminalGuiHost<T extends WirelessTerminalItem> extends Ite
         return this.viewCellStorage;
     }
 
+    @Override
+    public InternalInventory getTempCellStorage() {
+        return this.tempCellStorage;
+    }
+
+    @Override
+    public NBTTagCompound loadCellTerminalSubnetLedgerTag() {
+        NBTTagCompound tag = WirelessTerminals.getExistingTerminalData(getItemStack(), this.terminalItem);
+        return tag == null
+            ? new NBTTagCompound()
+            : tag.getCompoundTag(WirelessTerminals.TAG_CELL_TERMINAL_SUBNETS).copy();
+    }
+
+    @Override
+    public void saveCellTerminalSubnetLedgerTag(NBTTagCompound tag) {
+        WirelessTerminals.getTerminalData(getItemStack(), this.terminalItem)
+                         .setTag(WirelessTerminals.TAG_CELL_TERMINAL_SUBNETS, tag.copy());
+    }
+
     @Nullable
     private IGrid getLinkedGrid(ItemStack stack) {
         return getItem().getLinkedGrid(stack, this.terminalItem, getPlayer().world, null);
@@ -225,6 +270,11 @@ public class WirelessTerminalGuiHost<T extends WirelessTerminalItem> extends Ite
             return this.currentQuantumBridge.getActionableNode();
         }
         return null;
+    }
+
+    @Override
+    public IGridNode getGridNode() {
+        return getActionableNode();
     }
 
     protected AccessPointSignal getAccessPointSignal(IWirelessAccessPoint wap) {

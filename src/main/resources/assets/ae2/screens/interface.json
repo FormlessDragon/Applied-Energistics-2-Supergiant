@@ -33,7 +33,7 @@
     },
     "interface_config": {
       "text": {
-        "translate": "gui.ae2.InterfaceConfigPage"
+        "translate": "gui.ae2.InterfaceConfig"
       },
       "position": {
         "left": 8,

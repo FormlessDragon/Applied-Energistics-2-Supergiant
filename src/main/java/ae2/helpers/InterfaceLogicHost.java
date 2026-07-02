@@ -12,6 +12,7 @@ import ae2.helpers.externalstorage.GenericStackInv;
 import ae2.parts.AEBasePart;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntity;
+import org.jetbrains.annotations.Nullable;
 
 public interface InterfaceLogicHost extends IConfigurableObject, IUpgradeableObject, IPriorityHost, IConfigInvHost {
     TileEntity getTileEntity();
@@ -19,6 +20,15 @@ public interface InterfaceLogicHost extends IConfigurableObject, IUpgradeableObj
     void saveChanges();
 
     InterfaceLogic getInterfaceLogic();
+
+    @Nullable
+    default String getCellTerminalSubnetId() {
+        return null;
+    }
+
+    default void setCellTerminalSubnetId(String subnetId) {
+        throw new UnsupportedOperationException("Cell Terminal subnet id is not persisted by " + getClass().getName());
+    }
 
     @Override
     default IConfigManager getConfigManager() {

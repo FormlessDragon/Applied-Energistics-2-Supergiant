@@ -214,7 +214,7 @@ public class VoidCellInventory implements StorageCell, CondenserLogicHost {
         if (key == null) {
             return false;
         }
-        if (!(stack.getItem() instanceof VoidCellItem voidCellItem)) {
+        if (!(stack.getItem() instanceof VoidCellItem)) {
             return false;
         }
 

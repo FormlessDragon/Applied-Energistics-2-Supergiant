@@ -64,6 +64,9 @@ import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.core.network.serverbound.SwapSlotsPacket;
 import ae2.helpers.InventoryAction;
 import ae2.integration.Integrations;
+import ae2.integration.modules.hei.target.FakeSlotTarget;
+import ae2.integration.modules.hei.target.HeiGhostTargetSupport;
+import ae2.integration.modules.hei.target.TextFieldTarget;
 import ae2.items.tools.powered.WirelessUniversalTerminalItem;
 import ae2.util.EmptyArrays;
 import com.google.common.base.Stopwatch;
@@ -71,6 +74,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
+import mezz.jei.api.gui.IGhostIngredientHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiTextField;
@@ -135,6 +139,8 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     private boolean renderingModalSelectionPopup;
     @Nullable
     private ICompositeWidget mouseInteractionBlocker;
+    @Nullable
+    private Slot hoveredSlotForOverlay;
     private int modalSelectionPopupMouseX;
     private int modalSelectionPopupMouseY;
     @Nullable
@@ -241,6 +247,10 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         return button;
     }
 
+    protected final Rectangle getLeftToolbarBounds() {
+        return new Rectangle(this.verticalToolbar.getBounds());
+    }
+
     public void setInitialFocus(GuiTextField textField) {
         textField.setFocused(true);
     }
@@ -342,6 +352,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         Slot aeHoveredSlot = modalSelectionPopup || blockedByWidgetMouse ? null
             : widgets.hitTest(realMousePos) ? null : findSlot(mouseX, mouseY);
         this.hoveredSlot = aeHoveredSlot;
+        this.hoveredSlotForOverlay = aeHoveredSlot;
         if (modalSelectionPopup || blockedByWidgetMouse) {
             this.modalSelectionPopupMouseX = mouseX;
             this.modalSelectionPopupMouseY = mouseY;
@@ -361,10 +372,6 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
         this.hoveredSlot = aeHoveredSlot;
 
-        if (this.hoveredSlot != null) {
-            renderSlotHighlight(this.hoveredSlot, mouseX, mouseY);
-        }
-
         if (!modalSelectionPopup) {
             renderHoveredToolTip(mouseX, mouseY);
         }
@@ -379,6 +386,12 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     public void initGui() {
         super.initGui();
         this.guiLeft += getGuiLeftOffset();
+        int visualTopOutset = getGuiVisualTopOutset();
+        int visualBottomOutset = getGuiVisualBottomOutset();
+        if (visualTopOutset != 0 || visualBottomOutset != 0) {
+            this.guiTop = (this.height - this.ySize - visualTopOutset - visualBottomOutset) / 2
+                + visualTopOutset;
+        }
         closeSelectionPopup();
         this.suppressSelectionPopupMouseRelease = false;
         positionSlots();
@@ -387,6 +400,14 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     }
 
     protected int getGuiLeftOffset() {
+        return 0;
+    }
+
+    protected int getGuiVisualTopOutset() {
+        return 0;
+    }
+
+    protected int getGuiVisualBottomOutset() {
         return 0;
     }
 
@@ -827,6 +848,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     protected void drawSlot(Slot slot) {
         if (!(slot instanceof AppEngSlot appEngSlot)) {
             super.drawSlot(slot);
+            renderHoveredSlotOverlayIfNeeded(slot);
             return;
         }
 
@@ -838,6 +860,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         ItemStack rawStack = getRawStack(appEngSlot);
         if (rawStack.isEmpty()) {
             super.drawSlot(slot);
+            renderHoveredSlotOverlayIfNeeded(slot);
             return;
         }
 
@@ -850,6 +873,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         this.dragSplitting = wasDragSplitting;
 
         renderAppEngSlotAmount(slot, appEngSlot, rawStack);
+        renderHoveredSlotOverlayIfNeeded(slot);
     }
 
     private void drawGenericStackSlot(Slot slot, AppEngSlot appEngSlot) {
@@ -867,6 +891,8 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
                 what.formatAmount(amount, AmountFormat.SLOT), false);
             restoreStateForVanillaItemRender();
         }
+
+        renderHoveredSlotOverlayIfNeeded(slot);
     }
 
     private static void restoreStateForVanillaItemRender() {
@@ -1011,7 +1037,6 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         } finally {
             GlStateManager.popMatrix();
         }
-
         int popupMouseX = this.renderingModalSelectionPopup ? this.modalSelectionPopupMouseX : mouseX;
         int popupMouseY = this.renderingModalSelectionPopup ? this.modalSelectionPopupMouseY : mouseY;
         renderSelectionPopup(popupMouseX, popupMouseY);
@@ -1277,10 +1302,6 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return;
         }
 
-        if (slot instanceof DisabledSlot) {
-            return;
-        }
-
         if (clickType == ClickType.CLONE && slot != null && GenericStack.isWrapped(slot.getStack())) {
             return;
         }
@@ -1296,6 +1317,15 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             }
 
             sendInventoryAction(action, slotId);
+            return;
+        }
+
+        if (slot != null && Keyboard.isKeyDown(Keyboard.KEY_SPACE)) {
+            sendInventoryAction(InventoryAction.MOVE_REGION, slot.slotNumber);
+            return;
+        }
+
+        if (slot instanceof DisabledSlot || container.isPlayerInventorySlotLocked(slot)) {
             return;
         }
 
@@ -1319,11 +1349,6 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return;
         }
 
-        if (slot != null && Keyboard.isKeyDown(Keyboard.KEY_SPACE)) {
-            sendInventoryAction(InventoryAction.MOVE_REGION, slot.slotNumber);
-            return;
-        }
-
         if (slot != null && !this.disableShiftClick && isShiftKeyDown() && mouseButton == 0) {
             this.disableShiftClick = true;
 
@@ -1335,6 +1360,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             } else if (!this.dbl_whichItem.isEmpty()) {
                 for (Slot inventorySlot : this.getInventorySlots()) {
                     if (inventorySlot != null && inventorySlot.canTakeStack(this.mc.player)
+                        && !container.isPlayerInventorySlotLocked(inventorySlot)
                         && inventorySlot.getHasStack()
                         && isSameInventory(inventorySlot, slot)
                         && Container.canAddItemToSlot(inventorySlot, this.dbl_whichItem, true)) {
@@ -1423,24 +1449,13 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         return super.isPointInRegion(left, top, width, height, pointX, pointY);
     }
 
-    private boolean isHoveringForHighlight(Slot slot, int mouseX, int mouseY) {
-        int x = mouseX - guiLeft;
-        int y = mouseY - guiTop;
-        int width = 16;
-        int height = 16;
-        if (slot instanceof ResizableSlot resizableSlot) {
-            width = resizableSlot.getWidth();
-            height = resizableSlot.getHeight();
+    protected final void renderHoveredSlotOverlayIfNeeded(Slot slot) {
+        if (slot == this.hoveredSlotForOverlay) {
+            renderSlotHighlight(slot);
         }
-        return x >= slot.xPos - 1 && x < slot.xPos + width + 1
-            && y >= slot.yPos - 1 && y < slot.yPos + height + 1;
     }
 
-    protected void renderSlotHighlight(Slot slot, int mouseX, int mouseY) {
-        if (!isHoveringForHighlight(slot, mouseX, mouseY)) {
-            return;
-        }
-
+    protected void renderSlotHighlight(Slot slot) {
         int width = 16;
         int height = 16;
         if (slot instanceof ResizableSlot resizableSlot) {
@@ -1451,8 +1466,8 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         GlStateManager.disableLighting();
         GlStateManager.disableDepth();
         GlStateManager.colorMask(true, true, true, false);
-        this.drawGradientRect(guiLeft + slot.xPos - 1, guiTop + slot.yPos - 1,
-            guiLeft + slot.xPos + width + 1, guiTop + slot.yPos + height + 1, 0x669cd3ff, 0x669cd3ff);
+        this.drawGradientRect(slot.xPos - 1, slot.yPos - 1,
+            slot.xPos + width + 1, slot.yPos + height + 1, 0x669cd3ff, 0x669cd3ff);
         GlStateManager.colorMask(true, true, true, true);
         GlStateManager.enableDepth();
         GlStateManager.enableLighting();
@@ -1625,7 +1640,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
     @Override
     public boolean MT_isIgnored(Slot slot) {
-        return slot instanceof FakeSlot || slot instanceof DisabledSlot;
+        return slot instanceof FakeSlot || slot instanceof DisabledSlot || container.isPlayerInventorySlotLocked(slot);
     }
 
     @Override
@@ -1684,6 +1699,32 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     @SuppressWarnings("unused")
     public Collection<? extends Slot> getHEISlots(Object ingredient) {
         return container.inventorySlots;
+    }
+
+    @Optional.Method(modid = "jei")
+    public <I> List<IGhostIngredientHandler.Target<I>> getHEITargets(I ingredient, int ghostMouseButton) {
+        List<IGhostIngredientHandler.Target<I>> targets = new ObjectArrayList<>();
+
+        for (var slot : getHEISlots(ingredient)) {
+            if (!(slot instanceof FakeSlot fakeSlot) || !fakeSlot.isEnabled()) {
+                continue;
+            }
+
+            ItemStack stack = HeiGhostTargetSupport.toFilterStack(fakeSlot, ingredient);
+            if (!stack.isEmpty()) {
+                targets.add(new FakeSlotTarget<>(this, fakeSlot));
+            }
+        }
+
+        if (this instanceof ITextFieldGui textFieldGui) {
+            for (var field : textFieldGui.getTextFields()) {
+                if (field.getVisible()) {
+                    targets.add(new TextFieldTarget<>(this, field));
+                }
+            }
+        }
+
+        return targets;
     }
 
     private static final class SavedSlotInfo {

@@ -31,6 +31,7 @@ public class MEInventoryHandler extends DelegatingMEInventory {
 
     private IPartitionList partitionList = DefaultPriorityList.INSTANCE;
     private IncludeExclude partitionListMode = IncludeExclude.WHITELIST;
+    private boolean readPartitionFiltering;
     private boolean filterOnExtraction;
     private boolean filterAvailableContents;
     private boolean allowExtraction = true;
@@ -64,6 +65,10 @@ public class MEInventoryHandler extends DelegatingMEInventory {
         this.partitionList = myPartitionList;
     }
 
+    public void setReadPartitionFiltering(boolean readPartitionFiltering) {
+        this.readPartitionFiltering = readPartitionFiltering;
+    }
+
     public void setExtractFiltering(boolean filterOnExtraction, boolean filterAvailableContents) {
         this.filterOnExtraction = filterOnExtraction;
         this.filterAvailableContents = filterAvailableContents;
@@ -91,7 +96,7 @@ public class MEInventoryHandler extends DelegatingMEInventory {
 
     @Override
     public long extract(AEKey what, long amount, Actionable mode, IActionSource source) {
-        if (this.filterOnExtraction && !canExtract(what)) {
+        if (shouldFilterReads() && !canExtract(what)) {
             return 0;
 // we use a copy of size 1 here to prevent inventories from attempting to query multiple sub-inventories
         }
@@ -108,7 +113,7 @@ public class MEInventoryHandler extends DelegatingMEInventory {
 
         this.gettingAvailableContent = true;
         try {
-            if (!this.filterAvailableContents) {
+            if (!shouldFilterVisibleContents()) {
                 super.getAvailableStacks(out);
             } else {
                 if (!this.allowExtraction) {
@@ -128,7 +133,17 @@ public class MEInventoryHandler extends DelegatingMEInventory {
     }
 
     @Override
+    public KeyCounter getAvailableStacks() {
+        var result = new KeyCounter();
+        getAvailableStacks(result);
+        return result;
+    }
+
+    @Override
     public boolean isPreferredStorageFor(AEKey input, IActionSource source) {
+        if (!passesBlackOrWhitelist(input)) {
+            return false;
+        }
         if (this.partitionListMode == IncludeExclude.WHITELIST) {
             if (this.partitionList.isListed(input)) {
                 return true;
@@ -144,6 +159,9 @@ public class MEInventoryHandler extends DelegatingMEInventory {
 
     @Override
     public boolean isStickyStorageFor(AEKey input, IActionSource source) {
+        if (!passesBlackOrWhitelist(input)) {
+            return false;
+        }
         if (this.partitionListMode != IncludeExclude.WHITELIST) {
             return false;
         }
@@ -158,6 +176,14 @@ public class MEInventoryHandler extends DelegatingMEInventory {
 
     protected boolean canExtract(AEKey request) {
         return allowExtraction && passesBlackOrWhitelist(request);
+    }
+
+    private boolean shouldFilterReads() {
+        return this.readPartitionFiltering || this.filterOnExtraction;
+    }
+
+    private boolean shouldFilterVisibleContents() {
+        return this.readPartitionFiltering || this.filterAvailableContents;
     }
 
     private boolean passesBlackOrWhitelist(AEKey input) {

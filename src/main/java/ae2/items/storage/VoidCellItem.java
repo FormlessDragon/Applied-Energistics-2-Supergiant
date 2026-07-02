@@ -79,6 +79,11 @@ public class VoidCellItem extends AEBaseItem implements ICellWorkbenchItem, ISta
     }
 
     @Override
+    public boolean supportsAutoPartition(ItemStack is) {
+        return false;
+    }
+
+    @Override
     public FuzzyMode getFuzzyMode(ItemStack is) {
         NBTTagCompound tag = is.getTagCompound();
         if (tag != null && tag.hasKey(STORAGE_CELL_FUZZY_MODE, 8)) {

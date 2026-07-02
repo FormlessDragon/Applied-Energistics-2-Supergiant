@@ -100,7 +100,9 @@ public class ContainerMolecularAssembler extends AEBaseContainer
     public ItemStack transferStackInSlot(EntityPlayer player, int index) {
         if (!isClientSide() && index >= 0 && index < this.inventorySlots.size()) {
             Slot sourceSlot = this.inventorySlots.get(index);
-            if (sourceSlot != null && isPlayerSideSlot(sourceSlot) && isAssemblerPattern(sourceSlot.getStack())) {
+            if (isValidQuickMoveSource(sourceSlot, player)
+                && isPlayerSideSlot(sourceSlot)
+                && isAssemblerPattern(sourceSlot.getStack())) {
                 return moveSinglePatternFromPlayerSlot(sourceSlot, player);
             }
         }

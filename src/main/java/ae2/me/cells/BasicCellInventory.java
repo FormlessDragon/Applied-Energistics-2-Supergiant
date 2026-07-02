@@ -342,9 +342,6 @@ public class BasicCellInventory implements StorageCell {
         if (key == null || amount <= 0 || !cellType.getKeyType().contains(key)) {
             return;
         }
-        if (!isAllowedByCellWorkbench(key)) {
-            return;
-        }
         long currentAmount = cellItems.getLong(key);
         long newAmount = saturatedAdd(currentAmount, amount);
         cellItems.put(key, newAmount);

@@ -18,11 +18,13 @@
 
 package ae2.integration.modules.bogosorter;
 
+import ae2.container.AEBaseContainer;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.me.items.ContainerBasicCellChest;
 import ae2.container.me.items.ContainerCraftingTerm;
 import ae2.container.me.items.ContainerPatternEncodingTerm;
 import ae2.container.me.items.ContainerWirelessCraftingTerm;
+import ae2.container.slot.DisabledSlot;
 import ae2.core.AELog;
 import com.cleanroommc.bogosorter.api.IBogoSortAPI;
 import com.cleanroommc.bogosorter.api.IButtonPos;
@@ -32,6 +34,7 @@ import com.cleanroommc.bogosorter.api.ISlotGroup;
 import com.cleanroommc.bogosorter.api.ISortingContextBuilder;
 import com.cleanroommc.bogosorter.common.sort.SortHandler;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.InventoryBasic;
@@ -78,6 +81,8 @@ public final class InventoryBogoSortModule {
 
         private static void init() {
             IBogoSortAPI api = IBogoSortAPI.getInstance();
+            api.addSlotGetter(Slot.class, LockedAwareSlot::new);
+            api.addSlotGetter(DisabledSlot.class, LockedAwareSlot::new);
             registerTerminal(api, ContainerMEStorage.class);
             registerTerminal(api, ContainerBasicCellChest.class);
             registerTerminal(api, ContainerCraftingTerm.class);
@@ -113,13 +118,112 @@ public final class InventoryBogoSortModule {
             throw new IllegalArgumentException(message);
         }
 
-        private static final class MeNetworkInsertSlot implements ISlot {
-            private static final int SLOT_NUMBER_BASE = Integer.MIN_VALUE;
-            private final int index;
+        private static final class LockedAwareSlot implements ISlot {
+            private final Slot slot;
+            private final boolean lockedByAeContainer;
 
-            private MeNetworkInsertSlot(int index) {
-                this.index = index;
+            private LockedAwareSlot(Slot slot) {
+                this.slot = slot;
+                this.lockedByAeContainer = isLockedByAeContainer(slot);
             }
+
+            private static boolean isLockedByAeContainer(Slot slot) {
+                if (!(slot.inventory instanceof InventoryPlayer inventory)) {
+                    return false;
+                }
+                return inventory.player.openContainer instanceof AEBaseContainer container
+                    && container.isPlayerInventorySlotLocked(slot);
+            }
+
+            @Override
+            public Slot bogo$getRealSlot() {
+                return this.slot;
+            }
+
+            @Override
+            public int bogo$getX() {
+                return this.slot.xPos;
+            }
+
+            @Override
+            public int bogo$getY() {
+                return this.slot.yPos;
+            }
+
+            @Override
+            public int bogo$getSlotNumber() {
+                return this.slot.slotNumber;
+            }
+
+            @Override
+            public int bogo$getSlotIndex() {
+                return this.slot.getSlotIndex();
+            }
+
+            @Override
+            public IInventory bogo$getInventory() {
+                return this.slot.inventory;
+            }
+
+            @Override
+            public void bogo$putStack(ItemStack itemStack) {
+                if (!this.lockedByAeContainer) {
+                    this.slot.putStack(itemStack);
+                }
+            }
+
+            @Override
+            public ItemStack bogo$getStack() {
+                return this.lockedByAeContainer ? ItemStack.EMPTY : this.slot.getStack();
+            }
+
+            @Override
+            public int bogo$getMaxStackSize(ItemStack itemStack) {
+                return this.lockedByAeContainer ? 0 : this.slot.getSlotStackLimit();
+            }
+
+            @Override
+            public int bogo$getItemStackLimit(ItemStack itemStack) {
+                return this.lockedByAeContainer ? 0 : this.slot.getItemStackLimit(itemStack);
+            }
+
+            @Override
+            public boolean bogo$isEnabled() {
+                return !this.lockedByAeContainer && this.slot.isEnabled();
+            }
+
+            @Override
+            public boolean bogo$isItemValid(ItemStack itemStack) {
+                return !this.lockedByAeContainer && this.slot.isItemValid(itemStack);
+            }
+
+            @Override
+            public boolean bogo$canTakeStack(EntityPlayer entityPlayer) {
+                return !this.lockedByAeContainer && this.slot.canTakeStack(entityPlayer);
+            }
+
+            @Override
+            public void bogo$onSlotChanged() {
+                if (!this.lockedByAeContainer) {
+                    this.slot.onSlotChanged();
+                }
+            }
+
+            @Override
+            public void bogo$onSlotChanged(ItemStack itemStack, ItemStack itemStack1) {
+                if (!this.lockedByAeContainer) {
+                    this.slot.onSlotChange(itemStack, itemStack1);
+                }
+            }
+
+            @Override
+            public ItemStack bogo$onTake(EntityPlayer entityPlayer, ItemStack itemStack) {
+                return this.lockedByAeContainer ? ItemStack.EMPTY : this.slot.onTake(entityPlayer, itemStack);
+            }
+        }
+
+        private record MeNetworkInsertSlot(int index) implements ISlot {
+            private static final int SLOT_NUMBER_BASE = Integer.MIN_VALUE;
 
             @Override
             public Slot bogo$getRealSlot() {

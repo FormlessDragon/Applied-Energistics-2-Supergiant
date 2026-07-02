@@ -15,7 +15,8 @@ import ae2.client.gui.style.WidgetStyle;
 import ae2.client.gui.widgets.AECheckbox;
 import ae2.client.gui.widgets.ITooltip;
 import ae2.client.gui.widgets.IconButton;
-import ae2.container.me.common.ContainerMEStorage;
+import ae2.container.AEBaseContainer;
+import ae2.container.interfaces.IKeyTypeSelectionContainer;
 import ae2.core.localization.GuiText;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -31,7 +32,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-final class KeyTypeSelectionWindow implements ICompositeWidget {
+public final class KeyTypeSelectionWindow<C extends AEBaseContainer & IKeyTypeSelectionContainer>
+    implements ICompositeWidget {
     private static final GuiStyle STYLE = GuiStyleManager.loadStyleDoc("/screens/key_type_selection.json");
     private static final String BACK_WIDGET = "back";
     private static final String KEY_TYPES_WIDGET = "keytypes";
@@ -42,7 +44,7 @@ final class KeyTypeSelectionWindow implements ICompositeWidget {
     private static final int PADDING = 6;
     private static final int KEY_TYPE_SPACING = AECheckbox.SIZE + PADDING;
 
-    private final GuiMEStorage<? extends ContainerMEStorage> parent;
+    private final AEBaseGui<C> parent;
     private final ITextComponent title;
     private final ObjectArrayList<GuiButton> buttons = new ObjectArrayList<>();
     private final Object2ObjectLinkedOpenHashMap<AEKeyType, AECheckbox> checkboxes =
@@ -54,7 +56,7 @@ final class KeyTypeSelectionWindow implements ICompositeWidget {
     private Point dragOffset = Point.ZERO;
     private boolean resetPositionOnOpen = true;
 
-    KeyTypeSelectionWindow(GuiMEStorage<? extends ContainerMEStorage> parent, ITextComponent title) {
+    public KeyTypeSelectionWindow(AEBaseGui<C> parent, ITextComponent title) {
         this.parent = parent;
         this.title = title;
     }
@@ -84,7 +86,7 @@ final class KeyTypeSelectionWindow implements ICompositeWidget {
         return coordinate;
     }
 
-    void open() {
+    public void open() {
         this.visible = true;
         this.dragging = false;
         this.resetPositionOnOpen = true;
@@ -92,14 +94,14 @@ final class KeyTypeSelectionWindow implements ICompositeWidget {
         rebuildButtons();
     }
 
-    void close() {
+    public void close() {
         this.visible = false;
         this.dragging = false;
         this.buttons.clear();
         this.checkboxes.clear();
     }
 
-    void toggle() {
+    public void toggle() {
         if (this.visible) {
             close();
         } else {

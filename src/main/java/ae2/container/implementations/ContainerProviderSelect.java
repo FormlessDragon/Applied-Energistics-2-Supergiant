@@ -25,6 +25,14 @@ import ae2.parts.AEBasePart;
 import ae2.util.inv.FilteredInternalInventory;
 import ae2.util.inv.filter.IAEItemFilter;
 import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
+import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.objects.Reference2LongMap;
+import it.unimi.dsi.fastutil.objects.Reference2LongOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.ShortSet;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -36,15 +44,10 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -61,9 +64,9 @@ public class ContainerProviderSelect extends AEBaseContainer implements ISubGui 
     private static final int MAX_MAPPING_ACTION_PAYLOAD_LENGTH = 1024;
 
     private final IPatternTerminalGuiHost host;
-    private final Map<Long, ProviderEntry> entriesById = new LinkedHashMap<>();
-    private final Map<PatternContainer, Long> idsByContainer = new IdentityHashMap<>();
-    private final List<Integer> filteredEntryIndexes = new ArrayList<>();
+    private final Long2ObjectMap<ProviderEntry> entriesById = new Long2ObjectLinkedOpenHashMap<>();
+    private final Reference2LongMap<PatternContainer> idsByContainer = new Reference2LongOpenHashMap<>();
+    private final IntList filteredEntryIndexes = new IntArrayList();
     @GuiSync(SYNC_PROVIDER_ENTRIES)
     private ProviderEntries providerEntries = ProviderEntries.empty();
     @GuiSync(SYNC_INITIAL_SEARCH_TEXT)
@@ -313,7 +316,7 @@ public class ContainerProviderSelect extends AEBaseContainer implements ISubGui 
 
         List<PatternContainer> selectableProviders = collectSelectableProviders(grid);
         MappingSnapshot mappings = cleanAndSnapshotMappings(world, selectableProviders);
-        List<PatternContainer> uploadTargets = new ArrayList<>();
+        List<PatternContainer> uploadTargets = new ObjectArrayList<>();
         for (PatternContainer container : selectableProviders) {
             if (countEmptySlots(container) <= 0) {
                 continue;
@@ -371,35 +374,22 @@ public class ContainerProviderSelect extends AEBaseContainer implements ISubGui 
         }
     }
 
-    private void rebuildEntries(@Nullable IGrid grid) {
-        this.entriesById.clear();
-
-        List<DisplayEntry> displayEntries = new ArrayList<>();
-        if (grid == null) {
-            setProviderEntries(displayEntries);
-            return;
-        }
-
-        List<PatternContainer> containers = collectSelectableProviders(grid);
-        MappingSnapshot mappings = cleanAndSnapshotMappings(getPlayer().world, containers);
-        for (PatternContainer container : containers) {
-            ProviderReference reference = createProviderReference(container);
-            if (reference == null) {
+    public static List<PatternContainer> collectSelectableProviders(IGrid grid) {
+        List<PatternContainer> containers = new ObjectArrayList<>();
+        for (Class<?> machineClass : grid.getMachineClasses()) {
+            if (!PatternContainer.class.isAssignableFrom(machineClass)) {
                 continue;
             }
 
-            int emptySlots = countEmptySlots(container);
-            long providerId = this.idsByContainer.computeIfAbsent(container, ignored -> this.nextEntryId++);
-            String providerName = getProviderName(container);
-            List<String> recipeTypes = mappings.getRecipeTypes(reference);
-            String label = formatProviderLabel(recipeTypes, providerName, emptySlots);
-            ProviderEntry entry = new ProviderEntry(providerId, container, reference);
-            this.entriesById.put(entry.id, entry);
-            displayEntries.add(new DisplayEntry(providerId, reference, label, providerName,
-                buildSearchText(label, providerName, recipeTypes)));
+            Class<? extends PatternContainer> containerClass = machineClass.asSubclass(PatternContainer.class);
+            for (PatternContainer container : grid.getActiveMachines(containerClass)) {
+                if (isSelectableProvider(container)) {
+                    containers.add(container);
+                }
+            }
         }
-
-        setProviderEntries(displayEntries);
+        containers.sort(Comparator.comparingLong(PatternContainer::getTerminalSortOrder));
+        return containers;
     }
 
     private void setProviderEntries(List<DisplayEntry> displayEntries) {
@@ -432,18 +422,17 @@ public class ContainerProviderSelect extends AEBaseContainer implements ISubGui 
         }
     }
 
-    private DisplayEntry getVisibleEntry(int visibleIndex) {
-        if (visibleIndex < 0 || visibleIndex >= this.filteredEntryIndexes.size()) {
-            AELog.warn("Invalid visible provider entry index: {} of {}", visibleIndex, this.filteredEntryIndexes.size());
+    private static MappingSnapshot cleanAndSnapshotMappings(World world, List<PatternContainer> containers) {
+        PatternProviderMappingData mappingData = PatternProviderMappingData.get(world);
+        Set<ProviderReference> availableReferences = new ObjectLinkedOpenHashSet<>();
+        for (PatternContainer container : containers) {
+            ProviderReference reference = createProviderReference(container);
+            if (reference != null) {
+                availableReferences.add(reference);
+            }
         }
-
-        int entryIndex = this.filteredEntryIndexes.get(visibleIndex);
-        List<DisplayEntry> entries = this.providerEntries.entries();
-        if (entryIndex < 0 || entryIndex >= entries.size()) {
-            AELog.warn("Invalid provider entry index from filtered entries: {} of {}", entryIndex, entries.size());
-        }
-
-        return entries.get(entryIndex);
+        mappingData.removeUnavailableReferences(availableReferences);
+        return new MappingSnapshot(mappingData, availableReferences);
     }
 
     private static String normalizeSearchText(String searchText) {
@@ -468,35 +457,49 @@ public class ContainerProviderSelect extends AEBaseContainer implements ISubGui 
         return node.grid();
     }
 
-    public static List<PatternContainer> collectSelectableProviders(IGrid grid) {
-        List<PatternContainer> containers = new ArrayList<>();
-        for (Class<?> machineClass : grid.getMachineClasses()) {
-            if (!PatternContainer.class.isAssignableFrom(machineClass)) {
+    private void rebuildEntries(@Nullable IGrid grid) {
+        this.entriesById.clear();
+
+        List<DisplayEntry> displayEntries = new ObjectArrayList<>();
+        if (grid == null) {
+            setProviderEntries(displayEntries);
+            return;
+        }
+
+        List<PatternContainer> containers = collectSelectableProviders(grid);
+        MappingSnapshot mappings = cleanAndSnapshotMappings(getPlayer().world, containers);
+        for (PatternContainer container : containers) {
+            ProviderReference reference = createProviderReference(container);
+            if (reference == null) {
                 continue;
             }
 
-            Class<? extends PatternContainer> containerClass = machineClass.asSubclass(PatternContainer.class);
-            for (PatternContainer container : grid.getActiveMachines(containerClass)) {
-                if (isSelectableProvider(container)) {
-                    containers.add(container);
-                }
-            }
+            int emptySlots = countEmptySlots(container);
+            long providerId = this.idsByContainer.computeIfAbsent(container, ignored -> this.nextEntryId++);
+            String providerName = getProviderName(container);
+            List<String> recipeTypes = mappings.getRecipeTypes(reference);
+            String label = formatProviderLabel(recipeTypes, providerName, emptySlots);
+            ProviderEntry entry = new ProviderEntry(providerId, container, reference);
+            this.entriesById.put(entry.id, entry);
+            displayEntries.add(new DisplayEntry(providerId, reference, label, providerName,
+                buildSearchText(label, providerName, recipeTypes)));
         }
-        containers.sort(Comparator.comparingLong(PatternContainer::getTerminalSortOrder));
-        return containers;
+
+        setProviderEntries(displayEntries);
     }
 
-    private static MappingSnapshot cleanAndSnapshotMappings(World world, List<PatternContainer> containers) {
-        PatternProviderMappingData mappingData = PatternProviderMappingData.get(world);
-        Set<ProviderReference> availableReferences = new LinkedHashSet<>();
-        for (PatternContainer container : containers) {
-            ProviderReference reference = createProviderReference(container);
-            if (reference != null) {
-                availableReferences.add(reference);
-            }
+    private DisplayEntry getVisibleEntry(int visibleIndex) {
+        if (visibleIndex < 0 || visibleIndex >= this.filteredEntryIndexes.size()) {
+            AELog.warn("Invalid visible provider entry index: {} of {}", visibleIndex, this.filteredEntryIndexes.size());
         }
-        mappingData.removeUnavailableReferences(availableReferences);
-        return new MappingSnapshot(mappingData, availableReferences);
+
+        int entryIndex = this.filteredEntryIndexes.getInt(visibleIndex);
+        List<DisplayEntry> entries = this.providerEntries.entries();
+        if (entryIndex < 0 || entryIndex >= entries.size()) {
+            AELog.warn("Invalid provider entry index from filtered entries: {} of {}", entryIndex, entries.size());
+        }
+
+        return entries.get(entryIndex);
     }
 
     @Nullable
@@ -619,7 +622,7 @@ public class ContainerProviderSelect extends AEBaseContainer implements ISubGui 
             if (!this.availableReferences.contains(reference)) {
                 return Collections.emptyList();
             }
-            return new ArrayList<>(this.mappingData.getRecipeTypes(reference));
+            return new ObjectArrayList<>(this.mappingData.getRecipeTypes(reference));
         }
     }
 
@@ -659,7 +662,7 @@ public class ContainerProviderSelect extends AEBaseContainer implements ISubGui 
                 AELog.warn("Invalid provider entry count: {}", entryCount);
             }
 
-            List<DisplayEntry> entries = new ArrayList<>(entryCount);
+            List<DisplayEntry> entries = new ObjectArrayList<>(entryCount);
             for (int i = 0; i < entryCount; i++) {
                 long id = data.readLong();
                 ProviderReference reference = new ProviderReference(data.readInt(), data.readLong(), data.readInt());

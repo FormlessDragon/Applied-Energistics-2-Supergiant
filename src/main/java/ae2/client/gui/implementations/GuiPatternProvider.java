@@ -8,6 +8,7 @@ import ae2.api.config.PatternProviderOutputSideMode;
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
 import ae2.api.upgrades.Upgrades;
+import ae2.client.Point;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
@@ -23,6 +24,7 @@ import ae2.container.slot.AppEngSlot;
 import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.ConfigValueServerPacket;
+import ae2.helpers.patternmodifier.PatternModifierToolboxLayout;
 import ae2.helpers.patternprovider.PatternProviderCapacity;
 import ae2.util.EnumCycler;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -167,10 +169,10 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
         }
 
         @Override
-        public ae2.client.Point getPatternModifierPanelOffset() {
-            return new ae2.client.Point(
-                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_LEFT_OFFSET + 6,
-                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_TOP_OFFSET - 22);
+        public Point getPatternModifierPanelOffset() {
+            return new Point(
+                PatternModifierToolboxLayout.PANEL_LEFT_OFFSET + 6,
+                PatternModifierToolboxLayout.PANEL_TOP_OFFSET - 22);
         }
 
         @Override

@@ -45,6 +45,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
@@ -600,7 +601,7 @@ public class CPUSelectionList implements ICompositeWidget {
         }
     }
 
-    public Collection<? extends net.minecraft.client.gui.GuiTextField> getTextFields() {
+    public Collection<? extends GuiTextField> getTextFields() {
         if (activeRenameField != null && activeRenameField.getVisible()) {
             return List.of(searchField, activeRenameField);
         }

@@ -1,6 +1,7 @@
 package ae2.core.localization;
 
 import ae2.api.behaviors.EmptyingAction;
+import ae2.api.config.PowerUnit;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AmountFormat;
@@ -12,6 +13,8 @@ import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 
+import java.text.DecimalFormat;
+import java.text.MessageFormat;
 import java.util.List;
 
 public enum Tooltips implements LocalizationEnum {
@@ -32,6 +35,16 @@ public enum Tooltips implements LocalizationEnum {
     MatterBalls,
     Singularity,
     QuantumKey;
+
+    private static final char DECIMAL_SEPARATOR;
+    private static final String[] DECIMAL_UNITS = new String[]{"k", "M", "G", "T", "P", "E"};
+    private static final long[] DECIMAL_NUMS = new long[]{1_000L, 1_000_000L, 1_000_000_000L,
+        1_000_000_000_000L, 1_000_000_000_000_000L, 1_000_000_000_000_000_000L};
+
+    static {
+        var format = (DecimalFormat) DecimalFormat.getInstance();
+        DECIMAL_SEPARATOR = format.getDecimalFormatSymbols().getDecimalSeparator();
+    }
 
     public static final TextFormatting RED = TextFormatting.RED;
     public static final TextFormatting GREEN = TextFormatting.GREEN;
@@ -81,6 +94,20 @@ public enum Tooltips implements LocalizationEnum {
         return new TextComponentString(Long.toString(number)).setStyle(numberStyle());
     }
 
+    public static String energyStorageTooltip(double energy, double max) {
+        return TextFormatting.GRAY + GuiText.StoredEnergy.getLocal()
+            + TextFormatting.GRAY + ": "
+            + TextFormatting.LIGHT_PURPLE + formatNumber(energy, max)
+            + TextFormatting.GOLD + " " + PowerUnit.AE.getLocal()
+            + TextFormatting.GRAY + " ("
+            + percentColor(energy, max) + formatPercent(energy, max)
+            + TextFormatting.GRAY + ")";
+    }
+
+    public static String colored(LocalizationEnum text, TextFormatting color) {
+        return color + text.getLocal();
+    }
+
     public static ITextComponent bytesUsed(long bytes, long max) {
         var result = of(GuiText.BytesUsed.text(ofUnformattedNumber(bytes)));
         result.appendText(" / ");
@@ -110,21 +137,12 @@ public enum Tooltips implements LocalizationEnum {
         return getAmountTooltip(baseText, stack.what(), stack.amount());
     }
 
-    public static ITextComponent getSetAmountTooltip() {
-        return muted(ButtonToolTips.ModifyAmountAction.text(getMouseButtonText(2)));
-    }
-
     public static String getSetAmountTooltipLocal() {
-        return TextFormatting.DARK_GRAY + ButtonToolTips.ModifyAmountAction.getLocal(getMouseButtonTextLocal(2));
-    }
-
-    public static ITextComponent getRenameTooltip() {
-        ITextComponent input = new TextComponentString("Alt + ").appendSibling(getMouseButtonText(2));
-        return muted(ButtonToolTips.RenameAction.text(input));
+        return TextFormatting.DARK_GRAY + ButtonToolTips.ModifyAmountAction.getLocal(ButtonToolTips.RightClick.getLocal());
     }
 
     public static String getRenameTooltipLocal() {
-        return TextFormatting.DARK_GRAY + ButtonToolTips.RenameAction.getLocal("Alt + " + getMouseButtonTextLocal(2));
+        return TextFormatting.DARK_GRAY + ButtonToolTips.RenameAction.getLocal("Alt + " + ButtonToolTips.RightClick.getLocal());
     }
 
     public static ITextComponent getAmountTooltip(LocalizationEnum baseText, AEKey what, long amount) {
@@ -139,13 +157,62 @@ public enum Tooltips implements LocalizationEnum {
         return TextFormatting.DARK_GRAY + baseText.getLocal(what.formatAmount(amount, AmountFormat.FULL));
     }
 
-    private static String getMouseButtonTextLocal(int button) {
-        return switch (button) {
-            case 0 -> ButtonToolTips.LeftClick.getLocal();
-            case 1 -> ButtonToolTips.RightClick.getLocal();
-            case 2 -> ButtonToolTips.MiddleClick.getLocal();
-            default -> ButtonToolTips.MouseButton.getLocal(button);
-        };
+    private static String formatNumber(double number, double max) {
+        MaxedAmount amount = getMaxedAmount(number, max);
+        boolean numberUnit = !amount.digit().equals("0");
+        return amount.digit() + (numberUnit ? amount.unit() : "") + TextFormatting.GRAY + "/"
+            + TextFormatting.LIGHT_PURPLE + amount.maxDigit() + amount.unit();
+    }
+
+    private static MaxedAmount getMaxedAmount(double amount, double max) {
+        if (max < 10_000) {
+            return new MaxedAmount(formatAmount(amount, 1), formatAmount(max, 1), "");
+        }
+
+        int unitIndex = 0;
+        while (unitIndex + 1 < DECIMAL_NUMS.length && max / DECIMAL_NUMS[unitIndex] >= 1_000) {
+            unitIndex++;
+        }
+        long divisor = DECIMAL_NUMS[unitIndex];
+        return new MaxedAmount(formatAmount(amount, divisor), formatAmount(max, divisor), DECIMAL_UNITS[unitIndex]);
+    }
+
+    private static String formatAmount(double amount, long divisor) {
+        double fraction = amount / divisor;
+        String result;
+        if (fraction < 10) {
+            result = String.format("%.3f", fraction);
+        } else if (fraction < 100) {
+            result = String.format("%.2f", fraction);
+        } else {
+            result = String.format("%.1f", fraction);
+        }
+        while (result.endsWith("0")) {
+            result = result.substring(0, result.length() - 1);
+        }
+        if (result.endsWith(String.valueOf(DECIMAL_SEPARATOR))) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
+    }
+
+    private static String formatPercent(double energy, double max) {
+        double ratio = max <= 0 ? 0 : energy / max;
+        return MessageFormat.format("{0,number,#.##%}", ratio);
+    }
+
+    private static TextFormatting percentColor(double energy, double max) {
+        if (max <= 0) {
+            return TextFormatting.RED;
+        }
+        double ratio = Math.clamp(energy / max, 0, 1);
+        if (ratio >= 0.67) {
+            return TextFormatting.GREEN;
+        }
+        if (ratio >= 0.33) {
+            return TextFormatting.YELLOW;
+        }
+        return TextFormatting.RED;
     }
 
     private static ITextComponent normalTooltipText(ITextComponent text) {
@@ -162,6 +229,9 @@ public enum Tooltips implements LocalizationEnum {
 
     private static Style numberStyle() {
         return new Style().setColor(TextFormatting.LIGHT_PURPLE).setItalic(false);
+    }
+
+    private record MaxedAmount(String digit, String maxDigit, String unit) {
     }
 
     @Override

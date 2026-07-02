@@ -28,10 +28,13 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.stats.StatList;
+import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import net.minecraftforge.oredict.OreDictionary;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * Owns automatic pickup state and insertion behavior for item-based portable cells.
@@ -267,8 +270,8 @@ public final class PortableItemCellAutoPickup {
     private static boolean hasPickupConfig(ItemStack stack) {
         NBTTagCompound tag = stack.getTagCompound();
         return tag != null
-            && tag.hasKey(PICKUP_CONFIG_TAG, net.minecraftforge.common.util.Constants.NBT.TAG_LIST)
-            && tag.getTagList(PICKUP_CONFIG_TAG, net.minecraftforge.common.util.Constants.NBT.TAG_COMPOUND).tagCount() > 0;
+            && tag.hasKey(PICKUP_CONFIG_TAG, Constants.NBT.TAG_LIST)
+            && tag.getTagList(PICKUP_CONFIG_TAG, Constants.NBT.TAG_COMPOUND).tagCount() > 0;
     }
 
     private static boolean matchesFilter(ItemStack candidate, ItemStack filter, boolean matchNbt, boolean matchDamage,
@@ -323,7 +326,7 @@ public final class PortableItemCellAutoPickup {
     }
 
     @SideOnly(Side.CLIENT)
-    public static void addInformationToTooltip(ItemStack stack, java.util.List<String> lines) {
+    public static void addInformationToTooltip(ItemStack stack, List<String> lines) {
         if (!isSupported(stack)) {
             return;
         }

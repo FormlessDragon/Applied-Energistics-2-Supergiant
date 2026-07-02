@@ -364,7 +364,9 @@ public class StorageBusPart extends UpgradeablePart
         this.handler.setAccessRestriction(this.getConfigManager().getSetting(Settings.ACCESS));
         this.handler.setWhitelist(isUpgradedWith(AEItems.INVERTER_CARD) ? IncludeExclude.BLACKLIST
             : IncludeExclude.WHITELIST);
-        this.handler.setPartitionList(createFilter());
+        var partitionList = createFilter();
+        this.handler.setPartitionList(partitionList);
+        this.handler.setReadPartitionFiltering(!partitionList.isEmpty());
         this.handler.setVoidOverflow(this.isUpgradedWith(AEItems.VOID_CARD));
         this.handler.setSticky(this.isUpgradedWith(AEItems.STICKY_CARD));
 

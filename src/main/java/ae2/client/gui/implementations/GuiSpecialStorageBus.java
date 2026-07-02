@@ -1,11 +1,13 @@
 package ae2.client.gui.implementations;
 
 import ae2.api.config.AccessRestriction;
+import ae2.api.config.ActionItems;
 import ae2.api.config.Settings;
 import ae2.api.config.StorageFilter;
 import ae2.api.config.YesNo;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.PaletteColor;
+import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.container.implementations.ContainerStorageBus;
@@ -22,6 +24,7 @@ public class GuiSpecialStorageBus<T extends ContainerStorageBus> extends GuiUpgr
     public GuiSpecialStorageBus(T container, InventoryPlayer playerInventory, ITextComponent title, GuiStyle style) {
         super(container, playerInventory, title, style);
         widgets.addOpenPriorityButton();
+        addToLeftToolbar(new ActionButton(ActionItems.CLOSE, container::clear));
         this.rwMode = new ServerSettingToggleButton<>(Settings.ACCESS, AccessRestriction.READ_WRITE);
         this.storageFilter = new ServerSettingToggleButton<>(Settings.STORAGE_FILTER, StorageFilter.EXTRACTABLE_ONLY);
         this.filterOnExtract = new ServerSettingToggleButton<>(Settings.FILTER_ON_EXTRACT, YesNo.YES);

@@ -1,0 +1,54 @@
+{
+  "$schema": "schema.json",
+  "includes": ["common/common.json"],
+  "slots": {
+    "UPGRADE": {
+      "right": 20,
+      "top": 6,
+      "grid": "BREAK_AFTER_3COLS"
+    },
+    "WIRELESS_SINGULARITY": {
+      "right": 20,
+      "top": 6
+    },
+    "TEMP_CELL": {
+      "hidden": true
+    },
+    "PLAYER_INVENTORY": {
+      "left": 22,
+      "bottom": 82,
+      "grid": "BREAK_AFTER_9COLS"
+    },
+    "PLAYER_HOTBAR": {
+      "left": 22,
+      "bottom": 24,
+      "grid": "HORIZONTAL"
+    }
+  },
+  "widgets": {
+    "verticalToolbar": {
+      "left": 3,
+      "top": 1
+    },
+    "search": {
+      "left": 95,
+      "top": 4,
+      "width": 90,
+      "height": 12
+    },
+    "scrollbar": {
+      "left": 192,
+      "top": 19
+    },
+    "keyTypeSelectionWindow": {
+      "left": 0,
+      "top": 0,
+      "width": 0,
+      "height": 0
+    },
+    "upgrades": {
+      "right": 1,
+      "top": 0
+    }
+  }
+}

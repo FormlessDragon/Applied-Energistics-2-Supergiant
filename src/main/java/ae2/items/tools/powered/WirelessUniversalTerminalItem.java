@@ -11,6 +11,7 @@ import ae2.core.gui.locator.GuiHostLocators;
 import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.PlayerMessages;
+import ae2.core.localization.Tooltips;
 import ae2.helpers.WirelessTerminalGuiHost;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.creativetab.CreativeTabs;
@@ -37,7 +38,6 @@ public class WirelessUniversalTerminalItem extends WirelessTerminalItem {
     public WirelessUniversalTerminalItem(double powerCapacity) {
         super(powerCapacity,
             "wireless_universal_terminal",
-            GuiIds.GuiKey.WIRELESS_TERMINAL,
             ItemStack::new,
             WirelessTerminalGuiHost::new,
             "wireless_universal_terminal",
@@ -61,6 +61,12 @@ public class WirelessUniversalTerminalItem extends WirelessTerminalItem {
     }
 
     @Override
+    public @Nullable GuiIds.GuiKey getLegacyGuiKey(ItemStack stack) {
+        WirelessTerminalItem terminal = getCurrentTerminal(stack);
+        return terminal == null ? null : terminal.getLegacyGuiKey(stack);
+    }
+
+    @Override
     public WirelessTerminalGuiHost<?> getGuiHost(EntityPlayer player, ItemGuiHostLocator locator,
                                                  @Nullable RayTraceResult hitResult) {
         ItemStack stack = locator.locateItem(player);
@@ -79,7 +85,7 @@ public class WirelessUniversalTerminalItem extends WirelessTerminalItem {
             return false;
         }
 
-        WirelessTerminalItem terminal = getCurrentTerminal(stack);
+        WirelessTerminalItem terminal = ensureCurrentTerminal(stack);
         if (terminal == null) {
             player.sendStatusMessage(PlayerMessages.DeviceNotLinked.text(), true);
             return false;
@@ -187,6 +193,16 @@ public class WirelessUniversalTerminalItem extends WirelessTerminalItem {
 
     @Nullable
     public WirelessTerminalItem getCurrentTerminal(ItemStack stack) {
+        return resolveCurrentTerminal(stack, false);
+    }
+
+    @Nullable
+    public WirelessTerminalItem ensureCurrentTerminal(ItemStack stack) {
+        return resolveCurrentTerminal(stack, true);
+    }
+
+    @Nullable
+    private WirelessTerminalItem resolveCurrentTerminal(ItemStack stack, boolean initializeMissing) {
         NBTTagCompound tag = stack.getTagCompound();
         if (tag == null) {
             return null;
@@ -196,7 +212,9 @@ public class WirelessUniversalTerminalItem extends WirelessTerminalItem {
             for (String id : getInstalledTerminalIds(stack)) {
                 WirelessTerminalDefinition definition = WirelessTerminalRegistry.definitionOfId(id);
                 if (definition != null) {
-                    tag.setString(WirelessTerminals.TAG_CURRENT_TERMINAL, id);
+                    if (initializeMissing) {
+                        tag.setString(WirelessTerminals.TAG_CURRENT_TERMINAL, id);
+                    }
                     return definition.item();
                 }
             }
@@ -231,13 +249,13 @@ public class WirelessUniversalTerminalItem extends WirelessTerminalItem {
                                          ITooltipFlag advancedTooltips) {
         WirelessTerminalItem current = getCurrentTerminal(stack);
         if (current != null) {
-            lines.add(GuiText.WirelessTerminalCurrent.getLocal(
-                current.getWirelessTerminalDefinition().displayName().getFormattedText()));
+            lines.add(Tooltips.of(GuiText.WirelessTerminalCurrent.text(
+                current.getWirelessTerminalDefinition().displayName())).getFormattedText());
         }
         for (String id : getInstalledTerminalIds(stack)) {
             WirelessTerminalDefinition definition = WirelessTerminalRegistry.definitionOfId(id);
             if (definition != null) {
-                lines.add(" - " + definition.displayName().getFormattedText());
+                lines.add(Tooltips.of(" - " + definition.displayName().getFormattedText()).getFormattedText());
             }
         }
         super.addCheckedInformation(stack, world, lines, advancedTooltips);

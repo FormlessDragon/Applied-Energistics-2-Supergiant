@@ -1,9 +1,7 @@
 package ae2.client.gui.implementations;
 
-import ae2.api.config.ActionItems;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AETextField;
-import ae2.client.gui.widgets.ActionButton;
 import ae2.container.implementations.ContainerODStorageBus;
 import ae2.core.localization.GuiText;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -16,7 +14,6 @@ public class GuiODStorageBus extends GuiSpecialStorageBus<ContainerODStorageBus>
     public GuiODStorageBus(ContainerODStorageBus container, InventoryPlayer playerInventory, ITextComponent title,
                            GuiStyle style) {
         super(container, playerInventory, title, style);
-        addToLeftToolbar(new ActionButton(ActionItems.COG, container::partition));
         this.white = widgets.addTextField("whiteExpression");
         this.black = widgets.addTextField("blackExpression");
         this.white.setResponder(container::setWhiteExpression);

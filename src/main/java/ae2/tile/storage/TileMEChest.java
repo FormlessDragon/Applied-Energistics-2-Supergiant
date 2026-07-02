@@ -271,6 +271,35 @@ public class TileMEChest extends AENetworkedPoweredTile
         return null;
     }
 
+    public void invalidateCellInventory(int slot) {
+        if (slot != 0) {
+            throw new IllegalArgumentException("Invalid ME chest cell slot: " + slot);
+        }
+
+        this.isCached = false;
+        this.cellHandler = null;
+        this.fluidHandler = null;
+        this.idlePowerUsage = 0;
+        this.getMainNode().setIdlePowerUsage(0);
+        updateHandler();
+        IStorageProvider.requestUpdate(getMainNode());
+        saveChanges();
+        markForUpdate();
+    }
+
+    public void rebuildCellInventoryCache(int slot) {
+        if (slot != 0) {
+            throw new IllegalArgumentException("Invalid ME chest cell slot: " + slot);
+        }
+
+        this.isCached = false;
+        this.cellHandler = null;
+        this.fluidHandler = null;
+        this.idlePowerUsage = 0;
+        this.getMainNode().setIdlePowerUsage(0);
+        updateHandler();
+    }
+
     @Override
     public boolean isPowered() {
         if (isClientSide()) {

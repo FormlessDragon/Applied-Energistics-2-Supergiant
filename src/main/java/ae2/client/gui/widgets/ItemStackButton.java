@@ -32,4 +32,9 @@ public class ItemStackButton extends IconButton {
         ItemStack stack = this.itemSupplier.get();
         return stack == null ? ItemStack.EMPTY : stack;
     }
+
+    @Override
+    protected boolean shouldRenderItemStackOverlay() {
+        return false;
+    }
 }

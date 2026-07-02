@@ -19,8 +19,8 @@ import java.util.Map;
 
 @SuppressWarnings("deprecation")
 public final class IconAtlas {
-    public static final int TEXTURE_WIDTH = 256;
-    public static final int TEXTURE_HEIGHT = 256;
+    public static final int TEXTURE_WIDTH = 512;
+    public static final int TEXTURE_HEIGHT = 512;
 
     private static final ResourceLocation TEXTURE = AppEng.makeId("textures/guis/generated/states.png");
     private static final Map<Icon, Position> positions = new Object2ObjectOpenHashMap<>();

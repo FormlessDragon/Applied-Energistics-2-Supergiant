@@ -127,7 +127,6 @@ public final class AppEngClient extends AppEngServer {
         "key.ae2.mouse_wheel_item_modifier", Keyboard.KEY_LSHIFT, "key.ae2.category");
     private static final KeyBinding PART_PLACEMENT_OPPOSITE = new KeyBinding(
         "key.ae2.part_placement_opposite", Keyboard.KEY_LCONTROL, "key.ae2.category");
-
     private CableRenderMode prevCableRenderMode = CableRenderMode.STANDARD;
     private boolean prevPartPlacementOppositeDown;
 

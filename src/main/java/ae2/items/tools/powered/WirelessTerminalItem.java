@@ -24,7 +24,6 @@ import ae2.api.upgrades.Upgrades;
 import ae2.api.util.DimensionalBlockPos;
 import ae2.api.util.IConfigManager;
 import ae2.container.GuiIds;
-import ae2.core.gui.GuiOpener;
 import ae2.core.gui.locator.GuiHostLocators;
 import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.core.localization.GuiText;
@@ -59,6 +58,7 @@ import java.util.function.Supplier;
 public class WirelessTerminalItem extends PoweredContainerItem implements IGuiItem, IUpgradeableItem, IBauble {
     public static final IGridLinkableHandler LINKABLE_HANDLER = new LinkableHandler();
     private final double powerCapacity;
+    @Nullable
     private final GuiIds.GuiKey fallbackGuiKey;
     private WirelessTerminalDefinition definition;
 
@@ -68,42 +68,54 @@ public class WirelessTerminalItem extends PoweredContainerItem implements IGuiIt
             GuiIds.GuiKey.WIRELESS_TERMINAL,
             ItemStack::new,
             WirelessTerminalGuiHost::new,
+            WirelessTerminalDefinitionFactories.storageContainer(GuiIds.GuiKey.WIRELESS_TERMINAL),
+            WirelessTerminalDefinitionFactories.storageScreen("/screens/terminals/wireless_terminal.json"),
             HotkeyAction.WIRELESS_TERMINAL,
-            2);
+            2,
+            true);
     }
 
-    protected WirelessTerminalItem(double powerCapacity, String id, GuiIds.GuiKey guiKey,
+    protected WirelessTerminalItem(double powerCapacity, String id,
                                    Function<WirelessTerminalItem, ItemStack> iconFactory,
                                    WirelessTerminalDefinition.HostFactory hostFactory,
-                                   String hotkeyName, int upgradeSlots) {
-        this(powerCapacity, id, guiKey, iconFactory, hostFactory, hotkeyName, upgradeSlots, true);
+                                   WirelessTerminalDefinition.ContainerFactory containerFactory,
+                                   WirelessTerminalDefinition.ScreenFactory screenFactory, String hotkeyName,
+                                   int upgradeSlots) {
+        this(powerCapacity, id, null, iconFactory, hostFactory, containerFactory, screenFactory, hotkeyName,
+            upgradeSlots, true);
     }
 
-    protected WirelessTerminalItem(double powerCapacity, String id, GuiIds.GuiKey guiKey,
+    protected WirelessTerminalItem(double powerCapacity, String id,
+                                   Function<WirelessTerminalItem, ItemStack> iconFactory,
+                                   WirelessTerminalDefinition.HostFactory hostFactory, String hotkeyName,
+                                   int upgradeSlots, boolean registerTerminal) {
+        this(powerCapacity, id, null, iconFactory, hostFactory,
+            WirelessTerminalDefinitionFactories.storageContainer(GuiIds.GuiKey.WIRELESS_TERMINAL),
+            WirelessTerminalDefinitionFactories.storageScreen("/screens/terminals/wireless_terminal.json"),
+            hotkeyName, upgradeSlots, registerTerminal);
+    }
+
+    protected WirelessTerminalItem(double powerCapacity, String id, @Nullable GuiIds.GuiKey legacyGuiKey,
                                    Function<WirelessTerminalItem, ItemStack> iconFactory,
                                    WirelessTerminalDefinition.HostFactory hostFactory,
-                                   String hotkeyName, int upgradeSlots, boolean registerTerminal) {
+                                   WirelessTerminalDefinition.ContainerFactory containerFactory,
+                                   WirelessTerminalDefinition.ScreenFactory screenFactory, String hotkeyName,
+                                   int upgradeSlots, boolean registerTerminal) {
         super(powerCapacity);
         this.setMaxStackSize(1);
         this.powerCapacity = powerCapacity;
-        this.fallbackGuiKey = guiKey;
+        this.fallbackGuiKey = legacyGuiKey;
         GridLinkables.register(this, LINKABLE_HANDLER);
         if (registerTerminal) {
             AddWirelessTerminalEvent.register(event -> event.builder(id, this,
-                                                                (registeredDefinition, player, locator, terminalStack, returningFromSubmenu) ->
-                                                                    !terminalStack.isEmpty()
-                                                                        && openBuiltInGui(registeredDefinition, player, locator, returningFromSubmenu),
                                                                 hostFactory,
+                                                                containerFactory,
+                                                                screenFactory,
                                                                 iconFactory)
                                                             .hotkeyName(hotkeyName)
                                                             .upgradeSlots(upgradeSlots)
                                                             .addTerminal());
         }
-    }
-
-    private static boolean openBuiltInGui(WirelessTerminalDefinition definition, EntityPlayer player,
-                                          ItemGuiHostLocator locator, boolean returningFromSubmenu) {
-        return GuiOpener.openItemGui(player, definition.item().getGuiKey(), locator, returningFromSubmenu);
     }
 
     @Override
@@ -164,14 +176,19 @@ public class WirelessTerminalItem extends PoweredContainerItem implements IGuiIt
     }
 
     @Override
+    public boolean shouldCauseReequipAnimation(ItemStack oldStack, ItemStack newStack, boolean slotChanged) {
+        return slotChanged;
+    }
+
+    @Override
     protected void addCheckedInformation(final ItemStack stack, final World world, final List<String> lines,
                                          final ITooltipFlag advancedTooltips) {
         super.addCheckedInformation(stack, world, lines, advancedTooltips);
 
         if (!isLinkedForTooltip(stack)) {
-            lines.add(Tooltips.RED + GuiText.Unlinked.getLocal());
+            lines.add(Tooltips.colored(GuiText.Unlinked, Tooltips.RED));
         } else {
-            lines.add(Tooltips.GREEN + GuiText.Linked.getLocal());
+            lines.add(Tooltips.colored(GuiText.Linked, Tooltips.GREEN));
         }
     }
 
@@ -244,10 +261,21 @@ public class WirelessTerminalItem extends PoweredContainerItem implements IGuiIt
     }
 
     public GuiIds.GuiKey getGuiKey() {
+        if (this.fallbackGuiKey == null) {
+            throw new IllegalStateException("Wireless terminal has no legacy GUI key: " + getTerminalId());
+        }
         return this.fallbackGuiKey;
     }
 
     public GuiIds.GuiKey getGuiKey(ItemStack stack) {
+        if (this.fallbackGuiKey == null) {
+            throw new IllegalStateException("Wireless terminal has no legacy GUI key: " + getTerminalId());
+        }
+        return this.fallbackGuiKey;
+    }
+
+    @Nullable
+    public GuiIds.GuiKey getLegacyGuiKey(ItemStack stack) {
         return this.fallbackGuiKey;
     }
 
@@ -328,7 +356,7 @@ public class WirelessTerminalItem extends PoweredContainerItem implements IGuiIt
             if (itemStack.getItem() instanceof WirelessUniversalTerminalItem universalTerminal) {
                 WirelessTerminals.getOrCreateUniversalSharedData(itemStack)
                                  .setTag(WirelessTerminals.TAG_LINK, link.copy());
-                universalTerminal.getCurrentTerminal(itemStack);
+                universalTerminal.ensureCurrentTerminal(itemStack);
                 return;
             }
 

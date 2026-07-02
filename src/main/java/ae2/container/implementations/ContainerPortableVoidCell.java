@@ -3,6 +3,7 @@ package ae2.container.implementations;
 import ae2.api.config.Actionable;
 import ae2.api.config.CondenserOutput;
 import ae2.api.inventories.BaseInternalInventory;
+import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
@@ -267,7 +268,7 @@ public class ContainerPortableVoidCell extends AEBaseContainer implements IProgr
     }
 
     private final class InputSlot extends FakeSlot {
-        private InputSlot(ae2.api.inventories.InternalInventory inventory, int slotIndex, int x, int y) {
+        private InputSlot(InternalInventory inventory, int slotIndex, int x, int y) {
             super(inventory, slotIndex, x, y);
         }
 

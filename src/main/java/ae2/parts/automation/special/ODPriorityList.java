@@ -1,6 +1,5 @@
 package ae2.parts.automation.special;
 
-import ae2.api.config.IncludeExclude;
 import ae2.api.stacks.AEKey;
 import ae2.util.prioritylist.IPartitionList;
 import it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap;
@@ -49,12 +48,6 @@ final class ODPriorityList implements IPartitionList {
     public Iterable<AEKey> getItems() {
         return List.of();
     }
-
-    @Override
-    public boolean matchesFilter(AEKey key, IncludeExclude mode) {
-        return isEmpty() || isListed(key);
-    }
-
     private boolean evaluate(AEKey input) {
         boolean hasWhite = !this.whiteExpression.isEmpty();
         boolean hasBlack = !this.blackExpression.isEmpty();

@@ -19,9 +19,11 @@ public final class OverlayHighlightBoxes {
             return List.of(new AxisAlignedBB(pos));
         }
 
-        ObjectArrayList<AxisAlignedBB> boxes = new ObjectArrayList<>(shape == OverlayHighlightShape.P2P_TUNNEL ? 3 : 2);
+        ObjectArrayList<AxisAlignedBB> boxes = new ObjectArrayList<>(
+            shape == OverlayHighlightShape.P2P_TUNNEL || shape == OverlayHighlightShape.STORAGE_BUS ? 3 : 2);
         IPartCollisionHelper helper = new BusCollisionHelper(boxes, side, true);
         switch (shape) {
+            case STORAGE_BUS -> addStorageBusBoxes(helper);
             case PATTERN_PROVIDER -> addPatternProviderBoxes(helper);
             case P2P_TUNNEL -> addP2PTunnelBoxes(helper);
             case WHOLE_BLOCK -> throw new IllegalStateException("Whole block shape should have been handled first.");
@@ -31,6 +33,12 @@ public final class OverlayHighlightBoxes {
             offsetBoxes.add(box.offset(pos));
         }
         return offsetBoxes;
+    }
+
+    private static void addStorageBusBoxes(IPartCollisionHelper helper) {
+        helper.addBox(3, 3, 15, 13, 13, 16);
+        helper.addBox(2, 2, 14, 14, 14, 15);
+        helper.addBox(5, 5, 12, 11, 11, 14);
     }
 
     private static void addPatternProviderBoxes(IPartCollisionHelper helper) {

@@ -21,6 +21,8 @@ public final class WirelessTerminals {
     public static final String TAG_LINK_Y = "y";
     public static final String TAG_LINK_Z = "z";
     public static final String TAG_VIEW_CELLS = "view_cells";
+    public static final String TAG_TEMP_CELLS = "temp_cells";
+    public static final String TAG_CELL_TERMINAL_SUBNETS = "cell_terminal_subnets";
     public static final String TAG_CRAFTING_GRID = "crafting_grid";
     public static final String TAG_PATTERN_ENCODING = "pattern_encoding";
     public static final String TAG_SINGULARITY = "quantum_singularity";

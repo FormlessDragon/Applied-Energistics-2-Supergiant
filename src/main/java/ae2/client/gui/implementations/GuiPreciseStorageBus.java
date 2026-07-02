@@ -29,7 +29,6 @@ public class GuiPreciseStorageBus extends GuiSpecialStorageBus<ContainerStorageB
     public GuiPreciseStorageBus(ContainerStorageBus container, InventoryPlayer playerInventory, ITextComponent title,
                                 GuiStyle style) {
         super(container, playerInventory, title, style);
-        addToLeftToolbar(new ActionButton(ActionItems.CLOSE, container::clear));
         addToLeftToolbar(new ActionButton(ActionItems.COG, container::partition));
     }
 

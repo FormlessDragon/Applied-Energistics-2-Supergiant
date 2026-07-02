@@ -29,6 +29,7 @@ import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.ILinkStatus;
 import ae2.api.upgrades.IUpgradeableObject;
+import ae2.client.Point;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.PatternContainerExternalGuiReturnHandler;
@@ -63,6 +64,7 @@ import ae2.core.network.serverbound.QuickMovePatternPacket;
 import ae2.crafting.execution.CraftingSupplierLocator;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
+import ae2.helpers.patternmodifier.PatternModifierToolboxLayout;
 import ae2.items.tools.powered.WirelessUniversalTerminalItem;
 import ae2.util.inv.AppEngInternalInventory;
 import com.google.common.collect.HashMultimap;
@@ -1457,10 +1459,10 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
         }
 
         @Override
-        public ae2.client.Point getPatternModifierPanelOffset() {
-            return new ae2.client.Point(
-                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_LEFT_OFFSET + 8,
-                ae2.helpers.patternmodifier.PatternModifierToolboxLayout.PANEL_TOP_OFFSET - 52);
+        public Point getPatternModifierPanelOffset() {
+            return new Point(
+                PatternModifierToolboxLayout.PANEL_LEFT_OFFSET + 8,
+                PatternModifierToolboxLayout.PANEL_TOP_OFFSET - 52);
         }
 
         @Override

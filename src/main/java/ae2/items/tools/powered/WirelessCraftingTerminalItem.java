@@ -12,8 +12,11 @@ public class WirelessCraftingTerminalItem extends WirelessTerminalItem {
             GuiIds.GuiKey.WIRELESS_CRAFTING_TERMINAL,
             ItemStack::new,
             WirelessCraftingTerminalGuiHost::new,
+            WirelessTerminalDefinitionFactories.craftingContainer(),
+            WirelessTerminalDefinitionFactories.craftingScreen(),
             "wireless_crafting_terminal",
-            2);
+            2,
+            true);
     }
 
 }

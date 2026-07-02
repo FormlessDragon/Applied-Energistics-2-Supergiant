@@ -1,8 +1,10 @@
 package ae2.core.gui;
 
+import ae2.api.cellterminal.CellTerminalContainerHost;
 import ae2.api.implementations.guiobjects.IGuiItem;
 import ae2.api.implementations.guiobjects.IPortableTerminal;
 import ae2.api.implementations.guiobjects.ItemGuiHost;
+import ae2.api.implementations.items.WirelessTerminalDefinition;
 import ae2.api.storage.ITerminalHost;
 import ae2.api.util.ICustomName;
 import ae2.client.gui.implementations.GuiAdvancedIOBus;
@@ -10,6 +12,7 @@ import ae2.client.gui.implementations.GuiAdvancedMemoryCard;
 import ae2.client.gui.implementations.GuiAnnihilationPlane;
 import ae2.client.gui.implementations.GuiCaner;
 import ae2.client.gui.implementations.GuiCellRestriction;
+import ae2.client.gui.implementations.GuiCellTerminal;
 import ae2.client.gui.implementations.GuiCellWorkbench;
 import ae2.client.gui.implementations.GuiCondenser;
 import ae2.client.gui.implementations.GuiConfigModifier;
@@ -70,6 +73,7 @@ import ae2.container.implementations.ContainerAdvancedMemoryCard;
 import ae2.container.implementations.ContainerAnnihilationPlane;
 import ae2.container.implementations.ContainerCaner;
 import ae2.container.implementations.ContainerCellRestriction;
+import ae2.container.implementations.ContainerCellTerminal;
 import ae2.container.implementations.ContainerCellWorkbench;
 import ae2.container.implementations.ContainerCondenser;
 import ae2.container.implementations.ContainerConfigModifier;
@@ -131,6 +135,7 @@ import ae2.helpers.WirelessCraftingTerminalGuiHost;
 import ae2.helpers.WirelessPatternAccessTerminalGuiHost;
 import ae2.helpers.WirelessPatternEncodingTerminalGuiHost;
 import ae2.helpers.WirelessRequesterTerminalGuiHost;
+import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.items.contents.AdvancedMemoryCardGuiHost;
 import ae2.items.contents.ConfigModifierGuiHost;
 import ae2.items.contents.NetworkToolGuiHost;
@@ -221,10 +226,12 @@ public class AEGuiHandler implements IGuiHandler {
             || bridge == GuiIds.GuiKey.PORTABLE_VOID_CELL
             || bridge == GuiIds.GuiKey.PORTABLE_FLUID_CELL
             || bridge == GuiIds.GuiKey.WIRELESS_TERMINAL
+            || bridge == GuiIds.GuiKey.WIRELESS_CELL_TERMINAL
             || bridge == GuiIds.GuiKey.WIRELESS_CRAFTING_TERMINAL
             || bridge == GuiIds.GuiKey.WIRELESS_PATTERN_ENCODING_TERMINAL
             || bridge == GuiIds.GuiKey.WIRELESS_PATTERN_ACCESS_TERMINAL
-            || bridge == GuiIds.GuiKey.WIRELESS_REQUESTER_TERMINAL;
+            || bridge == GuiIds.GuiKey.WIRELESS_REQUESTER_TERMINAL
+            || bridge == GuiIds.GuiKey.WIRELESS_TERMINAL_DYNAMIC;
     }
 
     private static boolean isPartGui(GuiIds.GuiKey bridge) {
@@ -247,6 +254,7 @@ public class AEGuiHandler implements IGuiHandler {
             || bridge == GuiIds.GuiKey.STORAGE_LEVEL_EMITTER
             || bridge == GuiIds.GuiKey.THRESHOLD_LEVEL_EMITTER
             || bridge == GuiIds.GuiKey.ME_STORAGE_TERMINAL
+            || bridge == GuiIds.GuiKey.CELL_TERMINAL
             || bridge == GuiIds.GuiKey.CRAFTING_TERMINAL
             || bridge == GuiIds.GuiKey.PATTERN_ENCODING_TERMINAL
             || bridge == GuiIds.GuiKey.PATTERN_ACCESS_TERMINAL
@@ -563,6 +571,10 @@ public class AEGuiHandler implements IGuiHandler {
                 return createPartContainer(player, partLocator(x, y, z), ID, ItemTerminalPart.class,
                     host -> new ContainerMEStorage(GuiIds.GuiKey.ME_STORAGE_TERMINAL, player.inventory, host));
             }
+            case CELL_TERMINAL -> {
+                return createPartContainer(player, partLocator(x, y, z), ID, CellTerminalContainerHost.class,
+                    host -> new ContainerCellTerminal(player.inventory, host));
+            }
             case CRAFTING_TERMINAL -> {
                 return createPartContainer(player, partLocator(x, y, z), ID, CraftingTerminalPart.class,
                     host -> new ContainerCraftingTerm(player.inventory, host));
@@ -624,6 +636,9 @@ public class AEGuiHandler implements IGuiHandler {
             case WIRELESS_TERMINAL -> {
                 return createWirelessTerminalContainer(player, x, ID);
             }
+            case WIRELESS_CELL_TERMINAL -> {
+                return createWirelessCellTerminalContainer(player, x, ID);
+            }
             case WIRELESS_CRAFTING_TERMINAL -> {
                 return createWirelessCraftingTerminalContainer(player, x, ID);
             }
@@ -635,6 +650,9 @@ public class AEGuiHandler implements IGuiHandler {
             }
             case WIRELESS_REQUESTER_TERMINAL -> {
                 return createWirelessRequesterTerminalContainer(player, x, ID);
+            }
+            case WIRELESS_TERMINAL_DYNAMIC -> {
+                return createDynamicWirelessTerminalContainer(player, x, y, ID);
             }
         }
         return null;
@@ -1069,6 +1087,12 @@ public class AEGuiHandler implements IGuiHandler {
                 }
                 return null;
             }
+            case CELL_TERMINAL -> {
+                ContainerCellTerminal cellTerminalContainer = createPartContainer(player,
+                    partLocator(x, y, z), ID,
+                    CellTerminalContainerHost.class, host -> new ContainerCellTerminal(player.inventory, host));
+                return cellTerminalContainer == null ? null : new GuiCellTerminal(cellTerminalContainer, player.inventory);
+            }
             case CRAFTING_TERMINAL -> {
                 ContainerCraftingTerm craftingTerminalContainer = createPartContainer(player,
                     partLocator(x, y, z), ID,
@@ -1215,6 +1239,11 @@ public class AEGuiHandler implements IGuiHandler {
                 }
                 return null;
             }
+            case WIRELESS_CELL_TERMINAL -> {
+                ContainerCellTerminal wirelessCellTerminalContainer = createWirelessCellTerminalContainer(player, x, ID);
+                return wirelessCellTerminalContainer == null ? null
+                    : new GuiCellTerminal(wirelessCellTerminalContainer, player.inventory);
+            }
             case WIRELESS_CRAFTING_TERMINAL -> {
                 ContainerWirelessCraftingTerm wirelessCraftingTerminalContainer =
                     createWirelessCraftingTerminalContainer(player, x, ID);
@@ -1250,6 +1279,16 @@ public class AEGuiHandler implements IGuiHandler {
                         GuiStyleManager.loadStyleDoc("/screens/terminals/requester_terminal.json"));
                 }
                 return null;
+            }
+            case WIRELESS_TERMINAL_DYNAMIC -> {
+                AEBaseContainer wirelessTerminalContainer = createDynamicWirelessTerminalContainer(player, x, y, ID);
+                if (wirelessTerminalContainer == null) {
+                    return null;
+                }
+                WirelessTerminalDefinition definition = WirelessTerminalRegistry.definitionAtIndex(y);
+                return definition == null ? null : definition.screenFactory()
+                                                             .create(definition, wirelessTerminalContainer,
+                                                                 player.inventory);
             }
         }
         return null;
@@ -1388,6 +1427,23 @@ public class AEGuiHandler implements IGuiHandler {
             locator, guiId);
     }
 
+    private @Nullable AEBaseContainer createDynamicWirelessTerminalContainer(EntityPlayer player, int slot,
+                                                                             int terminalIndex, int guiId) {
+        WirelessTerminalDefinition definition = WirelessTerminalRegistry.definitionAtIndex(terminalIndex);
+        if (definition == null) {
+            return null;
+        }
+
+        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+        ItemGuiHost<?> host = createItemGuiHost(player, locator, definition);
+        if (!(host instanceof WirelessTerminalGuiHost<?> wirelessHost)) {
+            return null;
+        }
+
+        AEBaseContainer container = definition.containerFactory().create(definition, player.inventory, wirelessHost);
+        return container == null ? null : initContainer(container, locator, guiId);
+    }
+
     private @Nullable ContainerMEStorage createWirelessTerminalContainer(EntityPlayer player, int slot, int guiId) {
         ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
         IPortableTerminal host = createPortableTerminalHost(player, locator, GuiIds.GuiKey.WIRELESS_TERMINAL);
@@ -1397,6 +1453,17 @@ public class AEGuiHandler implements IGuiHandler {
 
         return initContainer(new ContainerMEStorage(GuiIds.GuiKey.WIRELESS_TERMINAL, player.inventory, host),
             locator, guiId);
+    }
+
+    private @Nullable ContainerCellTerminal createWirelessCellTerminalContainer(EntityPlayer player, int slot,
+                                                                                int guiId) {
+        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+        ItemGuiHost<?> host = createItemGuiHost(player, locator, GuiIds.GuiKey.WIRELESS_CELL_TERMINAL);
+        if (!(host instanceof CellTerminalContainerHost cellTerminalHost)) {
+            return null;
+        }
+
+        return initContainer(new ContainerCellTerminal(player.inventory, cellTerminalHost), locator, guiId);
     }
 
     private @Nullable ContainerWirelessCraftingTerm createWirelessCraftingTerminalContainer(EntityPlayer player, int slot,
@@ -1466,7 +1533,7 @@ public class AEGuiHandler implements IGuiHandler {
     }
 
     private @Nullable ItemGuiHost<?> createItemGuiHost(EntityPlayer player, ItemGuiHostLocator locator) {
-        return createItemGuiHost(player, locator, null);
+        return createItemGuiHost(player, locator, (GuiIds.GuiKey) null);
     }
 
     private @Nullable ItemGuiHost<?> createItemGuiHost(EntityPlayer player, ItemGuiHostLocator locator,
@@ -1485,14 +1552,40 @@ public class AEGuiHandler implements IGuiHandler {
         return guiItem.getGuiHost(player, locator, locator.hitResult());
     }
 
+    private @Nullable ItemGuiHost<?> createItemGuiHost(EntityPlayer player, ItemGuiHostLocator locator,
+                                                       WirelessTerminalDefinition requestedDefinition) {
+        Integer slot = locator.getPlayerInventorySlot();
+        if (slot != null && (slot < 0 || slot >= player.inventory.getSizeInventory())) {
+            return null;
+        }
+
+        ItemStack stack = locator.locateItem(player);
+        if (stack.isEmpty() || !(stack.getItem() instanceof IGuiItem guiItem)) {
+            return null;
+        }
+
+        if (!selectTerminalForDefinition(stack, requestedDefinition)) {
+            return null;
+        }
+        return guiItem.getGuiHost(player, locator, locator.hitResult());
+    }
+
     private void selectUniversalTerminalForGui(ItemStack stack, GuiIds.GuiKey requestedGui) {
         if (requestedGui == null || !(stack.getItem() instanceof WirelessUniversalTerminalItem universalTerminal)) {
             return;
         }
         WirelessTerminalRegistry.allDefinitions()
                                 .stream()
-                                .filter(definition -> definition.item().getGuiKey(stack) == requestedGui)
+                                .filter(definition -> definition.item().getLegacyGuiKey(stack) == requestedGui)
                                 .findFirst()
                                 .ifPresent(definition -> universalTerminal.selectTerminal(stack, definition.id()));
+    }
+
+    private boolean selectTerminalForDefinition(ItemStack stack, WirelessTerminalDefinition requestedDefinition) {
+        if (stack.getItem() instanceof WirelessUniversalTerminalItem universalTerminal) {
+            return universalTerminal.hasTerminal(stack, requestedDefinition.item())
+                && universalTerminal.selectTerminal(stack, requestedDefinition.id());
+        }
+        return stack.getItem() == requestedDefinition.item();
     }
 }

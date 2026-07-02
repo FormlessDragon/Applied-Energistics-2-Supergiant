@@ -347,6 +347,7 @@
                 "$comment": "Configures the slots with this semantic in a grid",
                 "enum": [
                   "IO_BUS_CONFIG",
+                  "BREAK_AFTER_1COL",
                   "BREAK_AFTER_9COLS",
                   "BREAK_AFTER_2COLS",
                   "BREAK_AFTER_3COLS",
@@ -369,6 +370,7 @@
           "PLAYER_INVENTORY",
           "PLAYER_HOTBAR",
           "TOOLBOX",
+          "TEMP_CELL",
           "CONFIG",
           "UPGRADE",
           "STORAGE_CELL",
@@ -380,6 +382,7 @@
           "MACHINE_CRAFTING_GRID",
           "CANER_CONTENT",
           "CANER_CONTAINER",
+          "CELL_TERMINAL_TARGET_UPGRADE",
           "BLANK_PATTERN",
           "ENCODED_PATTERN",
           "PATTERN_MODIFIER_PANEL",

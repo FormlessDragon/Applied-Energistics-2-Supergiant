@@ -99,6 +99,16 @@ public final class Settings {
     public static final Setting<YesNo> INSCRIBER_BUFFER_SIZE = register("inscriber_buffer_size", YesNo.NO, YesNo.YES);
     public static final Setting<InscriberInputCapacity> INSCRIBER_INPUT_CAPACITY = register("inscriber_input_capacity",
         InscriberInputCapacity.class);
+    public static final Setting<CellTerminalSearchMode> CELL_TERMINAL_SEARCH_MODE = register(
+        "cell_terminal_search_mode", CellTerminalSearchMode.class);
+    public static final Setting<CellTerminalContentFilter> CELL_TERMINAL_CONTENT_FILTER = register(
+        "cell_terminal_content_filter", CellTerminalContentFilter.class);
+    public static final Setting<CellTerminalContentFilter> CELL_TERMINAL_PARTITION_FILTER = register(
+        "cell_terminal_partition_filter", CellTerminalContentFilter.class);
+    public static final Setting<CellTerminalSlotLimit> CELL_TERMINAL_SLOT_LIMIT = register(
+        "cell_terminal_slot_limit", CellTerminalSlotLimit.class);
+    public static final Setting<CellTerminalSubnetVisibility> CELL_TERMINAL_SUBNET_VISIBILITY = register(
+        "cell_terminal_subnet_visibility", CellTerminalSubnetVisibility.class);
 
     private Settings() {
     }

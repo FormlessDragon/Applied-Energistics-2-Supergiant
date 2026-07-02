@@ -12,8 +12,11 @@ public class WirelessPatternAccessTerminalItem extends WirelessTerminalItem {
             GuiIds.GuiKey.WIRELESS_PATTERN_ACCESS_TERMINAL,
             ItemStack::new,
             WirelessPatternAccessTerminalGuiHost::new,
+            WirelessTerminalDefinitionFactories.patternAccessContainer(),
+            WirelessTerminalDefinitionFactories.patternAccessScreen(),
             "wireless_pattern_access_terminal",
-            2);
+            2,
+            true);
     }
 
 }

@@ -12,8 +12,11 @@ public class WirelessPatternEncodingTerminalItem extends WirelessTerminalItem {
             GuiIds.GuiKey.WIRELESS_PATTERN_ENCODING_TERMINAL,
             ItemStack::new,
             WirelessPatternEncodingTerminalGuiHost::new,
+            WirelessTerminalDefinitionFactories.patternEncodingContainer(),
+            WirelessTerminalDefinitionFactories.patternEncodingScreen(),
             "wireless_pattern_encoding_terminal",
-            2);
+            2,
+            true);
     }
 
 }

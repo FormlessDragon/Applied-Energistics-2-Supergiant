@@ -32,6 +32,7 @@ import ae2.core.localization.InGameTooltip;
 import ae2.core.localization.ItemTooltip;
 import ae2.core.localization.PlayerMessages;
 import ae2.items.AEBaseItem;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Slot;
@@ -51,6 +52,7 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 import java.util.List;
 
 public class UpgradeCardItem extends AEBaseItem {
+    private static final int DEFAULT_SUPPORTED_TARGETS_TOOLTIP_LIMIT = 3;
     private static final String FORCE_CRAFTING_TAG = "crafting_card_force_start";
 
     public static boolean isCraftingCard(ItemStack stack) {
@@ -113,8 +115,15 @@ public class UpgradeCardItem extends AEBaseItem {
         var supportedBy = Upgrades.getTooltipLinesForCard(this);
         if (!supportedBy.isEmpty()) {
             lines.add(InGameTooltip.supported_by.getLocal());
-            for (var line : supportedBy) {
+            boolean showAll = GuiScreen.isShiftKeyDown();
+            int visibleCount = showAll ? supportedBy.size()
+                : Math.min(DEFAULT_SUPPORTED_TARGETS_TOOLTIP_LIMIT, supportedBy.size());
+            for (int i = 0; i < visibleCount; i++) {
+                var line = supportedBy.get(i);
                 lines.add(line.getFormattedText());
+            }
+            if (!showAll && supportedBy.size() > DEFAULT_SUPPORTED_TARGETS_TOOLTIP_LIMIT) {
+                lines.add(TextFormatting.DARK_GRAY + GuiText.PressShiftForFullList.getLocal());
             }
         }
     }

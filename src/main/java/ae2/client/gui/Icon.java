@@ -263,6 +263,53 @@ public final class Icon {
         "portable_cell_pickup_match_ore_dictionary_enabled");
     public static final Icon PORTABLE_CELL_PICKUP_MATCH_ORE_DICTIONARY_DISABLED = registerBuiltin(
         "portable_cell_pickup_match_ore_dictionary_disabled");
+
+    public static final Icon CELL_TERMINAL_BTN_DO_PARTITION = registerBuiltin("cell_terminal_btn_do_partition");
+    public static final Icon CELL_TERMINAL_BTN_CLEAR_PARTITION = registerBuiltin("cell_terminal_btn_clear_partition");
+    public static final Icon CELL_TERMINAL_BTN_READ_ONLY = registerBuiltin("cell_terminal_btn_read_only");
+    public static final Icon CELL_TERMINAL_BTN_WRITE_ONLY = registerBuiltin("cell_terminal_btn_write_only");
+    public static final Icon CELL_TERMINAL_BTN_READ_WRITE = registerBuiltin("cell_terminal_btn_read_write");
+    public static final Icon CELL_TERMINAL_ACT_EJECT = registerBuiltin("cell_terminal_act_eject");
+    public static final Icon CELL_TERMINAL_ACT_EJECT_HOVER = registerBuiltin("cell_terminal_act_eject_hover");
+    public static final Icon CELL_TERMINAL_ACT_INVENTORY = registerBuiltin("cell_terminal_act_inventory");
+    public static final Icon CELL_TERMINAL_ACT_PARTITION = registerBuiltin("cell_terminal_act_partition");
+    public static final Icon CELL_TERMINAL_SEARCH_MODE_INVENTORY = registerBuiltin(
+        "cell_terminal_search_mode_inventory");
+    public static final Icon CELL_TERMINAL_SEARCH_MODE_PARTITION = registerBuiltin(
+        "cell_terminal_search_mode_partition");
+    public static final Icon CELL_TERMINAL_SEARCH_MODE_MIXED = registerBuiltin("cell_terminal_search_mode_mixed");
+    public static final Icon CELL_TERMINAL_MAIN_NET = registerBuiltin("cell_terminal_main_net");
+    public static final Icon CELL_TERMINAL_ARROW_OUT = registerBuiltin("cell_terminal_arrow_out");
+    public static final Icon CELL_TERMINAL_ARROW_IN = registerBuiltin("cell_terminal_arrow_in");
+    public static final Icon CELL_TERMINAL_HELP = registerBuiltin("cell_terminal_help");
+    public static final Icon CELL_TERMINAL_RUN = registerBuiltin("cell_terminal_run");
+    public static final Icon CELL_TERMINAL_RUN_DISABLED = registerBuiltin("cell_terminal_run_disabled");
+    public static final Icon CELL_TERMINAL_STAR_ON = registerBuiltin("cell_terminal_star_on");
+    public static final Icon CELL_TERMINAL_STAR_OFF = registerBuiltin("cell_terminal_star_off");
+    public static final Icon CELL_TERMINAL_MINI_SLOT = registerBuiltin("cell_terminal_mini_slot");
+    public static final Icon CELL_TERMINAL_MINI_SLOT_PARTITION = registerBuiltin("cell_terminal_mini_slot_partition");
+    public static final Icon CELL_TERMINAL_CONTENT_FILTER_SHOW_ALL = registerBuiltin(
+        "cell_terminal_content_filter_show_all");
+    public static final Icon CELL_TERMINAL_CONTENT_FILTER_SHOW_ONLY = registerBuiltin(
+        "cell_terminal_content_filter_show_only");
+    public static final Icon CELL_TERMINAL_CONTENT_FILTER_HIDE = registerBuiltin("cell_terminal_content_filter_hide");
+    public static final Icon CELL_TERMINAL_PARTITION_FILTER_SHOW_ALL = registerBuiltin(
+        "cell_terminal_partition_filter_show_all");
+    public static final Icon CELL_TERMINAL_PARTITION_FILTER_SHOW_ONLY = registerBuiltin(
+        "cell_terminal_partition_filter_show_only");
+    public static final Icon CELL_TERMINAL_PARTITION_FILTER_HIDE = registerBuiltin(
+        "cell_terminal_partition_filter_hide");
+    public static final Icon CELL_TERMINAL_TAB = registerBuiltin("cell_terminal_tab");
+    public static final Icon CELL_TERMINAL_TAB_HOVER = registerBuiltin("cell_terminal_tab_hover");
+    public static final Icon CELL_TERMINAL_TAB_SELECTED = registerBuiltin("cell_terminal_tab_selected");
+    public static final Icon CELL_TERMINAL_TAB_DISABLED = registerBuiltin("cell_terminal_tab_disabled");
+    public static final Icon CELL_TERMINAL_SUBNET_VISIBILITY_SHOW_ALL = registerBuiltin(
+        "cell_terminal_subnet_visibility_show_all");
+    public static final Icon CELL_TERMINAL_SUBNET_VISIBILITY_SHOW_FAVORITES = registerBuiltin(
+        "cell_terminal_subnet_visibility_show_favorites");
+    public static final Icon CELL_TERMINAL_SUBNET_VISIBILITY_DONT_SHOW = registerBuiltin(
+        "cell_terminal_subnet_visibility_dont_show");
+
     private final Size manualSize;
     public int width;
     private final ResourceLocation id;

@@ -188,6 +188,10 @@ public class ContainerCellWorkbench extends UpgradeableContainer<ICellWorkbenchH
             return;
         }
 
+        if (!supportsAutoPartition()) {
+            return;
+        }
+
         GenericStackInv inv = getConfigInventory();
         Iterator<? extends AEKey> it = iterateCellStacks(getWorkbenchItem());
         for (int i = 0; i < inv.size(); i++) {
@@ -243,6 +247,12 @@ public class ContainerCellWorkbench extends UpgradeableContainer<ICellWorkbenchH
 
     public CopyMode getCopyMode() {
         return this.copyMode;
+    }
+
+    public boolean supportsAutoPartition() {
+        ICellWorkbenchItem cell = getHost().getCell();
+        ItemStack stack = getWorkbenchItem();
+        return cell != null && !stack.isEmpty() && cell.supportsAutoPartition(stack);
     }
 
     private GenericStackInv getConfigInventory() {

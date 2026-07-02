@@ -28,7 +28,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.storage.MapStorage;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -145,7 +144,7 @@ public final class PlayerRegistryInternal extends AESavedData implements IPlayer
         int index = 0;
         int[] playerIds = new int[mapping.size()];
         int[] profileIdParts = new int[mapping.size() * 4];
-        for (Map.Entry<UUID, Integer> entry : mapping.entrySet()) {
+        for (var entry : mapping.entrySet()) {
             packLong(profileIdParts, index * 4, entry.getKey().getMostSignificantBits());
             packLong(profileIdParts, index * 4 + 2, entry.getKey().getLeastSignificantBits());
             playerIds[index] = entry.getValue();

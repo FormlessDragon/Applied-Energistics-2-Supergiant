@@ -48,7 +48,6 @@ import ae2.container.GuiIds;
 import ae2.container.ISubGui;
 import ae2.core.definitions.AEItems;
 import ae2.core.gui.GuiOpener;
-import ae2.core.settings.TickRates;
 import ae2.helpers.IConfigInvHost;
 import ae2.helpers.IPriorityHost;
 import ae2.helpers.IWorkIntervalHost;

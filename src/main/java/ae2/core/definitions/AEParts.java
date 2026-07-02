@@ -70,6 +70,7 @@ import ae2.parts.p2p.MEP2PTunnelPart;
 import ae2.parts.p2p.P2PTunnelPart;
 import ae2.parts.p2p.PatternProviderP2PTunnelPart;
 import ae2.parts.p2p.RedstoneP2PTunnelPart;
+import ae2.parts.reporting.CellTerminalPart;
 import ae2.parts.reporting.ConversionMonitorPart;
 import ae2.parts.reporting.CraftingTerminalPart;
 import ae2.parts.reporting.DarkPanelPart;
@@ -178,6 +179,8 @@ public final class AEParts {
         AEPartIds.CABLE_ANCHOR, CableAnchorPart.class, CableAnchorPart::new);
     public static final ItemDefinition<PartItem<ItemTerminalPart>> TERMINAL = createPart(AEPartIds.TERMINAL,
         ItemTerminalPart.class, ItemTerminalPart::new);
+    public static final ItemDefinition<PartItem<CellTerminalPart>> CELL_TERMINAL = createPart(AEPartIds.CELL_TERMINAL,
+        CellTerminalPart.class, CellTerminalPart::new);
     public static final ItemDefinition<PartItem<PanelPart>> MONITOR = createPart(AEPartIds.MONITOR,
         PanelPart.class, PanelPart::new);
     public static final ItemDefinition<PartItem<SemiDarkPanelPart>> SEMI_DARK_MONITOR = createPart(
@@ -244,6 +247,7 @@ public final class AEParts {
         INVERTED_TOGGLE_BUS,
         CABLE_ANCHOR,
         TERMINAL,
+        CELL_TERMINAL,
         MONITOR,
         SEMI_DARK_MONITOR,
         DARK_MONITOR,

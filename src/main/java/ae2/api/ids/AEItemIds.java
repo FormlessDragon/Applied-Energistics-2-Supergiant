@@ -59,6 +59,7 @@ public final class AEItemIds {
     public static final ResourceLocation CHARGED_STAFF = id("charged_staff");
     public static final ResourceLocation COLOR_APPLICATOR = id("color_applicator");
     public static final ResourceLocation WIRELESS_TERMINAL = id("wireless_terminal");
+    public static final ResourceLocation WIRELESS_CELL_TERMINAL = id("wireless_cell_terminal");
     public static final ResourceLocation WIRELESS_CRAFTING_TERMINAL = id("wireless_crafting_terminal");
     public static final ResourceLocation WIRELESS_PATTERN_ENCODING_TERMINAL = id("wireless_pattern_encoding_terminal");
     public static final ResourceLocation WIRELESS_PATTERN_ACCESS_TERMINAL = id("wireless_pattern_access_terminal");

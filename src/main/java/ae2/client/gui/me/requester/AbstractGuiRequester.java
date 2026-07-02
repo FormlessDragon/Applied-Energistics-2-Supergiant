@@ -244,6 +244,8 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
             String amount = genericStack.what().formatAmount(genericStack.amount(), AmountFormat.SLOT);
             StackSizeRenderer.renderSizeLabel(this.fontRenderer, slot.xPos, slot.yPos, amount, false);
         }
+
+        renderHoveredSlotOverlayIfNeeded(slot);
     }
 
     @Override
