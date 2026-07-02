@@ -1,16 +1,8 @@
 {
-  "neoforge:conditions": [
-    {
-      "type": "neoforge:not",
-      "value": {
-        "type": "neoforge:tag_empty",
-        "tag": "c:nuggets/chicken"
-      }
-    }
-  ],
   "type": "ae2:matter_cannon",
   "ammo": {
-    "tag": "c:nuggets/chicken"
+    "type": "forge:ore_dict",
+    "ore": "nuggetChicken"
   },
   "weight": 32.0
 }

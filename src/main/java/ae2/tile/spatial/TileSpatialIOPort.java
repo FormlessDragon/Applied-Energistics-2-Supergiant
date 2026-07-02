@@ -29,6 +29,7 @@ import ae2.api.networking.energy.IEnergyService;
 import ae2.api.networking.events.GridSpatialEvent;
 import ae2.api.networking.spatial.ISpatialService;
 import ae2.api.util.AECableType;
+import ae2.core.AELog;
 import ae2.core.definitions.AEBlocks;
 import ae2.hooks.ticking.TickHandler;
 import ae2.tile.grid.AENetworkedInvTile;
@@ -81,6 +82,10 @@ public class TileSpatialIOPort extends AENetworkedInvTile {
     @Override
     protected boolean readFromStream(ByteBuf data) {
         boolean changed = super.readFromStream(data);
+        if (data.readableBytes() < 1) {
+            AELog.error("Malformed spatial IO port update payload at %s: missing active state byte", this.pos);
+            return changed;
+        }
         boolean nextActive = data.readBoolean();
         changed = changed || this.active != nextActive;
         this.active = nextActive;

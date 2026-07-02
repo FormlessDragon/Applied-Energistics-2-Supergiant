@@ -1,16 +1,8 @@
 {
-  "neoforge:conditions": [
-    {
-      "type": "neoforge:not",
-      "value": {
-        "type": "neoforge:tag_empty",
-        "tag": "c:nuggets/electrum"
-      }
-    }
-  ],
   "type": "ae2:matter_cannon",
   "ammo": {
-    "tag": "c:nuggets/electrum"
+    "type": "forge:ore_dict",
+    "ore": "nuggetElectrum"
   },
   "weight": 152.41737
 }

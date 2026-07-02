@@ -139,16 +139,20 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     @Override
     public NBTTagCompound getUpdateTag() {
         NBTTagCompound data = super.getUpdateTag();
+        this.writeUpdatePayload(data, "Failed to write update tag");
+        return data;
+    }
+
+    private void writeUpdatePayload(NBTTagCompound data, String failureMessage) {
         ByteBuf buf = Unpooled.buffer();
         try {
             this.writeToStream(buf);
+            byte[] bytes = new byte[buf.readableBytes()];
+            buf.readBytes(bytes);
+            data.setByteArray("#upd", bytes);
         } catch (Throwable t) {
-            AELog.error(t, "Failed to write update tag");
+            AELog.error(t, failureMessage);
         }
-        byte[] bytes = new byte[buf.readableBytes()];
-        buf.readBytes(bytes);
-        data.setByteArray("#upd", bytes);
-        return data;
     }
 
     @Override
@@ -168,15 +172,7 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     @Override
     public SPacketUpdateTileEntity getUpdatePacket() {
         NBTTagCompound tag = new NBTTagCompound();
-        ByteBuf buf = Unpooled.buffer();
-        try {
-            this.writeToStream(buf);
-        } catch (Throwable t) {
-            AELog.error(t, "Failed to write update packet");
-        }
-        byte[] bytes = new byte[buf.readableBytes()];
-        buf.readBytes(bytes);
-        tag.setByteArray("#upd", bytes);
+        this.writeUpdatePayload(tag, "Failed to write update packet");
         return new SPacketUpdateTileEntity(this.pos, 0, tag);
     }
 

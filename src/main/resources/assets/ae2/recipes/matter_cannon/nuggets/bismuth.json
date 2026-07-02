@@ -1,16 +1,8 @@
 {
-  "neoforge:conditions": [
-    {
-      "type": "neoforge:not",
-      "value": {
-        "type": "neoforge:tag_empty",
-        "tag": "c:nuggets/bismuth"
-      }
-    }
-  ],
   "type": "ae2:matter_cannon",
   "ammo": {
-    "tag": "c:nuggets/bismuth"
+    "type": "forge:ore_dict",
+    "ore": "nuggetBismuth"
   },
   "weight": 208.9804
 }

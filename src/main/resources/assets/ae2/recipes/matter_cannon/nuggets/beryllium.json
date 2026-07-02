@@ -1,16 +1,8 @@
 {
-  "neoforge:conditions": [
-    {
-      "type": "neoforge:not",
-      "value": {
-        "type": "neoforge:tag_empty",
-        "tag": "c:nuggets/beryllium"
-      }
-    }
-  ],
   "type": "ae2:matter_cannon",
   "ammo": {
-    "tag": "c:nuggets/beryllium"
+    "type": "forge:ore_dict",
+    "ore": "nuggetBeryllium"
   },
   "weight": 9.0122
 }

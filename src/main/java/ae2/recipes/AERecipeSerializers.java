@@ -9,7 +9,6 @@ import ae2.recipes.handlers.CrystalAssemblerRecipeSerializer;
 import ae2.recipes.handlers.CrystalFixerRecipeSerializer;
 import ae2.recipes.handlers.InscriberRecipeSerializer;
 import ae2.recipes.mattercannon.MatterCannonAmmoSerializer;
-import ae2.recipes.serializers.JsonRecipeUtils;
 import ae2.recipes.transform.TransformRecipeSerializer;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
@@ -44,10 +43,6 @@ public final class AERecipeSerializers {
     }
 
     public static void register(JsonObject json, JsonContext ctx) {
-        if (!JsonRecipeUtils.shouldLoad(json)) {
-            return;
-        }
-
         String type = ctx.appendModId(JsonUtils.getString(json, "type"));
         IAERecipeFactory factory = FACTORIES.get(readType(type));
         if (factory == null) {

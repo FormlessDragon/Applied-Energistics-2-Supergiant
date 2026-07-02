@@ -1,16 +1,8 @@
 {
-  "neoforge:conditions": [
-    {
-      "type": "neoforge:not",
-      "value": {
-        "type": "neoforge:tag_empty",
-        "tag": "c:nuggets/meatcooked"
-      }
-    }
-  ],
   "type": "ae2:matter_cannon",
   "ammo": {
-    "tag": "c:nuggets/meatcooked"
+    "type": "forge:ore_dict",
+    "ore": "nuggetMeatcooked"
   },
   "weight": 32.0
 }

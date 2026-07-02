@@ -15,10 +15,6 @@ public class AERecipeFactoryAdapter implements IRecipeFactory {
 
     @Override
     public IRecipe parse(JsonContext context, JsonObject json) {
-        if (!JsonRecipeUtils.shouldLoad(json)) {
-            return new AENonCraftingRecipe();
-        }
-
         this.delegate.register(json, context);
         return new AENonCraftingRecipe();
     }

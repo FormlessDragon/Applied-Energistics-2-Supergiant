@@ -91,38 +91,6 @@ public final class JsonRecipeUtils {
         return block;
     }
 
-    public static boolean shouldLoad(JsonObject json) {
-        if (!json.has("neoforge:conditions")) {
-            return true;
-        }
-
-        JsonArray conditions = JsonUtils.getJsonArray(json, "neoforge:conditions");
-        for (JsonElement element : conditions) {
-            if (!element.isJsonObject()) {
-                return false;
-            }
-            JsonObject condition = element.getAsJsonObject();
-            if (!condition.has("type")) {
-                return false;
-            }
-
-            String type = JsonUtils.getString(condition, "type");
-            if ("neoforge:not".equals(type)) {
-                JsonObject value = JsonUtils.getJsonObject(condition, "Value");
-                if (value != null && value.has("type") && "neoforge:tag_empty".equals(JsonUtils.getString(value, "type"))) {
-                    ResourceLocation tagId = parseId(JsonUtils.getString(value, "tag"));
-                    if (OreDictionary.getOres(toOreDictionaryName(tagId)).isEmpty()) {
-                        return false;
-                    }
-                    continue;
-                }
-            }
-            return false;
-        }
-
-        return true;
-    }
-
     private static Ingredient readIngredient(JsonElement json, JsonContext ctx) {
         Ingredient bridged = tryReadIngredient(json, ctx);
         return bridged != null ? bridged : CraftingHelper.getIngredient(json, ctx);

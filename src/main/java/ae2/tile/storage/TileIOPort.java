@@ -47,6 +47,7 @@ import ae2.api.upgrades.UpgradeInventories;
 import ae2.api.util.AECableType;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigurableObject;
+import ae2.core.AELog;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.definitions.AEItems;
 import ae2.core.settings.TickRates;
@@ -124,6 +125,10 @@ public class TileIOPort extends AENetworkedInvTile implements IUpgradeableObject
     @Override
     protected boolean readFromStream(ByteBuf data) {
         boolean changed = super.readFromStream(data);
+        if (data.readableBytes() < 1) {
+            AELog.error("Malformed IO port update payload at %s: missing active state byte", this.pos);
+            return changed;
+        }
         boolean nextActive = data.readBoolean();
         changed = changed || nextActive != this.active;
         this.active = nextActive;
