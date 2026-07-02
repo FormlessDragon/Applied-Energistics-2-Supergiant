@@ -9,7 +9,7 @@ record CraftConfirmStartButtonState(GuiText label, boolean clickable, boolean hi
         var label = getLabel(hasMissingEntries, mergeAvailable, ctrlDown);
         var canUseCpu = !hasNoCpu || (mergeAvailable && !ctrlDown);
         var clickable = planIsStartable && canUseCpu && (!hasMissingEntries || shiftDown);
-        var highlighted = planIsStartable && ((hasMissingEntries && shiftDown) || (mergeAvailable && !ctrlDown));
+        var highlighted = planIsStartable && hasMissingEntries && shiftDown;
         return new CraftConfirmStartButtonState(label, clickable, highlighted);
     }
 

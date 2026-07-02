@@ -1495,6 +1495,8 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return;
         }
 
+        restoreStateForVanillaItemRender();
+        GlStateManager.clear(GL11.GL_DEPTH_BUFFER_BIT);
         this.activeSelectionPopup.render(this.mc, mouseX - this.guiLeft, mouseY - this.guiTop);
     }
 
