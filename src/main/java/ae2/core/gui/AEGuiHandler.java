@@ -59,11 +59,11 @@ import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.client.gui.me.crafting.GuiCraftingCPU;
 import ae2.client.gui.me.crafting.GuiCraftingTree;
 import ae2.client.gui.me.items.GuiCraftingTerm;
-import ae2.client.gui.me.patternencode.GuiPEATerm;
-import ae2.client.gui.me.patternencode.GuiPatternEncodingTerm;
 import ae2.client.gui.me.networktool.GuiNetworkStatus;
 import ae2.client.gui.me.networktool.GuiNetworkTool;
 import ae2.client.gui.me.patternaccess.GuiPatternAccessTerm;
+import ae2.client.gui.me.patternencode.GuiPEATerm;
+import ae2.client.gui.me.patternencode.GuiPatternEncodingTerm;
 import ae2.client.gui.me.requester.GuiRequesterTerm;
 import ae2.client.gui.networking.GuiControllerStatus;
 import ae2.client.gui.style.GuiStyleManager;
@@ -134,8 +134,8 @@ import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.core.gui.locator.PartLocator;
 import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.WirelessCraftingTerminalGuiHost;
-import ae2.helpers.WirelessPatternAccessTerminalGuiHost;
 import ae2.helpers.WirelessPEATerminalGuiHost;
+import ae2.helpers.WirelessPatternAccessTerminalGuiHost;
 import ae2.helpers.WirelessPatternEncodingTerminalGuiHost;
 import ae2.helpers.WirelessRequesterTerminalGuiHost;
 import ae2.helpers.WirelessTerminalGuiHost;
@@ -1541,7 +1541,7 @@ public class AEGuiHandler implements IGuiHandler {
         }
 
         return initContainer(new ContainerPEATerm(GuiIds.GuiKey.WIRELESS_PEA_TERMINAL,
-            player.inventory, wirelessHost, true), locator, guiId);
+            player.inventory, wirelessHost), locator, guiId);
     }
 
     private @Nullable ContainerRequesterTerm createWirelessRequesterTerminalContainer(EntityPlayer player,

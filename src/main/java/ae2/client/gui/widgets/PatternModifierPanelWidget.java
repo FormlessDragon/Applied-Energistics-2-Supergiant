@@ -189,6 +189,7 @@ public final class PatternModifierPanelWidget implements ICompositeWidget {
             return;
         }
         this.expanded = !this.expanded;
+        this.host.updatePatternModifierPanelVisibleSlots(this.expanded);
         this.gui.requestExclusionZonesUpdate();
     }
 

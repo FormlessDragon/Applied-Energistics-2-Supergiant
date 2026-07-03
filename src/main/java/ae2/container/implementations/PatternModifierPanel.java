@@ -35,6 +35,7 @@ public final class PatternModifierPanel {
     private final InternalInventory emptyInventory = new EmptyPatternInventory();
     @Nullable
     private final PatternModifierGuiHost host;
+    private boolean slotsEnabled;
 
     public PatternModifierPanel(Host container) {
         this.container = container;
@@ -64,7 +65,7 @@ public final class PatternModifierPanel {
     }
 
     public ItemStack insertPattern(ItemStack stack, boolean simulate) {
-        if (!isAvailable()) {
+        if (!canAcceptEncodingInsert()) {
             return stack;
         }
         ItemStack remaining = stack;
@@ -75,8 +76,12 @@ public final class PatternModifierPanel {
         return remaining;
     }
 
+    public boolean canAcceptEncodingInsert() {
+        return isPatternInventoryEnabled();
+    }
+
     public boolean consumeBlankPattern() {
-        if (!isAvailable()) {
+        if (!isPatternInventoryEnabled()) {
             return false;
         }
         InternalInventory inventory = getHost().getPatternInventory();
@@ -95,12 +100,17 @@ public final class PatternModifierPanel {
 
     public void updateSlotState(boolean visible) {
         boolean enabled = visible && isAvailable();
+        this.slotsEnabled = enabled;
         for (var slot : this.container.getSlots(PATTERN_MODIFIER_PANEL)) {
             if (slot instanceof AppEngSlot appEngSlot) {
                 appEngSlot.setSlotEnabled(enabled);
                 appEngSlot.setActive(enabled);
             }
         }
+    }
+
+    private boolean isPatternInventoryEnabled() {
+        return this.slotsEnabled;
     }
 
     public void clearPatterns() {

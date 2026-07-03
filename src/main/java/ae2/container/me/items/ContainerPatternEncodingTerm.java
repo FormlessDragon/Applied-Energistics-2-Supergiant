@@ -81,6 +81,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     private static final String ACTION_RENAME_PROCESSING_PATTERN_ITEM = "renameProcessingPatternItem";
     private static final String ACTION_SET_HEI_PROCESSING_RECIPE = "setHeiProcessingRecipe";
     private static final String ACTION_UPLOAD_PATTERN = "uploadPattern";
+    private static final String ACTION_SET_PATTERN_MODIFIER_PANEL_VISIBLE = "setPatternModifierPanelVisible";
     private static final int MAX_RENAME_PROCESSING_PATTERN_ITEM_PAYLOAD_LENGTH = 512;
     private static final int MAX_SET_HEI_PROCESSING_RECIPE_PAYLOAD_LENGTH = 16384;
     private static final int MAX_CUSTOM_NAME_LENGTH = 32;
@@ -194,6 +195,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
             MAX_SET_HEI_PROCESSING_RECIPE_PAYLOAD_LENGTH,
             this::setHeiProcessingRecipe);
         registerClientAction(ACTION_UPLOAD_PATTERN, Boolean.class, this::uploadPattern);
+        registerClientAction(ACTION_SET_PATTERN_MODIFIER_PANEL_VISIBLE, Boolean.class,
+            this::setPatternModifierPanelVisibleFromClient);
         this.patternModifierPanel = new PatternModifierPanel(this);
         this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
 
@@ -980,6 +983,17 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     }
 
     public void updatePatternModifierPanelVisibleSlots(boolean visible) {
+        if (isClientSide() && this.patternModifierPanelVisible != visible) {
+            sendClientAction(ACTION_SET_PATTERN_MODIFIER_PANEL_VISIBLE, visible);
+        }
+        applyPatternModifierPanelVisible(visible);
+    }
+
+    private void setPatternModifierPanelVisibleFromClient(boolean visible) {
+        applyPatternModifierPanelVisible(visible);
+    }
+
+    private void applyPatternModifierPanelVisible(boolean visible) {
         this.patternModifierPanelVisible = visible;
         this.patternModifierPanel.updateSlotState(visible && this.patternModifierPanelAvailable);
     }

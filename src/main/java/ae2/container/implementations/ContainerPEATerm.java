@@ -5,7 +5,6 @@ import ae2.api.config.ShowPatternProviders;
 import ae2.api.config.YesNo;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
-import ae2.api.storage.ILinkStatus;
 import ae2.api.storage.IPEATermContainerHost;
 import ae2.api.util.IConfigManager;
 import ae2.container.GuiIds;
@@ -39,12 +38,11 @@ public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IP
     public ShowPatternProviders showPatternProviders = ShowPatternProviders.VISIBLE;
 
     public ContainerPEATerm(InventoryPlayer ip, IPEATermContainerHost host) {
-        this(GuiIds.GuiKey.PEA_TERMINAL, ip, host, true);
+        this(GuiIds.GuiKey.PEA_TERMINAL, ip, host);
     }
 
-    public ContainerPEATerm(GuiIds.GuiKey guiKey, InventoryPlayer ip, IPEATermContainerHost host,
-                            boolean bindInventory) {
-        super(guiKey, ip, host, bindInventory);
+    public ContainerPEATerm(GuiIds.GuiKey guiKey, InventoryPlayer ip, IPEATermContainerHost host) {
+        super(guiKey, ip, host, true);
         this.host = host;
         this.patternAccessSupport = new PatternAccessSupport<>(
             this::getPatternProviderGrid,
@@ -123,11 +121,6 @@ public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IP
     @Override
     public ShowPatternProviders getShownProviders() {
         return this.showPatternProviders;
-    }
-
-    @Override
-    public ILinkStatus getLinkStatus() {
-        return super.getLinkStatus();
     }
 
     @Override

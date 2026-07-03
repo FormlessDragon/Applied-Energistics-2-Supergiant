@@ -43,6 +43,8 @@ dependencies {
 * [AlmostReliable/merequester](https://github.com/AlmostReliable/merequester): integrated ME Requester under LGPL-3.0 license.
 * [62832/MEGACells](https://github.com/62832/MEGACells): integrated Portable Cell Workbench assets under CC BY-NC-SA 3.0;
 * [yuuki1293/AE2PatternEncodingAccessTerminal](https://github.com/yuuki1293/AE2PatternEncodingAccessTerminal): integrated AE2PatternEncodingAccessTerminal with partial code reuse and assets, all under the MIT license.
+* [Aedial/DiskTerminal](https://github.com/Aedial/DiskTerminal) Heavily referenced its implementation, under the MIT license.
+
 ## Native Additions
 
 * Advanced Memory Card: in-network P2P management with filtering, binding, unbinding, renaming, and world highlights.
