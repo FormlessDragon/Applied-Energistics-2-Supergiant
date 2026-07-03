@@ -121,8 +121,8 @@ public class GuiPatternAccessTerm<C extends ContainerPatternAccessTerm> extends 
     private static final int SEARCH_FIELD_WIDTH = 65;
     private static final int CONTENT_RIGHT_X = GUI_PADDING_X + COLUMNS * SLOT_SIZE;
     private static final int RIGHT_SEARCH_FIELD_LEFT = CONTENT_RIGHT_X - SEARCH_FIELD_WIDTH;
-    private static final int HEADER_TITLE_MAX_WIDTH = RIGHT_SEARCH_FIELD_LEFT - GUI_PADDING_X - HEADER_TITLE_RIGHT_GAP;
     private static final int HEADER_TITLE_RIGHT_GAP = 4;
+    private static final int HEADER_TITLE_MAX_WIDTH = RIGHT_SEARCH_FIELD_LEFT - GUI_PADDING_X - HEADER_TITLE_RIGHT_GAP;
     private static final int MIN_VISIBLE_ROWS = 2;
     private static final int PATTERN_PROVIDER_NAME_MARGIN_X = 2;
     private static final int TEXT_MAX_WIDTH = 173;
