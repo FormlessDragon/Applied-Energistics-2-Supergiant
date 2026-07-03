@@ -1,0 +1,23 @@
+{
+  "type": "forge:ore_shaped",
+  "pattern": [
+    "a",
+    "b",
+    "c"
+  ],
+  "key": {
+    "a": {
+      "item": "ae2:wireless_receiver"
+    },
+    "b": {
+      "item": "ae2:pattern_encoding_access_terminal"
+    },
+    "c": {
+      "item": "ae2:dense_energy_cell"
+    }
+  },
+  "result": {
+    "item": "ae2:wireless_pattern_encoding_access_terminal",
+    "count": 1
+  }
+}

@@ -19,20 +19,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntConsumer;
 
-public class GuiPatternImportPrioritySettings extends AEBaseGui<ContainerPatternEncodingTerm> {
+public class GuiPatternImportPrioritySettings<C extends ContainerPatternEncodingTerm> extends AEBaseGui<C> {
     private static final int ROWS_PER_PAGE = 6;
     private static final int BUTTON_NAME_X = 44;
     private static final int BUTTON_Y = 28;
     private static final int BUTTON_SPACING = 24;
     private static final int NAME_WIDTH = 138;
 
-    private final GuiPatternEncodingTerm parent;
+    private final AEBaseGui<C> parent;
     private final List<PriorityOrderButton> priorityButtons = new ArrayList<>();
     private final AE2Button previousPageButton;
     private final AE2Button nextPageButton;
     private int currentPage;
 
-    public GuiPatternImportPrioritySettings(GuiPatternEncodingTerm parent) {
+    public GuiPatternImportPrioritySettings(AEBaseGui<C> parent) {
         super(parent.getContainer(), parent.getContainer().getPlayerInventory(),
             GuiStyleManager.loadStyleDoc("/screens/terminals/pattern_import_priority_settings.json"));
         this.parent = parent;

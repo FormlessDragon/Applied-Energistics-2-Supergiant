@@ -37,12 +37,18 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 import java.util.Objects;
 
-public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHandler<ContainerPatternEncodingTerm> {
+public class PatternEncodingRecipeTransferHandler<C extends ContainerPatternEncodingTerm> implements IRecipeTransferHandler<C> {
     @SuppressWarnings("unused")
     private static final int RECIPE_OUTPUT_SLOT = 0;
     private static final int CRAFTING_GRID_SIZE = 9;
 
-    private static void encodeCraftingRecipe(ContainerPatternEncodingTerm container, IRecipeLayout recipeLayout) {
+    private final Class<C> containerClass;
+
+    public PatternEncodingRecipeTransferHandler(Class<C> containerClass) {
+        this.containerClass = containerClass;
+    }
+
+    private void encodeCraftingRecipe(C container, IRecipeLayout recipeLayout) {
         container.setMode(EncodingMode.CRAFTING);
         PatternImportPriorityContext context = PatternImportPriorityContextImpl.create(container,
             HeiBookmarkHelper.getBookmarkedStacks());
@@ -69,7 +75,7 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
         }
     }
 
-    private static void encodeProcessingRecipe(ContainerPatternEncodingTerm container, IRecipeLayout recipeLayout) {
+    private void encodeProcessingRecipe(C container, IRecipeLayout recipeLayout) {
         container.setMode(EncodingMode.PROCESSING);
         PatternImportPriorityContext context = PatternImportPriorityContextImpl.create(container,
             HeiBookmarkHelper.getBookmarkedStacks());
@@ -93,7 +99,7 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
         return GenericIngredientHelper.getIngredients(recipeLayout, true, true, CRAFTING_GRID_SIZE);
     }
 
-    private static RecipeTransferSlots findTransferSlots(ContainerPatternEncodingTerm container,
+    private RecipeTransferSlots findTransferSlots(C container,
                                                          IRecipeLayout recipeLayout) {
         IntList missingSlots = new IntArrayList();
         IntList craftableSlots = new IntArrayList();
@@ -181,10 +187,10 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
         return matchingStacks.length == 0 ? Ingredient.EMPTY : Ingredient.fromStacks(matchingStacks);
     }
 
-    private static void encodeSelectedStacksIntoSlots(ContainerPatternEncodingTerm container,
-                                                      List<List<GenericStack>> possibleInputsBySlot,
-                                                      PatternImportPriorityContext context,
-                                                      FakeSlot[] slots) {
+    private void encodeSelectedStacksIntoSlots(C container,
+                                               List<List<GenericStack>> possibleInputsBySlot,
+                                               PatternImportPriorityContext context,
+                                               FakeSlot[] slots) {
         List<GenericStack> encodedInputs = new ObjectArrayList<>();
         for (List<GenericStack> genericIngredient : possibleInputsBySlot) {
             if (!genericIngredient.isEmpty()) {
@@ -204,10 +210,10 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
         }
     }
 
-    private static List<List<String>> encodeProcessingInputsIntoSlots(ContainerPatternEncodingTerm container,
-                                                                      List<List<GenericStack>> possibleInputsBySlot,
-                                                                      PatternImportPriorityContext context,
-                                                                      FakeSlot[] slots) {
+    private List<List<String>> encodeProcessingInputsIntoSlots(C container,
+                                                               List<List<GenericStack>> possibleInputsBySlot,
+                                                               PatternImportPriorityContext context,
+                                                               FakeSlot[] slots) {
         List<GenericStack> encodedInputs = new ObjectArrayList<>();
         List<List<AEKey>> candidatesByEncodedSlot = new ObjectArrayList<>();
         for (List<GenericStack> genericIngredient : possibleInputsBySlot) {
@@ -308,7 +314,7 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
         stacks.add(newStack);
     }
 
-    private static void setFilter(ContainerPatternEncodingTerm container, FakeSlot slot, ItemStack stack) {
+    private void setFilter(C container, FakeSlot slot, ItemStack stack) {
         if (slot == null) {
             return;
         }
@@ -320,8 +326,8 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
     }
 
     @Override
-    public Class<ContainerPatternEncodingTerm> getContainerClass() {
-        return ContainerPatternEncodingTerm.class;
+    public Class<C> getContainerClass() {
+        return this.containerClass;
     }
 
     private static String getRecipeCategoryUid(IRecipeLayout recipeLayout) {
@@ -337,13 +343,9 @@ public class PatternEncodingRecipeTransferHandler implements IRecipeTransferHand
     }
 
     @Override
-    public IRecipeTransferError transferRecipe(@NotNull ContainerPatternEncodingTerm container,
+    public IRecipeTransferError transferRecipe(@NotNull C container,
                                                @NotNull IRecipeLayout recipeLayout,
                                                @NotNull EntityPlayer player, boolean maxTransfer, boolean doTransfer) {
-        if (recipeLayout == null) {
-            return null;
-        }
-
         String recipeCategoryUid = getRecipeCategoryUid(recipeLayout);
         if (VanillaRecipeCategoryUid.INFORMATION.equals(recipeCategoryUid)
             || VanillaRecipeCategoryUid.FUEL.equals(recipeCategoryUid)) {

@@ -59,7 +59,8 @@ import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.client.gui.me.crafting.GuiCraftingCPU;
 import ae2.client.gui.me.crafting.GuiCraftingTree;
 import ae2.client.gui.me.items.GuiCraftingTerm;
-import ae2.client.gui.me.items.GuiPatternEncodingTerm;
+import ae2.client.gui.me.patternencode.GuiPEATerm;
+import ae2.client.gui.me.patternencode.GuiPatternEncodingTerm;
 import ae2.client.gui.me.networktool.GuiNetworkStatus;
 import ae2.client.gui.me.networktool.GuiNetworkTool;
 import ae2.client.gui.me.patternaccess.GuiPatternAccessTerm;
@@ -98,6 +99,7 @@ import ae2.container.implementations.ContainerNetworkStatus;
 import ae2.container.implementations.ContainerNetworkTool;
 import ae2.container.implementations.ContainerODFilterBus;
 import ae2.container.implementations.ContainerODStorageBus;
+import ae2.container.implementations.ContainerPEATerm;
 import ae2.container.implementations.ContainerPatternAccessTerm;
 import ae2.container.implementations.ContainerPatternModifier;
 import ae2.container.implementations.ContainerPatternProvider;
@@ -133,6 +135,7 @@ import ae2.core.gui.locator.PartLocator;
 import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.WirelessCraftingTerminalGuiHost;
 import ae2.helpers.WirelessPatternAccessTerminalGuiHost;
+import ae2.helpers.WirelessPEATerminalGuiHost;
 import ae2.helpers.WirelessPatternEncodingTerminalGuiHost;
 import ae2.helpers.WirelessRequesterTerminalGuiHost;
 import ae2.helpers.WirelessTerminalGuiHost;
@@ -164,6 +167,7 @@ import ae2.parts.automation.special.PreciseExportBusPart;
 import ae2.parts.automation.special.PreciseStorageBusPart;
 import ae2.parts.automation.special.ThresholdExportBusPart;
 import ae2.parts.crafting.PatternProviderPart;
+import ae2.parts.encoding.PEATerminalPart;
 import ae2.parts.encoding.PatternEncodingTerminalPart;
 import ae2.parts.misc.InterfacePart;
 import ae2.parts.reporting.CraftingTerminalPart;
@@ -230,6 +234,7 @@ public class AEGuiHandler implements IGuiHandler {
             || bridge == GuiIds.GuiKey.WIRELESS_CRAFTING_TERMINAL
             || bridge == GuiIds.GuiKey.WIRELESS_PATTERN_ENCODING_TERMINAL
             || bridge == GuiIds.GuiKey.WIRELESS_PATTERN_ACCESS_TERMINAL
+            || bridge == GuiIds.GuiKey.WIRELESS_PEA_TERMINAL
             || bridge == GuiIds.GuiKey.WIRELESS_REQUESTER_TERMINAL
             || bridge == GuiIds.GuiKey.WIRELESS_TERMINAL_DYNAMIC;
     }
@@ -258,6 +263,7 @@ public class AEGuiHandler implements IGuiHandler {
             || bridge == GuiIds.GuiKey.CRAFTING_TERMINAL
             || bridge == GuiIds.GuiKey.PATTERN_ENCODING_TERMINAL
             || bridge == GuiIds.GuiKey.PATTERN_ACCESS_TERMINAL
+            || bridge == GuiIds.GuiKey.PEA_TERMINAL
             || bridge == GuiIds.GuiKey.REQUESTER_TERMINAL;
     }
 
@@ -587,6 +593,10 @@ public class AEGuiHandler implements IGuiHandler {
                 return createPartContainer(player, partLocator(x, y, z), ID, PatternAccessTerminalPart.class,
                     host -> new ContainerPatternAccessTerm(player.inventory, host));
             }
+            case PEA_TERMINAL -> {
+                return createPartContainer(player, partLocator(x, y, z), ID, PEATerminalPart.class,
+                    host -> new ContainerPEATerm(player.inventory, host));
+            }
             case REQUESTER_TERMINAL -> {
                 return createPartContainer(player, partLocator(x, y, z), ID, RequesterTerminalPart.class,
                     host -> new ContainerRequesterTerm(player.inventory, host));
@@ -647,6 +657,9 @@ public class AEGuiHandler implements IGuiHandler {
             }
             case WIRELESS_PATTERN_ACCESS_TERMINAL -> {
                 return createWirelessPatternAccessTerminalContainer(player, x, ID);
+            }
+            case WIRELESS_PEA_TERMINAL -> {
+                return createWirelessPEATerminalContainer(player, x, ID);
             }
             case WIRELESS_REQUESTER_TERMINAL -> {
                 return createWirelessRequesterTerminalContainer(player, x, ID);
@@ -1120,10 +1133,20 @@ public class AEGuiHandler implements IGuiHandler {
                     PatternAccessTerminalPart.class,
                     host -> new ContainerPatternAccessTerm(player.inventory, host));
                 if (patternAccessTerminalContainer != null) {
-                    return new GuiPatternAccessTerm<>(patternAccessTerminalContainer, player.inventory, null,
+                    return new GuiPatternAccessTerm(patternAccessTerminalContainer, player.inventory, null,
                         GuiStyleManager.loadStyleDoc("/screens/terminals/pattern_access_terminal.json"));
                 }
                 return null;
+            }
+            case PEA_TERMINAL -> {
+                ContainerPEATerm peaTermContainer = createPartContainer(player,
+                    partLocator(x, y, z), ID,
+                    PEATerminalPart.class,
+                    host -> new ContainerPEATerm(player.inventory, host));
+                if (peaTermContainer != null) {
+                    return new GuiPEATerm(peaTermContainer, player.inventory, null,
+                        GuiStyleManager.loadStyleDoc("/screens/terminals/pattern_encoding_access_terminal.json"));
+                }
             }
             case REQUESTER_TERMINAL -> {
                 ContainerRequesterTerm requesterTerminalContainer = createPartContainer(player,
@@ -1266,8 +1289,17 @@ public class AEGuiHandler implements IGuiHandler {
                 ContainerPatternAccessTerm wirelessPatternAccessTerminalContainer =
                     createWirelessPatternAccessTerminalContainer(player, x, ID);
                 if (wirelessPatternAccessTerminalContainer != null) {
-                    return new GuiPatternAccessTerm<>(wirelessPatternAccessTerminalContainer, player.inventory, null,
+                    return new GuiPatternAccessTerm(wirelessPatternAccessTerminalContainer, player.inventory, null,
                         GuiStyleManager.loadStyleDoc("/screens/terminals/pattern_access_terminal.json"));
+                }
+                return null;
+            }
+            case WIRELESS_PEA_TERMINAL -> {
+                ContainerPEATerm wirelessPatternEncodingAccessTerminalContainer =
+                    createWirelessPEATerminalContainer(player, x, ID);
+                if (wirelessPatternEncodingAccessTerminalContainer != null) {
+                    return new GuiPEATerm(wirelessPatternEncodingAccessTerminalContainer, player.inventory, null,
+                        GuiStyleManager.loadStyleDoc("/screens/terminals/pattern_encoding_access_terminal.json"));
                 }
                 return null;
             }
@@ -1498,6 +1530,18 @@ public class AEGuiHandler implements IGuiHandler {
         }
 
         return initContainer(new ContainerPatternAccessTerm(player.inventory, wirelessHost), locator, guiId);
+    }
+
+    private @Nullable ContainerPEATerm createWirelessPEATerminalContainer(EntityPlayer player,
+                                                                                           int slot, int guiId) {
+        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+        ItemGuiHost<?> host = createItemGuiHost(player, locator, GuiIds.GuiKey.WIRELESS_PEA_TERMINAL);
+        if (!(host instanceof WirelessPEATerminalGuiHost wirelessHost)) {
+            return null;
+        }
+
+        return initContainer(new ContainerPEATerm(GuiIds.GuiKey.WIRELESS_PEA_TERMINAL,
+            player.inventory, wirelessHost, true), locator, guiId);
     }
 
     private @Nullable ContainerRequesterTerm createWirelessRequesterTerminalContainer(EntityPlayer player,

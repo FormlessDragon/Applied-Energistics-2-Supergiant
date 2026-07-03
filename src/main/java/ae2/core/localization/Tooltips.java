@@ -138,7 +138,7 @@ public enum Tooltips implements LocalizationEnum {
     }
 
     public static String getSetAmountTooltipLocal() {
-        return TextFormatting.DARK_GRAY + ButtonToolTips.ModifyAmountAction.getLocal(ButtonToolTips.RightClick.getLocal());
+        return TextFormatting.DARK_GRAY + ButtonToolTips.ModifyAmountAction.getLocal(ButtonToolTips.MiddleClick.getLocal());
     }
 
     public static String getRenameTooltipLocal() {

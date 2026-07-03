@@ -1,6 +1,7 @@
-package ae2.client.gui.me.items;
+package ae2.client.gui.me.patternencode;
 
 import ae2.client.Point;
+import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.ICompositeWidget;
 import ae2.client.gui.Icon;
 import ae2.client.gui.WidgetContainer;
@@ -10,7 +11,7 @@ import net.minecraft.util.text.ITextComponent;
 import java.awt.Rectangle;
 
 abstract class EncodingModePanel implements ICompositeWidget {
-    protected final GuiPatternEncodingTerm screen;
+    protected final AEBaseGui<? extends ContainerPatternEncodingTerm> screen;
     protected final ContainerPatternEncodingTerm container;
     protected final WidgetContainer widgets;
     protected Point position = Point.ZERO;
@@ -18,7 +19,7 @@ abstract class EncodingModePanel implements ICompositeWidget {
     protected int height;
     protected boolean visible;
 
-    EncodingModePanel(GuiPatternEncodingTerm screen, WidgetContainer widgets) {
+    EncodingModePanel(AEBaseGui<? extends ContainerPatternEncodingTerm> screen, WidgetContainer widgets) {
         this.screen = screen;
         this.container = screen.getContainer();
         this.widgets = widgets;
@@ -53,4 +54,3 @@ abstract class EncodingModePanel implements ICompositeWidget {
 
     public abstract ITextComponent getTabTooltip();
 }
-

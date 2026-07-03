@@ -16,14 +16,14 @@ import net.minecraft.util.text.ITextComponent;
 import java.io.IOException;
 import java.util.Collection;
 
-public class GuiPatternItemRenamer extends AEBaseGui<ContainerPatternEncodingTerm> implements ITextFieldGui {
+public class GuiPatternItemRenamer<C extends ContainerPatternEncodingTerm> extends AEBaseGui<C> implements ITextFieldGui {
 
-    private final GuiPatternEncodingTerm parent;
+    private final AEBaseGui<C> parent;
     private final int slotNumber;
     private final AETextField name;
     private boolean submitted;
 
-    public GuiPatternItemRenamer(GuiPatternEncodingTerm parent, Slot slot, ITextComponent parentIconTooltip) {
+    public GuiPatternItemRenamer(AEBaseGui<C> parent, Slot slot, ITextComponent parentIconTooltip) {
         super(parent.getContainer(), parent.getContainer().getPlayerInventory(),
             GuiStyleManager.loadStyleDoc("/screens/renamer.json"));
         this.parent = parent;

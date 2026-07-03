@@ -1,0 +1,28 @@
+{
+  "$schema": "../../schema.json",
+  "slots": {
+    "CRAFTING_GRID": {
+      "left": 24,
+      "bottom": 158,
+      "grid": "BREAK_AFTER_3COLS"
+    },
+    "CRAFTING_RESULT": {
+      "left": 115,
+      "bottom": 140
+    }
+  },
+  "widgets": {
+    "craftingSubstitutions": {
+      "left": 89,
+      "bottom": 159
+    },
+    "craftingFluidSubstitutions": {
+      "left": 99,
+      "bottom": 159
+    },
+    "craftingClearPattern": {
+      "left": 79,
+      "bottom": 159
+    }
+  }
+}

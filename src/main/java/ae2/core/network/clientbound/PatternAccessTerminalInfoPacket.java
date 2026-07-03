@@ -1,6 +1,6 @@
 package ae2.core.network.clientbound;
 
-import ae2.client.gui.me.patternaccess.GuiPatternAccessTerm;
+import ae2.client.gui.me.patternaccess.IPatternProviderDisplay;
 import ae2.core.network.ClientboundPacket;
 import ae2.core.network.NetworkPacketHelper;
 import io.netty.buffer.ByteBuf;
@@ -53,8 +53,8 @@ public class PatternAccessTerminalInfoPacket extends ClientboundPacket {
     @Override
     @SideOnly(Side.CLIENT)
     public void handleClient(Minecraft minecraft) {
-        if (minecraft.currentScreen instanceof GuiPatternAccessTerm<?> patternAccessTerminal) {
-            patternAccessTerminal.postProviderInfo(this.inventoryId, this.dimensionId, this.pos, this.face);
+        if (minecraft.currentScreen instanceof IPatternProviderDisplay display) {
+            display.postProviderInfo(this.inventoryId, this.dimensionId, this.pos, this.face);
         }
     }
 }

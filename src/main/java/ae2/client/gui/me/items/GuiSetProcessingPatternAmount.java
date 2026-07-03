@@ -6,6 +6,7 @@ import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.NumberEntryType;
 import ae2.client.gui.me.common.ClientDisplaySlot;
+import ae2.client.gui.me.patternencode.GuiPatternEncodingTerm;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.widgets.GuiNumberEntryButtonSettings;

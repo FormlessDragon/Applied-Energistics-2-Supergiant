@@ -1,13 +1,15 @@
-package ae2.client.gui.me.items;
+package ae2.client.gui.me.patternencode;
 
 import ae2.api.config.ActionItems;
 import ae2.client.Point;
+import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.WidgetContainer;
 import ae2.client.gui.style.Blitter;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.ToggleButton;
 import ae2.container.SlotSemantics;
+import ae2.container.me.items.ContainerPatternEncodingTerm;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import net.minecraft.client.gui.Gui;
@@ -24,7 +26,7 @@ public class CraftingEncodingPanel extends EncodingModePanel {
     private final ToggleButton substitutionsBtn;
     private final ToggleButton fluidSubstitutionsBtn;
 
-    public CraftingEncodingPanel(GuiPatternEncodingTerm screen, WidgetContainer widgets) {
+    public CraftingEncodingPanel(AEBaseGui<? extends ContainerPatternEncodingTerm> screen, WidgetContainer widgets) {
         super(screen, widgets);
         this.clearBtn = new ActionButton(ActionItems.S_CLOSE, this.container::clear);
         this.clearBtn.setHalfSize(true);

@@ -1,37 +1,18 @@
-/*
- * This file is part of Applied Energistics 2.
- * Copyright (c) 2013 - 2014, AlgorithmX2, All rights reserved.
- *
- * Applied Energistics 2 is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Applied Energistics 2 is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Applied Energistics 2.  If not, see <http://www.gnu.org/licenses/lgpl>.
- */
-
 package ae2.container.implementations;
 
 import ae2.api.config.Settings;
 import ae2.api.config.ShowPatternProviders;
+import ae2.api.config.YesNo;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.storage.ILinkStatus;
-import ae2.api.storage.IPatternAccessTermContainerHost;
-import ae2.container.AEBaseContainer;
+import ae2.api.storage.IPEATermContainerHost;
+import ae2.api.util.IConfigManager;
+import ae2.container.GuiIds;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
-import ae2.container.guisync.ILinkStatusAwareContainer;
-import ae2.container.slot.RestrictedInputSlot;
-import ae2.core.network.clientbound.SetLinkStatusPacket;
+import ae2.container.me.items.ContainerPatternEncodingTerm;
 import ae2.helpers.InventoryAction;
-import ae2.helpers.WirelessTerminalGuiHost;
 import it.unimi.dsi.fastutil.longs.LongList;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -39,43 +20,47 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Objects;
-
-public class ContainerPatternAccessTerm extends AEBaseContainer
-    implements ILinkStatusAwareContainer, PatternModifierPanel.Host, IPatternAccess {
+public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IPatternAccess {
 
     private static final String ACTION_OPEN_PROVIDER = "openProvider";
     private static final String ACTION_TOGGLE_PROVIDER_VISIBILITY = "toggleProviderVisibility";
     private static final String ACTION_RENAME_GROUP = "renameGroup";
     private static final String ACTION_RENAME_PROVIDER = "renameProvider";
 
-    private final IPatternAccessTermContainerHost host;
-    private final PatternAccessSupport<ContainerPatternAccessTerm> patternAccessSupport;
-    private final PatternModifierPanel patternModifierPanel;
-    @GuiSync(1)
+    private final IPEATermContainerHost host;
+    private final IConfigManager clientConfigManager = IConfigManager.builder(() -> {})
+                                                                    .registerSetting(Settings.PATTERN_AUTO_FILL, YesNo.NO)
+                                                                    .registerSetting(
+                                                                        Settings.TERMINAL_SHOW_PATTERN_PROVIDERS,
+                                                                        ShowPatternProviders.VISIBLE)
+                                                                    .build();
+    private final PatternAccessSupport<ContainerPEATerm> patternAccessSupport;
+    @GuiSync(91)
     public ShowPatternProviders showPatternProviders = ShowPatternProviders.VISIBLE;
-    @GuiSync(2)
-    public boolean patternModifierPanelAvailable;
-    private ILinkStatus linkStatus = ILinkStatus.ofDisconnected();
 
-    public ContainerPatternAccessTerm(InventoryPlayer playerInventory, IPatternAccessTermContainerHost host) {
-        super(playerInventory, host);
+    public ContainerPEATerm(InventoryPlayer ip, IPEATermContainerHost host) {
+        this(GuiIds.GuiKey.PEA_TERMINAL, ip, host, true);
+    }
+
+    public ContainerPEATerm(GuiIds.GuiKey guiKey, InventoryPlayer ip, IPEATermContainerHost host,
+                            boolean bindInventory) {
+        super(guiKey, ip, host, bindInventory);
         this.host = host;
         this.patternAccessSupport = new PatternAccessSupport<>(
-            this::getGrid,
+            this::getPatternProviderGrid,
             this::getShownProviders,
             () -> getPlayer().world,
-            this::isPlayerSideSlot,
+            slot -> isPlayerSideSlot(slot) || isEncodedPatternSlot(slot),
             this::sendPacketToClient,
             new PatternAccessSupport.PlayerHandAccess() {
                 @Override
                 public ItemStack getCarried() {
-                    return ContainerPatternAccessTerm.this.getCarried();
+                    return ContainerPEATerm.this.getCarried();
                 }
 
                 @Override
                 public void setCarried(ItemStack stack) {
-                    ContainerPatternAccessTerm.this.setCarried(stack);
+                    ContainerPEATerm.this.setCarried(stack);
                 }
             },
             this);
@@ -85,16 +70,6 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
             this::renamePatternGroup);
         registerClientAction(ACTION_RENAME_PROVIDER, PatternAccessSupport.RenamePatternProviderPayload.class,
             this::renamePatternProvider);
-        if (host instanceof WirelessTerminalGuiHost<?> wirelessHost) {
-            setupUpgrades(wirelessHost.getUpgrades());
-            RestrictedInputSlot slot = new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.QE_SINGULARITY,
-                wirelessHost.getSingularityStorage(), 0, 0, 0);
-            slot.setStackLimit(1);
-            this.addSlot(slot, SlotSemantics.WIRELESS_SINGULARITY);
-        }
-        this.addPlayerInventorySlots(0, 0);
-        this.patternModifierPanel = new PatternModifierPanel(this);
-        this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
     }
 
     @Override
@@ -152,26 +127,19 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
 
     @Override
     public ILinkStatus getLinkStatus() {
-        return this.linkStatus;
+        return super.getLinkStatus();
     }
 
     @Override
-    public void setLinkStatus(ILinkStatus linkStatus) {
-        this.linkStatus = linkStatus;
-    }
-
-    @Override
-    public boolean isPatternModifierPanelAvailable() {
-        return this.patternModifierPanelAvailable;
-    }
-
-    @Override
-    public PatternModifierPanel getPatternModifierPanel() {
-        return this.patternModifierPanel;
+    public IConfigManager getConfigManager() {
+        if (isServerSide()) {
+            return this.host.getConfigManager();
+        }
+        return this.clientConfigManager;
     }
 
     @Nullable
-    private IGrid getGrid() {
+    private IGrid getPatternProviderGrid() {
         IGridNode node = this.host.getGridNode();
         if (node != null && node.isActive()) {
             return node.grid();
@@ -181,57 +149,36 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
 
     @Override
     public void broadcastChanges() {
+        super.broadcastChanges();
         if (isClientSide()) {
             return;
         }
 
-        this.showPatternProviders = this.host.getConfigManager().getSetting(Settings.TERMINAL_SHOW_PATTERN_PROVIDERS);
-        this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
-
-        super.broadcastChanges();
-
-        updateLinkStatus();
+        this.showPatternProviders =
+            this.host.getConfigManager().getSetting(Settings.TERMINAL_SHOW_PATTERN_PROVIDERS);
         this.patternAccessSupport.updateProviderVisibility();
     }
 
     @Override
     public void doAction(EntityPlayerMP player, InventoryAction action, int slot, long id) {
-        this.patternAccessSupport.doAction(player, action, slot, id);
-    }
-
-    @Override
-    public void quickMovePattern(EntityPlayerMP player, Slot sourceSlot, LongList allowedPatternContainerIds,
-                                 LongList allowedPatternSlots) {
-        this.patternAccessSupport.quickMovePattern(player, sourceSlot, allowedPatternContainerIds,
-            allowedPatternSlots);
-    }
-
-    protected void updateLinkStatus() {
-        ILinkStatus linkStatus = this.host.getLinkStatus();
-        if (!Objects.equals(this.linkStatus, linkStatus)) {
-            this.linkStatus = linkStatus;
-            sendPacketToClient(new SetLinkStatusPacket(linkStatus));
+        if (!this.patternAccessSupport.doAction(player, action, slot, id)) {
+            super.doAction(player, action, slot, id);
         }
     }
 
     @Override
-    public void updatePatternModifierPanelVisibleSlots(boolean visible) {
-        this.patternModifierPanel.updateSlotState(visible && this.patternModifierPanelAvailable);
+    public void quickMovePattern(EntityPlayerMP player, Slot sourceSlot, LongList allowedPatternContainerIds,
+                                  LongList allowedPatternSlots) {
+        this.patternAccessSupport.quickMovePattern(player, sourceSlot, allowedPatternContainerIds,
+            allowedPatternSlots);
     }
 
     @Override
-    public void registerPatternModifierPanelAction(String action, Runnable runnable) {
-        registerClientAction(action, runnable);
+    protected ItemStack transferStackToContainerWithRemainder(ItemStack input) {
+        return input;
     }
 
-    @Override
-    public void sendPatternModifierPanelAction(String action) {
-        sendClientAction(action);
+    public boolean isEncodedPatternSlot(Slot slot) {
+        return getSlots(SlotSemantics.ENCODED_PATTERN).contains(slot);
     }
-
-    @Override
-    public void lockPatternModifierPlayerInventorySlot(int slot) {
-        lockPlayerInventorySlot(slot);
-    }
-
 }
