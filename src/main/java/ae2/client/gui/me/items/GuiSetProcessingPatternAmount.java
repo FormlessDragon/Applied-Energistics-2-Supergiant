@@ -8,9 +8,9 @@ import ae2.client.gui.NumberEntryType;
 import ae2.client.gui.me.common.ClientDisplaySlot;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.GuiStyleManager;
-import ae2.client.gui.widgets.NumberEntryWidget;
 import ae2.client.gui.widgets.GuiNumberEntryButtonSettings;
 import ae2.client.gui.widgets.NumberEntryButtonConfigButton;
+import ae2.client.gui.widgets.NumberEntryWidget;
 import ae2.client.gui.widgets.TabButton;
 import ae2.container.AEBaseContainer;
 import ae2.container.SlotSemantics;
@@ -19,6 +19,7 @@ import ae2.text.TextComponentItemStack;
 import com.google.common.primitives.Longs;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.text.ITextComponent;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Consumer;
 
@@ -27,7 +28,8 @@ public class GuiSetProcessingPatternAmount extends AEBaseGui<AEBaseContainer> {
     private final GenericStack currentStack;
     private final Consumer<GenericStack> setter;
     private final NumberEntryWidget amount;
-    private final Slot displaySlot;
+    @Nullable
+    private Slot displaySlot;
 
     public GuiSetProcessingPatternAmount(GuiPatternEncodingTerm parent, GenericStack currentStack,
                                          Consumer<GenericStack> setter) {
@@ -59,9 +61,13 @@ public class GuiSetProcessingPatternAmount extends AEBaseGui<AEBaseContainer> {
         this.amount.setMinValue(0);
         this.amount.setOnConfirm(this::confirm);
 
-        this.displaySlot = getContainer().addClientSideSlot(new ClientDisplaySlot(currentStack),
-            SlotSemantics.MACHINE_OUTPUT);
         setSlotsHidden(SlotSemantics.TOOLBOX, true);
+    }
+
+    @Override
+    public void initGui() {
+        ensureDisplaySlot();
+        super.initGui();
     }
 
     private void confirm() {
@@ -81,9 +87,18 @@ public class GuiSetProcessingPatternAmount extends AEBaseGui<AEBaseContainer> {
     }
 
     private void removeDisplaySlot() {
-        if (getContainer().isClientSideSlot(this.displaySlot)) {
+        if (this.displaySlot != null && getContainer().isClientSideSlot(this.displaySlot)) {
             getContainer().removeClientSideSlot(this.displaySlot);
         }
+        this.displaySlot = null;
+    }
+
+    private void ensureDisplaySlot() {
+        if (this.displaySlot != null && getContainer().isClientSideSlot(this.displaySlot)) {
+            return;
+        }
+        this.displaySlot = getContainer().addClientSideSlot(new ClientDisplaySlot(this.currentStack),
+            SlotSemantics.MACHINE_OUTPUT);
     }
 
     private void returnToParent() {

@@ -8,6 +8,7 @@ import ae2.client.gui.style.Blitter;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.widgets.AETextField;
+import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SettingToggleButton;
@@ -19,6 +20,7 @@ import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
@@ -27,11 +29,13 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
-public class GuiCraftConfirmCpuList extends AEBaseGui<ContainerCraftConfirm> {
+public class GuiCraftConfirmCpuList extends AEBaseGui<ContainerCraftConfirm> implements ITextFieldGui {
     private static final String STYLE_PATH = "/screens/craft_confirm_cpu_list.json";
     private static final String TEXTURE = "guis/craft_confirm_cpu_list.png";
     private static final int LIST_X = 8;
@@ -392,6 +396,11 @@ public class GuiCraftConfirmCpuList extends AEBaseGui<ContainerCraftConfirm> {
             tooltip.add(gray(GuiText.ConfirmCraftMergeAvailable.text()));
         }
         return tooltip;
+    }
+
+    @Override
+    public Collection<? extends GuiTextField> getTextFields() {
+        return Collections.singleton(searchField);
     }
 
     private enum CraftConfirmCpuSortMode {

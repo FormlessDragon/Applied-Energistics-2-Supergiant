@@ -142,7 +142,7 @@ public enum Tooltips implements LocalizationEnum {
     }
 
     public static String getRenameTooltipLocal() {
-        return TextFormatting.DARK_GRAY + ButtonToolTips.RenameAction.getLocal("Alt + " + ButtonToolTips.RightClick.getLocal());
+        return TextFormatting.DARK_GRAY + ButtonToolTips.RenameAction.getLocal("Alt + " + ButtonToolTips.MiddleClick.getLocal());
     }
 
     public static ITextComponent getAmountTooltip(LocalizationEnum baseText, AEKey what, long amount) {

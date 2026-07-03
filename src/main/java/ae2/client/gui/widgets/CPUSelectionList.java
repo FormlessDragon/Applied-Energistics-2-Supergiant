@@ -59,6 +59,7 @@ import org.lwjgl.input.Keyboard;
 
 import java.awt.Rectangle;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -321,9 +322,13 @@ public class CPUSelectionList implements ICompositeWidget {
 
         finishRename(true);
 
+        if (searchField.isFocused() && !searchField.isMouseOver(absoluteMouseX, absoluteMouseY)) {
+            searchField.setFocused(false);
+        }
+
         if (searchField.isMouseOver(absoluteMouseX, absoluteMouseY)) {
             if (button == 1) {
-                searchField.setText("");
+                clearSearchText();
             }
             searchField.mouseClicked(absoluteMouseX, absoluteMouseY, button);
             return true;
@@ -364,7 +369,7 @@ public class CPUSelectionList implements ICompositeWidget {
 
     @Override
     public boolean wantsAllMouseDownEvents() {
-        return activeRenameField != null && activeRenameField.getVisible();
+        return searchField.isFocused() || activeRenameField != null && activeRenameField.getVisible();
     }
 
     @Override
@@ -605,7 +610,7 @@ public class CPUSelectionList implements ICompositeWidget {
         if (activeRenameField != null && activeRenameField.getVisible()) {
             return List.of(searchField, activeRenameField);
         }
-        return List.of(searchField);
+        return Collections.singleton(searchField);
     }
 
     public void setOnSelectionChanged(@Nullable Runnable onSelectionChanged) {
@@ -615,6 +620,11 @@ public class CPUSelectionList implements ICompositeWidget {
     private void setSearchText(String text) {
         viewState.setSearchText(text);
         invalidateView();
+    }
+
+    private void clearSearchText() {
+        searchField.setText("");
+        setSearchText("");
     }
 
     private void invalidateView() {
@@ -982,6 +992,7 @@ public class CPUSelectionList implements ICompositeWidget {
     }
 
     private void openRenameField(ContainerCraftingStatus.CraftingCpuListEntry cpu) {
+        searchField.setFocused(false);
         if (activeRenameField != null && activeRenameCpuSerial == cpu.serial()) {
             activeRenameField.setFocused(true);
             activeRenameField.selectAll();

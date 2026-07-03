@@ -27,6 +27,7 @@ import ae2.client.gui.me.search.AEKeySearch;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.AETextField;
+import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
@@ -40,6 +41,7 @@ import ae2.core.network.serverbound.TraceCraftingSupplierPacket;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
@@ -50,10 +52,11 @@ import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T> {
+public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T> implements ITextFieldGui {
     private static final String TEXTURE = "guis/craftingcpu.png";
     private static final int FIXED_HEADER_HEIGHT = CraftingScreenLayout.TABLE_TOP;
     private static final int FIXED_FOOTER_HEIGHT = 28;
@@ -313,5 +316,10 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
     private void updateScrollbar(int entryCount) {
         this.scrollbar.setHeight(CraftingScreenLayout.getScrollbarHeight(this.table.getRows()));
         this.scrollbar.setRange(0, this.table.getScrollableRows(entryCount), 1);
+    }
+
+    @Override
+    public Collection<? extends GuiTextField> getTextFields() {
+        return Collections.singletonList(searchField);
     }
 }

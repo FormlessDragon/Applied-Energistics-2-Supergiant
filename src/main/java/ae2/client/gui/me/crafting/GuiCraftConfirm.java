@@ -30,6 +30,7 @@ import ae2.client.gui.me.search.AEKeySearch;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.AETextField;
+import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.ITooltip;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SettingToggleButton;
@@ -44,6 +45,7 @@ import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.SwitchCraftingTreePacket;
 import ae2.integration.Integrations;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
@@ -54,6 +56,7 @@ import java.awt.Rectangle;
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -62,7 +65,7 @@ import java.util.List;
  * This screen shows the computed crafting plan and allows the player to select a CPU on which it should be scheduled
  * for crafting.
  */
-public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
+public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> implements ITextFieldGui {
     private static final String TEXTURE = "guis/craftingreport.png";
     private static final int FIXED_HEADER_HEIGHT = CraftingScreenLayout.TABLE_TOP;
     private static final int FIXED_FOOTER_HEIGHT = 72;
@@ -463,6 +466,11 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> {
 
     private void invalidateSortedPlan() {
         this.filteredPlan = null;
+    }
+
+    @Override
+    public Collection<? extends GuiTextField> getTextFields() {
+        return Collections.singletonList(searchField);
     }
 
     private static final class TooltipButton extends AE2Button implements ITooltip {

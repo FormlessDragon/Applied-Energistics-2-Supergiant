@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   workflow_call:
   merge_group:
+  push:
+    branches:
+      - '**'
 
 permissions:
   contents: read
