@@ -54,6 +54,7 @@ import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.TabButton;
 import ae2.client.gui.widgets.ToolboxPanel;
+import ae2.client.gui.widgets.ToggleButton;
 import ae2.client.gui.widgets.UpgradesPanel;
 import ae2.client.gui.widgets.ViewCellsPanel;
 import ae2.container.GuiIds;
@@ -140,8 +141,10 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     @Nullable
     private final SettingToggleButton<ViewItems> viewModeToggle;
     private final SettingToggleButton<SortDir> sortDirToggle;
+    private final ToggleButton displayFreezeButton;
     private String searchText = "";
     private int rows;
+    private boolean displayFrozen;
 
     public GuiMEStorage(C container, InventoryPlayer playerInventory, ITextComponent title, GuiStyle style) {
         super(container, playerInventory, style);
@@ -214,6 +217,17 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
         this.sortDirToggle = this.addToLeftToolbar(
             new SettingToggleButton<>(Settings.SORT_DIRECTION, getSortDir(), this::toggleServerSetting));
+        this.displayFreezeButton = this.addToLeftToolbar(new ToggleButton(Icon.LOCKED, Icon.UNLOCKED,
+            this::setDisplayFrozen));
+        this.displayFreezeButton.setTooltipOn(List.of(
+            ButtonToolTips.TerminalDisplayFreeze.text(),
+            ButtonToolTips.TerminalDisplayFreezeOn.text()));
+        this.displayFreezeButton.setTooltipOff(List.of(
+            ButtonToolTips.TerminalDisplayFreeze.text(),
+            ButtonToolTips.TerminalDisplayFreezeOff.text()));
+        this.displayFrozen = AEConfig.instance().isTerminalDisplayFrozen();
+        this.displayFreezeButton.setState(this.displayFrozen);
+        this.repo.setPaused(shouldPauseRepo());
         this.addToLeftToolbar(new ActionButton(ActionItems.TERMINAL_SETTINGS, this::showSettings));
         this.addToLeftToolbar(new SettingToggleButton<>(
             Settings.TERMINAL_STYLE, AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
@@ -320,9 +334,25 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
-        this.repo.setPaused(isShiftKeyDown());
+        this.repo.setPaused(shouldPauseRepo());
         this.repo.setEnabled(canInteractWithRepo());
         updateSearch();
+    }
+
+    private boolean shouldPauseRepo() {
+        return this.displayFrozen || isShiftKeyDown();
+    }
+
+    private void setDisplayFrozen(boolean displayFrozen) {
+        if (this.displayFrozen == displayFrozen) {
+            return;
+        }
+
+        this.displayFrozen = displayFrozen;
+        this.displayFreezeButton.setState(displayFrozen);
+        AEConfig.instance().setTerminalDisplayFrozen(displayFrozen);
+        this.repo.setPaused(shouldPauseRepo());
+        updateScrollbar();
     }
 
     @Override
