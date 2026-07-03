@@ -433,6 +433,17 @@ public class AEConfig {
         }
     }
 
+    public boolean isTerminalDisplayFrozen() {
+        return TERMINALS.terminalDisplayFrozen;
+    }
+
+    public void setTerminalDisplayFrozen(boolean enabled) {
+        if (TERMINALS.terminalDisplayFrozen != enabled) {
+            TERMINALS.terminalDisplayFrozen = enabled;
+            this.save();
+        }
+    }
+
     public CraftingPlanSortMode getCraftingPlanSortMode() {
         return TERMINALS.craftingPlanSortMode == null ? CraftingPlanSortMode.AVAILABILITY
             : TERMINALS.craftingPlanSortMode;
@@ -862,6 +873,9 @@ public class AEConfig {
         @Config.Name("pinDisplayMode")
         @Config.Comment("How player pins are displayed in ME terminals.")
         public PinDisplayMode pinDisplayMode = PinDisplayMode.SORT_TOP;
+        @Config.Name("terminalDisplayFrozen")
+        @Config.Comment("Keep ME terminal entries in their current positions between updates.")
+        public boolean terminalDisplayFrozen;
         @Config.Name("craftingPlanSortMode")
         @Config.Comment("Sort mode used by the crafting plan GUI.")
         public CraftingPlanSortMode craftingPlanSortMode = CraftingPlanSortMode.AVAILABILITY;

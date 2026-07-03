@@ -225,6 +225,9 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         this.displayFreezeButton.setTooltipOff(List.of(
             ButtonToolTips.TerminalDisplayFreeze.text(),
             ButtonToolTips.TerminalDisplayFreezeOff.text()));
+        this.displayFrozen = AEConfig.instance().isTerminalDisplayFrozen();
+        this.displayFreezeButton.setState(this.displayFrozen);
+        this.repo.setPaused(shouldPauseRepo());
         this.addToLeftToolbar(new ActionButton(ActionItems.TERMINAL_SETTINGS, this::showSettings));
         this.addToLeftToolbar(new SettingToggleButton<>(
             Settings.TERMINAL_STYLE, AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
@@ -347,6 +350,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
         this.displayFrozen = displayFrozen;
         this.displayFreezeButton.setState(displayFrozen);
+        AEConfig.instance().setTerminalDisplayFrozen(displayFrozen);
         this.repo.setPaused(shouldPauseRepo());
         updateScrollbar();
     }
