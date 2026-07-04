@@ -62,6 +62,7 @@ import ae2.items.tools.NetworkAnalyserItem;
 import ae2.items.tools.NetworkToolItem;
 import ae2.items.tools.PatternModifierItem;
 import ae2.items.tools.PortableCellWorkbenchItem;
+import ae2.items.tools.PriorityTunerItem;
 import ae2.items.tools.TickAnalyserItem;
 import ae2.items.tools.fluix.FluixAxeItem;
 import ae2.items.tools.fluix.FluixHoeItem;
@@ -402,6 +403,8 @@ public final class AEItems {
         new MEPackageItem(), DebugCreativeTab.INSTANCE);
     public static final ItemDefinition<ConfigModifierItem> CONFIG_MODIFIER = new ItemDefinition<>(
         AEItemIds.CONFIG_MODIFIER, new ConfigModifierItem());
+    public static final ItemDefinition<PriorityTunerItem> PRIORITY_TUNER = new ItemDefinition<>(
+        AEItemIds.PRIORITY_TUNER, new PriorityTunerItem());
     public static final ItemDefinition<PatternModifierItem> PATTERN_MODIFIER = new ItemDefinition<>(
         AEItemIds.PATTERN_MODIFIER, new PatternModifierItem());
     public static final ItemDefinition<MemoryCardItem> MEMORY_CARD = new ItemDefinition<>(AEItemIds.MEMORY_CARD,
@@ -561,6 +564,7 @@ public final class AEItems {
         ME_PACKING_TAPE,
         PACKAGE,
         CONFIG_MODIFIER,
+        PRIORITY_TUNER,
         PATTERN_MODIFIER,
         MEMORY_CARD,
         ADVANCED_MEMORY_CARD,

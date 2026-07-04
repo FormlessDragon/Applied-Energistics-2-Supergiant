@@ -26,6 +26,7 @@ import ae2.client.gui.implementations.GuiCellRestriction;
 import ae2.client.gui.implementations.GuiOutputSides;
 import ae2.client.gui.implementations.GuiPortableCellPickupFilter;
 import ae2.client.gui.implementations.GuiPriority;
+import ae2.client.gui.implementations.GuiPriorityTuner;
 import ae2.client.gui.implementations.GuiProviderSelect;
 import ae2.client.gui.implementations.GuiWirelessMagnet;
 import ae2.client.gui.implementations.GuiWorkInterval;
@@ -43,6 +44,7 @@ import ae2.container.implementations.ContainerCraftingStatus;
 import ae2.container.implementations.ContainerOutputSides;
 import ae2.container.implementations.ContainerPortableCellPickupFilter;
 import ae2.container.implementations.ContainerPriority;
+import ae2.container.implementations.ContainerPriorityTuner;
 import ae2.container.implementations.ContainerProviderSelect;
 import ae2.container.implementations.ContainerSetStockAmount;
 import ae2.container.implementations.ContainerWirelessMagnet;
@@ -60,6 +62,7 @@ import ae2.helpers.InterfaceLogicHost;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.items.contents.PortableCellGuiHost;
 import ae2.items.contents.PortableVoidCellGuiHost;
+import ae2.items.contents.PriorityTunerGuiHost;
 import ae2.text.TextComponents;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -134,6 +137,9 @@ public class OpenGuiPacket extends ClientboundPacket {
         }
         if (guiKey == GuiIds.GuiKey.PORTABLE_CELL_PICKUP_FILTER) {
             return ItemGuiHost.class;
+        }
+        if (guiKey == GuiIds.GuiKey.PRIORITY_TUNER) {
+            return PriorityTunerGuiHost.class;
         }
         if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
             return ICellWorkbenchHost.class;
@@ -297,6 +303,9 @@ public class OpenGuiPacket extends ClientboundPacket {
             && (host instanceof PortableCellGuiHost<?> || host instanceof PortableVoidCellGuiHost)) {
             return new ContainerPortableCellPickupFilter(inventory, (ItemGuiHost<?>) host);
         }
+        if (this.guiKey == GuiIds.GuiKey.PRIORITY_TUNER && host instanceof PriorityTunerGuiHost priorityTunerHost) {
+            return new ContainerPriorityTuner(inventory, priorityTunerHost);
+        }
         if (this.guiKey == GuiIds.GuiKey.CELL_RESTRICTION && host instanceof ICellWorkbenchHost cellWorkbench) {
             return new ContainerCellRestriction(inventory, cellWorkbench);
         }
@@ -344,6 +353,10 @@ public class OpenGuiPacket extends ClientboundPacket {
         if (this.guiKey == GuiIds.GuiKey.PORTABLE_CELL_PICKUP_FILTER) {
             return new GuiPortableCellPickupFilter((ContainerPortableCellPickupFilter) container, inventory,
                 this.guiTitle != null ? this.guiTitle : container.getGuiTitle());
+        }
+        if (this.guiKey == GuiIds.GuiKey.PRIORITY_TUNER) {
+            return new GuiPriorityTuner((ContainerPriorityTuner) container, inventory,
+                GuiStyleManager.loadStyleDoc("/screens/priority_tuner.json"));
         }
         if (this.guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
             return new GuiCellRestriction((ContainerCellRestriction) container, inventory,

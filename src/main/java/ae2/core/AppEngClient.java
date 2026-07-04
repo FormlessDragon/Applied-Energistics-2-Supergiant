@@ -43,6 +43,7 @@ import ae2.client.render.overlay.CraftingCpuHighlightHandler;
 import ae2.client.render.overlay.CraftingSupplierHighlightHandler;
 import ae2.client.render.overlay.MeteoriteCompassBeaconRenderer;
 import ae2.client.render.overlay.OverlayManager;
+import ae2.client.render.overlay.PriorityTunerHighlightHandler;
 import ae2.client.render.tesr.ChargerTESR;
 import ae2.client.render.tesr.CrankRenderer;
 import ae2.client.render.tesr.CrystalFixerTESR;
@@ -173,6 +174,7 @@ public final class AppEngClient extends AppEngServer {
         MinecraftForge.EVENT_BUS.register(CraftingCpuHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(CraftingSupplierHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(AdvancedMemoryCardHighlightHandler.INSTANCE);
+        MinecraftForge.EVENT_BUS.register(PriorityTunerHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(StackTooltipRenderer.INSTANCE);
         MinecraftForge.EVENT_BUS.register(PatternContainerExternalGuiReturnHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(NetworkRender.INSTANCE);
@@ -451,6 +453,7 @@ public final class AppEngClient extends AppEngServer {
         ExportedGridContent.clearActiveExports();
         CompassManager.INSTANCE.clear();
         AdvancedMemoryCardHighlightHandler.INSTANCE.clear();
+        PriorityTunerHighlightHandler.INSTANCE.clear();
         PendingCraftingJobs.clearPendingJobs();
         PinnedKeys.clearPinnedKeys();
         Integrations.hei().clearIngredientSortRanks();

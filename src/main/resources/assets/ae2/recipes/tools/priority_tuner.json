@@ -1,0 +1,12 @@
+{
+  "type": "forge:ore_shapeless",
+  "ingredients": [
+    {
+      "item": "ae2:memory_card"
+    }
+  ],
+  "result": {
+    "item": "ae2:priority_tuner",
+    "count": 1
+  }
+}
