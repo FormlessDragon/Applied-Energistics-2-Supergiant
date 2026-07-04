@@ -15,7 +15,7 @@ import ae2.client.gui.me.items.GuiPatternItemRenamer;
 import ae2.client.gui.me.items.GuiSetProcessingPatternAmount;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.ActionButton;
-import ae2.client.gui.widgets.IconButton;
+import ae2.client.gui.widgets.DynamicIconButton;
 import ae2.client.gui.widgets.PatternModifierPanelWidget;
 import ae2.client.gui.widgets.TabButton;
 import ae2.container.me.items.ContainerPatternEncodingTerm;
@@ -39,11 +39,9 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +50,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     private static final EncodingMode[] ENCODING_MODES = EncodingMode.values();
     private final Map<EncodingMode, EncodingModePanel> modePanels = new EnumMap<>(EncodingMode.class);
     private final Map<EncodingMode, TabButton> modeTabButtons = new EnumMap<>(EncodingMode.class);
-    private final IconButton uploadPatternButton;
+    private final DynamicIconButton uploadPatternButton;
     private final PatternModifierPanelWidget patternModifierPanel;
 
     public GuiPatternEncodingTerm(ContainerPatternEncodingTerm container, InventoryPlayer playerInventory,
@@ -60,31 +58,14 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
         super(container, playerInventory, resolveTitle(container, title), style);
         addMode(EncodingMode.CRAFTING, new CraftingEncodingPanel(this, widgets), 0);
         addMode(EncodingMode.PROCESSING, new ProcessingEncodingPanel(this, widgets), 1);
-        this.uploadPatternButton = new IconButton(this::uploadPattern) {
-            {
-                setHalfSize(true);
-                setIconScale(0.5F);
-                setVisibility(false);
-            }
-
-            @Override
-            protected Icon getIcon() {
-                return Icon.PATTERN_UPLOAD;
-            }
-
-            @Override
-            public @NonNull List<ITextComponent> getTooltipMessage() {
-                if(container.mode == EncodingMode.PROCESSING) {
-                    return Arrays.asList(
-                            ButtonToolTips.PatternUpload.text(),
-                            ButtonToolTips.PatternUploadProcessingHint.text());
-                }
-                return Arrays.asList(
-                    ButtonToolTips.PatternUpload.text(),
-                    ButtonToolTips.PatternUploadHint.text(),
-                    ButtonToolTips.PatternUploadShiftHint.text());
-            }
-        };
+        this.uploadPatternButton = new DynamicIconButton(
+            () -> Icon.PATTERN_UPLOAD,
+            ButtonToolTips.PatternUpload.text(),
+            this::uploadPatternTooltip,
+            this::uploadPattern);
+        this.uploadPatternButton.setHalfSize(true);
+        this.uploadPatternButton.setIconScale(0.5F);
+        this.uploadPatternButton.setVisibility(false);
         widgets.add("uploadPattern", this.uploadPatternButton);
         widgets.add("encodePattern", new ActionButton(ActionItems.ENCODE,
             () -> container.encode(isShiftDown())));
@@ -105,6 +86,18 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
             return container.getGuiTitle();
         }
         return new TextComponentString("");
+    }
+
+    private List<ITextComponent> uploadPatternTooltip() {
+        if (container.mode == EncodingMode.PROCESSING) {
+            return List.of(
+                ButtonToolTips.PatternUpload.text(),
+                ButtonToolTips.PatternUploadProcessingHint.text());
+        }
+        return List.of(
+            ButtonToolTips.PatternUpload.text(),
+            ButtonToolTips.PatternUploadHint.text(),
+            ButtonToolTips.PatternUploadShiftHint.text());
     }
 
     @Override

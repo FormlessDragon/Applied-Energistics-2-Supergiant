@@ -12,8 +12,8 @@ import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.style.WidgetStyle;
 import ae2.client.gui.widgets.ITooltip;
-import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.ItemStackButton;
+import ae2.client.gui.widgets.SimpleIconButton;
 import ae2.container.AEBaseContainer;
 import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
@@ -294,13 +294,7 @@ public class WirelessUniversalTerminalSelectorWindow implements ICompositeWidget
         }
         this.buttons.ensureCapacity(getInstalledTerminalCount() + 1);
 
-        IconButton closeButton = new IconButton(this::close) {
-            @Override
-            protected Icon getIcon() {
-                return Icon.CLEAR;
-            }
-        };
-        closeButton.setMessage(GuiText.Close.text());
+        SimpleIconButton closeButton = new SimpleIconButton(Icon.CLEAR, GuiText.Close.text(), this::close);
         moveCloseButton(closeButton);
         this.buttons.add(closeButton);
 

@@ -8,8 +8,8 @@ import ae2.client.gui.style.Blitter;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.widgets.AETextField;
+import ae2.client.gui.widgets.DynamicIconButton;
 import ae2.client.gui.widgets.ITextFieldGui;
-import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.TabButton;
@@ -64,7 +64,7 @@ public class GuiCraftConfirmCpuList extends AEBaseGui<ContainerCraftConfirm> imp
     private final GuiCraftConfirm parent;
     private final AETextField searchField;
     private final Scrollbar scrollbar;
-    private final SortButton sortButton;
+    private final DynamicIconButton sortButton;
     private final SettingToggleButton<TerminalStyle> terminalStyleButton;
     private final ObjectArrayList<CraftConfirmCpuList.Entry> visibleCpus = new ObjectArrayList<>();
     private String searchText = "";
@@ -89,7 +89,11 @@ public class GuiCraftConfirmCpuList extends AEBaseGui<ContainerCraftConfirm> imp
         this.searchField.setTooltipMessage(List.of(GuiText.CraftingCpuListSearchTooltip.text()));
         this.searchField.setResponder(ignored -> updateSearch());
         this.scrollbar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
-        this.sortButton = new SortButton(this::toggleSortMode);
+        this.sortButton = new DynamicIconButton(
+            () -> this.sortMode.icon(),
+            this.sortMode.tooltip().text(),
+            () -> List.of(this.sortMode.tooltip().text()),
+            this::toggleSortMode);
         this.widgets.add("sort", this.sortButton);
         this.terminalStyleButton = new SettingToggleButton<>(
             Settings.TERMINAL_STYLE, AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle);
@@ -144,7 +148,6 @@ public class GuiCraftConfirmCpuList extends AEBaseGui<ContainerCraftConfirm> imp
     @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
-        this.sortButton.setMode(this.sortMode);
         this.terminalStyleButton.set(AEConfig.instance().getTerminalStyle());
         updateScrollbar();
     }
@@ -454,24 +457,4 @@ public class GuiCraftConfirmCpuList extends AEBaseGui<ContainerCraftConfirm> imp
         }
     }
 
-    private static final class SortButton extends IconButton {
-        private CraftConfirmCpuSortMode mode = CraftConfirmCpuSortMode.CAPACITY;
-
-        private SortButton(Runnable onPress) {
-            super(onPress);
-            setMessage(this.mode.tooltip().text());
-        }
-
-        private void setMode(CraftConfirmCpuSortMode mode) {
-            if (this.mode != mode) {
-                this.mode = mode;
-                setMessage(mode.tooltip().text());
-            }
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return this.mode.icon();
-        }
-    }
 }

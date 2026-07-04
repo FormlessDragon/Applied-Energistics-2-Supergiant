@@ -69,8 +69,8 @@ import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.GridSelectionPopup;
 import ae2.client.gui.widgets.ITextFieldGui;
-import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.ItemStackButton;
+import ae2.client.gui.widgets.KeyTypeWindowButton;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.UpgradesPanel;
@@ -112,7 +112,6 @@ import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.fml.common.Optional;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
@@ -128,7 +127,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.StringJoiner;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
@@ -322,7 +320,11 @@ public class GuiCellTerminal extends AEBaseGui<ContainerCellTerminal> implements
             KeyTypeSelectionWindow<ContainerCellTerminal> keyTypeWindow
                 = new KeyTypeSelectionWindow<>(this, ConfigureVisibleTypes.text());
             this.widgets.add("keyTypeSelectionWindow", keyTypeWindow);
-            this.addToLeftToolbar(new TypeFilterButton(keyTypeWindow));
+            this.addToLeftToolbar(new KeyTypeWindowButton(
+                ConfigureVisibleTypes.text(),
+                () -> this.container.getClientKeyTypeSelection().enabledSet(),
+                keyTypeWindow::toggle,
+                this::cycleVisibleKeyTypes));
         }
         this.addToLeftToolbar(new SettingToggleButton<>(
             Settings.CELL_TERMINAL_SEARCH_MODE, AEConfig.instance().getCellTerminalSearchMode(),
@@ -4145,30 +4147,4 @@ public class GuiCellTerminal extends AEBaseGui<ContainerCellTerminal> implements
         }
     }
 
-    private final class TypeFilterButton extends IconButton {
-        private TypeFilterButton(KeyTypeSelectionWindow<ContainerCellTerminal> window) {
-            super(() -> {
-                if (isShiftKeyDown()) {
-                    cycleVisibleKeyTypes();
-                } else {
-                    window.toggle();
-                }
-            });
-            setMessage(ConfigureVisibleTypes.text());
-        }
-
-        @Override
-        public @NonNull List<ITextComponent> getTooltipMessage() {
-            StringJoiner joiner = new StringJoiner(", ");
-            for (AEKeyType keyType : container.getClientKeyTypeSelection().enabledSet()) {
-                joiner.add(keyType.getDescription().getFormattedText());
-            }
-            return List.of(ConfigureVisibleTypes.text(), new TextComponentString(joiner.toString()));
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return Icon.TYPE_FILTER_ALL;
-        }
-    }
 }

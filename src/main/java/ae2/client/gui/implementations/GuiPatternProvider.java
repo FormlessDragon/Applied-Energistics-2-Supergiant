@@ -12,7 +12,7 @@ import ae2.client.Point;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
-import ae2.client.gui.widgets.IconButton;
+import ae2.client.gui.widgets.PageNavigationButton;
 import ae2.client.gui.widgets.PatternModifierPanelWidget;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
@@ -43,8 +43,8 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
     private final SettingToggleButton<PatternProviderBlockingType> blockingTypeButton;
     private final ToggleButton showInPatternAccessTerminalButton;
     private final PatternProviderLockReason lockReason;
-    private final PageButton previousPageButton;
-    private final PageButton nextPageButton;
+    private final PageNavigationButton previousPageButton;
+    private final PageNavigationButton nextPageButton;
     private final PatternModifierPanelWidget patternModifierPanel;
 
     public GuiPatternProvider(ContainerPatternProvider container, InventoryPlayer playerInventory, ITextComponent unusedTitle,
@@ -77,8 +77,12 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
         addToLeftToolbar(this.showInPatternAccessTerminalButton);
         this.lockReason = new PatternProviderLockReason(this);
         this.widgets.add("lockReason", this.lockReason);
-        this.previousPageButton = new PageButton(Icon.ARROW_LEFT, () -> container.setPage(container.getCurrentPage() - 1));
-        this.nextPageButton = new PageButton(Icon.ARROW_RIGHT, () -> container.setPage(container.getCurrentPage() + 1));
+        this.previousPageButton = new PageNavigationButton(Icon.ARROW_LEFT,
+            GuiText.PatternProviderPagePrevious.text(), GuiText.PatternProviderPageNext.text(),
+            () -> container.setPage(container.getCurrentPage() - 1));
+        this.nextPageButton = new PageNavigationButton(Icon.ARROW_RIGHT,
+            GuiText.PatternProviderPagePrevious.text(), GuiText.PatternProviderPageNext.text(),
+            () -> container.setPage(container.getCurrentPage() + 1));
         this.widgets.add("previousPage", this.previousPageButton);
         this.widgets.add("nextPage", this.nextPageButton);
         this.patternModifierPanel = new PatternModifierPanelWidget(this, new PatternProviderPanelHost());
@@ -143,23 +147,6 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
         list.add(GuiText.CompatibleUpgrades.text());
         list.addAll(upgradeLines);
         return list;
-    }
-
-    private static class PageButton extends IconButton {
-        private final Icon icon;
-
-        PageButton(Icon icon, Runnable onPress) {
-            super(onPress);
-            this.icon = icon;
-            this.setMessage((icon == Icon.ARROW_LEFT
-                ? GuiText.PatternProviderPagePrevious
-                : GuiText.PatternProviderPageNext).text());
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return this.icon;
-        }
     }
 
     private final class PatternProviderPanelHost implements PatternModifierPanelWidget.PanelHost {

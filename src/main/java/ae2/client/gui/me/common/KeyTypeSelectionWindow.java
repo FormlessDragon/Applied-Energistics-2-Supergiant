@@ -14,7 +14,7 @@ import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.style.WidgetStyle;
 import ae2.client.gui.widgets.AECheckbox;
 import ae2.client.gui.widgets.ITooltip;
-import ae2.client.gui.widgets.IconButton;
+import ae2.client.gui.widgets.SimpleIconButton;
 import ae2.container.AEBaseContainer;
 import ae2.container.interfaces.IKeyTypeSelectionContainer;
 import ae2.core.localization.GuiText;
@@ -276,13 +276,7 @@ public final class KeyTypeSelectionWindow<C extends AEBaseContainer & IKeyTypeSe
 
         this.buttons.ensureCapacity(this.parent.getContainer().getClientKeyTypeSelection().keyTypes().size() + 1);
 
-        IconButton closeButton = new IconButton(this::close) {
-            @Override
-            protected Icon getIcon() {
-                return Icon.CLEAR;
-            }
-        };
-        closeButton.setMessage(GuiText.Close.text());
+        SimpleIconButton closeButton = new SimpleIconButton(Icon.CLEAR, GuiText.Close.text(), this::close);
         moveCloseButton(closeButton);
         this.buttons.add(closeButton);
 

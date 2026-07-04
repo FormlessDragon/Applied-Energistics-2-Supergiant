@@ -7,7 +7,7 @@ import ae2.client.Point;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
-import ae2.client.gui.widgets.IconButton;
+import ae2.client.gui.widgets.PageNavigationButton;
 import ae2.client.gui.widgets.PatternModifierPanelWidget;
 import ae2.client.gui.widgets.ProgressBar;
 import ae2.client.gui.widgets.ToggleButton;
@@ -31,8 +31,8 @@ import java.util.List;
 
 public class GuiMolecularAssembler extends AEBaseGui<ContainerMolecularAssembler> {
     private final ProgressBar progressBar;
-    private final PageButton previousPageButton;
-    private final PageButton nextPageButton;
+    private final PageNavigationButton previousPageButton;
+    private final PageNavigationButton nextPageButton;
     private final ToggleButton showInPatternAccessTerminalButton;
     private final PatternModifierPanelWidget patternModifierPanel;
     private int lastProgress = Integer.MIN_VALUE;
@@ -55,8 +55,12 @@ public class GuiMolecularAssembler extends AEBaseGui<ContainerMolecularAssembler
             GuiText.PatternAccessTerminalHint.text(),
             this::selectPatternProviderMode);
         addToLeftToolbar(this.showInPatternAccessTerminalButton);
-        this.previousPageButton = new PageButton(Icon.ARROW_LEFT, () -> container.setPage(container.getCurrentPage() - 1));
-        this.nextPageButton = new PageButton(Icon.ARROW_RIGHT, () -> container.setPage(container.getCurrentPage() + 1));
+        this.previousPageButton = new PageNavigationButton(Icon.ARROW_LEFT,
+            GuiText.PatternProviderPagePrevious.text(), GuiText.PatternProviderPageNext.text(),
+            () -> container.setPage(container.getCurrentPage() - 1));
+        this.nextPageButton = new PageNavigationButton(Icon.ARROW_RIGHT,
+            GuiText.PatternProviderPagePrevious.text(), GuiText.PatternProviderPageNext.text(),
+            () -> container.setPage(container.getCurrentPage() + 1));
         this.widgets.add("previousPage", this.previousPageButton);
         this.widgets.add("nextPage", this.nextPageButton);
         this.progressBar = new ProgressBar(this.container, style.getImage("progressBar"), ProgressBar.Direction.HORIZONTAL);
@@ -124,23 +128,6 @@ public class GuiMolecularAssembler extends AEBaseGui<ContainerMolecularAssembler
         list.add(GuiText.CompatibleUpgrades.text());
         list.addAll(upgradeLines);
         return list;
-    }
-
-    private static class PageButton extends IconButton {
-        private final Icon icon;
-
-        PageButton(Icon icon, Runnable onPress) {
-            super(onPress);
-            this.icon = icon;
-            this.setMessage((icon == Icon.ARROW_LEFT
-                ? GuiText.PatternProviderPagePrevious
-                : GuiText.PatternProviderPageNext).text());
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return this.icon;
-        }
     }
 
     private final class AssemblerPanelHost implements PatternModifierPanelWidget.PanelHost {

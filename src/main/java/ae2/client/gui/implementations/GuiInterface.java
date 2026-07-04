@@ -5,6 +5,7 @@ import ae2.api.config.Settings;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.IconButton;
+import ae2.client.gui.widgets.PageNavigationButton;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.container.SlotSemantics;
@@ -25,16 +26,20 @@ public class GuiInterface extends GuiUpgradeable<ContainerInterface> {
 
     private final SettingToggleButton<FuzzyMode> fuzzyMode;
     private final ObjectArrayList<SetAmountButton> amountButtons = new ObjectArrayList<>();
-    private final PageButton previousPageButton;
-    private final PageButton nextPageButton;
+    private final PageNavigationButton previousPageButton;
+    private final PageNavigationButton nextPageButton;
 
     public GuiInterface(ContainerInterface container, InventoryPlayer playerInventory, ITextComponent title, GuiStyle style) {
         super(container, playerInventory, title, style);
 
         this.fuzzyMode = addToLeftToolbar(new ServerSettingToggleButton<>(Settings.FUZZY_MODE, FuzzyMode.IGNORE_ALL));
         widgets.addOpenPriorityButton();
-        this.previousPageButton = new PageButton(Icon.ARROW_LEFT, () -> container.setPage(container.getCurrentPage() - 1));
-        this.nextPageButton = new PageButton(Icon.ARROW_RIGHT, () -> container.setPage(container.getCurrentPage() + 1));
+        this.previousPageButton = new PageNavigationButton(Icon.ARROW_LEFT,
+            GuiText.InterfacePagePrevious.text(), GuiText.InterfacePageNext.text(),
+            () -> container.setPage(container.getCurrentPage() - 1));
+        this.nextPageButton = new PageNavigationButton(Icon.ARROW_RIGHT,
+            GuiText.InterfacePagePrevious.text(), GuiText.InterfacePageNext.text(),
+            () -> container.setPage(container.getCurrentPage() + 1));
         widgets.add("previousPage", this.previousPageButton);
         widgets.add("nextPage", this.nextPageButton);
 
@@ -99,18 +104,4 @@ public class GuiInterface extends GuiUpgradeable<ContainerInterface> {
         }
     }
 
-    static class PageButton extends IconButton {
-        private final Icon icon;
-
-        PageButton(Icon icon, Runnable onPress) {
-            super(onPress);
-            this.icon = icon;
-            this.setMessage((icon == Icon.ARROW_LEFT ? GuiText.InterfacePagePrevious : GuiText.InterfacePageNext).text());
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return this.icon;
-        }
-    }
 }

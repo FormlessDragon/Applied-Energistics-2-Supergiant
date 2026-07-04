@@ -31,6 +31,7 @@ import ae2.client.gui.widgets.AECheckbox;
 import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.IconButton;
+import ae2.client.gui.widgets.SimpleIconButton;
 import ae2.client.gui.widgets.TabButton;
 import ae2.container.AEBaseContainer;
 import ae2.container.GuiIds;
@@ -159,7 +160,8 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
             this::returnToParent));
         this.generalPageButton = addToLeftToolbar(
             new ActionButton(ActionItems.TERMINAL_SETTINGS, () -> switchPage(Page.GENERAL)));
-        this.wirelessPageButton = new WirelessSettingsPageButton(() -> switchPage(Page.WIRELESS));
+        this.wirelessPageButton = new SimpleIconButton(Icon.WIRELESS_SETTINGS_PAGE,
+            GuiText.WirelessTerminalSettingsTitle.text(), () -> switchPage(Page.WIRELESS));
         addToLeftToolbar(this.wirelessPageButton);
         this.previousPageButton = widgets.addButton("previousPage", new TextComponentString("<"), this::previousGeneralPage);
         this.nextPageButton = widgets.addButton("nextPage", new TextComponentString(">"), this::nextGeneralPage);
@@ -740,15 +742,4 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         WIRELESS
     }
 
-    private static class WirelessSettingsPageButton extends IconButton {
-        private WirelessSettingsPageButton(Runnable onPress) {
-            super(onPress);
-            setMessage(GuiText.WirelessTerminalSettingsTitle.text());
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return Icon.WIRELESS_SETTINGS_PAGE;
-        }
-    }
 }

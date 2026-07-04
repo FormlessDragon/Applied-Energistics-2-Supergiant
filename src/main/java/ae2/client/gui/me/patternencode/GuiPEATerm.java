@@ -19,7 +19,7 @@ import ae2.client.gui.me.patternaccess.AbstractPatternAccessTerm;
 import ae2.client.gui.me.patternaccess.GuiPatternSlot;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.ActionButton;
-import ae2.client.gui.widgets.IconButton;
+import ae2.client.gui.widgets.DynamicIconButton;
 import ae2.client.gui.widgets.TabButton;
 import ae2.container.SlotSemantics;
 import ae2.container.implementations.ContainerPEATerm;
@@ -44,7 +44,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.util.EnumMap;
@@ -66,7 +65,7 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> {
 
     private final Map<EncodingMode, EncodingModePanel> modePanels = new EnumMap<>(EncodingMode.class);
     private final Map<EncodingMode, TabButton> modeTabButtons = new EnumMap<>(EncodingMode.class);
-    private final IconButton uploadPatternButton;
+    private final DynamicIconButton uploadPatternButton;
 
     public GuiPEATerm(ContainerPEATerm container, InventoryPlayer playerInventory, @Nullable ITextComponent title,
                       GuiStyle style) {
@@ -75,31 +74,14 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> {
 
         addMode(EncodingMode.CRAFTING, new CraftingEncodingPanel(this, widgets), 0);
         addMode(EncodingMode.PROCESSING, new ProcessingEncodingPanel(this, widgets), 1);
-        this.uploadPatternButton = new IconButton(this::uploadPattern) {
-            {
-                setHalfSize(true);
-                setIconScale(0.5F);
-                setVisibility(false);
-            }
-
-            @Override
-            protected Icon getIcon() {
-                return Icon.PATTERN_UPLOAD;
-            }
-
-            @Override
-            public @NonNull List<ITextComponent> getTooltipMessage() {
-                if (container.mode == EncodingMode.PROCESSING) {
-                    return List.of(
-                        ButtonToolTips.PatternUpload.text(),
-                        ButtonToolTips.PatternUploadProcessingHint.text());
-                }
-                return List.of(
-                    ButtonToolTips.PatternUpload.text(),
-                    ButtonToolTips.PatternUploadHint.text(),
-                    ButtonToolTips.PatternUploadShiftHint.text());
-            }
-        };
+        this.uploadPatternButton = new DynamicIconButton(
+            () -> Icon.PATTERN_UPLOAD,
+            ButtonToolTips.PatternUpload.text(),
+            this::uploadPatternTooltip,
+            this::uploadPattern);
+        this.uploadPatternButton.setHalfSize(true);
+        this.uploadPatternButton.setIconScale(0.5F);
+        this.uploadPatternButton.setVisibility(false);
         widgets.add("uploadPattern", this.uploadPatternButton);
         widgets.add("encodePattern", new ActionButton(ActionItems.ENCODE,
             () -> container.encode(isShiftDown())));
@@ -117,6 +99,18 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> {
         widgets.add("modeTabButton" + index, tabButton);
         this.modePanels.put(mode, panel);
         this.modeTabButtons.put(mode, tabButton);
+    }
+
+    private List<ITextComponent> uploadPatternTooltip() {
+        if (container.mode == EncodingMode.PROCESSING) {
+            return List.of(
+                ButtonToolTips.PatternUpload.text(),
+                ButtonToolTips.PatternUploadProcessingHint.text());
+        }
+        return List.of(
+            ButtonToolTips.PatternUpload.text(),
+            ButtonToolTips.PatternUploadHint.text(),
+            ButtonToolTips.PatternUploadShiftHint.text());
     }
 
     private void openImportPrioritySettings() {

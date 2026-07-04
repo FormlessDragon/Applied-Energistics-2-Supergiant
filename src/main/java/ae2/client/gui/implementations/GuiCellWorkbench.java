@@ -30,8 +30,9 @@ import ae2.api.storage.cells.ICellWorkbenchItem;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.ActionButton;
-import ae2.client.gui.widgets.IconButton;
+import ae2.client.gui.widgets.PageNavigationButton;
 import ae2.client.gui.widgets.SettingToggleButton;
+import ae2.client.gui.widgets.SimpleIconButton;
 import ae2.client.gui.widgets.ToggleButton;
 import ae2.container.GuiIds;
 import ae2.container.implementations.ContainerCellWorkbench;
@@ -51,9 +52,9 @@ import java.util.List;
 public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
     private final ToggleButton copyMode;
     private final SettingToggleButton<FuzzyMode> fuzzyMode;
-    private final CellRestrictionButton cellRestrictionButton;
-    private final PageButton previousPageButton;
-    private final PageButton nextPageButton;
+    private final SimpleIconButton cellRestrictionButton;
+    private final PageNavigationButton previousPageButton;
+    private final PageNavigationButton nextPageButton;
     private ItemStack cachedWorkbenchItem = ItemStack.EMPTY;
     private boolean cachedFuzzyVisible;
     private boolean cachedRestrictionVisible;
@@ -67,13 +68,18 @@ public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
         this.fuzzyMode = new SettingToggleButton<>(Settings.FUZZY_MODE, FuzzyMode.IGNORE_ALL, this::toggleFuzzyMode);
         this.addToLeftToolbar(new ActionButton(ActionItems.COG, container::partition));
         this.addToLeftToolbar(new ActionButton(ActionItems.CLOSE, container::clear));
-        this.cellRestrictionButton = new CellRestrictionButton(this::openCellRestriction);
+        this.cellRestrictionButton = new SimpleIconButton(Icon.CELL_RESTRICTION, GuiText.CellRestriction.text(),
+            this::openCellRestriction);
         this.copyMode = this.addToLeftToolbar(new ToggleButton(Icon.COPY_MODE_ON, Icon.COPY_MODE_OFF,
             GuiText.CopyMode.text(), GuiText.CopyModeDesc.text(), act -> container.nextWorkBenchCopyMode()));
         this.addToLeftToolbar(this.fuzzyMode);
         this.addToLeftToolbar(this.cellRestrictionButton);
-        this.previousPageButton = new PageButton(Icon.ARROW_LEFT, () -> container.setPage(container.getCurrentPage() - 1));
-        this.nextPageButton = new PageButton(Icon.ARROW_RIGHT, () -> container.setPage(container.getCurrentPage() + 1));
+        this.previousPageButton = new PageNavigationButton(Icon.ARROW_LEFT,
+            GuiText.InterfacePagePrevious.text(), GuiText.InterfacePageNext.text(),
+            () -> container.setPage(container.getCurrentPage() - 1));
+        this.nextPageButton = new PageNavigationButton(Icon.ARROW_RIGHT,
+            GuiText.InterfacePagePrevious.text(), GuiText.InterfacePageNext.text(),
+            () -> container.setPage(container.getCurrentPage() + 1));
         this.widgets.add("previousPage", this.previousPageButton);
         this.widgets.add("nextPage", this.nextPageButton);
     }
@@ -176,35 +182,6 @@ public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
         }
 
         return lines;
-    }
-
-    private static class PageButton extends IconButton {
-        private final Icon icon;
-
-        PageButton(Icon icon, Runnable onPress) {
-            super(onPress);
-            this.icon = icon;
-            this.setMessage((icon == Icon.ARROW_LEFT
-                ? GuiText.InterfacePagePrevious
-                : GuiText.InterfacePageNext).text());
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return this.icon;
-        }
-    }
-
-    private static class CellRestrictionButton extends IconButton {
-        CellRestrictionButton(Runnable onPress) {
-            super(onPress);
-            this.setMessage(GuiText.CellRestriction.text());
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return Icon.CELL_RESTRICTION;
-        }
     }
 
 }

@@ -31,10 +31,10 @@ import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.ITextFieldGui;
-import ae2.client.gui.widgets.ITooltip;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.TabButton;
+import ae2.client.gui.widgets.TooltipButton;
 import ae2.container.implementations.ContainerCraftConfirm;
 import ae2.container.me.crafting.CraftingPlanSummary;
 import ae2.container.me.crafting.CraftingPlanSummaryEntry;
@@ -50,10 +50,8 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
-import java.awt.Rectangle;
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.Arrays;
@@ -474,27 +472,4 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> implements
         return Collections.singletonList(searchField);
     }
 
-    private static final class TooltipButton extends AE2Button implements ITooltip {
-        private final List<ITextComponent> tooltip;
-
-        private TooltipButton(ITextComponent message, ITextComponent tooltip, Runnable onPress) {
-            super(message, onPress);
-            this.tooltip = Collections.singletonList(tooltip);
-        }
-
-        @Override
-        public @NonNull List<ITextComponent> getTooltipMessage() {
-            return this.tooltip;
-        }
-
-        @Override
-        public Rectangle getTooltipArea() {
-            return new Rectangle(this.x, this.y, this.width, this.height);
-        }
-
-        @Override
-        public boolean isTooltipAreaVisible() {
-            return this.visible;
-        }
-    }
 }

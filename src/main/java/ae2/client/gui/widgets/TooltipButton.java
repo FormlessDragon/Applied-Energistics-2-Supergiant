@@ -11,14 +11,33 @@ import java.util.function.Supplier;
 public class TooltipButton extends AE2Button implements ITooltip {
     private Supplier<List<ITextComponent>> tooltipSupplier;
 
+    public TooltipButton(int x, int y, int width, int height, ITextComponent component,
+                         Supplier<List<ITextComponent>> tooltipSupplier, Runnable onPress) {
+        super(x, y, width, height, component, onPress);
+        this.tooltipSupplier = Objects.requireNonNull(tooltipSupplier);
+    }
+
+    public TooltipButton(int x, int y, int width, int height, ITextComponent component,
+                         List<ITextComponent> tooltip, Runnable onPress) {
+        this(x, y, width, height, component, () -> tooltip, onPress);
+    }
+
+    public TooltipButton(int x, int y, int width, int height, ITextComponent component,
+                         ITextComponent tooltip, Runnable onPress) {
+        this(x, y, width, height, component, List.of(tooltip), onPress);
+    }
+
     public TooltipButton(ITextComponent component, Supplier<List<ITextComponent>> tooltipSupplier,
                          Runnable onPress) {
-        super(component, onPress);
-        this.tooltipSupplier = Objects.requireNonNull(tooltipSupplier);
+        this(0, 0, 0, 0, component, tooltipSupplier, onPress);
     }
 
     public TooltipButton(ITextComponent component, List<ITextComponent> tooltip, Runnable onPress) {
         this(component, () -> tooltip, onPress);
+    }
+
+    public TooltipButton(ITextComponent component, ITextComponent tooltip, Runnable onPress) {
+        this(component, List.of(tooltip), onPress);
     }
 
     public void setTooltipSupplier(Supplier<List<ITextComponent>> tooltipSupplier) {

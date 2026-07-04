@@ -5,14 +5,13 @@ import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.Blitter;
 import ae2.client.gui.style.WidgetStyle;
-import ae2.client.gui.widgets.IconButton;
+import ae2.client.gui.widgets.SimpleIconButton;
 import ae2.core.AppEng;
 import ae2.core.localization.GuiText;
 import ae2.util.ColorData;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.text.ITextComponent;
 
 import java.awt.Rectangle;
 import java.util.ArrayList;
@@ -43,9 +42,9 @@ public class ColorWindow extends ClickableArea {
         addElement("color_alpha", this.alpha = new DraggableArea(0, 0, 0, 0, parent));
         addElement("color_preview", this.preview = new ColorArea(0, 0, 0, 0, parent, () -> {
         }));
-        this.buttons.add(new ColorActionButton(Icon.ENTER,
+        this.buttons.add(new SimpleIconButton(Icon.ENTER,
             GuiText.Set.text(), apply));
-        this.buttons.add(new ColorActionButton(Icon.CLEAR,
+        this.buttons.add(new SimpleIconButton(Icon.CLEAR,
             GuiText.Cancel.text(), cancel));
     }
 
@@ -223,21 +222,6 @@ public class ColorWindow extends ClickableArea {
             }
         }
         return false;
-    }
-
-    private static final class ColorActionButton extends IconButton {
-        private final Icon icon;
-
-        private ColorActionButton(Icon icon, ITextComponent message, Runnable onPress) {
-            super(onPress);
-            this.icon = icon;
-            setMessage(message);
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return this.icon;
-        }
     }
 
     private record Element(String id, ClickableArea area) {

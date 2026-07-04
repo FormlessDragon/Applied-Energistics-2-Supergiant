@@ -11,9 +11,7 @@ import ae2.core.AppEng;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.GuiText;
 import ae2.helpers.patternmodifier.PatternModifierToolboxLayout;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
-import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
@@ -21,7 +19,6 @@ import net.minecraft.util.text.TextComponentString;
 import org.jspecify.annotations.NonNull;
 
 import java.awt.Rectangle;
-import java.util.Collections;
 import java.util.List;
 
 public final class PatternModifierPanelWidget implements ICompositeWidget {
@@ -29,7 +26,7 @@ public final class PatternModifierPanelWidget implements ICompositeWidget {
 
     private final AEBaseGui<?> gui;
     private final PanelHost host;
-    private final AE2Button[] amountButtons;
+    private final GuiButton[] amountButtons;
     private final IconButton clearButton;
     private final ItemStackButton toggleButton;
     private boolean expanded;
@@ -37,7 +34,7 @@ public final class PatternModifierPanelWidget implements ICompositeWidget {
     public PatternModifierPanelWidget(AEBaseGui<?> gui, PanelHost host) {
         this.gui = gui;
         this.host = host;
-        this.amountButtons = new AE2Button[]{
+        this.amountButtons = new GuiButton[]{
             amountButton(2, false),
             amountButton(2, true),
             amountButton(3, false),
@@ -45,7 +42,11 @@ public final class PatternModifierPanelWidget implements ICompositeWidget {
             amountButton(5, false),
             amountButton(5, true)
         };
-        this.clearButton = new ClearButton();
+        this.clearButton = new SimpleIconButton(Icon.CLEAR, GuiText.PatternModifierClearDescription.text(),
+            host::clearPatternModifierPanel);
+        this.clearButton.width = PatternModifierToolboxLayout.BUTTON_WIDTH;
+        this.clearButton.height = PatternModifierToolboxLayout.BUTTON_HEIGHT;
+        this.clearButton.setDisableClickSound(false);
         this.toggleButton = new ToggleButton();
     }
 
@@ -115,7 +116,7 @@ public final class PatternModifierPanelWidget implements ICompositeWidget {
         this.host.updatePatternModifierPanelVisibleSlots(visible);
         positionButtons();
         positionSlots(visible);
-        for (AE2Button button : this.amountButtons) {
+        for (GuiButton button : this.amountButtons) {
             button.visible = visible;
             button.enabled = visible;
         }
@@ -194,8 +195,15 @@ public final class PatternModifierPanelWidget implements ICompositeWidget {
         this.gui.requestExclusionZonesUpdate();
     }
 
-    private AE2Button amountButton(int factor, boolean divide) {
-        return new TooltipAmountButton(factor, divide);
+    private GuiButton amountButton(int factor, boolean divide) {
+        return new SmallTextTooltipButton(
+            PatternModifierToolboxLayout.BUTTON_WIDTH,
+            PatternModifierToolboxLayout.BUTTON_HEIGHT,
+            () -> (divide ? "/" : "x") + factor,
+            () -> List.of(divide
+                ? GuiText.PatternModifierDivideDescription.text(factor)
+                : GuiText.PatternModifierMultiplyDescription.text(factor)),
+            () -> host.modifyPatternModifierPanelAmounts(factor, divide));
     }
 
     private boolean isHoveringPanelSlot(int mouseX, int mouseY) {
@@ -223,93 +231,6 @@ public final class PatternModifierPanelWidget implements ICompositeWidget {
         void clearPatternModifierPanel();
 
         void modifyPatternModifierPanelAmounts(int factor, boolean divide);
-    }
-
-    private final class TooltipAmountButton extends AE2Button implements ITooltip {
-        private final int factor;
-        private final boolean divide;
-
-        private TooltipAmountButton(int factor, boolean divide) {
-            super(0, 0, PatternModifierToolboxLayout.BUTTON_WIDTH, PatternModifierToolboxLayout.BUTTON_HEIGHT,
-                new TextComponentString((divide ? "/" : "x") + factor), () -> {
-                });
-            this.factor = factor;
-            this.divide = divide;
-        }
-
-        @Override
-        public void mouseReleased(int mouseX, int mouseY) {
-            boolean releasedInside = this.enabled && this.visible
-                && mouseX >= this.x
-                && mouseY >= this.y
-                && mouseX < this.x + this.width
-                && mouseY < this.y + this.height;
-            super.mouseReleased(mouseX, mouseY);
-            if (releasedInside) {
-                host.modifyPatternModifierPanelAmounts(this.factor, this.divide);
-            }
-        }
-
-        @Override
-        public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
-            setMessage(getMessageComponent());
-            try {
-                super.drawButton(minecraft, mouseX, mouseY, partialTicks);
-            } finally {
-                GlStateManager.disableDepth();
-            }
-        }
-
-        @Override
-        public ITextComponent getMessageComponent() {
-            return new TextComponentString((this.divide ? "/" : "x") + this.factor);
-        }
-
-        @Override
-        public @NonNull List<ITextComponent> getTooltipMessage() {
-            return Collections.singletonList(this.divide
-                ? GuiText.PatternModifierDivideDescription.text(this.factor)
-                : GuiText.PatternModifierMultiplyDescription.text(this.factor));
-        }
-
-        @Override
-        public Rectangle getTooltipArea() {
-            return new Rectangle(this.x, this.y, this.width, this.height);
-        }
-
-        @Override
-        public boolean isTooltipAreaVisible() {
-            return this.visible;
-        }
-    }
-
-    private final class ClearButton extends IconButton implements ITooltip {
-        private ClearButton() {
-            super(host::clearPatternModifierPanel);
-            this.width = PatternModifierToolboxLayout.BUTTON_WIDTH;
-            this.height = PatternModifierToolboxLayout.BUTTON_HEIGHT;
-            setDisableClickSound(false);
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return Icon.CLEAR;
-        }
-
-        @Override
-        public @NonNull List<ITextComponent> getTooltipMessage() {
-            return Collections.singletonList(GuiText.PatternModifierClearDescription.text());
-        }
-
-        @Override
-        public Rectangle getTooltipArea() {
-            return new Rectangle(this.x, this.y, this.width, this.height);
-        }
-
-        @Override
-        public boolean isTooltipAreaVisible() {
-            return this.visible;
-        }
     }
 
     private final class ToggleButton extends ItemStackButton {

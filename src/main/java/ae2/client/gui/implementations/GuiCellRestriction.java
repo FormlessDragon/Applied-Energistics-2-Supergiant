@@ -5,21 +5,17 @@ import ae2.client.gui.MathExpressionParser;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.AETextField;
-import ae2.client.gui.widgets.ITooltip;
+import ae2.client.gui.widgets.TooltipButton;
 import ae2.container.implementations.ContainerCellRestriction;
 import ae2.core.localization.GuiText;
 import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.util.text.ITextComponent;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
-import java.awt.Rectangle;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.util.List;
 import java.util.OptionalLong;
 
 public class GuiCellRestriction extends AEBaseGui<ContainerCellRestriction> {
@@ -59,7 +55,8 @@ public class GuiCellRestriction extends AEBaseGui<ContainerCellRestriction> {
         this.types.setResponder(ignored -> updateInputCache());
 
         this.setButton = widgets.addButton("set", GuiText.Set.text(), this::setRestriction);
-        this.releaseButton = new ResetRestrictionButton(this::releaseRestriction);
+        this.releaseButton = new TooltipButton(GuiText.ResetRestriction.text(), GuiText.ResetRestrictionHint.text(),
+            this::releaseRestriction);
         widgets.add("release", this.releaseButton);
     }
 
@@ -225,27 +222,6 @@ public class GuiCellRestriction extends AEBaseGui<ContainerCellRestriction> {
             return OptionalLong.of(value.setScale(0, RoundingMode.UNNECESSARY).longValueExact());
         } catch (ArithmeticException ignored) {
             return OptionalLong.empty();
-        }
-    }
-
-    private static class ResetRestrictionButton extends AE2Button implements ITooltip {
-        private ResetRestrictionButton(Runnable onPress) {
-            super(GuiText.ResetRestriction.text(), onPress);
-        }
-
-        @Override
-        public @NonNull List<ITextComponent> getTooltipMessage() {
-            return List.of(GuiText.ResetRestrictionHint.text());
-        }
-
-        @Override
-        public Rectangle getTooltipArea() {
-            return new Rectangle(this.x, this.y, this.width, this.height);
-        }
-
-        @Override
-        public boolean isTooltipAreaVisible() {
-            return this.visible;
         }
     }
 

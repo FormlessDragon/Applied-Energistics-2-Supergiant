@@ -5,7 +5,7 @@ import ae2.api.config.Settings;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.PaletteColor;
-import ae2.client.gui.widgets.IconButton;
+import ae2.client.gui.widgets.DynamicIconButton;
 import ae2.client.gui.widgets.ServerSettingToggleButton;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.container.implementations.ContainerThresholdExportBus;
@@ -14,7 +14,6 @@ import ae2.parts.automation.special.ThresholdMode;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
-import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
@@ -30,7 +29,13 @@ public class GuiThresholdExportBus extends GuiSpecialExportBus<ContainerThreshol
         } else {
             this.schedulingMode = null;
         }
-        addToLeftToolbar(new ThresholdModeButton(container));
+        addToLeftToolbar(new DynamicIconButton(
+            () -> container.mode == ThresholdMode.GREATER ? Icon.ARROW_UP : Icon.ARROW_DOWN,
+            GuiText.thresholdMode(container.mode).text(),
+            () -> List.of(GuiText.thresholdMode(container.mode).text()),
+            () -> container.setMode(container.mode == ThresholdMode.GREATER
+                ? ThresholdMode.LOWER
+                : ThresholdMode.GREATER)));
     }
 
     @Override
@@ -54,27 +59,4 @@ public class GuiThresholdExportBus extends GuiSpecialExportBus<ContainerThreshol
         GlStateManager.popMatrix();
     }
 
-    private static final class ThresholdModeButton extends IconButton {
-        private final ContainerThresholdExportBus container;
-
-        private ThresholdModeButton(ContainerThresholdExportBus container) {
-            super(() -> container.setMode(
-                container.mode == ThresholdMode.GREATER
-                    ? ThresholdMode.LOWER
-                    : ThresholdMode.GREATER));
-            this.container = container;
-        }
-
-        @Override
-        protected Icon getIcon() {
-            return this.container.mode == ThresholdMode.GREATER
-                ? Icon.ARROW_UP
-                : Icon.ARROW_DOWN;
-        }
-
-        @Override
-        public @NonNull List<ITextComponent> getTooltipMessage() {
-            return List.of(GuiText.thresholdMode(this.container.mode).text());
-        }
-    }
 }
