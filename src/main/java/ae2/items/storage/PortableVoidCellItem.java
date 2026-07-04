@@ -32,7 +32,7 @@ public class PortableVoidCellItem extends VoidCellItem {
     }
 
     private static String createTypesLine() {
-        return TextFormatting.LIGHT_PURPLE + "0 "
+        return TextFormatting.GREEN + "0 "
             + GuiText.Of.getLocal() + " "
             + obfuscatedMaxText()
             + TextFormatting.LIGHT_PURPLE + " "
@@ -41,7 +41,7 @@ public class PortableVoidCellItem extends VoidCellItem {
     }
 
     private static String numberText() {
-        return TextFormatting.LIGHT_PURPLE + "0" + TextFormatting.RESET;
+        return TextFormatting.GREEN + "0" + TextFormatting.RESET;
     }
 
     private static String obfuscatedMaxText() {

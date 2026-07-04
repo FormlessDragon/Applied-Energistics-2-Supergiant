@@ -50,6 +50,7 @@ public class AEBaseBlockItem extends ItemBlock {
     @SideOnly(Side.CLIENT)
     public void addCheckedInformation(ItemStack itemStack, @Nullable World worldIn,
                                       List<String> toolTip, ITooltipFlag advancedTooltips) {
+        this.blockType.addCheckedInformation(itemStack, worldIn, toolTip, advancedTooltips);
     }
 
     @Override

@@ -1183,6 +1183,8 @@ gui.tooltips.ae2.TrashController=按下Shift或空格删除。
 gui.tooltips.ae2.TypeFilter=显示模式
 gui.tooltips.ae2.View=浏览
 gui.tooltips.ae2.Write=仅存入
+gui.ae2.tooltip.MysteriousQuote=" 借由他人,寻找自我 "
+gui.ae2.tooltip.NotSoMysteriousQuote= " 近在咫尺,却邈以山河 "
 
 # Items
 item.ae2.advanced_card.name=高级卡

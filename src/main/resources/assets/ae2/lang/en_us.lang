@@ -1183,6 +1183,8 @@ gui.tooltips.ae2.TrashController=Deletion via Shift / Space Clicking.
 gui.tooltips.ae2.TypeFilter=Filter Types
 gui.tooltips.ae2.View=View
 gui.tooltips.ae2.Write=Insert Only
+gui.ae2.tooltip.MysteriousQuote=\"Durch andere werden wir uns selbst finden.\"
+gui.ae2.tooltip.NotSoMysteriousQuote= \"So weit, egal wie nahe.\"
 
 # Items
 item.ae2.advanced_card.name=Advanced Card

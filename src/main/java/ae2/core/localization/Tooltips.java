@@ -94,6 +94,10 @@ public enum Tooltips implements LocalizationEnum {
         return new TextComponentString(Long.toString(number)).setStyle(numberStyle());
     }
 
+    public static ITextComponent ofUnformattedNumber(long number, TextFormatting color) {
+        return new TextComponentString(Long.toString(number)).setStyle(new Style().setColor(color).setItalic(false));
+    }
+
     public static String energyStorageTooltip(double energy, double max) {
         return TextFormatting.GRAY + GuiText.StoredEnergy.getLocal()
             + TextFormatting.GRAY + ": "
@@ -109,14 +113,14 @@ public enum Tooltips implements LocalizationEnum {
     }
 
     public static ITextComponent bytesUsed(long bytes, long max) {
-        var result = of(GuiText.BytesUsed.text(ofUnformattedNumber(bytes)));
+        var result = of(GuiText.BytesUsed.text(ofUnformattedNumber(bytes, TextFormatting.GREEN)));
         result.appendText(" / ");
         result.appendSibling(ofUnformattedNumber(max));
         return result;
     }
 
     public static ITextComponent typesUsed(long types, long max) {
-        var result = ofUnformattedNumber(types);
+        var result = ofUnformattedNumber(types, TextFormatting.GREEN);
         result.appendText(" ");
         result.appendSibling(of(GuiText.Of));
         result.appendText(" ");
