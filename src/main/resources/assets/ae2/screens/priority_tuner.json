@@ -20,9 +20,9 @@
   },
   "widgets": {
     "mode": {
-      "left": 60,
+      "left": 40,
       "top": 95,
-      "width": 62,
+      "width": 102,
       "height": 20
     },
     "priority": {

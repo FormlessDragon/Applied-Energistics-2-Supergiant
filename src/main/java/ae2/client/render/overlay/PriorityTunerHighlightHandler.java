@@ -3,10 +3,10 @@ package ae2.client.render.overlay;
 import ae2.core.definitions.AEItems;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -19,7 +19,6 @@ import org.lwjgl.opengl.GL11;
 public class PriorityTunerHighlightHandler {
     public static final PriorityTunerHighlightHandler INSTANCE = new PriorityTunerHighlightHandler();
     private static final float HIGHLIGHT_LINE_WIDTH = 3.0F;
-    private static final double HIGHLIGHT_GROW = 0.03D;
     private static final float HIGHLIGHT_RED = 0.35F;
     private static final float HIGHLIGHT_GREEN = 0.8F;
     private static final float HIGHLIGHT_BLUE = 1.0F;
@@ -41,7 +40,26 @@ public class PriorityTunerHighlightHandler {
             this.currentDimensionEntries.clear();
             this.highlightedDimension = dimensionId;
         }
+        if (has(dimensionId, pos, side)) {
+            return;
+        }
         this.currentDimensionEntries.add(new PendingPriority(pos, side, priority));
+    }
+
+    public boolean has(int dimensionId, BlockPos pos, @Nullable EnumFacing side) {
+        if (dimensionId != this.highlightedDimension) {
+            return false;
+        }
+        for (PendingPriority entry : this.currentDimensionEntries) {
+            if (entry.matches(pos, side)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public int getStagedCount(int dimensionId) {
+        return dimensionId == this.highlightedDimension ? this.currentDimensionEntries.size() : 0;
     }
 
     public void clear() {
@@ -80,11 +98,8 @@ public class PriorityTunerHighlightHandler {
         GlStateManager.depthMask(false);
 
         for (PendingPriority entry : this.currentDimensionEntries) {
-            for (AxisAlignedBB box : OverlayHighlightBoxes.create(OverlayHighlightShape.WHOLE_BLOCK, entry.pos(),
-                entry.side())) {
-                RenderGlobal.drawSelectionBoundingBox(box.grow(HIGHLIGHT_GROW),
-                    HIGHLIGHT_RED, HIGHLIGHT_GREEN, HIGHLIGHT_BLUE, HIGHLIGHT_ALPHA);
-            }
+            RenderGlobal.drawSelectionBoundingBox(new AxisAlignedBB(entry.pos()),
+                HIGHLIGHT_RED, HIGHLIGHT_GREEN, HIGHLIGHT_BLUE, HIGHLIGHT_ALPHA);
         }
 
         GlStateManager.glLineWidth(1.0F);
@@ -105,7 +120,7 @@ public class PriorityTunerHighlightHandler {
         String text = Integer.toString(entry.priority());
         BlockPos pos = entry.pos();
         GlStateManager.pushMatrix();
-        GlStateManager.translate(pos.getX() + 0.5D, pos.getY() + 1.18D, pos.getZ() + 0.5D);
+        GlStateManager.translate(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D);
         GlStateManager.rotate(-minecraft.getRenderManager().playerViewY, 0.0F, 1.0F, 0.0F);
         GlStateManager.rotate(minecraft.getRenderManager().playerViewX, 1.0F, 0.0F, 0.0F);
         GlStateManager.scale(-0.025F, -0.025F, 0.025F);
@@ -117,14 +132,14 @@ public class PriorityTunerHighlightHandler {
         BufferBuilder builder = Tessellator.getInstance().getBuffer();
         GlStateManager.disableTexture2D();
         builder.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
-        builder.pos(-width - 2, -2, 0).color(0, 0, 0, 120).endVertex();
-        builder.pos(-width - 2, 9, 0).color(0, 0, 0, 120).endVertex();
-        builder.pos(width + 2, 9, 0).color(0, 0, 0, 120).endVertex();
-        builder.pos(width + 2, -2, 0).color(0, 0, 0, 120).endVertex();
+        builder.pos(-width - 2, -6, 0).color(0, 0, 0, 120).endVertex();
+        builder.pos(-width - 2, 5, 0).color(0, 0, 0, 120).endVertex();
+        builder.pos(width + 2, 5, 0).color(0, 0, 0, 120).endVertex();
+        builder.pos(width + 2, -6, 0).color(0, 0, 0, 120).endVertex();
         Tessellator.getInstance().draw();
         GlStateManager.enableTexture2D();
 
-        minecraft.fontRenderer.drawString(text, -width, 0, 0xFFFFFF);
+        minecraft.fontRenderer.drawString(text, -width, -4, 0xFFFFFF);
         GlStateManager.enableDepth();
         GlStateManager.depthMask(true);
         GlStateManager.enableLighting();
@@ -132,5 +147,8 @@ public class PriorityTunerHighlightHandler {
     }
 
     private record PendingPriority(BlockPos pos, @Nullable EnumFacing side, int priority) {
+        private boolean matches(BlockPos pos, @Nullable EnumFacing side) {
+            return this.pos.equals(pos) && this.side == side;
+        }
     }
 }

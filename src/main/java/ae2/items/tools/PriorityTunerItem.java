@@ -35,8 +35,10 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class PriorityTunerItem extends AEBaseItem implements IGuiItem {
     private static final String MODE_TAG = "priority_tuner_mode";
@@ -51,15 +53,6 @@ public class PriorityTunerItem extends AEBaseItem implements IGuiItem {
 
     public PriorityTunerItem() {
         setMaxStackSize(1);
-    }
-
-    private static NBTTagCompound getOrCreateTag(ItemStack stack) {
-        NBTTagCompound tag = stack.getTagCompound();
-        if (tag == null) {
-            tag = new NBTTagCompound();
-            stack.setTagCompound(tag);
-        }
-        return tag;
     }
 
     private static @Nullable PriorityTarget findPriorityTarget(World world, BlockPos pos, Vec3d hit, @Nullable EnumFacing side) {
@@ -92,8 +85,18 @@ public class PriorityTunerItem extends AEBaseItem implements IGuiItem {
     }
 
     @SideOnly(Side.CLIENT)
-    private static void addClientHighlight(World world, BlockPos pos, @Nullable EnumFacing side, int priority) {
-        PriorityTunerHighlightHandler.INSTANCE.add(world.provider.getDimension(), pos, side, priority);
+    private static void stageClientHighlight(ItemStack stack, World world, BlockPos pos, @Nullable EnumFacing side,
+                                             Settings settings) {
+        int dimensionId = world.provider.getDimension();
+        if (hasPendingTarget(stack, dimensionId, pos, side)
+            || PriorityTunerHighlightHandler.INSTANCE.has(dimensionId, pos, side)) {
+            return;
+        }
+
+        int stagedCount = Math.max(getPendingCount(stack),
+            PriorityTunerHighlightHandler.INSTANCE.getStagedCount(dimensionId));
+        int priority = settings.mode().nextPriority(settings.priority(), stagedCount);
+        PriorityTunerHighlightHandler.INSTANCE.add(dimensionId, pos, side, priority);
     }
 
     @SideOnly(Side.CLIENT)
@@ -114,7 +117,7 @@ public class PriorityTunerItem extends AEBaseItem implements IGuiItem {
     }
 
     public void setSettings(ItemStack stack, Settings settings) {
-        NBTTagCompound tag = getOrCreateTag(stack);
+        NBTTagCompound tag = Platform.openNbtData(stack);
         tag.setString(MODE_TAG, settings.mode().getSerializedName());
         tag.setInteger(PRIORITY_TAG, settings.priority());
     }
@@ -136,8 +139,7 @@ public class PriorityTunerItem extends AEBaseItem implements IGuiItem {
         Settings settings = getSettings(tool);
         if (world.isRemote) {
             if (settings.mode().isBatchMode()) {
-                int value = settings.mode().nextPriority(settings.priority(), getPendingCount(tool));
-                addClientHighlight(world, pos, target.side(), value);
+                stageClientHighlight(tool, world, pos, target.side(), settings);
             }
             return EnumActionResult.SUCCESS;
         }
@@ -156,9 +158,12 @@ public class PriorityTunerItem extends AEBaseItem implements IGuiItem {
                 player.sendStatusMessage(PlayerMessages.PriorityTunerApplied.text(settings.priority()), true);
             }
             case INCREMENT, DECREMENT -> {
-                int value = settings.mode().nextPriority(settings.priority(), getPendingCount(tool));
-                addPending(tool, world.provider.getDimension(), pos, target.side(), value);
-                player.sendStatusMessage(PlayerMessages.PriorityTunerStaged.text(value), true);
+                int dimensionId = world.provider.getDimension();
+                if (!hasPendingTarget(tool, dimensionId, pos, target.side())) {
+                    int value = settings.mode().nextPriority(settings.priority(), getPendingCount(tool));
+                    addPending(tool, dimensionId, pos, target.side(), value);
+                    player.sendStatusMessage(PlayerMessages.PriorityTunerStaged.text(value), true);
+                }
             }
         }
 
@@ -227,16 +232,44 @@ public class PriorityTunerItem extends AEBaseItem implements IGuiItem {
         return tag.getTagList(PENDING_TAG, Constants.NBT.TAG_COMPOUND).tagCount();
     }
 
+    private static boolean hasPendingTarget(ItemStack stack, int dimensionId, BlockPos pos, @Nullable EnumFacing side) {
+        NBTTagCompound tag = stack.getTagCompound();
+        if (tag == null || !tag.hasKey(PENDING_TAG, Constants.NBT.TAG_LIST)) {
+            return false;
+        }
+
+        NBTTagList pending = tag.getTagList(PENDING_TAG, Constants.NBT.TAG_COMPOUND);
+        int sideIndex = sideIndex(side);
+        for (int i = 0; i < pending.tagCount(); i++) {
+            if (matchesPendingTarget(pending.getCompoundTagAt(i), dimensionId, pos, sideIndex)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesPendingTarget(NBTTagCompound entry, int dimensionId, BlockPos pos, int sideIndex) {
+        return entry.getInteger(PENDING_DIMENSION_TAG) == dimensionId
+            && entry.getInteger(PENDING_X_TAG) == pos.getX()
+            && entry.getInteger(PENDING_Y_TAG) == pos.getY()
+            && entry.getInteger(PENDING_Z_TAG) == pos.getZ()
+            && entry.getInteger(PENDING_SIDE_TAG) == sideIndex;
+    }
+
+    private static int sideIndex(@Nullable EnumFacing side) {
+        return side == null ? -1 : side.ordinal();
+    }
+
     private static void addPending(ItemStack stack, int dimensionId, BlockPos pos, @Nullable EnumFacing side,
                                    int priority) {
-        NBTTagCompound tag = getOrCreateTag(stack);
+        NBTTagCompound tag = Platform.openNbtData(stack);
         NBTTagList pending = tag.getTagList(PENDING_TAG, Constants.NBT.TAG_COMPOUND);
         NBTTagCompound entry = new NBTTagCompound();
         entry.setInteger(PENDING_DIMENSION_TAG, dimensionId);
         entry.setInteger(PENDING_X_TAG, pos.getX());
         entry.setInteger(PENDING_Y_TAG, pos.getY());
         entry.setInteger(PENDING_Z_TAG, pos.getZ());
-        entry.setInteger(PENDING_SIDE_TAG, side == null ? -1 : side.ordinal());
+        entry.setInteger(PENDING_SIDE_TAG, sideIndex(side));
         entry.setInteger(PENDING_VALUE_TAG, priority);
         pending.appendTag(entry);
         tag.setTag(PENDING_TAG, pending);
@@ -251,6 +284,7 @@ public class PriorityTunerItem extends AEBaseItem implements IGuiItem {
         int applied = 0;
         int currentDimension = world.provider.getDimension();
         NBTTagList pending = tag.getTagList(PENDING_TAG, Constants.NBT.TAG_COMPOUND);
+        Set<PendingIdentity> appliedTargets = new HashSet<>();
         for (int i = 0; i < pending.tagCount(); i++) {
             NBTTagCompound entry = pending.getCompoundTagAt(i);
             if (entry.getInteger(PENDING_DIMENSION_TAG) != currentDimension) {
@@ -263,7 +297,11 @@ public class PriorityTunerItem extends AEBaseItem implements IGuiItem {
             if (!Platform.hasPermissions(new DimensionalBlockPos(world, pos), player)) {
                 continue;
             }
-            IPriorityHost host = findPriorityHost(world, pos, entry.getInteger(PENDING_SIDE_TAG));
+            int side = entry.getInteger(PENDING_SIDE_TAG);
+            if (!appliedTargets.add(new PendingIdentity(currentDimension, pos, side))) {
+                continue;
+            }
+            IPriorityHost host = findPriorityHost(world, pos, side);
             if (host == null) {
                 continue;
             }
@@ -317,5 +355,8 @@ public class PriorityTunerItem extends AEBaseItem implements IGuiItem {
     }
 
     private record PriorityTarget(IPriorityHost host, @Nullable EnumFacing side) {
+    }
+
+    private record PendingIdentity(int dimensionId, BlockPos pos, int side) {
     }
 }

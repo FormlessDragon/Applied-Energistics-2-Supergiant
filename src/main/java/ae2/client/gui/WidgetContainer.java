@@ -33,6 +33,7 @@ import ae2.client.gui.widgets.ITooltip;
 import ae2.client.gui.widgets.NumberEntryWidget;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.TabButton;
+import ae2.client.gui.widgets.TooltipButton;
 import ae2.container.GuiIds;
 import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
@@ -53,6 +54,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * This utility class helps with positioning commonly used Minecraft {@link GuiButton} instances on a screen
@@ -182,6 +184,13 @@ public class WidgetContainer {
      */
     public AE2Button addButton(String id, ITextComponent text, Runnable action) {
         AE2Button button = new AE2Button(text, action);
+        add(id, button);
+        return button;
+    }
+
+    public TooltipButton addTooltipButton(String id, ITextComponent text,
+                                          Supplier<List<ITextComponent>> tooltipSupplier, Runnable action) {
+        TooltipButton button = new TooltipButton(text, tooltipSupplier, action);
         add(id, button);
         return button;
     }
