@@ -5,7 +5,7 @@ import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.ICompositeWidget;
 import ae2.client.gui.Icon;
 import ae2.client.gui.WidgetContainer;
-import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
 import net.minecraft.util.text.ITextComponent;
 
 import java.awt.Rectangle;

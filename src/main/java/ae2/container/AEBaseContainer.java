@@ -43,6 +43,7 @@ import ae2.core.AELog;
 import ae2.core.gui.locator.GuiHostLocator;
 import ae2.core.network.ClientboundPacket;
 import ae2.core.network.InitNetwork;
+import ae2.core.network.NetworkPacketHelper;
 import ae2.core.network.clientbound.GuiDataSyncPacket;
 import ae2.core.network.serverbound.GuiActionPacket;
 import ae2.helpers.InventoryAction;
@@ -53,7 +54,6 @@ import ae2.util.ConfigGuiInventory;
 import com.google.common.base.Preconditions;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonParseException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -1098,7 +1098,11 @@ public abstract class AEBaseContainer extends Container {
                     + clientAction.maxPayloadLength + " (" + jsonPayload.length() + ")");
         }
 
-        InitNetwork.sendToServer(new GuiActionPacket(this.windowId, clientAction.name, jsonPayload));
+        sendClientActionPacket(clientAction.name, jsonPayload);
+    }
+
+    protected void sendClientActionPacket(String actionName, @Nullable String jsonPayload) {
+        InitNetwork.sendToServer(new GuiActionPacket(this.windowId, actionName, jsonPayload));
     }
 
     protected final void sendClientAction(String action) {
@@ -1256,7 +1260,9 @@ public abstract class AEBaseContainer extends Container {
                 }
                 try {
                     arg = gson.fromJson(jsonPayload, argClass);
-                } catch (JsonParseException e) {
+                } catch (RuntimeException e) {
+                    NetworkPacketHelper.warnMalformedPacket(e, "gui-action:" + this.name,
+                        "Ignoring malformed GUI action payload for %s", this.name);
                     return;
                 }
                 if (arg == null) {

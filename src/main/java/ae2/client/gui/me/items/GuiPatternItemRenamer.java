@@ -6,7 +6,7 @@ import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.TabButton;
-import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.inventory.Slot;

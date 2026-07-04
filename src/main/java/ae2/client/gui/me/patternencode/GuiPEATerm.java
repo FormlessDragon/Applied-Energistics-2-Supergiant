@@ -9,20 +9,22 @@ import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
 import ae2.client.gui.Icon;
+import ae2.client.gui.me.patternaccess.AbstractPatternAccessTerm;
+import ae2.client.gui.me.patternaccess.GuiPatternSlot;
+import ae2.client.gui.me.patternaccess.GuiProviderSelect;
 import ae2.client.gui.me.common.GuiTerminalSettings;
 import ae2.client.gui.me.common.GuiTerminalSettings.GeneralSetting;
 import ae2.client.gui.me.common.RepoSlot;
 import ae2.client.gui.me.items.GuiPatternImportPrioritySettings;
 import ae2.client.gui.me.items.GuiPatternItemRenamer;
 import ae2.client.gui.me.items.GuiSetProcessingPatternAmount;
-import ae2.client.gui.me.patternaccess.AbstractPatternAccessTerm;
-import ae2.client.gui.me.patternaccess.GuiPatternSlot;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.DynamicIconButton;
 import ae2.client.gui.widgets.TabButton;
 import ae2.container.SlotSemantics;
-import ae2.container.implementations.ContainerPEATerm;
+import ae2.container.me.patternencode.ContainerPEATerm;
+import ae2.container.me.patternencode.ProviderDirectoryPage;
 import ae2.container.slot.AppEngSlot;
 import ae2.core.AEConfig;
 import ae2.core.AppEng;
@@ -31,6 +33,8 @@ import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
+import ae2.core.network.clientbound.IProviderSelectPageReceiver;
+import ae2.container.me.patternencode.ProviderMappingPage;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
@@ -51,10 +55,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> {
+public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm>
+    implements IProviderSelectPageReceiver {
 
     private static final ResourceLocation ACCESS_TEXTURE = AppEng.makeId("textures/guis/ex_pattern_access_terminal.png");
     private static final ResourceLocation ENCODING_TEXTURE = AppEng.makeId("textures/guis/ex_pattern.png");
+    private static final String PROVIDER_SELECT_OVERLAY_WIDGET = GuiProviderSelect.WIDGET_ID;
     private static final int GUI_FOOTER_HEIGHT = 178;
     private static final int GUI_FOOTER_TEXTURE_Y = 73;
     private static final Set<GeneralSetting> PEAT_GENERAL_SETTINGS = Set.of(
@@ -66,12 +72,15 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> {
     private final Map<EncodingMode, EncodingModePanel> modePanels = new EnumMap<>(EncodingMode.class);
     private final Map<EncodingMode, TabButton> modeTabButtons = new EnumMap<>(EncodingMode.class);
     private final DynamicIconButton uploadPatternButton;
+    private final GuiProviderSelect<?> providerSelectOverlay;
+    private int providerSelectOverlayRequestNonce;
 
     public GuiPEATerm(ContainerPEATerm container, InventoryPlayer playerInventory, @Nullable ITextComponent title,
                       GuiStyle style) {
         super(container, playerInventory, title, GuiText.PatternEncodingAccessTerminalShort.text(), style,
             "pattern encoding access terminal", GUI_FOOTER_HEIGHT);
 
+        this.providerSelectOverlay = new GuiProviderSelect<>(this);
         addMode(EncodingMode.CRAFTING, new CraftingEncodingPanel(this, widgets), 0);
         addMode(EncodingMode.PROCESSING, new ProcessingEncodingPanel(this, widgets), 1);
         this.uploadPatternButton = new DynamicIconButton(
@@ -82,6 +91,7 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> {
         this.uploadPatternButton.setHalfSize(true);
         this.uploadPatternButton.setIconScale(0.5F);
         this.uploadPatternButton.setVisibility(false);
+        widgets.add(PROVIDER_SELECT_OVERLAY_WIDGET, this.providerSelectOverlay);
         widgets.add("uploadPattern", this.uploadPatternButton);
         widgets.add("encodePattern", new ActionButton(ActionItems.ENCODE,
             () -> container.encode(isShiftDown())));
@@ -105,7 +115,8 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> {
         if (container.mode == EncodingMode.PROCESSING) {
             return List.of(
                 ButtonToolTips.PatternUpload.text(),
-                ButtonToolTips.PatternUploadProcessingHint.text());
+                ButtonToolTips.PatternUploadProcessingHint.text(),
+                ButtonToolTips.PatternUploadProcessingShiftHint.text());
         }
         return List.of(
             ButtonToolTips.PatternUpload.text(),
@@ -192,6 +203,7 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> {
 
     @Override
     protected void beforePatternAccessUpdate() {
+        syncProviderSelectOverlayOpenRequest();
         for (EncodingMode mode : ENCODING_MODES) {
             boolean selected = this.container.getMode() == mode;
             TabButton tabButton = this.modeTabButtons.get(mode);
@@ -204,6 +216,22 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> {
             }
         }
         this.uploadPatternButton.setVisibility(true);
+    }
+
+    private void syncProviderSelectOverlayOpenRequest() {
+        int requestNonce = this.container.getProviderSelectOverlayRequestNonce();
+        if (requestNonce == this.providerSelectOverlayRequestNonce) {
+            return;
+        }
+
+        this.providerSelectOverlayRequestNonce = requestNonce;
+        if (requestNonce == 0) {
+            return;
+        }
+
+        this.providerSelectOverlay.open(
+            this.container.getProviderSelectOverlaySearchText(),
+            this.container.getProviderSelectOverlayMappingText());
     }
 
     @Override
@@ -295,6 +323,16 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> {
 
     private boolean isEncodedPatternSlot(Slot slot) {
         return this.container.getSlots(SlotSemantics.ENCODED_PATTERN).contains(slot);
+    }
+
+    @Override
+    public void receiveProviderDirectoryPage(ProviderDirectoryPage page) {
+        this.providerSelectOverlay.receiveProviderDirectoryPage(page);
+    }
+
+    @Override
+    public void receiveProviderMappingPage(ProviderMappingPage page) {
+        this.providerSelectOverlay.receiveProviderMappingPage(page);
     }
 
 }

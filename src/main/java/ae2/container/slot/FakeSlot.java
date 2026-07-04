@@ -61,7 +61,11 @@ public class FakeSlot extends AppEngSlot {
             if (realInv.getMode() == ConfigInventory.Mode.CONFIG_STACKS) {
                 var newFilter = configInv.convertToSuitableStack(stack);
                 if (newFilter != null && newFilter.what().equals(realInv.getKey(getSlotIndex()))) {
-                    realInv.insert(getSlotIndex(), newFilter.what(), newFilter.amount(), Actionable.MODULATE);
+                    long inserted = realInv.insert(getSlotIndex(), newFilter.what(), newFilter.amount(),
+                        Actionable.MODULATE);
+                    if (inserted > 0) {
+                        onSlotChanged();
+                    }
                     return;
                 }
             }
@@ -76,7 +80,11 @@ public class FakeSlot extends AppEngSlot {
             if (realInv.getMode() == ConfigInventory.Mode.CONFIG_STACKS) {
                 var newFilter = configInv.convertToSuitableStack(stack);
                 if (newFilter != null) {
-                    realInv.extract(getSlotIndex(), newFilter.what(), newFilter.amount(), Actionable.MODULATE);
+                    long extracted = realInv.extract(getSlotIndex(), newFilter.what(), newFilter.amount(),
+                        Actionable.MODULATE);
+                    if (extracted > 0) {
+                        onSlotChanged();
+                    }
                     return;
                 }
             }

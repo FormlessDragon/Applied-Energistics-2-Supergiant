@@ -34,16 +34,16 @@ import ae2.client.render.overlay.OverlayHighlightLocation;
 import ae2.client.render.overlay.OverlayHighlightShape;
 import ae2.container.AEBaseContainer;
 import ae2.container.SlotSemantics;
-import ae2.container.implementations.IPatternAccess;
+import ae2.container.me.patternaccess.IPatternAccess;
 import ae2.core.AEConfig;
 import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.core.network.serverbound.QuickMovePatternPacket;
-import ae2.crafting.execution.CraftingSupplierLocator;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.helpers.patternmodifier.PatternModifierToolboxLayout;
+import ae2.crafting.execution.CraftingSupplierLocator;
 import ae2.items.tools.powered.WirelessUniversalTerminalItem;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
@@ -410,6 +410,12 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
             return;
         }
 
+        Point mousePos = new Point(mouseX - this.guiLeft, mouseY - this.guiTop);
+        if (this.widgets.blocksMouseInteraction(mousePos)) {
+            this.widgets.onMouseDown(mousePos, mouseButton);
+            return;
+        }
+
         if (this.activeGroupRenameField != null && this.activeGroupRenameField.getVisible()
             && this.activeGroupRenameField.isMouseOver(mouseX, mouseY)) {
             clearSearchFieldOnRightClick(this.activeGroupRenameField, mouseX, mouseY, mouseButton);
@@ -541,8 +547,10 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
             }
 
             PatternAccessDisplaySupport.Row row = rows().get(scroll + i);
-            if (row instanceof PatternAccessDisplaySupport.SlotsRow(PatternContainerEntry containerEntry, int offset,
-                                                                     int count)) {
+            if (row instanceof PatternAccessDisplaySupport.SlotsRow(
+                PatternContainerEntry containerEntry, int offset,
+                int count
+            )) {
                 int end = offset + count;
                 for (int slot = offset; slot < end; slot++) {
                     visiblePatternContainerIds.add(containerEntry.getServerId());
@@ -746,6 +754,13 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
             return;
         }
 
+        int localMouseX = mouseX - this.guiLeft;
+        int localMouseY = mouseY - this.guiTop;
+        if (this.widgets.blocksTooltips(localMouseX, localMouseY)) {
+            super.renderHoveredToolTip(mouseX, mouseY);
+            return;
+        }
+
         for (ProviderActionButton button : this.providerActionButtons) {
             if (button.visible && button.getTooltipArea().contains(mouseX, mouseY)) {
                 var tooltipMessage = button.getTooltipMessage();
@@ -790,10 +805,12 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
 
     @Override
     public void postFullUpdate(long inventoryId, long sortBy, boolean canEditTerminalName,
-                               boolean canModifyTerminalVisibility, PatternContainerGroup group,
+                               boolean canModifyTerminalVisibility, boolean acceptsProcessingPatterns,
+                               PatternContainerGroup group, String providerLabel, String providerSearchText,
                                int inventorySize, Int2ObjectMap<ItemStack> slots) {
         if (this.patternAccessDisplay.postFullUpdate(inventoryId, sortBy, canEditTerminalName,
-            canModifyTerminalVisibility, group, inventorySize, slots)) {
+            canModifyTerminalVisibility, acceptsProcessingPatterns, group, providerLabel, providerSearchText,
+            inventorySize, slots)) {
             refreshList();
         }
     }
@@ -844,8 +861,10 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
                 }
                 continue;
             }
-            if (row instanceof PatternAccessDisplaySupport.SlotsRow(PatternContainerEntry patternContainer, int offset,
-                                                                     int slots)) {
+            if (row instanceof PatternAccessDisplaySupport.SlotsRow(
+                PatternContainerEntry patternContainer, int offset,
+                int slots
+            )) {
                 if (offset == 0) {
                     PatternAccessDisplaySupport.PatternProviderInfo info =
                         this.patternAccessDisplay.getProviderInfo(patternContainer.getServerId());
@@ -913,8 +932,10 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
         }
 
         PatternAccessDisplaySupport.Row row = rows().get(rowIndex);
-        if (!(row instanceof PatternAccessDisplaySupport.SlotsRow(PatternContainerEntry containerEntry, int offset,
-                                                                   int slots))) {
+        if (!(row instanceof PatternAccessDisplaySupport.SlotsRow(
+            PatternContainerEntry containerEntry, int offset,
+            int slots
+        ))) {
             return false;
         }
 

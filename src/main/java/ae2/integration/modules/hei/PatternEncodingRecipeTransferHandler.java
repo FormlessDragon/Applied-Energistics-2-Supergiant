@@ -8,7 +8,7 @@ import ae2.client.patternimport.PatternImportPriorityContextImpl;
 import ae2.client.patternimport.PatternImportPrioritySelector;
 import ae2.container.me.common.GridInventoryEntry;
 import ae2.container.me.common.IClientRepo;
-import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
 import ae2.container.slot.FakeSlot;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;

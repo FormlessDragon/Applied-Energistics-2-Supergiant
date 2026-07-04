@@ -19,12 +19,10 @@ import ae2.container.implementations.ContainerOutputSides;
 import ae2.container.implementations.ContainerPortableCellPickupFilter;
 import ae2.container.implementations.ContainerPortableVoidCell;
 import ae2.container.implementations.ContainerPriority;
-import ae2.container.implementations.ContainerProviderSelect;
 import ae2.container.implementations.ContainerSetStockAmount;
 import ae2.container.implementations.ContainerWirelessMagnet;
 import ae2.container.implementations.ContainerWorkInterval;
 import ae2.container.me.common.ContainerMEStorage;
-import ae2.container.me.items.ContainerPatternEncodingTerm;
 import ae2.core.definitions.AEItems;
 import ae2.core.gui.PatternContainerGuiReturnContext;
 import ae2.core.gui.locator.GuiHostLocator;
@@ -34,7 +32,6 @@ import ae2.core.network.clientbound.OpenGuiPacket;
 import ae2.core.network.clientbound.RestorePreviousGuiPacket;
 import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.IOutputSideConfigHost;
-import ae2.helpers.IPatternTerminalGuiHost;
 import ae2.helpers.IPriorityHost;
 import ae2.helpers.IWorkIntervalHost;
 import ae2.helpers.InterfaceLogicHost;
@@ -217,9 +214,6 @@ public class SwitchGuisPacket extends ServerboundPacket {
         if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
             return ICellWorkbenchHost.class;
         }
-        if (guiKey == GuiIds.GuiKey.PROVIDER_SELECT) {
-            return IPatternTerminalGuiHost.class;
-        }
         return null;
     }
 
@@ -254,9 +248,6 @@ public class SwitchGuisPacket extends ServerboundPacket {
         }
         if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION && host instanceof ICellWorkbenchHost cellWorkbench) {
             return new ContainerCellRestriction(inventory, cellWorkbench);
-        }
-        if (guiKey == GuiIds.GuiKey.PROVIDER_SELECT && host instanceof IPatternTerminalGuiHost patternTerm) {
-            return new ContainerProviderSelect(inventory, patternTerm);
         }
         return null;
     }
@@ -318,8 +309,6 @@ public class SwitchGuisPacket extends ServerboundPacket {
                 && PortableItemCellAutoPickup.isSupported(portableVoidCellHost.getItemStack()));
             case CELL_RESTRICTION -> source instanceof ContainerCellWorkbench cellWorkbench
                 && cellWorkbench.canRestrictCell();
-            case PROVIDER_SELECT -> source instanceof ContainerPatternEncodingTerm
-                && source.getTarget() instanceof IPatternTerminalGuiHost;
             default -> false;
         };
     }

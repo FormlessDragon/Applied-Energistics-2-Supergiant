@@ -7,6 +7,7 @@ import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.core.AELog;
 import ae2.core.localization.GuiText;
 import ae2.integration.Integrations;
 import net.minecraft.client.util.ITooltipFlag;
@@ -20,12 +21,15 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class AEProcessingPattern implements IPatternDetails {
     public static final int MAX_INPUT_SLOTS = 9 * 9;
     public static final int MAX_OUTPUT_SLOTS = 3 * 9;
     private static final String ENCODED_PROCESSING_PATTERN = "encoded_processing_pattern";
     private static final String TAG_RECIPE_TYPE_UID = "recipeTypeUid";
+    private static final int INVALID_RECIPE_TYPE_UID_WARNING_LIMIT = 8;
+    private static final AtomicInteger INVALID_RECIPE_TYPE_UID_WARNING_COUNT = new AtomicInteger();
 
     private final AEItemKey definition;
     private final List<GenericStack> sparseInputs;
@@ -54,9 +58,7 @@ public class AEProcessingPattern implements IPatternDetails {
             throw new IllegalArgumentException("At least one output must be present.");
         }
         Objects.requireNonNull(this.sparseOutputs.getFirst(), "The first (primary) output must be non-null.");
-        this.recipeTypeUid = encodedPattern.hasKey(TAG_RECIPE_TYPE_UID, 8)
-            ? encodedPattern.getString(TAG_RECIPE_TYPE_UID)
-            : null;
+        this.recipeTypeUid = readRecipeTypeUid(encodedPattern);
         var condensedInputs = AEPatternHelper.condenseStacks(sparseInputs);
         this.inputs = new Input[condensedInputs.size()];
         for (int i = 0; i < inputs.length; ++i) {
@@ -80,11 +82,12 @@ public class AEProcessingPattern implements IPatternDetails {
         }
         Objects.requireNonNull(sparseOutputs.getFirst(), "The first (primary) output must be non-null.");
 
+        String normalizedRecipeTypeUid = recipeTypeUid == null ? null : RecipeTypeUid.requireValid(recipeTypeUid);
         var encoded = new NBTTagCompound();
         encoded.setTag("inputs", writeGenericStackList(sparseInputs));
         encoded.setTag("outputs", writeGenericStackList(sparseOutputs));
-        if (recipeTypeUid != null && !recipeTypeUid.isEmpty()) {
-            encoded.setString(TAG_RECIPE_TYPE_UID, recipeTypeUid);
+        if (normalizedRecipeTypeUid != null) {
+            encoded.setString(TAG_RECIPE_TYPE_UID, normalizedRecipeTypeUid);
         }
         stack.setTagInfo(ENCODED_PROCESSING_PATTERN, encoded);
     }
@@ -105,7 +108,7 @@ public class AEProcessingPattern implements IPatternDetails {
                     tooltip.addOutput(output);
                 }
             }
-            addRecipeTypeProperty(tooltip, tag.hasKey(TAG_RECIPE_TYPE_UID, 8) ? tag.getString(TAG_RECIPE_TYPE_UID) : null);
+            addRecipeTypeProperty(tooltip, readRecipeTypeUid(tag));
         }
         return tooltip;
     }
@@ -118,6 +121,37 @@ public class AEProcessingPattern implements IPatternDetails {
         String title = Integrations.hei().getRecipeCategoryTitle(recipeTypeUid);
         if (title != null && !title.isEmpty()) {
             tooltip.addProperty(GuiText.RecipeType.text(), new TextComponentString(title));
+        }
+    }
+
+    @Nullable
+    private static String readRecipeTypeUid(NBTTagCompound encodedPattern) {
+        if (!encodedPattern.hasKey(TAG_RECIPE_TYPE_UID)) {
+            return null;
+        }
+        if (!encodedPattern.hasKey(TAG_RECIPE_TYPE_UID, Constants.NBT.TAG_STRING)) {
+            warnInvalidStoredRecipeTypeUid(
+                "Ignoring recipe type UID stored in a processing pattern because its NBT tag is not a string");
+            return null;
+        }
+
+        String rawRecipeTypeUid = encodedPattern.getString(TAG_RECIPE_TYPE_UID);
+        String normalizedRecipeTypeUid = RecipeTypeUid.normalize(rawRecipeTypeUid);
+        if (normalizedRecipeTypeUid == null) {
+            warnInvalidStoredRecipeTypeUid(
+                "Ignoring invalid recipe type UID stored in a processing pattern (UTF-16 length: %d)",
+                rawRecipeTypeUid.length());
+        }
+        return normalizedRecipeTypeUid;
+    }
+
+    private static void warnInvalidStoredRecipeTypeUid(String warningMessage, Object... parameters) {
+        int warningIndex = INVALID_RECIPE_TYPE_UID_WARNING_COUNT.getAndUpdate(
+            current -> current <= INVALID_RECIPE_TYPE_UID_WARNING_LIMIT ? current + 1 : current);
+        if (warningIndex < INVALID_RECIPE_TYPE_UID_WARNING_LIMIT) {
+            AELog.warn(warningMessage, parameters);
+        } else if (warningIndex == INVALID_RECIPE_TYPE_UID_WARNING_LIMIT) {
+            AELog.warn("Suppressing further warnings for invalid recipe type UIDs stored in processing patterns");
         }
     }
 
@@ -190,6 +224,11 @@ public class AEProcessingPattern implements IPatternDetails {
     @Nullable
     public String getRecipeType() {
         return Integrations.hei().getRecipeCategoryTitle(recipeTypeUid);
+    }
+
+    @Nullable
+    public String getRecipeTypeUid() {
+        return this.recipeTypeUid;
     }
 
     public List<GenericStack> getSparseInputs() {

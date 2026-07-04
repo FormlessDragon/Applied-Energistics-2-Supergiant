@@ -9,7 +9,7 @@ import ae2.client.gui.style.Blitter;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.ToggleButton;
 import ae2.container.SlotSemantics;
-import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import net.minecraft.client.gui.Gui;
