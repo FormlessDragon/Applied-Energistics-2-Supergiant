@@ -21,6 +21,7 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
+import org.jspecify.annotations.NonNull;
 
 import java.awt.Rectangle;
 import java.io.IOException;
@@ -258,7 +259,7 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             return List.of(
                 getMessageComponent(),
                 Tooltips.muted(ButtonToolTips.CycleModeAction.text(Tooltips.getMouseButtonText(0))),
@@ -311,7 +312,7 @@ public class GuiPatternModifier extends AEBaseGui<ContainerPatternModifier> {
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             return Collections.singletonList(this.tooltip);
         }
 

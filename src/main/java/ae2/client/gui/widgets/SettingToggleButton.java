@@ -66,6 +66,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -651,7 +652,7 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
     }
 
     @Override
-    public List<ITextComponent> getTooltipMessage() {
+    public @NonNull List<ITextComponent> getTooltipMessage() {
         if (this.buttonSetting == null || this.currentValue == null) {
             return Collections.emptyList();
         }

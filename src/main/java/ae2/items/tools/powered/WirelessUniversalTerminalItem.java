@@ -11,7 +11,6 @@ import ae2.core.gui.locator.GuiHostLocators;
 import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.PlayerMessages;
-import ae2.core.localization.Tooltips;
 import ae2.helpers.WirelessTerminalGuiHost;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.creativetab.CreativeTabs;
@@ -29,6 +28,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.input.Keyboard;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -249,14 +249,26 @@ public class WirelessUniversalTerminalItem extends WirelessTerminalItem {
                                          ITooltipFlag advancedTooltips) {
         WirelessTerminalItem current = getCurrentTerminal(stack);
         if (current != null) {
-            lines.add(Tooltips.of(GuiText.WirelessTerminalCurrent.text(
-                current.getWirelessTerminalDefinition().displayName())).getFormattedText());
+            lines.add(GuiText.WirelessUniversalTerminalCurrent.getLocal(
+                current.getWirelessTerminalDefinition().displayName().getFormattedText()));
         }
-        for (String id : getInstalledTerminalIds(stack)) {
-            WirelessTerminalDefinition definition = WirelessTerminalRegistry.definitionOfId(id);
-            if (definition != null) {
-                lines.add(Tooltips.of(" - " + definition.displayName().getFormattedText()).getFormattedText());
+        boolean shiftDown = Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
+        if (shiftDown) {
+            lines.add(GuiText.WirelessUniversalTerminalInstalledTitle.getLocal());
+            boolean foundInstalled = false;
+            for (String id : getInstalledTerminalIds(stack)) {
+                WirelessTerminalDefinition definition = WirelessTerminalRegistry.definitionOfId(id);
+                if (definition != null) {
+                    lines.add(GuiText.WirelessUniversalTerminalInstalledLine.getLocal(
+                        definition.displayName().getFormattedText()));
+                    foundInstalled = true;
+                }
             }
+            if (!foundInstalled) {
+                lines.add(GuiText.WirelessUniversalTerminalInstalledEmpty.getLocal());
+            }
+        } else {
+            lines.add(GuiText.WirelessUniversalTerminalDetailsHint.getLocal());
         }
         super.addCheckedInformation(stack, world, lines, advancedTooltips);
     }

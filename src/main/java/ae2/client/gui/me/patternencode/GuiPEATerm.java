@@ -44,6 +44,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.util.EnumMap;
@@ -87,7 +88,7 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> {
             }
 
             @Override
-            public List<ITextComponent> getTooltipMessage() {
+            public @NonNull List<ITextComponent> getTooltipMessage() {
                 if (container.mode == EncodingMode.PROCESSING) {
                     return List.of(
                         ButtonToolTips.PatternUpload.text(),

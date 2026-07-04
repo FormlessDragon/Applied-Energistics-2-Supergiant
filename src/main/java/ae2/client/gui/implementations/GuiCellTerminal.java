@@ -112,6 +112,7 @@ import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.fml.common.Optional;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
@@ -4157,7 +4158,7 @@ public class GuiCellTerminal extends AEBaseGui<ContainerCellTerminal> implements
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             StringJoiner joiner = new StringJoiner(", ");
             for (AEKeyType keyType : container.getClientKeyTypeSelection().enabledSet()) {
                 joiner.add(keyType.getDescription().getFormattedText());

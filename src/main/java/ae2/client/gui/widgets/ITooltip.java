@@ -19,6 +19,7 @@
 package ae2.client.gui.widgets;
 
 import net.minecraft.util.text.ITextComponent;
+import org.jetbrains.annotations.NotNull;
 
 import java.awt.Rectangle;
 import java.util.Collections;
@@ -34,6 +35,7 @@ public interface ITooltip {
      *
      * @return tooltip message or an empty list to not show a tooltip
      */
+    @NotNull
     default List<ITextComponent> getTooltipMessage() {
         return Collections.emptyList();
     }

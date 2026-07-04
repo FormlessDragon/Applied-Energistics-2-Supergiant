@@ -14,6 +14,7 @@ import ae2.parts.automation.special.ThresholdMode;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
+import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
@@ -72,7 +73,7 @@ public class GuiThresholdExportBus extends GuiSpecialExportBus<ContainerThreshol
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             return List.of(GuiText.thresholdMode(this.container.mode).text());
         }
     }

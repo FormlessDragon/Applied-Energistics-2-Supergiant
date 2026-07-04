@@ -10,6 +10,7 @@ import ae2.container.implementations.ContainerCellRestriction;
 import ae2.core.localization.GuiText;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.awt.Rectangle;
@@ -233,7 +234,7 @@ public class GuiCellRestriction extends AEBaseGui<ContainerCellRestriction> {
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             return List.of(GuiText.ResetRestrictionHint.text());
         }
 

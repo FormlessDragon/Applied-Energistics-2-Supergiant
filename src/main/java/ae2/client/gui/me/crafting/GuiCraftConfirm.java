@@ -50,6 +50,7 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.awt.Rectangle;
@@ -482,7 +483,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> implements
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             return this.tooltip;
         }
 

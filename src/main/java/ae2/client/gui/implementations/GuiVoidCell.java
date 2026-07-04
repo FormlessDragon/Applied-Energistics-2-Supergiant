@@ -10,6 +10,7 @@ import ae2.core.localization.GuiText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
+import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
@@ -72,7 +73,7 @@ public class GuiVoidCell extends AEBaseGui<ContainerVoidCell> {
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             return List.of(GuiText.voidCellMode(this.output).text());
         }
     }

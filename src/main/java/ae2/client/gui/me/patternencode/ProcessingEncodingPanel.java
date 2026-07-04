@@ -18,6 +18,7 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.util.text.ITextComponent;
+import org.jspecify.annotations.NonNull;
 
 import java.awt.Rectangle;
 import java.util.Collections;
@@ -232,7 +233,7 @@ public class ProcessingEncodingPanel extends EncodingModePanel {
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             int amount = switch (this.operation) {
                 case MULTIPLY_2, DIVIDE_2 -> 2;
                 case MULTIPLY_3, DIVIDE_3 -> 3;

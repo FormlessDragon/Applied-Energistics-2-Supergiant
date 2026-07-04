@@ -1,5 +1,6 @@
 package ae2.core.network.serverbound;
 
+import ae2.api.config.Actionable;
 import ae2.api.config.FuzzyMode;
 import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.inventories.InternalInventory;
@@ -19,6 +20,7 @@ import ae2.core.network.ServerboundPacket;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.items.storage.ViewCellItem;
 import ae2.me.storage.NullInventory;
+import ae2.util.Platform;
 import ae2.util.CraftingRecipeUtil;
 import ae2.util.EmptyArrays;
 import ae2.util.prioritylist.IPartitionList;
@@ -42,6 +44,7 @@ import net.minecraft.item.crafting.Ingredient;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.NonNullList;
 import net.minecraft.util.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.List;
@@ -276,35 +279,35 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
         writeGenericStacks(packetBuffer, this.temporaryPseudoOutputs);
     }
 
-    private ItemStack growIngredientFromNetwork(ICraftingGridContainer container, IEnergySource energy,
-                                                MEStorage networkStorage, KeyCounter cachedStorage,
-                                                IPartitionList filter, Ingredient ingredient, ItemStack currentItem,
-                                                int targetAmount) {
+    private static boolean canMergeIntoIngredientStack(ItemStack currentItem, ItemStack candidate) {
+        return currentItem.isEmpty()
+            || ItemStack.areItemsEqual(currentItem, candidate)
+            && ItemStack.areItemStackTagsEqual(currentItem, candidate);
+    }
+
+    private ItemStack growIngredientFromGridCache(List<ItemStack> gridCache, Ingredient ingredient,
+                                                  ItemStack currentItem, int targetAmount) {
         int missing = targetAmount - currentItem.getCount();
         if (missing <= 0) {
             return currentItem;
         }
 
         ItemStack result = currentItem.copy();
-        for (AEItemKey what : findBestMatchingItemStack(ingredient, filter, cachedStorage)) {
-            ItemStack candidate = what.toStack();
-            if (!result.isEmpty() && (!ItemStack.areItemsEqual(result, candidate)
-                || !ItemStack.areItemStackTagsEqual(result, candidate))) {
-                continue;
-            }
-            long extracted = StorageHelper.poweredExtraction(energy, networkStorage, what, missing,
-                container.getActionSource());
-            if (extracted <= 0) {
+        for (ItemStack cachedStack : gridCache) {
+            if (cachedStack.isEmpty() || !ingredient.apply(cachedStack)
+                || !canMergeIntoIngredientStack(result, cachedStack)) {
                 continue;
             }
 
-            ItemStack extractedStack = what.toStack(Ints.saturatedCast(extracted));
+            int taken = Math.min(missing, cachedStack.getCount());
+            ItemStack takenStack = cachedStack.copy();
+            takenStack.setCount(taken);
             if (result.isEmpty()) {
-                result = extractedStack;
-            } else if (ItemStack.areItemsEqual(result, extractedStack)
-                && ItemStack.areItemStackTagsEqual(result, extractedStack)) {
-                result.grow(extractedStack.getCount());
+                result = takenStack;
+            } else {
+                result.grow(taken);
             }
+            cachedStack.shrink(taken);
 
             missing = targetAmount - result.getCount();
             if (missing <= 0) {
@@ -314,8 +317,45 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
         return result;
     }
 
-    private ItemStack growIngredientFromPlayer(ICraftingGridContainer container, EntityPlayerMP player,
-                                               Ingredient ingredient, ItemStack currentItem, int targetAmount) {
+    private ItemStack growIngredientFromNetworkPlan(KeyCounter networkAvailable, KeyCounter networkRequests,
+                                                    IPartitionList filter, Ingredient ingredient,
+                                                    ItemStack currentItem, int targetAmount) {
+        int missing = targetAmount - currentItem.getCount();
+        if (missing <= 0) {
+            return currentItem;
+        }
+
+        ItemStack result = currentItem.copy();
+        for (AEItemKey what : findBestMatchingItemStack(ingredient, filter, networkAvailable)) {
+            ItemStack candidate = what.toStack();
+            if (!canMergeIntoIngredientStack(result, candidate)) {
+                continue;
+            }
+
+            int taken = Ints.saturatedCast(Math.min(missing, networkAvailable.get(what)));
+            if (taken <= 0) {
+                continue;
+            }
+            ItemStack extractedStack = what.toStack(taken);
+            if (result.isEmpty()) {
+                result = extractedStack;
+            } else {
+                result.grow(taken);
+            }
+            networkAvailable.remove(what, taken);
+            networkRequests.add(what, taken);
+
+            missing = targetAmount - result.getCount();
+            if (missing <= 0) {
+                break;
+            }
+        }
+        return result;
+    }
+
+    private ItemStack growIngredientFromPlayerPlan(ICraftingGridContainer container, EntityPlayerMP player,
+                                                   int[] reservedPlayerItems, List<PlayerTake> playerTakes,
+                                                   Ingredient ingredient, ItemStack currentItem, int targetAmount) {
         ItemStack result = currentItem.copy();
         int missing = targetAmount - result.getCount();
         if (missing <= 0) {
@@ -328,17 +368,19 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
             }
 
             ItemStack item = player.inventory.mainInventory.get(i);
-            if (!item.isEmpty() && ingredient.apply(item)) {
-                if (!result.isEmpty() && (!ItemStack.areItemsEqual(result, item)
-                    || !ItemStack.areItemStackTagsEqual(result, item))) {
-                    continue;
-                }
-                ItemStack taken = item.splitStack(Math.min(missing, item.getCount()));
+            int available = item.getCount() - reservedPlayerItems[i];
+            if (!item.isEmpty() && available > 0 && ingredient.apply(item)
+                && canMergeIntoIngredientStack(result, item)) {
+                int taken = Math.min(missing, available);
+                ItemStack takenStack = item.copy();
+                takenStack.setCount(taken);
                 if (result.isEmpty()) {
-                    result = taken;
+                    result = takenStack;
                 } else {
-                    result.grow(taken.getCount());
+                    result.grow(taken);
                 }
+                reservedPlayerItems[i] += taken;
+                playerTakes.add(new PlayerTake(i, taken));
                 missing = targetAmount - result.getCount();
                 if (missing <= 0) {
                     break;
@@ -346,11 +388,6 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
             }
         }
         return result;
-    }
-
-    private ItemStack takeIngredientFromPlayer(ICraftingGridContainer container, EntityPlayerMP player,
-                                               Ingredient ingredient, int targetAmount) {
-        return growIngredientFromPlayer(container, player, ingredient, ItemStack.EMPTY, targetAmount);
     }
 
     private int getDesiredAmount(int slot) {
@@ -364,6 +401,207 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
             }
         }
         return 1;
+    }
+
+    @Nullable
+    private PlannedTransfer planTransfer(ICraftingGridContainer container, EntityPlayerMP player,
+                                         InternalInventory craftMatrix, KeyCounter cachedStorage,
+                                         IPartitionList filter, NonNullList<Ingredient> ingredients,
+                                         boolean useTemporaryPseudoCraft, @Nullable ICraftingService craftingService) {
+        NonNullList<ItemStack> plannedGrid = NonNullList.withSize(craftMatrix.size(), ItemStack.EMPTY);
+        List<ItemStack> gridCache = new ObjectArrayList<>(craftMatrix.size());
+        for (int slot = 0; slot < craftMatrix.size(); slot++) {
+            ItemStack stack = craftMatrix.getStackInSlot(slot);
+            if (!stack.isEmpty()) {
+                gridCache.add(stack.copy());
+            }
+        }
+
+        KeyCounter networkAvailable = new KeyCounter();
+        networkAvailable.addAll(cachedStorage);
+        KeyCounter networkRequests = new KeyCounter();
+        int[] reservedPlayerItems = new int[player.inventory.mainInventory.size()];
+        List<PlayerTake> playerTakes = new ObjectArrayList<>();
+        Object2ObjectMap<AEItemKey, AutoCraftRequest> toAutoCraft = new Object2ObjectLinkedOpenHashMap<>();
+
+        int slotsToFill = Math.min(craftMatrix.size(), ingredients.size());
+        for (int slot = 0; slot < slotsToFill; slot++) {
+            Ingredient ingredient = ingredients.get(slot);
+            if (ingredient == Ingredient.EMPTY) {
+                continue;
+            }
+
+            int targetAmount = getDesiredAmount(slot);
+            ItemStack plannedItem = ItemStack.EMPTY;
+            plannedItem = growIngredientFromGridCache(gridCache, ingredient, plannedItem, targetAmount);
+            plannedItem = growIngredientFromNetworkPlan(networkAvailable, networkRequests, filter, ingredient,
+                plannedItem, targetAmount);
+            plannedItem = growIngredientFromPlayerPlan(container, player, reservedPlayerItems, playerTakes,
+                ingredient, plannedItem, targetAmount);
+            plannedGrid.set(slot, plannedItem);
+
+            int missingAmount = targetAmount - (!plannedItem.isEmpty() && ingredient.apply(plannedItem)
+                ? plannedItem.getCount()
+                : 0);
+            if (missingAmount <= 0) {
+                continue;
+            }
+
+            boolean scheduledCraft = false;
+            if (this.craftMissing && !useTemporaryPseudoCraft && craftingService != null) {
+                Optional<AEItemKey> craftableKey = findCraftableKey(ingredient, craftingService);
+                if (craftableKey.isPresent()) {
+                    AutoCraftRequest request = toAutoCraft.computeIfAbsent(craftableKey.get(),
+                        ignored -> new AutoCraftRequest());
+                    request.add(slot, missingAmount);
+                    scheduledCraft = true;
+                }
+            }
+            if (!scheduledCraft && !useTemporaryPseudoCraft) {
+                return null;
+            }
+        }
+
+        gridCache.removeIf(ItemStack::isEmpty);
+        return new PlannedTransfer(plannedGrid, gridCache, networkRequests, playerTakes, toAutoCraft);
+    }
+
+    private boolean canApplyPlayerTakes(EntityPlayerMP player, List<PlayerTake> playerTakes) {
+        int[] required = new int[player.inventory.mainInventory.size()];
+        for (PlayerTake take : playerTakes) {
+            if (take.slot < 0 || take.slot >= player.inventory.mainInventory.size()) {
+                return false;
+            }
+            required[take.slot] += take.amount;
+        }
+
+        for (int slot = 0; slot < required.length; slot++) {
+            if (required[slot] <= 0) {
+                continue;
+            }
+            ItemStack stack = player.inventory.mainInventory.get(slot);
+            if (stack.isEmpty() || stack.getCount() < required[slot]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void applyPlayerTakes(EntityPlayerMP player, List<PlayerTake> playerTakes) {
+        for (PlayerTake take : playerTakes) {
+            ItemStack stack = player.inventory.mainInventory.get(take.slot);
+            stack.shrink(take.amount);
+            if (stack.isEmpty()) {
+                player.inventory.mainInventory.set(take.slot, ItemStack.EMPTY);
+            }
+        }
+    }
+
+    @Nullable
+    private List<NetworkExtraction> extractPlannedNetworkRequests(ICraftingGridContainer container,
+                                                                  IEnergySource energy,
+                                                                  MEStorage networkStorage,
+                                                                  KeyCounter networkRequests,
+                                                                  EntityPlayerMP player) {
+        for (Object2LongMap.Entry<AEKey> entry : networkRequests) {
+            long amount = entry.getLongValue();
+            if (amount <= 0) {
+                continue;
+            }
+            long available = StorageHelper.poweredExtraction(energy, networkStorage, entry.getKey(), amount,
+                container.getActionSource(), Actionable.SIMULATE);
+            if (available < amount) {
+                return null;
+            }
+        }
+
+        List<NetworkExtraction> extracted = new ObjectArrayList<>();
+        for (Object2LongMap.Entry<AEKey> entry : networkRequests) {
+            long amount = entry.getLongValue();
+            if (amount <= 0) {
+                continue;
+            }
+            long extractedAmount = StorageHelper.poweredExtraction(energy, networkStorage, entry.getKey(), amount,
+                container.getActionSource(), Actionable.MODULATE);
+            if (extractedAmount < amount) {
+                returnExtractedNetworkItems(container, energy, networkStorage, player, extracted);
+                if (extractedAmount > 0) {
+                    returnExtractedNetworkItems(container, energy, networkStorage, player,
+                        List.of(new NetworkExtraction(entry.getKey(), extractedAmount)));
+                }
+                return null;
+            }
+            extracted.add(new NetworkExtraction(entry.getKey(), extractedAmount));
+        }
+        return extracted;
+    }
+
+    private void returnExtractedNetworkItems(ICraftingGridContainer container, IEnergySource energy,
+                                             MEStorage networkStorage, EntityPlayerMP player,
+                                             List<NetworkExtraction> extractions) {
+        for (NetworkExtraction extraction : extractions) {
+            if (extraction.amount <= 0 || !(extraction.what instanceof AEItemKey itemKey)) {
+                continue;
+            }
+            recycleStack(container, energy, networkStorage, player, itemKey.toStack(Ints.saturatedCast(extraction.amount)));
+        }
+    }
+
+    private boolean recycleGridCache(ICraftingGridContainer container, IEnergySource energy, MEStorage networkStorage,
+                                     EntityPlayerMP player, List<ItemStack> gridCache) {
+        boolean touchedGridStorage = false;
+        for (ItemStack stack : gridCache) {
+            if (!stack.isEmpty() && recycleStack(container, energy, networkStorage, player, stack.copy())) {
+                touchedGridStorage = true;
+            }
+        }
+        return touchedGridStorage;
+    }
+
+    private boolean recycleStack(ICraftingGridContainer container, IEnergySource energy, MEStorage networkStorage,
+                                 EntityPlayerMP player, ItemStack stack) {
+        boolean touchedGridStorage = false;
+        AEItemKey key = AEItemKey.of(stack);
+        if (key != null) {
+            long inserted = StorageHelper.poweredInsert(energy, networkStorage, key, stack.getCount(),
+                container.getActionSource());
+            if (inserted > 0) {
+                touchedGridStorage = true;
+                stack.shrink(Ints.saturatedCast(inserted));
+            }
+        }
+        if (!stack.isEmpty()) {
+            player.inventory.addItemStackToInventory(stack);
+        }
+        if (!stack.isEmpty()) {
+            Platform.spawnDrops(player.world, player.getPosition(), List.of(stack.copy()));
+            stack.setCount(0);
+        }
+        return touchedGridStorage;
+    }
+
+    private TransferCommit applyPlannedTransfer(ICraftingGridContainer container, EntityPlayerMP player,
+                                                IEnergySource energy, MEStorage networkStorage,
+                                                InternalInventory craftMatrix, PlannedTransfer plannedTransfer) {
+        if (!canApplyPlayerTakes(player, plannedTransfer.playerTakes)) {
+            return TransferCommit.failed();
+        }
+        List<NetworkExtraction> extractedNetwork = extractPlannedNetworkRequests(container, energy, networkStorage,
+            plannedTransfer.networkRequests, player);
+        if (extractedNetwork == null) {
+            return TransferCommit.failed();
+        }
+
+        applyPlayerTakes(player, plannedTransfer.playerTakes);
+        for (int slot = 0; slot < craftMatrix.size(); slot++) {
+            craftMatrix.setItemDirect(slot, ItemStack.EMPTY);
+        }
+        boolean recycledToNetwork = recycleGridCache(container, energy, networkStorage, player,
+            plannedTransfer.gridCacheRemainders);
+        for (int slot = 0; slot < Math.min(craftMatrix.size(), plannedTransfer.grid.size()); slot++) {
+            craftMatrix.setItemDirect(slot, plannedTransfer.grid.get(slot).copy());
+        }
+        return new TransferCommit(true, !plannedTransfer.networkRequests.isEmpty() || recycledToNetwork);
     }
 
     @Override
@@ -402,101 +640,27 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
         InternalInventory craftMatrix = container.getCraftingMatrix();
         IPartitionList filter = ViewCellItem.createItemFilter(container.getViewCells());
         NonNullList<Ingredient> ingredients = getDesiredIngredients();
-        boolean useTemporaryPseudoCraft = this.craftMissing
+        boolean useTemporaryPseudoCraft = craftingService != null && this.craftMissing
             && !this.temporaryPseudoInputs.isEmpty()
             && !this.temporaryPseudoOutputs.isEmpty();
 
-        Object2ObjectMap<AEItemKey, AutoCraftRequest> toAutoCraft = new Object2ObjectLinkedOpenHashMap<>();
-        boolean touchedGridStorage = false;
-
-        int slotsToFill = Math.min(craftMatrix.size(), ingredients.size());
-        for (int slot = 0; slot < slotsToFill; slot++) {
-            ItemStack currentItem = craftMatrix.getStackInSlot(slot);
-            Ingredient ingredient = ingredients.get(slot);
-            int targetAmount = ingredient == Ingredient.EMPTY ? 1 : getDesiredAmount(slot);
-
-            if (!currentItem.isEmpty()) {
-                if (ingredient.apply(currentItem) && currentItem.getCount() >= targetAmount) {
-                    continue;
-                }
-
-                if (!ingredient.apply(currentItem)) {
-                    AEItemKey in = AEItemKey.of(currentItem);
-                    long inserted = in != null
-                        ? StorageHelper.poweredInsert(energy, networkStorage, in, currentItem.getCount(),
-                        container.getActionSource())
-                        : 0;
-                    if (inserted > 0) {
-                        touchedGridStorage = true;
-                    }
-                    if (inserted < currentItem.getCount()) {
-                        currentItem = currentItem.copy();
-                        currentItem.shrink((int) inserted);
-                    } else {
-                        currentItem = ItemStack.EMPTY;
-                    }
-                    if (!currentItem.isEmpty()) {
-                        player.inventory.addItemStackToInventory(currentItem);
-                    }
-                    craftMatrix.setItemDirect(slot, currentItem.isEmpty() ? ItemStack.EMPTY : currentItem);
-                }
-            }
-
-            if (ingredient == Ingredient.EMPTY) {
-                continue;
-            }
-
-            if (!currentItem.isEmpty() && ingredient.apply(currentItem) && currentItem.getCount() < targetAmount) {
-                int beforeCount = currentItem.getCount();
-                currentItem = growIngredientFromNetwork(container, energy, networkStorage, cachedStorage, filter,
-                    ingredient, currentItem, targetAmount);
-                if (currentItem.getCount() > beforeCount) {
-                    touchedGridStorage = true;
-                }
-                if (currentItem.getCount() < targetAmount) {
-                    currentItem = growIngredientFromPlayer(container, player, ingredient, currentItem, targetAmount);
-                }
-                craftMatrix.setItemDirect(slot, currentItem);
-                continue;
-            }
-
-            if (currentItem.isEmpty()) {
-                for (AEItemKey what : findBestMatchingItemStack(ingredient, filter, cachedStorage)) {
-                    long extracted = StorageHelper.poweredExtraction(energy, networkStorage, what, targetAmount,
-                        container.getActionSource());
-                    if (extracted > 0) {
-                        touchedGridStorage = true;
-                        currentItem = what.toStack(Ints.saturatedCast(extracted));
-                        break;
-                    }
-                }
-            }
-
-            if (currentItem.isEmpty()) {
-                currentItem = takeIngredientFromPlayer(container, player, ingredient, targetAmount);
-            }
-
-            craftMatrix.setItemDirect(slot, currentItem);
-
-            int missingAmount = targetAmount - (!currentItem.isEmpty() && ingredient.apply(currentItem)
-                ? currentItem.getCount()
-                : 0);
-            if (missingAmount > 0 && this.craftMissing && !useTemporaryPseudoCraft && craftingService != null) {
-                final int craftSlot = slot;
-                final int craftAmount = missingAmount;
-                findCraftableKey(ingredient, craftingService).ifPresent(key -> {
-                    AutoCraftRequest request = toAutoCraft.computeIfAbsent(key, ignored -> new AutoCraftRequest());
-                    request.add(craftSlot, craftAmount);
-                });
-            }
+        PlannedTransfer plannedTransfer = planTransfer(container, player, craftMatrix, cachedStorage, filter,
+            ingredients, useTemporaryPseudoCraft, craftingService);
+        if (plannedTransfer == null) {
+            return;
+        }
+        TransferCommit transferCommit = applyPlannedTransfer(container, player, energy, networkStorage, craftMatrix,
+            plannedTransfer);
+        if (!transferCommit.success) {
+            return;
         }
 
         if (player.openContainer == baseContainer) {
             baseContainer.onCraftMatrixChanged(craftMatrix.toContainer());
         }
 
-        if (useTemporaryPseudoCraft && craftingService != null) {
-            if (touchedGridStorage && storageService != null) {
+        if (useTemporaryPseudoCraft) {
+            if (transferCommit.touchedGridStorage && storageService != null) {
                 storageService.invalidateCache();
             }
 
@@ -504,14 +668,14 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
             return;
         }
 
-        if (!toAutoCraft.isEmpty()) {
-            if (touchedGridStorage && storageService != null) {
+        if (!plannedTransfer.toAutoCraft.isEmpty()) {
+            if (transferCommit.touchedGridStorage && storageService != null) {
                 storageService.invalidateCache();
             }
 
             List<ICraftingGridContainer.AutoCraftEntry> stacks = new ObjectArrayList<>(
-                toAutoCraft.size());
-            for (Object2ObjectMap.Entry<AEItemKey, AutoCraftRequest> entry : toAutoCraft.object2ObjectEntrySet()) {
+                plannedTransfer.toAutoCraft.size());
+            for (Object2ObjectMap.Entry<AEItemKey, AutoCraftRequest> entry : plannedTransfer.toAutoCraft.object2ObjectEntrySet()) {
                 AutoCraftRequest request = entry.getValue();
                 stacks.add(new ICraftingGridContainer.AutoCraftEntry(entry.getKey(), request.amount(), request.slots()));
             }
@@ -582,6 +746,23 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
             }
         }
         return Optional.empty();
+    }
+
+    private record PlannedTransfer(NonNullList<ItemStack> grid, List<ItemStack> gridCacheRemainders,
+                                   KeyCounter networkRequests, List<PlayerTake> playerTakes,
+                                   Object2ObjectMap<AEItemKey, AutoCraftRequest> toAutoCraft) {
+    }
+
+    private record PlayerTake(int slot, int amount) {
+    }
+
+    private record NetworkExtraction(AEKey what, long amount) {
+    }
+
+    private record TransferCommit(boolean success, boolean touchedGridStorage) {
+        private static TransferCommit failed() {
+            return new TransferCommit(false, false);
+        }
     }
 
     private static final class AutoCraftRequest {

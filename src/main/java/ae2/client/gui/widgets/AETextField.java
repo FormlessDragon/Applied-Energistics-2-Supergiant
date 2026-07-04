@@ -30,6 +30,7 @@ import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
@@ -297,7 +298,7 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
     }
 
     @Override
-    public List<ITextComponent> getTooltipMessage() {
+    public @NonNull List<ITextComponent> getTooltipMessage() {
         return this.tooltipMessage;
     }
 

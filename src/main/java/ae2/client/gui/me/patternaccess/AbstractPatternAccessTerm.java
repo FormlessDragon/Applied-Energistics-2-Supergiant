@@ -64,6 +64,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.awt.Rectangle;
@@ -1278,7 +1279,7 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             boolean editable = isEditable(this.entry);
             boolean visibilityModifiable = canToggleVisibility();
             int lineCount = 0;

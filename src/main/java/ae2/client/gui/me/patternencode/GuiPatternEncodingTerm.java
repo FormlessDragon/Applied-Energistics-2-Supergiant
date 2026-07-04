@@ -39,6 +39,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
@@ -72,7 +73,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
             }
 
             @Override
-            public List<ITextComponent> getTooltipMessage() {
+            public @NonNull List<ITextComponent> getTooltipMessage() {
                 if(container.mode == EncodingMode.PROCESSING) {
                     return Arrays.asList(
                             ButtonToolTips.PatternUpload.text(),

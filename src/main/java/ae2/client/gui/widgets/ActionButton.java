@@ -27,6 +27,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Collections;
 import java.util.List;
@@ -185,7 +186,7 @@ public class ActionButton extends IconButton {
     }
 
     @Override
-    public List<ITextComponent> getTooltipMessage() {
+    public @NonNull List<ITextComponent> getTooltipMessage() {
         return this.tooltip;
     }
 

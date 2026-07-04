@@ -11,6 +11,7 @@ import ae2.core.localization.GuiText;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
@@ -108,7 +109,7 @@ public class GuiWirelessMagnet extends AEBaseGui<ContainerWirelessMagnet> {
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             return this.tooltip;
         }
     }

@@ -572,7 +572,10 @@ public class WidgetContainer {
                 if (tooltip.isTooltipAreaVisible()) {
                     Rectangle area = toRelative(tooltip.getTooltipArea());
                     if (contains(area, mouseX, mouseY)) {
-                        return new Tooltip(tooltip.getTooltipMessage());
+                        var t = tooltip.getTooltipMessage();
+                        if (!t.isEmpty()) {
+                            return new Tooltip(t);
+                        }
                     }
                 }
             }
@@ -582,7 +585,10 @@ public class WidgetContainer {
             if (widget.isTooltipAreaVisible()) {
                 Rectangle area = toRelative(widget.getTooltipArea());
                 if (contains(area, mouseX, mouseY)) {
-                    return new Tooltip(widget.getTooltipMessage());
+                    var t = widget.getTooltipMessage();
+                    if (!t.isEmpty()) {
+                        return new Tooltip(t);
+                    }
                 }
             }
         }

@@ -2,6 +2,7 @@ package ae2.items.tools.powered;
 
 import ae2.api.implementations.items.WirelessTerminalDefinition;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectLinkedOpenHashMap;
 import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -11,7 +12,7 @@ import java.util.Map;
 
 public final class WirelessTerminalRegistry {
     private static final Map<String, WirelessTerminalDefinition> BY_ID = new Object2ObjectLinkedOpenHashMap<>();
-    private static final Map<WirelessTerminalItem, WirelessTerminalDefinition> BY_ITEM = new Object2ObjectLinkedOpenHashMap<>();
+    private static final Map<WirelessTerminalItem, WirelessTerminalDefinition> BY_ITEM = new Reference2ObjectLinkedOpenHashMap<>();
     private static List<WirelessTerminalDefinition> frozenDefinitions = List.of();
     private static boolean frozen;
 

@@ -18,6 +18,7 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
+import org.jspecify.annotations.NonNull;
 
 import java.awt.Rectangle;
 import java.util.Collections;
@@ -265,7 +266,7 @@ public final class PatternModifierPanelWidget implements ICompositeWidget {
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             return Collections.singletonList(this.divide
                 ? GuiText.PatternModifierDivideDescription.text(this.factor)
                 : GuiText.PatternModifierMultiplyDescription.text(this.factor));
@@ -296,7 +297,7 @@ public final class PatternModifierPanelWidget implements ICompositeWidget {
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             return Collections.singletonList(GuiText.PatternModifierClearDescription.text());
         }
 
@@ -318,7 +319,7 @@ public final class PatternModifierPanelWidget implements ICompositeWidget {
         }
 
         @Override
-        public List<ITextComponent> getTooltipMessage() {
+        public @NonNull List<ITextComponent> getTooltipMessage() {
             return List.of(
                 new TextComponentString(AEItems.PATTERN_MODIFIER.stack(1).getDisplayName()),
                 PatternModifierPanelWidget.this.expanded

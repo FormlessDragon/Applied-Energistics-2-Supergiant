@@ -32,6 +32,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.awt.Rectangle;
 import java.util.Collections;
@@ -169,7 +170,7 @@ public abstract class IconButton extends GuiButton implements ITooltip {
     }
 
     @Override
-    public List<ITextComponent> getTooltipMessage() {
+    public @NonNull List<ITextComponent> getTooltipMessage() {
         return Collections.singletonList(getMessageComponent());
     }
 

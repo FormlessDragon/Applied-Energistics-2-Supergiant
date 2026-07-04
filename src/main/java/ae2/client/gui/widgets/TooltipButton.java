@@ -1,6 +1,7 @@
 package ae2.client.gui.widgets;
 
 import net.minecraft.util.text.ITextComponent;
+import org.jspecify.annotations.NonNull;
 
 import java.awt.Rectangle;
 import java.util.List;
@@ -29,7 +30,7 @@ public class TooltipButton extends AE2Button implements ITooltip {
     }
 
     @Override
-    public List<ITextComponent> getTooltipMessage() {
+    public @NonNull List<ITextComponent> getTooltipMessage() {
         return this.tooltipSupplier.get();
     }
 

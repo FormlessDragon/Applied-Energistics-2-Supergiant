@@ -5,6 +5,7 @@ import ae2.client.gui.Icon;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Collections;
 import java.util.List;
@@ -46,7 +47,7 @@ public class OutputSideSelectionButton extends IconButton {
     }
 
     @Override
-    public List<ITextComponent> getTooltipMessage() {
+    public @NonNull List<ITextComponent> getTooltipMessage() {
         return this.tooltip;
     }
 
