@@ -2021,6 +2021,11 @@ gui.tooltips.ae2.CellTerminalSubnetVisibility=Subnet Visibility
 gui.tooltips.ae2.CellTerminalSubnetVisibilityShowAll=Show all subnets
 gui.tooltips.ae2.CellTerminalSubnetVisibilityShowFavorites=Only show favorite subnets
 gui.tooltips.ae2.CellTerminalSubnetVisibilityDontShow=Only show hide subnets
+gui.tooltips.ae2.CellTerminalDoPartition=Partition from stored contents
+gui.tooltips.ae2.CellTerminalClearPartition=Clear partition
+gui.tooltips.ae2.CellTerminalReadOnly=Read only
+gui.tooltips.ae2.CellTerminalWriteOnly=Write only
+gui.tooltips.ae2.CellTerminalReadWrite=Read and write
 
 # Cell Terminal GUI - widget keys
 gui.ae2.CellTerminal.button.do_partition=Add All to Partition

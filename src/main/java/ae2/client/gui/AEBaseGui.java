@@ -462,6 +462,10 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
     }
 
+    protected final boolean isMouseOverTooltipBlockingWidget(int mouseX, int mouseY) {
+        return this.widgets.blocksTooltips(getMousePoint(mouseX, mouseY));
+    }
+
     private void renderDebugGuiOverlays() {
         if (!AEConfig.instance().isShowDebugGuiOverlays()) {
             return;

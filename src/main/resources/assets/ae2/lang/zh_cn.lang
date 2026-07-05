@@ -2021,6 +2021,11 @@ gui.tooltips.ae2.CellTerminalSubnetVisibility=子网可见性
 gui.tooltips.ae2.CellTerminalSubnetVisibilityShowAll=显示全部子网
 gui.tooltips.ae2.CellTerminalSubnetVisibilityShowFavorites=仅显示收藏子网
 gui.tooltips.ae2.CellTerminalSubnetVisibilityDontShow=仅显示隐藏子网
+gui.tooltips.ae2.CellTerminalDoPartition=根据已存内容分区
+gui.tooltips.ae2.CellTerminalClearPartition=清空分区
+gui.tooltips.ae2.CellTerminalReadOnly=只读
+gui.tooltips.ae2.CellTerminalWriteOnly=只写
+gui.tooltips.ae2.CellTerminalReadWrite=读写
 
 # Cell Terminal GUI - widget keys
 gui.ae2.CellTerminal.button.do_partition=全部添加至分区

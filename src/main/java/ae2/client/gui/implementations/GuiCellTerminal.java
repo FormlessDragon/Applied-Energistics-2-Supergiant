@@ -3221,6 +3221,10 @@ public class GuiCellTerminal extends AEBaseGui<ContainerCellTerminal> implements
             return;
         }
 
+        if (isMouseOverTooltipBlockingWidget(mouseX, mouseY)) {
+            return;
+        }
+
         List<String> priorityTooltip = PriorityFieldManager.getInstance().getTooltip(mouseX, mouseY);
         if (!priorityTooltip.isEmpty()) {
             drawTooltipLines(mouseX, mouseY, priorityTooltip);

@@ -602,6 +602,16 @@ public class WidgetContainer {
         return null;
     }
 
+    public boolean blocksTooltips(Point mousePos) {
+        for (int i = this.compositeWidgetOrder.size() - 1; i >= 0; i--) {
+            ICompositeWidget widget = this.compositeWidgetOrder.get(i);
+            if (widget.isVisible() && widget.blocksTooltips(mousePos.x(), mousePos.y())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Check if there's any content or compound widget at the given screen-relative mouse position.
      */
