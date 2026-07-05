@@ -489,7 +489,6 @@ gui.ae2.ODFilterDesc3=匹配矿词名和物品ID
 gui.ae2.ODFilterWhite=白名单表达式
 gui.ae2.ODFilterWhiteTooltip=矿词白名单表达式
 gui.ae2.ODStorageBus=ME矿词存储总线
-gui.ae2.IncompatibleWithCell=与单元格不兼容
 gui.ae2.IncreasedEnergyUseFromEnchants=附魔会增加能耗。
 gui.ae2.Inscriber=压印器
 gui.ae2.CrystalAssembler=水晶装配器

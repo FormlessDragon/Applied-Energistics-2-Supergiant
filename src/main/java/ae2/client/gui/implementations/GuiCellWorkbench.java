@@ -45,7 +45,6 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextFormatting;
 
 import java.util.List;
 
@@ -83,11 +82,6 @@ public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
         this.widgets.add("previousPage", this.previousPageButton);
         this.widgets.add("nextPage", this.nextPageButton);
     }
-
-    private static void addIncompatibleWithCellTooltip(List<String> lines) {
-        lines.add(TextFormatting.RED + GuiText.IncompatibleWithCell.getLocal());
-    }
-
     @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
@@ -162,22 +156,15 @@ public class GuiCellWorkbench extends GuiUpgradeable<ContainerCellWorkbench> {
 
         ConfigInventory configInventory = workbenchItem.getConfigInventory(cell);
         if (!configInventory.isSupportedType(what.getType())) {
-            addIncompatibleWithCellTooltip(lines);
             return lines;
         }
 
         AEKeySlotFilter filter = configInventory.getFilter();
         if (filter != null) {
-            boolean anySlotMatches = false;
             for (int i = 0; i < configInventory.size(); i++) {
                 if (configInventory.isAllowedIn(i, what)) {
-                    anySlotMatches = true;
                     break;
                 }
-            }
-
-            if (!anySlotMatches) {
-                addIncompatibleWithCellTooltip(lines);
             }
         }
 

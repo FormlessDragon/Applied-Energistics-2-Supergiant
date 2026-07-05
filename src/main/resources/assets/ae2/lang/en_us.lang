@@ -489,7 +489,6 @@ gui.ae2.ODFilterDesc3=Matches ore dictionary names and item ids
 gui.ae2.ODFilterWhite=Whitelist Expression
 gui.ae2.ODFilterWhiteTooltip=Ore dictionary whitelist expression
 gui.ae2.ODStorageBus=ME Ore Dictionary Storage Bus
-gui.ae2.IncompatibleWithCell=Incompatible with cell
 gui.ae2.IncreasedEnergyUseFromEnchants=Enchants increase energy use
 gui.ae2.Inscriber=Inscriber
 gui.ae2.CrystalAssembler=Crystal Assembler

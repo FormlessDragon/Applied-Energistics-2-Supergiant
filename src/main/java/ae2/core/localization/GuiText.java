@@ -638,7 +638,6 @@ public enum GuiText implements LocalizationEnum {
     With,
     Yes,
     No,
-    IncompatibleWithCell,
     CantFitInsideStorageCell,
     CraftTree;
 
