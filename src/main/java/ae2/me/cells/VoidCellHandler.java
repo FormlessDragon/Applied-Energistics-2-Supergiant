@@ -4,6 +4,7 @@ import ae2.api.stacks.GenericStack;
 import ae2.api.storage.cells.ICellHandler;
 import ae2.api.storage.cells.ICellWorkbenchItem;
 import ae2.api.storage.cells.ISaveProvider;
+import ae2.core.AEConfig;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.GuiText;
 import ae2.items.storage.StorageCellTooltipComponent;
@@ -12,6 +13,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -39,27 +41,37 @@ public class VoidCellHandler implements ICellHandler {
         }
 
         var upgrades = new ObjectArrayList<ItemStack>();
-        for (var upgrade : workbenchItem.getUpgrades(stack)) {
-            if (!upgrade.isEmpty()) {
-                upgrades.add(upgrade.copy());
+        if (AEConfig.instance().isTooltipShowCellUpgrades()) {
+            for (var upgrade : workbenchItem.getUpgrades(stack)) {
+                if (!upgrade.isEmpty()) {
+                    upgrades.add(upgrade.copy());
+                }
             }
         }
 
-        var content = new ObjectArrayList<GenericStack>();
-        var inventory = getCellInventory(stack, null);
-        if (inventory != null) {
-            for (var entry : inventory.getAvailableStacks()) {
-                content.add(new GenericStack(entry.getKey(), entry.getLongValue()));
+        List<GenericStack> content;
+        boolean hasMoreContent;
+        if (AEConfig.instance().isTooltipShowCellContent()) {
+            content = new ObjectArrayList<>();
+            int maxCountShown = AEConfig.instance().getTooltipMaxCellContentShown();
+            var inventory = getCellInventory(stack, null);
+            if (inventory != null) {
+                for (var entry : inventory.getAvailableStacks()) {
+                    content.add(new GenericStack(entry.getKey(), entry.getLongValue()));
+                }
+                content.sort(Comparator.comparingLong(GenericStack::amount).reversed()
+                    .thenComparing(entry -> entry.what().getDisplayName().getFormattedText()));
             }
-            content.sort(Comparator.comparingLong(GenericStack::amount).reversed()
-                                   .thenComparing(entry -> entry.what().getDisplayName().getFormattedText()));
+
+            hasMoreContent = content.size() > maxCountShown;
+            if (content.size() > maxCountShown) {
+                content = new ObjectArrayList<>(content.subList(0, maxCountShown));
+            }
+        } else {
+            content = Collections.emptyList();
+            hasMoreContent = false;
         }
 
-        int contentLimit = Math.min(content.size(), 5);
-        boolean hasMoreContent = content.size() > contentLimit;
-        if (content.size() > contentLimit) {
-            content = new ObjectArrayList<>(content.subList(0, contentLimit));
-        }
         return Optional.of(new StorageCellTooltipComponent(upgrades, content, hasMoreContent, true));
     }
 

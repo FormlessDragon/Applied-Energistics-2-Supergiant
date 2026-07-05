@@ -5,6 +5,7 @@ import ae2.api.stacks.GenericStack;
 import ae2.client.gui.PreviousExternalGui;
 import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.container.me.common.MEIngredientAction;
+import ae2.core.AEConfig;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
@@ -70,12 +71,14 @@ final class HeiClientFeatures {
             return;
         }
 
-        if (Minecraft.getMinecraft().currentScreen instanceof GuiMEStorage<?>) {
-            addTooltipLine(event, ButtonToolTips.HeiAutoPin.getLocal(getKeyText(RETRIEVE)));
-        } else {
-            addTooltipLine(event, GuiText.HeiRetrieveIngredientTooltip.getLocal(getKeyText(RETRIEVE)));
+        if (AEConfig.instance().isShowHeiTooltip()) {
+            if (Minecraft.getMinecraft().currentScreen instanceof GuiMEStorage<?>) {
+                addTooltipLine(event, ButtonToolTips.HeiAutoPin.getLocal(getKeyText(RETRIEVE)));
+            } else {
+                addTooltipLine(event, GuiText.HeiRetrieveIngredientTooltip.getLocal(getKeyText(RETRIEVE)));
+            }
+            addTooltipLine(event, GuiText.HeiCraftIngredientTooltip.getLocal(getKeyText(CRAFT)));
         }
-        addTooltipLine(event, GuiText.HeiCraftIngredientTooltip.getLocal(getKeyText(CRAFT)));
     }
 
     private static void handleInput(int eventKey, Consumer<Boolean> cancelEvent) {
