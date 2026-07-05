@@ -23,6 +23,7 @@ import ae2.api.storage.cells.IBasicCellItem;
 import ae2.api.storage.cells.ICellHandler;
 import ae2.api.storage.cells.ICellWorkbenchItem;
 import ae2.api.storage.cells.ISaveProvider;
+import ae2.core.AEConfig;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
@@ -31,6 +32,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -78,29 +80,37 @@ public class BasicCellHandler implements ICellHandler {
         }
 
         var upgrades = new ObjectArrayList<ItemStack>();
-        if (stack.getItem() instanceof ICellWorkbenchItem workbenchItem) {
-            for (var upgrade : workbenchItem.getUpgrades(stack)) {
-                if (!upgrade.isEmpty()) {
-                    upgrades.add(upgrade.copy());
+        if (AEConfig.instance().isTooltipShowCellUpgrades()) {
+            if (stack.getItem() instanceof ICellWorkbenchItem workbenchItem) {
+                for (var upgrade : workbenchItem.getUpgrades(stack)) {
+                    if (!upgrade.isEmpty()) {
+                        upgrades.add(upgrade.copy());
+                    }
                 }
             }
         }
 
-        var content = new ObjectArrayList<GenericStack>();
-        for (var entry : inventory.getAvailableStacks()) {
-            content.add(new GenericStack(entry.getKey(), entry.getLongValue()));
-        }
-        content.sort(Comparator.comparingLong(GenericStack::amount).reversed()
-                               .thenComparing(entry -> entry.what().getDisplayName().getFormattedText()));
+        List<GenericStack> content;
+        boolean hasMoreContent;
+        if (AEConfig.instance().isTooltipShowCellContent()) {
+            content = new ObjectArrayList<>();
+            int maxCountShown = AEConfig.instance().getTooltipMaxCellContentShown();
+            for (var entry : inventory.getAvailableStacks()) {
+                content.add(new GenericStack(entry.getKey(), entry.getLongValue()));
+            }
+            content.sort(Comparator.comparingLong(GenericStack::amount).reversed()
+                .thenComparing(entry -> entry.what().getDisplayName().getFormattedText()));
 
-        boolean showAmounts = true;
-        int contentLimit = Math.min(content.size(), 5);
-        boolean hasMoreContent = content.size() > contentLimit;
-        if (content.size() > contentLimit) {
-            content = new ObjectArrayList<>(content.subList(0, contentLimit));
+            hasMoreContent = content.size() > maxCountShown;
+            if (content.size() > maxCountShown) {
+                content = new ObjectArrayList<>(content.subList(0, maxCountShown));
+            }
+        } else {
+            content = Collections.emptyList();
+            hasMoreContent = false;
         }
 
-        return Optional.of(new StorageCellTooltipComponent(upgrades, content, hasMoreContent, showAmounts));
+        return Optional.of(new StorageCellTooltipComponent(upgrades, content, hasMoreContent, true));
     }
 
     private void addPartitionInformation(ItemStack stack, ICellWorkbenchItem workbenchItem, List<String> lines) {

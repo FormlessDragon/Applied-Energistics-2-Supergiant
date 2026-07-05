@@ -252,7 +252,6 @@ public class AEConfig {
         return CRAFTING_CPU.craftingCalculationTimePerTick;
     }
 
-    @SuppressWarnings("unused")
     public boolean isTooltipShowCellUpgrades() {
         return TOOLTIP.showCellUpgrades;
     }
@@ -263,6 +262,10 @@ public class AEConfig {
 
     public int getTooltipMaxCellContentShown() {
         return TOOLTIP.maxCellContentShown;
+    }
+
+    public boolean isShowHeiTooltip() {
+        return TOOLTIP.showHeiTooltips;
     }
 
     public boolean isAnnihilationPlaneSkyDustGenerationEnabled() {
@@ -289,6 +292,7 @@ public class AEConfig {
         return CLIENT.placementPreviewEnabled;
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public boolean isShowDebugGuiOverlays() {
         return CLIENT.showDebugGuiOverlays;
     }
@@ -736,16 +740,20 @@ public class AEConfig {
     public static final class Tooltip {
         @Config.Name("showCellUpgrades")
         @Config.Comment("Show storage cell upgrades in extended tooltips.")
-        public final boolean showCellUpgrades = true;
+        public boolean showCellUpgrades = true;
 
         @Config.Name("showCellContent")
         @Config.Comment("Show storage cell contents in extended tooltips.")
-        public final boolean showCellContent = true;
+        public boolean showCellContent = true;
 
         @Config.Name("maxCellContentShown")
         @Config.Comment("Maximum number of storage cell entries shown in tooltips.")
         @Config.RangeInt(min = 1, max = 32)
-        public final int maxCellContentShown = 5;
+        public int maxCellContentShown = 5;
+
+        @Config.Name("showHeiTooltips")
+        @Config.Comment("Show requesting items/crafting and auto-pin in Hei tooltips.")
+        public boolean showHeiTooltips = true;
     }
 
     public static final class Wireless {
