@@ -19,19 +19,19 @@
       "top": 31
     },
     "search": {
-      "left": 17,
+      "left": 16,
       "top": 17,
       "width": 65,
       "height": 10
     },
     "inputSearch": {
-      "left": 114,
+      "left": 113,
       "top": 4,
       "width": 65,
       "height": 10
     },
     "outputSearch": {
-      "left": 114,
+      "left": 113,
       "top": 17,
       "width": 65,
       "height": 10
