@@ -18,19 +18,21 @@
 
 package ae2.client.gui.me.common;
 
-import ae2.api.config.ActionItems;
+import ae2.api.client.terminalsettings.TerminalSettingsPage;
+import ae2.api.client.terminalsettings.TerminalSettingsPageContext;
+import ae2.api.client.terminalsettings.TerminalSettingsPageProvider;
 import ae2.api.config.PinDisplayMode;
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
+import ae2.client.Point;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.GuiStyleManager;
+import ae2.client.gui.style.PaletteColor;
 import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.AECheckbox;
 import ae2.client.gui.widgets.AETextField;
-import ae2.client.gui.widgets.ActionButton;
-import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.SimpleIconButton;
 import ae2.client.gui.widgets.TabButton;
 import ae2.container.AEBaseContainer;
@@ -52,7 +54,10 @@ import ae2.items.tools.powered.WirelessTerminalItem;
 import ae2.items.tools.powered.WirelessTerminalMagnetMode;
 import ae2.items.tools.powered.WirelessTerminals;
 import ae2.text.TextComponentItemStack;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
@@ -63,6 +68,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiPredicate;
+import java.util.function.Consumer;
 
 public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
 
@@ -77,6 +84,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     }
 
     private static final long MAX_RECURSIVE_INGREDIENT_RESERVE = 1000;
+
     private final AEBaseGui<?> parent;
     private final Runnable beforeReturn;
     private final boolean wirelessOnly;
@@ -97,10 +105,9 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     private final AECheckbox clearExternalCheckbox;
     private final AETextField recursiveReserveField;
     private final AETextField playerPinRowsField;
-    private final AE2Button previousPageButton;
-    private final AE2Button nextPageButton;
-    private final IconButton generalPageButton;
-    private final IconButton wirelessPageButton;
+    private final List<PageEntry> pages = new ObjectArrayList<>();
+    @Nullable
+    private PageEntry selectedPage;
     @Nullable
     private final WirelessTerminalGuiHost<?> wirelessHost;
     @Nullable
@@ -115,8 +122,6 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     private final AECheckbox pickupToMECheckbox;
     @Nullable
     private final AE2Button magnetSettingsButton;
-    private Page page = Page.GENERAL;
-    private int generalPage;
     private long displayedRecursiveReserveAmount = -1;
     private boolean recursiveReserveFieldFocused;
     private boolean playerPinRowsDirty;
@@ -158,13 +163,6 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
             Icon.BACK,
             TextComponentItemStack.of(parentIcon),
             this::returnToParent));
-        this.generalPageButton = addToLeftToolbar(
-            new ActionButton(ActionItems.TERMINAL_SETTINGS, () -> switchPage(Page.GENERAL)));
-        this.wirelessPageButton = new SimpleIconButton(Icon.WIRELESS_SETTINGS_PAGE,
-            GuiText.WirelessTerminalSettingsTitle.text(), () -> switchPage(Page.WIRELESS));
-        addToLeftToolbar(this.wirelessPageButton);
-        this.previousPageButton = widgets.addButton("previousPage", new TextComponentString("<"), this::previousGeneralPage);
-        this.nextPageButton = widgets.addButton("nextPage", new TextComponentString(">"), this::nextGeneralPage);
 
         this.pinAutoCraftedItemsCheckbox = widgets.addCheckbox("pinAutoCraftedItemsCheckbox",
             GuiText.TerminalSettingsPinAutoCraftedItems.text(), this::save);
@@ -233,19 +231,10 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
 
         setTextContent(TEXT_ID_DIALOG_TITLE,
             wirelessOnly ? GuiText.WirelessTerminalSettingsTitle.text() : GuiText.TerminalSettingsTitle.text());
-        setTextContent("search_settings_title", GuiText.SearchSettingsTitle.text());
         setTextContent("recursive_reserve_label", GuiText.TerminalSettingsRecursiveIngredientReserve.text());
         setTextContent("player_pin_rows_label", GuiText.TerminalSettingsPlayerPinRows.text());
-        setTextContent("wireless_settings_title", GuiText.WirelessTerminalSettingsTitle.text());
         this.pendingPlayerPinRows = PinnedKeys.getPlayerPinRows();
-        if (wirelessOnly) {
-            this.page = Page.WIRELESS;
-        } else {
-            this.wirelessPageButton.visible = this.wirelessHost != null;
-            if (this.wirelessHost == null) {
-                this.page = Page.GENERAL;
-            }
-        }
+        initRegisteredPages();
         updateState();
     }
 
@@ -257,6 +246,29 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         return EnumSet.copyOf(checkedSettings);
     }
 
+    private void initRegisteredPages() {
+        HostContext visibilityContext = new HostContext(null);
+        for (TerminalSettingsPageProvider provider : TerminalSettingsPageRegistry.getRegistered()) {
+            if (!provider.isVisible(visibilityContext)) {
+                continue;
+            }
+            PageEntry entry = new PageEntry(provider);
+            HostContext pageContext = new HostContext(entry);
+            entry.context = pageContext;
+            entry.page = provider.create(pageContext);
+            entry.button = new SimpleIconButton(provider.icon(), provider.title(pageContext),
+                () -> List.of(provider.title(pageContext)),
+                () -> switchPage(provider.id()));
+            addToLeftToolbar(entry.button);
+            entry.page.init(pageContext);
+            this.pages.add(entry);
+        }
+        if (this.pages.isEmpty()) {
+            throw new IllegalStateException("Terminal settings opened without any visible pages");
+        }
+        this.selectedPage = this.pages.getFirst();
+    }
+
     @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
@@ -266,6 +278,9 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        if (this.selectedPage != null && this.selectedPage.page.keyTyped(typedChar, keyCode)) {
+            return;
+        }
         if (this.playerPinRowsField.isFocused() && handlePlayerPinRowsKeyTyped(typedChar, keyCode)) {
             return;
         }
@@ -304,31 +319,22 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     }
 
     private void returnToParent() {
+        for (PageEntry page : this.pages) {
+            page.page.onReturnToParent();
+        }
         commitPendingPlayerPinRowsOnce();
         this.beforeReturn.run();
         switchToScreen(parent);
         parent.returnFromSubScreen(this);
     }
 
-    private void switchPage(Page page) {
-        if (page == Page.WIRELESS && this.wirelessHost == null) {
-            return;
-        }
-        this.page = page;
-        updateState();
-    }
-
-    private void previousGeneralPage() {
-        if (this.generalPage > 0) {
-            this.generalPage--;
-            updateVisibility();
-        }
-    }
-
-    private void nextGeneralPage() {
-        if (this.generalPage + 1 < getGeneralPageCount()) {
-            this.generalPage++;
-            updateVisibility();
+    private void switchPage(ResourceLocation pageId) {
+        for (PageEntry page : this.pages) {
+            if (page.provider.id().equals(pageId)) {
+                this.selectedPage = page;
+                updateState();
+                return;
+            }
         }
     }
 
@@ -558,11 +564,11 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         magnetSettingsButton.visible = magnetCardInstalled;
     }
 
-    private boolean hasGeneralSetting(GeneralSetting setting) {
+    boolean hasGeneralSetting(GeneralSetting setting) {
         return this.generalSettings.contains(setting);
     }
 
-    private boolean hasGeneralTerminalPage() {
+    boolean hasGeneralTerminalPage() {
         return hasGeneralSetting(GeneralSetting.PINNED_ITEMS)
             || hasGeneralSetting(GeneralSetting.CRAFTING_JOB_NOTIFICATIONS)
             || hasGeneralSetting(GeneralSetting.CLEAR_GRID_ON_CLOSE)
@@ -571,73 +577,56 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
             || hasGeneralSetting(GeneralSetting.PLAYER_PIN_ROWS);
     }
 
-    private int getGeneralPageCount() {
-        int pageCount = 0;
-        if (hasGeneralTerminalPage()) {
-            pageCount++;
-        }
-        if (hasGeneralSetting(GeneralSetting.SEARCH)) {
-            pageCount++;
-        }
-        return Math.max(1, pageCount);
-    }
-
     private void updateVisibility() {
-        int generalPageCount = getGeneralPageCount();
-        if (this.generalPage >= generalPageCount) {
-            this.generalPage = generalPageCount - 1;
+        if (this.selectedPage == null || !this.pages.contains(this.selectedPage)) {
+            this.selectedPage = this.pages.getFirst();
         }
-        boolean general = !this.wirelessOnly && this.page == Page.GENERAL;
-        boolean wireless = this.page == Page.WIRELESS && this.wirelessHost != null;
-        boolean hasGeneralTerminalPage = hasGeneralTerminalPage();
-        boolean generalTerminalPage = general && hasGeneralTerminalPage && this.generalPage == 0;
-        boolean generalSearchPage = general && hasGeneralSetting(GeneralSetting.SEARCH)
-            && this.generalPage == (hasGeneralTerminalPage ? 1 : 0);
-        boolean showGeneralPageControls = general && generalPageCount > 1;
-        setTextContent(TEXT_ID_DIALOG_TITLE,
-            wireless ? GuiText.WirelessTerminalSettingsTitle.text() : GuiText.TerminalSettingsTitle.text());
-        setTextContent("page_info", new TextComponentString((this.generalPage + 1) + " / " + generalPageCount));
 
-        this.generalPageButton.visible = !this.wirelessOnly;
-        this.generalPageButton.setFocused(general);
-        this.wirelessPageButton.setFocused(wireless);
-        this.wirelessPageButton.visible = !this.wirelessOnly && this.wirelessHost != null;
-        this.previousPageButton.visible = showGeneralPageControls;
-        this.nextPageButton.visible = showGeneralPageControls;
-        this.previousPageButton.enabled = showGeneralPageControls && this.generalPage > 0;
-        this.nextPageButton.enabled = showGeneralPageControls && this.generalPage + 1 < generalPageCount;
+        boolean general = isBuiltinSelected(DefaultTerminalSettingsPages.GENERAL_ID);
+        boolean search = isBuiltinSelected(DefaultTerminalSettingsPages.SEARCH_ID);
+        boolean wireless = isBuiltinSelected(DefaultTerminalSettingsPages.WIRELESS_ID);
 
-        setTextHidden("search_settings_title", !generalSearchPage);
-        setTextHidden("page_info", !showGeneralPageControls);
-        setTextHidden("wireless_settings_title", true);
-        this.pinAutoCraftedItemsCheckbox.visible = generalTerminalPage
+        for (PageEntry page : this.pages) {
+            boolean selected = page == this.selectedPage;
+            page.button.visible = true;
+            page.button.enabled = true;
+            page.button.setFocused(selected);
+            page.button.setMessage(page.provider.title(page.context));
+            page.page.update(page.context, selected);
+            page.context.setSelected(selected);
+        }
+
+        ITextComponent title = this.selectedPage.provider.title(this.selectedPage.context);
+        setTextContent(TEXT_ID_DIALOG_TITLE, title);
+
+        this.pinAutoCraftedItemsCheckbox.visible = general
             && hasGeneralSetting(GeneralSetting.PINNED_ITEMS);
-        this.pinDisplaySortTopRadio.visible = generalTerminalPage
+        this.pinDisplaySortTopRadio.visible = general
             && hasGeneralSetting(GeneralSetting.PINNED_ITEMS);
-        this.pinDisplayLockedGridRadio.visible = generalTerminalPage
+        this.pinDisplayLockedGridRadio.visible = general
             && hasGeneralSetting(GeneralSetting.PINNED_ITEMS);
-        this.notifyForFinishedCraftingJobsCheckbox.visible = generalTerminalPage
+        this.notifyForFinishedCraftingJobsCheckbox.visible = general
             && hasGeneralSetting(GeneralSetting.CRAFTING_JOB_NOTIFICATIONS);
-        this.clearGridOnCloseCheckbox.visible = generalTerminalPage
+        this.clearGridOnCloseCheckbox.visible = general
             && hasGeneralSetting(GeneralSetting.CLEAR_GRID_ON_CLOSE);
         if (this.autoFillPatternsCheckbox != null) {
-            this.autoFillPatternsCheckbox.visible = generalTerminalPage
+            this.autoFillPatternsCheckbox.visible = general
                 && hasGeneralSetting(GeneralSetting.PATTERN_AUTO_FILL);
         }
-        this.useInternalSearchRadio.visible = generalSearchPage;
-        this.useExternalSearchRadio.visible = generalSearchPage;
-        this.rememberCheckbox.visible = generalSearchPage && this.useInternalSearchRadio.isSelected();
-        this.autoFocusCheckbox.visible = generalSearchPage && this.useInternalSearchRadio.isSelected();
-        this.syncWithExternalCheckbox.visible = generalSearchPage && this.useInternalSearchRadio.isSelected();
-        this.clearExternalCheckbox.visible = generalSearchPage && this.useExternalSearchRadio.isSelected();
+        this.useInternalSearchRadio.visible = search;
+        this.useExternalSearchRadio.visible = search;
+        this.rememberCheckbox.visible = search && this.useInternalSearchRadio.isSelected();
+        this.autoFocusCheckbox.visible = search && this.useInternalSearchRadio.isSelected();
+        this.syncWithExternalCheckbox.visible = search && this.useInternalSearchRadio.isSelected();
+        this.clearExternalCheckbox.visible = search && this.useExternalSearchRadio.isSelected();
         setTextHidden("recursive_reserve_label",
-            !(generalTerminalPage && hasGeneralSetting(GeneralSetting.RECURSIVE_INGREDIENT_RESERVE)));
+            !(general && hasGeneralSetting(GeneralSetting.RECURSIVE_INGREDIENT_RESERVE)));
         setTextHidden("player_pin_rows_label",
-            !(generalTerminalPage && this.supportsPlayerPinRows
+            !(general && this.supportsPlayerPinRows
                 && hasGeneralSetting(GeneralSetting.PLAYER_PIN_ROWS)));
-        this.recursiveReserveField.setVisible(generalTerminalPage
+        this.recursiveReserveField.setVisible(general
             && hasGeneralSetting(GeneralSetting.RECURSIVE_INGREDIENT_RESERVE));
-        this.playerPinRowsField.setVisible(generalTerminalPage && this.supportsPlayerPinRows
+        this.playerPinRowsField.setVisible(general && this.supportsPlayerPinRows
             && hasGeneralSetting(GeneralSetting.PLAYER_PIN_ROWS));
 
         if (this.pickBlockCheckbox != null) {
@@ -661,6 +650,10 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         }
     }
 
+    private boolean isBuiltinSelected(ResourceLocation id) {
+        return this.selectedPage != null && this.selectedPage.provider.id().equals(id);
+    }
+
     private void savePatternAutoFill() {
         if (this.autoFillPatternsCheckbox == null) {
             return;
@@ -679,6 +672,9 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
 
     @Override
     public void onGuiClosed() {
+        for (PageEntry page : this.pages) {
+            page.page.onClosed();
+        }
         commitPendingPlayerPinRowsOnce();
         super.onGuiClosed();
     }
@@ -737,9 +733,350 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         }
     }
 
-    private enum Page {
-        GENERAL,
-        WIRELESS
+    @Override
+    public void drawBG(int offsetX, int offsetY, int mouseX, int mouseY, float partialTicks) {
+        super.drawBG(offsetX, offsetY, mouseX, mouseY, partialTicks);
+        if (this.selectedPage != null) {
+            this.selectedPage.page.drawBackground(this.selectedPage.context, offsetX, offsetY, mouseX, mouseY,
+                partialTicks);
+        }
     }
 
+    @Override
+    public void drawFG(int offsetX, int offsetY, int mouseX, int mouseY) {
+        super.drawFG(offsetX, offsetY, mouseX, mouseY);
+        if (this.selectedPage != null) {
+            this.selectedPage.page.drawForeground(this.selectedPage.context, offsetX, offsetY, mouseX, mouseY);
+        }
+        for (PageEntry page : this.pages) {
+            page.context.drawLabels(offsetX, offsetY);
+        }
+    }
+
+    private GuiStyle requireTerminalSettingsStyle() {
+        if (this.style == null) {
+            throw new IllegalStateException("Terminal settings screen requires a style");
+        }
+        return this.style;
+    }
+
+    private final class HostContext implements TerminalSettingsPageContext, TerminalSettingsPageHostContext {
+        @Nullable
+        private final PageEntry owner;
+        private final List<DynamicControl> controls = new ObjectArrayList<>();
+        private final List<DynamicLabel> labels = new ObjectArrayList<>();
+
+        private HostContext(@Nullable PageEntry owner) {
+            this.owner = owner;
+        }
+
+        @Override
+        public AEBaseGui<?> parentGui() {
+            return parent;
+        }
+
+        @Override
+        public AEBaseContainer container() {
+            return container;
+        }
+
+        @Override
+        public InventoryPlayer playerInventory() {
+            return playerInventory;
+        }
+
+        @Nullable
+        @Override
+        public WirelessTerminalGuiHost<?> wirelessHost() {
+            return wirelessHost;
+        }
+
+        @Override
+        public boolean wirelessOnly() {
+            return wirelessOnly;
+        }
+
+        @Override
+        public TerminalSettingsCheckbox addCheckbox(String id, int x, int y, int width, ITextComponent text,
+                                                    Runnable changeListener) {
+            PageEntry page = requireOwner();
+            AECheckbox checkbox = new AECheckbox(0, 0, width, AECheckbox.SIZE, requireTerminalSettingsStyle(), text);
+            checkbox.setChangeListener(changeListener);
+            widgets.add(dynamicId(page, id), checkbox, new Point(x, y));
+            CheckboxControl control = new CheckboxControl(checkbox);
+            this.controls.add(control);
+            return control;
+        }
+
+        @Override
+        public TerminalSettingsTextField addTextField(String id, int x, int y, int width, int height) {
+            PageEntry page = requireOwner();
+            AETextField field = new AETextField(requireTerminalSettingsStyle(), fontRenderer, 0, 0, width, height);
+            widgets.add(dynamicId(page, id), field, new Point(x, y));
+            TextFieldControl control = new TextFieldControl(field);
+            this.controls.add(control);
+            return control;
+        }
+
+        @Override
+        public TerminalSettingsButton addButton(String id, int x, int y, int width, int height, ITextComponent text,
+                                                Runnable action) {
+            PageEntry page = requireOwner();
+            AE2Button button = new AE2Button(text, action);
+            button.width = width;
+            button.height = height;
+            widgets.add(dynamicId(page, id), button, new Point(x, y));
+            ButtonControl control = new ButtonControl(button);
+            this.controls.add(control);
+            return control;
+        }
+
+        @Override
+        public TerminalSettingsLabel addLabel(String id, int x, int y, ITextComponent text) {
+            DynamicLabel label = new DynamicLabel(x, y, text);
+            this.labels.add(label);
+            return label;
+        }
+
+        @Override
+        public boolean isWirelessOnlySettings() {
+            return wirelessOnly;
+        }
+
+        @Override
+        public boolean hasWirelessHost() {
+            return wirelessHost != null;
+        }
+
+        @Override
+        public boolean hasGeneralTerminalSettingsPage() {
+            return hasGeneralTerminalPage();
+        }
+
+        @Override
+        public boolean hasGeneralSetting(GeneralSetting setting) {
+            return GuiTerminalSettings.this.hasGeneralSetting(setting);
+        }
+
+        private PageEntry requireOwner() {
+            if (this.owner == null) {
+                throw new IllegalStateException("Terminal settings page controls can only be created during page init");
+            }
+            return this.owner;
+        }
+
+        private void setSelected(boolean selected) {
+            for (DynamicControl control : this.controls) {
+                control.applySelected(selected);
+            }
+            for (DynamicLabel label : this.labels) {
+                label.applySelected(selected);
+            }
+        }
+
+        private void drawLabels(int offsetX, int offsetY) {
+            int color = requireTerminalSettingsStyle().getColor(PaletteColor.DEFAULT_TEXT_COLOR).toARGB() & 0xFFFFFF;
+            for (DynamicLabel label : this.labels) {
+                if (label.visible) {
+                    fontRenderer.drawString(label.text.getFormattedText(), offsetX + label.x, offsetY + label.y,
+                        color);
+                }
+            }
+        }
+
+        private String dynamicId(PageEntry page, String id) {
+            return "terminal_settings." + page.provider.id() + "." + id;
+        }
+    }
+
+    private static final class PageEntry {
+        private final TerminalSettingsPageProvider provider;
+        private HostContext context;
+        private TerminalSettingsPage page;
+        private SimpleIconButton button;
+
+        private PageEntry(TerminalSettingsPageProvider provider) {
+            this.provider = provider;
+        }
+    }
+
+    private interface DynamicControl {
+        void applySelected(boolean selected);
+    }
+
+    private static final class CheckboxControl implements TerminalSettingsPageContext.TerminalSettingsCheckbox,
+        DynamicControl {
+        private final AECheckbox checkbox;
+        private boolean desiredVisible = true;
+
+        private CheckboxControl(AECheckbox checkbox) {
+            this.checkbox = checkbox;
+        }
+
+        @Override
+        public void setVisible(boolean visible) {
+            this.desiredVisible = visible;
+            this.checkbox.visible = visible;
+        }
+
+        @Override
+        public void setEnabled(boolean enabled) {
+            this.checkbox.enabled = enabled;
+        }
+
+        @Override
+        public boolean isSelected() {
+            return this.checkbox.isSelected();
+        }
+
+        @Override
+        public void setSelected(boolean selected) {
+            this.checkbox.setSelected(selected);
+        }
+
+        @Override
+        public void setRadio(boolean radio) {
+            this.checkbox.setRadio(radio);
+        }
+
+        @Override
+        public void setTooltipMessage(List<ITextComponent> tooltip) {
+            this.checkbox.setTooltipMessage(tooltip);
+        }
+
+        @Override
+        public void applySelected(boolean selected) {
+            this.checkbox.visible = selected && this.desiredVisible;
+        }
+    }
+
+    private static final class TextFieldControl implements TerminalSettingsPageContext.TerminalSettingsTextField,
+        DynamicControl {
+        private final AETextField field;
+        private boolean desiredVisible = true;
+
+        private TextFieldControl(AETextField field) {
+            this.field = field;
+        }
+
+        @Override
+        public void setVisible(boolean visible) {
+            this.desiredVisible = visible;
+            this.field.setVisible(visible);
+        }
+
+        @Override
+        public void setEnabled(boolean enabled) {
+            this.field.setEnabled(enabled);
+        }
+
+        @Override
+        public String getText() {
+            return this.field.getText();
+        }
+
+        @Override
+        public void setText(String text) {
+            this.field.setText(text);
+        }
+
+        @Override
+        public boolean isFocused() {
+            return this.field.isFocused();
+        }
+
+        @Override
+        public void setFocused(boolean focused) {
+            this.field.setFocused(focused);
+        }
+
+        @Override
+        public void setMaxStringLength(int length) {
+            this.field.setMaxStringLength(length);
+        }
+
+        @Override
+        public void setTextColor(int color) {
+            this.field.setTextColor(color);
+        }
+
+        @Override
+        public void setTooltipMessage(List<ITextComponent> tooltip) {
+            this.field.setTooltipMessage(tooltip);
+        }
+
+        @Override
+        public void setKeyFilter(@Nullable BiPredicate<Character, Integer> keyFilter) {
+            this.field.setKeyFilter(keyFilter == null ? null : keyFilter::test);
+        }
+
+        @Override
+        public void setResponder(@Nullable Consumer<String> responder) {
+            this.field.setResponder(responder);
+        }
+
+        @Override
+        public void applySelected(boolean selected) {
+            this.field.setVisible(selected && this.desiredVisible);
+        }
+    }
+
+    private static final class ButtonControl implements TerminalSettingsPageContext.TerminalSettingsButton,
+        DynamicControl {
+        private final AE2Button button;
+        private boolean desiredVisible = true;
+
+        private ButtonControl(AE2Button button) {
+            this.button = button;
+        }
+
+        @Override
+        public void setVisible(boolean visible) {
+            this.desiredVisible = visible;
+            this.button.visible = visible;
+        }
+
+        @Override
+        public void setEnabled(boolean enabled) {
+            this.button.enabled = enabled;
+        }
+
+        @Override
+        public void applySelected(boolean selected) {
+            this.button.visible = selected && this.desiredVisible;
+        }
+    }
+
+    private static final class DynamicLabel implements TerminalSettingsPageContext.TerminalSettingsLabel {
+        private final int x;
+        private final int y;
+        private ITextComponent text;
+        private boolean desiredVisible = true;
+        private boolean visible;
+
+        private DynamicLabel(int x, int y, ITextComponent text) {
+            this.x = x;
+            this.y = y;
+            this.text = text;
+        }
+
+        @Override
+        public void setVisible(boolean visible) {
+            this.desiredVisible = visible;
+            this.visible = visible;
+        }
+
+        @Override
+        public void setEnabled(boolean enabled) {
+        }
+
+        @Override
+        public void setText(ITextComponent text) {
+            this.text = text;
+        }
+
+        private void applySelected(boolean selected) {
+            this.visible = selected && this.desiredVisible;
+        }
+    }
 }

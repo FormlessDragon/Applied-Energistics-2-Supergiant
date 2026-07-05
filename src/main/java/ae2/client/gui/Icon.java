@@ -71,6 +71,7 @@ public final class Icon {
     public static final Icon BACKGROUND_ORE = registerBuiltin("background_ore");
 
     public static final Icon SEARCH_AUTO_FOCUS = registerBuiltin("search_auto_focus");
+    public static final Icon TERMINAL_SEARCH_SETTINGS = registerBuiltin("terminal_search_settings");
     public static final Icon BACKGROUND_PLATE = registerBuiltin("background_plate");
     public static final Icon TAB_CRAFTING = registerBuiltin("tab_crafting");
     public static final Icon TAB_PROCESSING = registerBuiltin("tab_processing");

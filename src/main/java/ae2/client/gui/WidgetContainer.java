@@ -70,6 +70,8 @@ public class WidgetContainer {
     private final Object2ObjectLinkedOpenHashMap<String, GuiButton> widgets = new Object2ObjectLinkedOpenHashMap<>();
     private final Object2ObjectLinkedOpenHashMap<String, AETextField> textFields = new Object2ObjectLinkedOpenHashMap<>();
     private final Object2ObjectLinkedOpenHashMap<String, ICompositeWidget> compositeWidgets = new Object2ObjectLinkedOpenHashMap<>();
+    private final Object2ObjectLinkedOpenHashMap<String, Point> manualWidgetPositions = new Object2ObjectLinkedOpenHashMap<>();
+    private final Object2ObjectLinkedOpenHashMap<String, Point> manualTextFieldPositions = new Object2ObjectLinkedOpenHashMap<>();
     private final ObjectList<ICompositeWidget> compositeWidgetOrder = new ObjectArrayList<>();
     private final Object2ObjectLinkedOpenHashMap<String, ResolvedTooltipArea> tooltips = new Object2ObjectLinkedOpenHashMap<>();
     private Rectangle currentBounds = Rects.ZERO;
@@ -119,6 +121,17 @@ public class WidgetContainer {
         this.layoutVersion++;
     }
 
+    public void add(String id, GuiButton widget, Point position) {
+        Preconditions.checkState(!compositeWidgets.containsKey(id), "%s already used for composite widget", id);
+        Preconditions.checkState(!textFields.containsKey(id), "%s already used for text field", id);
+
+        if (widgets.put(id, widget) != null) {
+            throw new IllegalStateException("Duplicate id: " + id);
+        }
+        manualWidgetPositions.put(id, position);
+        this.layoutVersion++;
+    }
+
     public void add(String id, AETextField widget) {
         Preconditions.checkState(!widgets.containsKey(id), "%s already used for widget", id);
         Preconditions.checkState(!compositeWidgets.containsKey(id), "%s already used for composite widget", id);
@@ -141,6 +154,17 @@ public class WidgetContainer {
         if (textFields.put(id, widget) != null) {
             throw new IllegalStateException("Duplicate id: " + id);
         }
+        this.layoutVersion++;
+    }
+
+    public void add(String id, AETextField widget, Point position) {
+        Preconditions.checkState(!widgets.containsKey(id), "%s already used for widget", id);
+        Preconditions.checkState(!compositeWidgets.containsKey(id), "%s already used for composite widget", id);
+
+        if (textFields.put(id, widget) != null) {
+            throw new IllegalStateException("Duplicate id: " + id);
+        }
+        manualTextFieldPositions.put(id, position);
         this.layoutVersion++;
     }
 
@@ -259,7 +283,11 @@ public class WidgetContainer {
                 checkBox.setFocused(false);
             }
 
-            if (this.style != null) {
+            Point manualPosition = manualWidgetPositions.get(entry.getKey());
+            if (manualPosition != null) {
+                widget.x = bounds.x + manualPosition.x();
+                widget.y = bounds.y + manualPosition.y();
+            } else if (this.style != null) {
                 WidgetStyle widgetStyle = this.style.getWidget(entry.getKey());
                 Point pos = widgetStyle.resolve(bounds);
                 if (widget instanceof IResizableWidget resizableWidget) {
@@ -279,7 +307,10 @@ public class WidgetContainer {
                 widget.setFocused(false);
             }
 
-            if (this.style != null) {
+            Point manualPosition = manualTextFieldPositions.get(entry.getKey());
+            if (manualPosition != null) {
+                widget.move(bounds.x + manualPosition.x(), bounds.y + manualPosition.y());
+            } else if (this.style != null) {
                 WidgetStyle widgetStyle = this.style.getWidget(entry.getKey());
                 widget.move(widgetStyle.resolve(bounds));
             }

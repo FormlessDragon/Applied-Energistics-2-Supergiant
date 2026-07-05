@@ -15,15 +15,6 @@
         "translate": "gui.ae2.TerminalSettingsTitle"
       }
     },
-    "search_settings_title": {
-      "position": {
-        "left": 8,
-        "top": 25
-      },
-      "text": {
-        "translate": "gui.ae2.SearchSettingsTitle"
-      }
-    },
     "recursive_reserve_label": {
       "position": {
         "left": 10,
@@ -40,24 +31,6 @@
       },
       "text": {
         "translate": "gui.ae2.TerminalSettingsPlayerPinRows"
-      }
-    },
-    "page_info": {
-      "position": {
-        "left": 86,
-        "top": 194
-      },
-      "text": {
-        "text": "1 / 2"
-      }
-    },
-    "wireless_settings_title": {
-      "position": {
-        "left": 8,
-        "top": 50
-      },
-      "text": {
-        "translate": "gui.ae2.WirelessTerminalSettingsTitle"
       }
     }
   },
@@ -170,18 +143,6 @@
       "left": 10,
       "top": 67,
       "width": 180
-    },
-    "previousPage": {
-      "left": 10,
-      "top": 190,
-      "width": 22,
-      "height": 20
-    },
-    "nextPage": {
-      "left": 168,
-      "top": 190,
-      "width": 22,
-      "height": 20
     }
   }
 }
