@@ -69,8 +69,8 @@
     },
     "scrollbar": {
       "left": 241,
-      "top": 18,
-      "height": 118
+      "top": 19,
+      "height": 125
     }
   },
   "images": {
@@ -90,7 +90,7 @@
       "texture": "guis/advanced_memory_card.png",
       "textureWidth": 256,
       "textureHeight": 256,
-      "srcRect": [0, 102, 256, 98]
+      "srcRect": [0, 102, 256, 52]
     }
   }
 }
