@@ -16,6 +16,8 @@ import ae2.core.localization.PlayerMessages;
 import ae2.items.contents.PortableCellGuiHost;
 import ae2.recipes.game.StorageCellDisassemblyRecipe;
 import ae2.util.InteractionUtil;
+import baubles.api.BaubleType;
+import baubles.api.IBauble;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -27,9 +29,11 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.World;
+import net.minecraftforge.fml.common.Optional;
 import org.jetbrains.annotations.Nullable;
 
-public abstract class AbstractPortableCell extends PoweredContainerItem implements ICellWorkbenchItem, IGuiItem {
+@Optional.Interface(iface = "baubles.api.IBauble", modid = "baubles")
+public abstract class AbstractPortableCell extends PoweredContainerItem implements ICellWorkbenchItem, IGuiItem, IBauble {
     private static final String COLOR_TAG = "portableCellColor";
 
     private final GuiIds.GuiKey guiKey;
@@ -179,5 +183,11 @@ public abstract class AbstractPortableCell extends PoweredContainerItem implemen
 
     public void onUpgradesChanged(ItemStack stack, IUpgradeInventory upgrades) {
         setAEMaxPower(stack, powerCapacity * (1 + Upgrades.getEnergyCardMultiplier(upgrades) * 8));
+    }
+
+    @Optional.Method(modid = "baubles")
+    @Override
+    public BaubleType getBaubleType(ItemStack stack) {
+        return BaubleType.TRINKET;
     }
 }

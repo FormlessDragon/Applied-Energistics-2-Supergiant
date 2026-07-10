@@ -633,7 +633,7 @@ public class AEGuiHandler implements IGuiHandler {
                 return createNetworkStatusContainer(player, y >> 8, new BlockPos(x, y & 255, z), ID);
             }
             case PORTABLE_ITEM_CELL -> {
-                return createPortableItemCellContainer(player, x, ID);
+                return createPortableItemCellContainer(player, x, y, z, ID);
             }
             case PORTABLE_CELL_PICKUP_FILTER -> {
                 return createPortableCellPickupFilterContainer(player, x, ID);
@@ -648,7 +648,7 @@ public class AEGuiHandler implements IGuiHandler {
                 return createVoidCellContainer(player, x, ID);
             }
             case PORTABLE_FLUID_CELL -> {
-                return createPortableFluidCellContainer(player, x, ID);
+                return createPortableFluidCellContainer(player, x, y, z, ID);
             }
             case WIRELESS_TERMINAL -> {
                 return createWirelessTerminalContainer(player, x, ID);
@@ -1219,7 +1219,7 @@ public class AEGuiHandler implements IGuiHandler {
                 return null;
             }
             case PORTABLE_ITEM_CELL -> {
-                ContainerMEStorage portableItemCellContainer = createPortableItemCellContainer(player, x, ID);
+                ContainerMEStorage portableItemCellContainer = createPortableItemCellContainer(player, x, y, z, ID);
                 if (portableItemCellContainer != null) {
                     return new GuiMEStorage<>(portableItemCellContainer, player.inventory, null,
                         GuiStyleManager.loadStyleDoc("/screens/terminals/portable_item_cell.json"));
@@ -1259,7 +1259,7 @@ public class AEGuiHandler implements IGuiHandler {
                 return null;
             }
             case PORTABLE_FLUID_CELL -> {
-                ContainerMEStorage portableFluidCellContainer = createPortableFluidCellContainer(player, x, ID);
+                ContainerMEStorage portableFluidCellContainer = createPortableFluidCellContainer(player, x, y, z, ID);
                 if (portableFluidCellContainer != null) {
                     return new GuiMEStorage<>(portableFluidCellContainer, player.inventory, null,
                         GuiStyleManager.loadStyleDoc("/screens/terminals/portable_fluid_cell.json"));
@@ -1412,8 +1412,9 @@ public class AEGuiHandler implements IGuiHandler {
         return initContainer(new ContainerAdvancedMemoryCard(player.inventory, advancedMemoryCardHost), locator, guiId);
     }
 
-    private @Nullable ContainerMEStorage createPortableItemCellContainer(EntityPlayer player, int slot, int guiId) {
-        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+    private @Nullable ContainerMEStorage createPortableItemCellContainer(EntityPlayer player, int x, int y, int z,
+                                                                         int guiId) {
+        ItemGuiHostLocator locator = getInventoryOrBaublesLocator(x, y, z);
         IPortableTerminal host = createPortableTerminalHost(player, locator);
         if (host == null) {
             return null;
@@ -1470,8 +1471,9 @@ public class AEGuiHandler implements IGuiHandler {
         return initContainer(new ContainerCellWorkbench(player.inventory, cellWorkbenchHost), locator, guiId);
     }
 
-    private @Nullable ContainerMEStorage createPortableFluidCellContainer(EntityPlayer player, int slot, int guiId) {
-        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+    private @Nullable ContainerMEStorage createPortableFluidCellContainer(EntityPlayer player, int x, int y, int z,
+                                                                          int guiId) {
+        ItemGuiHostLocator locator = getInventoryOrBaublesLocator(x, y, z);
         IPortableTerminal host = createPortableTerminalHost(player, locator);
         if (host == null) {
             return null;
@@ -1479,6 +1481,13 @@ public class AEGuiHandler implements IGuiHandler {
 
         return initContainer(new ContainerMEStorage(GuiIds.GuiKey.PORTABLE_FLUID_CELL, player.inventory, host),
             locator, guiId);
+    }
+
+    private ItemGuiHostLocator getInventoryOrBaublesLocator(int x, int y, int z) {
+        if (x < 0 && y == 0 && z == 0) {
+            return GuiHostLocators.forBaubleSlot(-x - 1);
+        }
+        return GuiHostLocators.forInventorySlot(x);
     }
 
     private @Nullable AEBaseContainer createDynamicWirelessTerminalContainer(EntityPlayer player, int slot,

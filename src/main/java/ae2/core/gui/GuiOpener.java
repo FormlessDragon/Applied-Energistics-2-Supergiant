@@ -63,9 +63,9 @@ public final class GuiOpener {
                                       boolean returnedFromSubScreen) {
         Integer slot = locator.getPlayerInventorySlot();
         if (slot == null) {
-            if (key == GuiIds.GuiKey.PATTERN_MODIFIER && locator instanceof BaublesItemLocator baublesLocator) {
+            if (canOpenFromBaubles(key) && locator instanceof BaublesItemLocator baublesLocator) {
                 player.openGui(AppEngBase.instance(), GuiIds.getGuiId(key, returnedFromSubScreen), player.world,
-                    encodeBaublesPatternModifierLocator(baublesLocator), 0, 0);
+                    encodeBaublesLocator(baublesLocator), 0, 0);
                 return true;
             }
             return false;
@@ -106,7 +106,13 @@ public final class GuiOpener {
         return true;
     }
 
-    private static int encodeBaublesPatternModifierLocator(BaublesItemLocator locator) {
+    private static boolean canOpenFromBaubles(GuiIds.GuiKey key) {
+        return key == GuiIds.GuiKey.PATTERN_MODIFIER
+            || key == GuiIds.GuiKey.PORTABLE_ITEM_CELL
+            || key == GuiIds.GuiKey.PORTABLE_FLUID_CELL;
+    }
+
+    private static int encodeBaublesLocator(BaublesItemLocator locator) {
         return -1 - locator.baubleSlot();
     }
 

@@ -9,6 +9,8 @@ import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.items.AEBaseItem;
 import ae2.items.contents.PatternModifierGuiHost;
 import ae2.util.InteractionUtil;
+import baubles.api.BaubleType;
+import baubles.api.IBauble;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ActionResult;
@@ -18,9 +20,11 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.World;
+import net.minecraftforge.fml.common.Optional;
 import org.jetbrains.annotations.Nullable;
 
-public class PatternModifierItem extends AEBaseItem implements IGuiItem {
+@Optional.Interface(iface = "baubles.api.IBauble", modid = "baubles")
+public class PatternModifierItem extends AEBaseItem implements IGuiItem, IBauble {
     public static final int PATTERN_SLOTS = 27;
     public static final int BLANK_PATTERN_SLOTS = 4;
 
@@ -57,5 +61,11 @@ public class PatternModifierItem extends AEBaseItem implements IGuiItem {
     public ItemGuiHost<?> getGuiHost(EntityPlayer player, ItemGuiHostLocator locator,
                                      @Nullable RayTraceResult hitResult) {
         return new PatternModifierGuiHost(this, player, locator);
+    }
+
+    @Optional.Method(modid = "baubles")
+    @Override
+    public BaubleType getBaubleType(ItemStack stack) {
+        return BaubleType.TRINKET;
     }
 }
