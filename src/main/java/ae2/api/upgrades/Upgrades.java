@@ -7,10 +7,12 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextComponentTranslation;
@@ -18,14 +20,19 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 public final class Upgrades {
     private static final Reference2ObjectMap<Item, List<Association>> ASSOCIATIONS = new Reference2ObjectOpenHashMap<>();
     private static final Reference2ObjectMap<IUpgradeableItem, Set<Item>> SUPPORTED_ITEM_UPGRADES = new Reference2ObjectOpenHashMap<>();
     private static final Reference2ObjectMap<Item, List<ITextComponent>> UPGRADE_CARD_TOOLTIP_LINES = new Reference2ObjectOpenHashMap<>();
+    private static final Reference2ObjectMap<Item, Map<ResourceLocation, Integer>> ADDITIONAL_SLOTS =
+        new Reference2ObjectOpenHashMap<>();
+    private static final Set<Item> FROZEN_SLOT_REGISTRATIONS = new ReferenceOpenHashSet<>();
 
     private Upgrades() {
     }
@@ -65,6 +72,51 @@ public final class Upgrades {
         }
 
         return 0;
+    }
+
+    /**
+     * Adds physical upgrade slots to a machine independently of which upgrade cards it supports.
+     * <p>
+     * The registration id must be unique for the given machine. This makes registrations additive across mods while
+     * preventing the same contribution from being applied twice.
+     *
+     * @param upgradableItem machine receiving the additional slots
+     * @param registrationId unique id for this slot contribution
+     * @param slots number of slots to add, must be positive
+     */
+    public static synchronized void addUpgradeSlots(Item upgradableItem, ResourceLocation registrationId, int slots) {
+        Objects.requireNonNull(upgradableItem, "upgradableItem");
+        Objects.requireNonNull(registrationId, "registrationId");
+        if (slots <= 0) {
+            throw new IllegalArgumentException("slots must be positive");
+        }
+        if (FROZEN_SLOT_REGISTRATIONS.contains(upgradableItem)) {
+            throw new IllegalStateException("Upgrade slot registrations are already frozen for " + upgradableItem);
+        }
+
+        var registrations = ADDITIONAL_SLOTS.computeIfAbsent(upgradableItem, ignored -> new LinkedHashMap<>());
+        var previous = registrations.putIfAbsent(registrationId, slots);
+        if (previous != null) {
+            throw new IllegalStateException("Upgrade slot contribution " + registrationId
+                + " is already registered for " + upgradableItem);
+        }
+    }
+
+    /**
+     * Returns the sum of all registered physical upgrade slot contributions for a machine.
+     */
+    public static synchronized int getAdditionalUpgradeSlots(Item upgradableItem) {
+        FROZEN_SLOT_REGISTRATIONS.add(upgradableItem);
+        var registrations = ADDITIONAL_SLOTS.get(upgradableItem);
+        if (registrations == null) {
+            return 0;
+        }
+
+        int result = 0;
+        for (var slots : registrations.values()) {
+            result = Math.addExact(result, slots);
+        }
+        return result;
     }
 
     @SuppressWarnings("unused")

@@ -40,11 +40,14 @@ public class CraftingServiceStorage implements IStorageProvider {
     private final MEStorage inventory = new MEStorage() {
         @Override
         public boolean isPreferredStorageFor(AEKey key, IActionSource source) {
-            return true;
+            return key.getType().isCraftingCpuInsertable();
         }
 
         @Override
         public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
+            if (!what.getType().isCraftingCpuInsertable()) {
+                return 0;
+            }
             // Item interception logic
             return craftingService.insertIntoCpus(what, amount, mode);
         }
