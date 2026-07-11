@@ -93,7 +93,8 @@ public class CraftConfirmTableRenderer extends AbstractTableRenderer<CraftingPla
             lines.add(GuiText.Crafting.getLocal(amount));
         }
         if (entry.requestCount() > 0) {
-            lines.add(GuiText.CraftingPlanRequests.getLocal(Long.toString(entry.requestCount())));
+            String count = entry.what().getType().formatAmount(entry.requestCount(), AmountFormat.SLOT);
+            lines.add(GuiText.CraftingPlanRequests.getLocal(count));
         }
         if (entry.intermediateCraftAmount() > 0) {
             String amount = entry.what().getType().formatAmount(entry.intermediateCraftAmount(), AmountFormat.SLOT);
@@ -126,7 +127,7 @@ public class CraftConfirmTableRenderer extends AbstractTableRenderer<CraftingPla
         }
         if (entry.requestCount() > 0) {
             lines.add(GuiText.CraftingPlanRequests
-                .text(Long.toString(entry.requestCount())));
+                .text(entry.what().getType().formatAmount(entry.requestCount(), AmountFormat.FULL)));
         }
         if (entry.intermediateCraftAmount() > 0) {
             lines.add(GuiText.IntermediateCraft
