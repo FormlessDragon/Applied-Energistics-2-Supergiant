@@ -19,6 +19,7 @@
 package ae2.parts.crafting;
 
 import ae2.api.networking.IGridNodeListener;
+import ae2.api.networking.extensions.GridLogicExtensions;
 import ae2.api.parts.IPartCollisionHelper;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
@@ -155,6 +156,10 @@ public class PatternProviderPart extends AEBasePart implements PatternProviderLo
     public void onNeighborChanged(IBlockAccess level, BlockPos pos, BlockPos neighbor) {
         this.logic.invalidateTargetCaches();
         this.logic.updateRedstoneState();
+        var side = GridLogicExtensions.getNeighborSide(pos, neighbor);
+        if (side != null && side == getSide() && !isClientSide()) {
+            this.logic.onNeighborChanged(side);
+        }
     }
 
     @Override

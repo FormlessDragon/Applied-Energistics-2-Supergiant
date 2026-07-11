@@ -24,7 +24,19 @@ public final class UpgradeInventories {
      */
     public static IUpgradeInventory forMachine(Item machineType, int maxUpgrades,
                                                MachineUpgradesChanged changeCallback) {
-        return new MachineUpgradeInventory(machineType, maxUpgrades, changeCallback);
+        return new MachineUpgradeInventory(machineType, getMachineUpgradeSlots(machineType, maxUpgrades),
+            changeCallback);
+    }
+
+    /**
+     * Resolves a machine's physical upgrade inventory size from its base slots and registered slot contributions.
+     * Calling this freezes further slot registrations for the machine.
+     */
+    public static int getMachineUpgradeSlots(Item machineType, int baseSlots) {
+        if (baseSlots < 0) {
+            throw new IllegalArgumentException("baseSlots must not be negative");
+        }
+        return Math.addExact(baseSlots, Upgrades.getAdditionalUpgradeSlots(machineType));
     }
 
     /**
