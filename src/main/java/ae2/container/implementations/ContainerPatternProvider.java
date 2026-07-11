@@ -42,6 +42,7 @@ public class ContainerPatternProvider extends AEBaseContainer
     public static final String ACTION_SET_PAGE = "setPage";
     @GuiSync(12)
     public final boolean remote;
+    private final PatternProviderLogicHost host;
     private final PatternProviderLogic logic;
     private final List<AppEngSlot> patternSlots = new ObjectArrayList<>();
     private final PatternModifierPanel patternModifierPanel;
@@ -73,6 +74,7 @@ public class ContainerPatternProvider extends AEBaseContainer
 
     public ContainerPatternProvider(InventoryPlayer playerInventory, PatternProviderLogicHost host) {
         super(playerInventory, host);
+        this.host = host;
         this.logic = host.getLogic();
         this.remote = playerInventory.player.openContainer instanceof ContainerPatternAccessTerm;
         this.registerClientAction(ACTION_SET_PAGE, Integer.class, this::setPage);
@@ -155,6 +157,10 @@ public class ContainerPatternProvider extends AEBaseContainer
 
     public PatternProviderLogic getLogic() {
         return this.logic;
+    }
+
+    public PatternProviderLogicHost getHost() {
+        return this.host;
     }
 
     public BlockingMode getBlockingMode() {
