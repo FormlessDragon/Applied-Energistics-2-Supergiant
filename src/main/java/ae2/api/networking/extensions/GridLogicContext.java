@@ -6,6 +6,7 @@ import ae2.api.upgrades.IUpgradeInventory;
 import net.minecraft.item.Item;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -22,18 +23,19 @@ public final class GridLogicContext {
     private final IManagedGridNode managedNode;
     private final IActionSource actionSource;
     private final IUpgradeInventory upgrades;
+    @Nullable
     private final TileEntity host;
     private final Supplier<? extends Set<EnumFacing>> targetSides;
 
     public GridLogicContext(Item machineType, Object owner, IManagedGridNode managedNode, IActionSource actionSource,
-                            IUpgradeInventory upgrades, TileEntity host,
+                            IUpgradeInventory upgrades, @Nullable TileEntity host,
                             Supplier<? extends Set<EnumFacing>> targetSides) {
         this.machineType = Objects.requireNonNull(machineType, "machineType");
         this.owner = Objects.requireNonNull(owner, "owner");
         this.managedNode = Objects.requireNonNull(managedNode, "managedNode");
         this.actionSource = Objects.requireNonNull(actionSource, "actionSource");
         this.upgrades = Objects.requireNonNull(upgrades, "upgrades");
-        this.host = Objects.requireNonNull(host, "host");
+        this.host = host;
         this.targetSides = Objects.requireNonNull(targetSides, "targetSides");
     }
 
@@ -60,6 +62,7 @@ public final class GridLogicContext {
         return upgrades;
     }
 
+    @Nullable
     public TileEntity getHostTile() {
         return host;
     }

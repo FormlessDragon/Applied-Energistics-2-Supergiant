@@ -485,7 +485,8 @@ extension sets.
 The factory receives a `GridLogicContext`, which exposes the machine item, owning block entity or part, host tile,
 managed grid node, action source, upgrade inventory, and a current snapshot of target sides. The host tile is the
 containing `TileEntity`; for a part, the owner returned by `getOwner()` is the part while the host tile is normally the
-cable bus tile.
+cable bus tile. The host tile can be `null` while AE2 constructs a placement preview, so extensions must not require
+it during factory construction or `initialize(...)`.
 
 Implement `GridLogicExtension` for lifecycle callbacks:
 
