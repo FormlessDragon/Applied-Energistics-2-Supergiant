@@ -56,6 +56,7 @@ public class InterfaceBlock extends AEBaseTileBlock<TileInterface> {
         return false;
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public void neighborChanged(IBlockState state, World world, BlockPos pos, Block blockIn, BlockPos fromPos) {
         super.neighborChanged(state, world, pos, blockIn, fromPos);
