@@ -29,6 +29,7 @@ relevant during normal Forge mod initialization:
 | `ae2.api.client.StorageCellModels`          | For customizing the models of storage cells when they are inserted into drives or ME chests.        |
 | `ae2.api.upgrades.Upgrades`                 | For managing upgrade cards and associating them with upgradable items, parts, or blocks.            |
 | `ae2.api.upgrades.UpgradeInventories`       | For creating upgrade inventories for upgradable machines and item-backed hosts.                     |
+| `ae2.api.networking.extensions.GridLogicExtensions` | Adds runtime behavior to supported AE2 grid logic instances without mixins.                  |
 | `ae2.api.behaviors.GenericInternalInventoryAdapters` | Allows addons to expose AE2 generic inventories through Forge capabilities.                         |
 
 In general, these registries are synchronized and may be used during mod loading. Finish registration before gameplay
@@ -53,6 +54,12 @@ or filtering.
 Each type of key is represented by an instance of `AEKeyType`, accessible via `AEKey.getType()`. It stores properties
 common to all keys of a type, such as amount formatting, bytes per amount, operation amount, the packet reader, and
 the NBT reader. New key families are registered through `AEKeyTypes.register`.
+
+Key types that cannot be delivered as crafting CPU output should override
+`AEKeyType.isCraftingCpuInsertable()` to return `false`. AE2 will then neither prefer the crafting CPU storage mount
+for the type nor forward inserts to crafting CPUs. This is appropriate for resource families such as externally
+produced energy that may be stored in a network but are not valid crafting results. It does not disable pattern
+registration or crafting-plan calculation for the key type.
 
 Keys can be saved to NBT using `toTagGeneric`, which also stores a reference to their type so that
 `AEKey.fromTagGeneric` can restore the key without the caller knowing the exact key class. The same mechanism can be
@@ -421,6 +428,31 @@ through `Upgrades.add(upgradeCard, upgradableObject, maxSupported, tooltipGroup)
 upgrade card, all supported machines with the same `tooltipGroup` are merged into a single translated line. AE2 uses
 this for related block/part forms and related item/fluid variants.
 
+### Physical Upgrade Slots
+
+The maximum number of copies of a card accepted by `Upgrades.add(...)` is independent from the number of physical
+slots on a machine. A machine may deliberately expose fewer slots than the sum of all supported card maxima, requiring
+the player to choose between compatible upgrades.
+
+Addons can contribute physical slots to an existing machine with `Upgrades.addUpgradeSlots(...)`:
+
+```java
+ResourceLocation id = new ResourceLocation("examplemod", "high_voltage_slot");
+
+Upgrades.add(HIGH_VOLTAGE_CARD, MY_MACHINE_ITEM, 1);
+Upgrades.addUpgradeSlots(MY_MACHINE_ITEM, id, 1);
+```
+
+The contribution id is unique per machine item. Reusing an id, supplying a non-positive slot count, or registering
+after the machine's upgrade-slot count has first been resolved throws an exception. Distinct addon ids are additive.
+This makes a feature that adds a card and a slot explicit while retaining the machine author's base capacity and
+upgrade trade-offs.
+
+`UpgradeInventories.forMachine(machine, baseSlots, callback)` automatically includes registered contributions.
+Custom machine inventories should call `UpgradeInventories.getMachineUpgradeSlots(machine, baseSlots)` exactly once
+when constructing their inventory. Both methods freeze further slot contributions for that machine, so register them
+during mod initialization before any instance of the machine can be created.
+
 ### Making Custom Machines or Items Upgradable
 
 Use `UpgradeInventories` to create inventories for storing upgrade cards. These inventories use the provided machine
@@ -432,6 +464,62 @@ many upgrades of a type are installed, and iterate over installed cards.
 For the machine version created by `UpgradeInventories.forMachine`, save the inventory from the change callback. For
 the item version created by `UpgradeInventories.forItem`, the upgrade inventory writes changes directly into the
 provided `ItemStack` NBT. The item variant also accepts an optional change callback.
+
+## Extending Built-In Grid Logic
+
+`GridLogicExtensions` lets addons attach independent runtime behavior to supported AE2 grid logic without mixins,
+access transformers, or references to private fields. The current built-in integration points are ME interfaces and
+pattern providers, for both their block and part forms.
+
+Register a factory for each machine item during mod initialization:
+
+```java
+ResourceLocation id = new ResourceLocation("examplemod", "network_monitor");
+GridLogicExtensions.register(MY_MACHINE_ITEM, id, MyLogicExtension::new);
+```
+
+Registration ids are unique per machine item. Registrations for a machine are frozen when its first logic instance is
+created; duplicate or late registrations throw an exception so a world cannot contain machines with different
+extension sets.
+
+The factory receives a `GridLogicContext`, which exposes the machine item, owning block entity or part, host tile,
+managed grid node, action source, upgrade inventory, and a current snapshot of target sides. The host tile is the
+containing `TileEntity`; for a part, the owner returned by `getOwner()` is the part while the host tile is normally the
+cable bus tile. The host tile can be `null` while AE2 constructs a placement preview, so extensions must not require
+it during factory construction or `initialize(...)`.
+
+Implement `GridLogicExtension` for lifecycle callbacks:
+
+```java
+final class MyLogicExtension implements GridLogicExtension {
+    private final GridLogicContext context;
+
+    MyLogicExtension(GridLogicContext context) {
+        this.context = context;
+    }
+
+    @Override
+    public void initialize(GridLogicContext context) {
+        context.getManagedNode().addService(IMyNodeService.class, new MyNodeService(context));
+    }
+
+    @Override
+    public void onUpgradesChanged() {
+        // Reconfigure behavior after AE2 has processed the upgrade change.
+    }
+
+    @Override
+    public void onNeighborChanged(EnumFacing side) {
+        // Invalidate state associated with this adjacent side.
+    }
+}
+```
+
+Factories create all extensions first. AE2 then calls `initialize(...)` after the complete extension list is attached
+to the owning logic, so initialization can safely cause follow-up logic activity. `onUpgradesChanged()` is dispatched
+after AE2's native upgrade handling. Neighbor callbacks are dispatched server-side for immediately adjacent block
+changes; an extension should use `context.getTargetSides()` when it only handles current output sides, because a
+pattern provider's selected side can change at runtime.
 
 ## Wireless Terminals
 

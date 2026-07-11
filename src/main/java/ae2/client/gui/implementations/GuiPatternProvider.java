@@ -1,5 +1,6 @@
 package ae2.client.gui.implementations;
 
+import ae2.api.client.PatternProviderGuiInitEvent;
 import ae2.api.config.BlockingMode;
 import ae2.api.config.LockCraftingMode;
 import ae2.api.config.PatternProviderBlockingType;
@@ -31,6 +32,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraftforge.common.MinecraftForge;
 
 import java.util.List;
 
@@ -88,6 +90,8 @@ public class GuiPatternProvider extends AEBaseGui<ContainerPatternProvider> {
         this.patternModifierPanel = new PatternModifierPanelWidget(this, new PatternProviderPanelHost());
         this.patternModifierPanel.addButtons();
         addToLeftToolbar(this.patternModifierPanel.getToolbarButton());
+        MinecraftForge.EVENT_BUS.post(
+            new PatternProviderGuiInitEvent(container.getHost(), this::addToLeftToolbar));
     }
 
     @Override

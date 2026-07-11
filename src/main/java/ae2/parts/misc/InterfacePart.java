@@ -5,6 +5,7 @@ import ae2.api.networking.GridHelper;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridNodeListener;
 import ae2.api.networking.IManagedGridNode;
+import ae2.api.networking.extensions.GridLogicExtensions;
 import ae2.api.parts.IPartCollisionHelper;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
@@ -21,11 +22,15 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.IBlockAccess;
 import net.minecraftforge.common.util.Constants;
 
 import org.jetbrains.annotations.Nullable;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 public class InterfacePart extends AEBasePart implements InterfaceLogicHost {
     private static final String CELL_TERMINAL_SUBNET_ID_TAG = "cellTerminalSubnetId";
@@ -135,6 +140,19 @@ public class InterfacePart extends AEBasePart implements InterfaceLogicHost {
     @Override
     public InterfaceLogic getInterfaceLogic() {
         return this.logic;
+    }
+
+    @Override
+    public Set<net.minecraft.util.EnumFacing> getTargets() {
+        return EnumSet.of(getSide());
+    }
+
+    @Override
+    public void onNeighborChanged(IBlockAccess level, BlockPos pos, BlockPos neighbor) {
+        var side = GridLogicExtensions.getNeighborSide(pos, neighbor);
+        if (side != null && side == getSide() && !isClientSide()) {
+            this.logic.onNeighborChanged(side);
+        }
     }
 
     @Override

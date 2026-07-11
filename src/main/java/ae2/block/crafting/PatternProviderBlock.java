@@ -17,6 +17,7 @@
  */
 package ae2.block.crafting;
 
+import ae2.api.networking.extensions.GridLogicExtensions;
 import ae2.block.AEBaseTileBlock;
 import ae2.core.gui.locator.GuiHostLocators;
 import ae2.tile.crafting.TilePatternProvider;
@@ -72,6 +73,10 @@ public class PatternProviderBlock extends AEBaseTileBlock<TilePatternProvider> {
         if (tile != null) {
             tile.getLogic().invalidateTargetCaches();
             tile.getLogic().updateRedstoneState();
+            var side = GridLogicExtensions.getNeighborSide(pos, fromPos);
+            if (side != null && !world.isRemote) {
+                tile.getLogic().onNeighborChanged(side);
+            }
         }
     }
 

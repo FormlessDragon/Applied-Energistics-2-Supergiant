@@ -12,10 +12,18 @@ import ae2.helpers.externalstorage.GenericStackInv;
 import ae2.parts.AEBasePart;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.EnumFacing;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 public interface InterfaceLogicHost extends IConfigurableObject, IUpgradeableObject, IPriorityHost, IConfigInvHost {
     TileEntity getTileEntity();
+
+    default Set<EnumFacing> getTargets() {
+        return EnumSet.allOf(EnumFacing.class);
+    }
 
     void saveChanges();
 

@@ -17,10 +17,12 @@
  */
 package ae2.block.misc;
 
+import ae2.api.networking.extensions.GridLogicExtensions;
 import ae2.block.AEBaseTileBlock;
 import ae2.core.gui.locator.GuiHostLocators;
 import ae2.tile.misc.TileInterface;
 import net.minecraft.block.material.Material;
+import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.EnumFacing;
@@ -52,6 +54,21 @@ public class InterfaceBlock extends AEBaseTileBlock<TileInterface> {
             return true;
         }
         return false;
+    }
+
+    @SuppressWarnings("deprecation")
+    @Override
+    public void neighborChanged(IBlockState state, World world, BlockPos pos, Block blockIn, BlockPos fromPos) {
+        super.neighborChanged(state, world, pos, blockIn, fromPos);
+        if (world.isRemote) {
+            return;
+        }
+
+        var side = GridLogicExtensions.getNeighborSide(pos, fromPos);
+        var tile = this.getTileEntity(world, pos);
+        if (side != null && tile != null) {
+            tile.getInterfaceLogic().onNeighborChanged(side);
+        }
     }
 }
 

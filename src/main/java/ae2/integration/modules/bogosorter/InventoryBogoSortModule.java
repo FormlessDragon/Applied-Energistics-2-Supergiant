@@ -19,6 +19,7 @@
 package ae2.integration.modules.bogosorter;
 
 import ae2.container.AEBaseContainer;
+import ae2.container.implementations.ContainerSkyChest;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.me.items.ContainerBasicCellChest;
 import ae2.container.me.items.ContainerCraftingTerm;
@@ -83,6 +84,7 @@ public final class InventoryBogoSortModule {
             IBogoSortAPI api = IBogoSortAPI.getInstance();
             api.addSlotGetter(Slot.class, LockedAwareSlot::new);
             api.addSlotGetter(DisabledSlot.class, LockedAwareSlot::new);
+            api.addCompat(ContainerSkyChest.class, (container, builder) -> builder.addSlotGroup(0, 36, 9));
             registerTerminal(api, ContainerMEStorage.class);
             registerTerminal(api, ContainerBasicCellChest.class);
             registerTerminal(api, ContainerCraftingTerm.class);

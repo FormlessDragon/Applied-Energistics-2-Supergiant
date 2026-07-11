@@ -43,6 +43,9 @@ import ae2.api.networking.IGridConnection;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IManagedGridNode;
 import ae2.api.networking.crafting.ICraftingProvider;
+import ae2.api.networking.extensions.GridLogicContext;
+import ae2.api.networking.extensions.GridLogicExtension;
+import ae2.api.networking.extensions.GridLogicExtensions;
 import ae2.api.networking.security.IActionHost;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.networking.ticking.IGridTickable;
@@ -56,6 +59,7 @@ import ae2.api.stacks.AEKeyType;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.upgrades.IUpgradeInventory;
+import ae2.api.upgrades.UpgradeInventories;
 import ae2.api.upgrades.Upgrades;
 import ae2.api.util.IConfigManager;
 import ae2.core.AEConfig;
@@ -137,6 +141,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     private final AppEngInternalInventory patternInventory;
     private final InternalInventory terminalPatternInventory = new ActivePatternInventory();
     private final IUpgradeInventory upgrades;
+    private final List<GridLogicExtension> extensions;
     private final ObjectList<IPatternDetails> patterns = new ObjectArrayList<>();
     private final ObjectSet<AEItemKey> patternKeys = new ObjectOpenHashSet<>();
     private final ObjectSet<AEKey> patternInputs = new ObjectOpenHashSet<>();
@@ -187,11 +192,16 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
                                            .build();
         this.patternInventory = new AppEngInternalInventory(this, patternInventorySize, 1, new PatternInventoryFilter());
         this.upgrades = new PatternProviderUpgradeInventory(machineType,
-            1 + AEConfig.instance().getPatternProviderExpansionCardLimit());
+            UpgradeInventories.getMachineUpgradeSlots(machineType,
+                1 + AEConfig.instance().getPatternProviderExpansionCardLimit()));
         this.returnInv = new PatternProviderReturnInventory(() -> {
             this.mainNode.ifPresent((grid, node) -> grid.getTickManager().alertDevice(node));
             this.host.saveChanges();
         });
+        var extensionContext = new GridLogicContext(machineType, host, this.mainNode, this.actionSource,
+            this.upgrades, hostTile, host::getTargets);
+        this.extensions = GridLogicExtensions.create(extensionContext);
+        GridLogicExtensions.initialize(this.extensions, extensionContext);
     }
 
     private static int countItem(InventoryPlayer inventory, ItemStack needle) {
@@ -238,6 +248,15 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         this.host.saveChanges();
         this.updatePatterns();
         ICraftingProvider.requestUpdate(this.mainNode);
+        for (var extension : this.extensions) {
+            extension.onUpgradesChanged();
+        }
+    }
+
+    public void onNeighborChanged(EnumFacing side) {
+        for (var extension : this.extensions) {
+            extension.onNeighborChanged(side);
+        }
     }
 
     private boolean isPatternSlotOccupied(int slot) {

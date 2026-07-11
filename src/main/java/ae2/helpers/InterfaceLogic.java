@@ -12,6 +12,9 @@ import ae2.api.networking.crafting.ICraftingLink;
 import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.networking.crafting.ICraftingRequester;
 import ae2.api.networking.energy.IEnergySource;
+import ae2.api.networking.extensions.GridLogicContext;
+import ae2.api.networking.extensions.GridLogicExtension;
+import ae2.api.networking.extensions.GridLogicExtensions;
 import ae2.api.networking.security.IActionHost;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.networking.ticking.IGridTickable;
@@ -61,6 +64,7 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
     protected final IActionSource interfaceRequestSource;
     private final MultiCraftingTracker craftingTracker;
     private final IUpgradeInventory upgrades;
+    private final List<GridLogicExtension> extensions;
     private final IConfigManager cm;
     private final GenericStack[] plannedWork;
     private final ConfigInventory config;
@@ -97,6 +101,10 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
 
         this.getConfig().useRegisteredCapacities();
         this.getStorage().useRegisteredCapacities();
+        var extensionContext = new GridLogicContext(machineType, host, this.mainNode, this.actionSource,
+            this.upgrades, host.getTileEntity(), host::getTargets);
+        this.extensions = GridLogicExtensions.create(extensionContext);
+        GridLogicExtensions.initialize(this.extensions, extensionContext);
     }
 
     public static boolean isForceStartCraftingEnabled(Iterable<ItemStack> upgrades) {
@@ -418,6 +426,15 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
         }
 
         this.updatePlan();
+        for (var extension : this.extensions) {
+            extension.onUpgradesChanged();
+        }
+    }
+
+    public void onNeighborChanged(EnumFacing side) {
+        for (var extension : this.extensions) {
+            extension.onNeighborChanged(side);
+        }
     }
 
     private void onConfigRowChanged() {

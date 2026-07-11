@@ -109,6 +109,13 @@ public abstract class AEKeyType {
         return false;
     }
 
+    /**
+     * Returns whether crafting CPUs may intercept inserted keys of this type as crafting output.
+     */
+    public boolean isCraftingCpuInsertable() {
+        return true;
+    }
+
     public final AEKeyFilter filter() {
         return filter;
     }
