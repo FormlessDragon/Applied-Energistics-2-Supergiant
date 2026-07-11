@@ -18,7 +18,7 @@
     "recursive_reserve_label": {
       "position": {
         "left": 10,
-        "top": 130
+        "top": 150
       },
       "text": {
         "translate": "gui.ae2.TerminalSettingsRecursiveIngredientReserve"
@@ -27,7 +27,7 @@
     "player_pin_rows_label": {
       "position": {
         "left": 10,
-        "top": 152
+        "top": 172
       },
       "text": {
         "translate": "gui.ae2.TerminalSettingsPlayerPinRows"
@@ -61,25 +61,30 @@
       "top": 65,
       "width": 180
     },
-    "clearGridOnCloseCheckbox": {
+    "windowsCraftingNotificationsCheckbox": {
       "left": 10,
       "top": 85,
       "width": 180
     },
-    "autoFillPatternsCheckbox": {
+    "clearGridOnCloseCheckbox": {
       "left": 10,
       "top": 105,
       "width": 180
     },
+    "autoFillPatternsCheckbox": {
+      "left": 10,
+      "top": 125,
+      "width": 180
+    },
     "recursiveReserveField": {
       "left": 154,
-      "top": 127,
+      "top": 147,
       "width": 36,
       "height": 12
     },
     "playerPinRowsField": {
       "left": 154,
-      "top": 149,
+      "top": 169,
       "width": 36,
       "height": 12
     },

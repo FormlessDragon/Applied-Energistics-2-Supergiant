@@ -489,6 +489,15 @@ public class AEConfig {
         this.save();
     }
 
+    public boolean isWindowsCraftingNotificationsEnabled() {
+        return CLIENT.windowsCraftingNotifications;
+    }
+
+    public void setWindowsCraftingNotificationsEnabled(boolean enabled) {
+        CLIENT.windowsCraftingNotifications = enabled;
+        this.save();
+    }
+
     public boolean isUseExternalSearch() {
         return SEARCH.useExternalSearch;
     }
@@ -852,6 +861,10 @@ public class AEConfig {
         @Config.Name("notifyForFinishedCraftingJobs")
         @Config.Comment("Show toast when long-running crafting jobs finish.")
         public boolean notifyForFinishedCraftingJobs = true;
+
+        @Config.Name("windowsCraftingNotifications")
+        @Config.Comment("Show a Windows notification when a crafting job finishes while the game is unfocused.")
+        public boolean windowsCraftingNotifications = false;
 
         @Config.Name("pinAutoCraftedItems")
         @Config.Comment("Pin items that the player auto-crafts to the top of the terminal.")

@@ -94,6 +94,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     private final AECheckbox pinDisplaySortTopRadio;
     private final AECheckbox pinDisplayLockedGridRadio;
     private final AECheckbox notifyForFinishedCraftingJobsCheckbox;
+    private final AECheckbox windowsCraftingNotificationsCheckbox;
     private final AECheckbox clearGridOnCloseCheckbox;
     @Nullable
     private final AECheckbox autoFillPatternsCheckbox;
@@ -177,6 +178,8 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
             GuiText.TerminalSettingsPinDisplayLockedGridTooltip.text()));
         this.notifyForFinishedCraftingJobsCheckbox = widgets.addCheckbox("notifyForFinishedCraftingJobsCheckbox",
             GuiText.TerminalSettingsNotifyForFinishedJobs.text(), this::save);
+        this.windowsCraftingNotificationsCheckbox = widgets.addCheckbox("windowsCraftingNotificationsCheckbox",
+            GuiText.TerminalSettingsWindowsCraftingNotifications.text(), this::save);
         this.clearGridOnCloseCheckbox = widgets.addCheckbox("clearGridOnCloseCheckbox",
             GuiText.TerminalSettingsClearGridOnClose.text(), this::save);
         if (this.container instanceof ContainerPatternEncodingTerm) {
@@ -379,6 +382,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
             ? PinDisplayMode.LOCKED_GRID
             : PinDisplayMode.SORT_TOP);
         config.setNotifyForFinishedCraftingJobs(notifyForFinishedCraftingJobsCheckbox.isSelected());
+        config.setWindowsCraftingNotificationsEnabled(windowsCraftingNotificationsCheckbox.isSelected());
         config.setClearGridOnClose(clearGridOnCloseCheckbox.isSelected());
         syncClearGridOnClose();
         config.setUseExternalSearch(hasExternalSearch() && this.useExternalSearchRadio.isSelected());
@@ -433,6 +437,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         pinDisplaySortTopRadio.setSelected(pinDisplayMode == PinDisplayMode.SORT_TOP);
         pinDisplayLockedGridRadio.setSelected(pinDisplayMode == PinDisplayMode.LOCKED_GRID);
         notifyForFinishedCraftingJobsCheckbox.setSelected(config.isNotifyForFinishedCraftingJobs());
+        windowsCraftingNotificationsCheckbox.setSelected(config.isWindowsCraftingNotificationsEnabled());
         clearGridOnCloseCheckbox.setSelected(config.isClearGridOnClose());
         if (this.autoFillPatternsCheckbox != null && this.container instanceof ContainerPatternEncodingTerm patternEncodingTerm) {
             this.autoFillPatternsCheckbox.setSelected(patternEncodingTerm.getAutoFillPatterns() == YesNo.YES);
@@ -606,6 +611,8 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         this.pinDisplayLockedGridRadio.visible = general
             && hasGeneralSetting(GeneralSetting.PINNED_ITEMS);
         this.notifyForFinishedCraftingJobsCheckbox.visible = general
+            && hasGeneralSetting(GeneralSetting.CRAFTING_JOB_NOTIFICATIONS);
+        this.windowsCraftingNotificationsCheckbox.visible = general
             && hasGeneralSetting(GeneralSetting.CRAFTING_JOB_NOTIFICATIONS);
         this.clearGridOnCloseCheckbox.visible = general
             && hasGeneralSetting(GeneralSetting.CLEAR_GRID_ON_CLOSE);
