@@ -4,8 +4,10 @@ import ae2.api.client.AEKeyRendering;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.client.gui.Icon;
+import ae2.crafting.pattern.EncodedPatternItem;
 import ae2.items.misc.GenericResourcePackageItem;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.item.ItemStack;
 
@@ -23,7 +25,10 @@ public final class RenderItemHooks {
             return false;
         }
 
-        AEKey aeKey = OVERRIDING.computeIfAbsent(stack, RenderItemHooks::unwrapWhat);
+        AEKey aeKey = getEncodedPatternOutput(stack);
+        if (aeKey == null) {
+            aeKey = OVERRIDING.computeIfAbsent(stack, RenderItemHooks::unwrapWhat);
+        }
         if (aeKey == null) {
             return false;
         }
@@ -47,6 +52,21 @@ public final class RenderItemHooks {
 
     private static AEKey unwrapWhat(ItemStack stack) {
         return GenericStack.unwrapWhat(stack);
+    }
+
+    private static AEKey getEncodedPatternOutput(ItemStack stack) {
+        if (!GuiScreen.isShiftKeyDown() || !(stack.getItem() instanceof EncodedPatternItem<?> encodedPattern)) {
+            return null;
+        }
+
+        var level = Minecraft.getMinecraft().world;
+        if (level == null) {
+            return null;
+        }
+
+        // Item outputs are handled by the encoded pattern's baked-model override. Generic outputs need to enter the
+        // AEKey GUI rendering path directly because their wrapper model intentionally has no baked quads.
+        return GenericStack.unwrapWhat(encodedPattern.getOutput(stack, level));
     }
 
     private static void drawPackageOverlay(int x, int y) {
