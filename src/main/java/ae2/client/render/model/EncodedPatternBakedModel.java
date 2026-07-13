@@ -1,5 +1,8 @@
 package ae2.client.render.model;
 
+import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.AEKey;
+import ae2.api.stacks.GenericStack;
 import ae2.client.render.DelegateBakedModel;
 import ae2.crafting.pattern.EncodedPatternItem;
 import net.minecraft.client.Minecraft;
@@ -21,6 +24,10 @@ public class EncodedPatternBakedModel extends DelegateBakedModel {
                 World level = world != null ? world : Minecraft.getMinecraft().world;
                 ItemStack output = level != null ? encodedPattern.getOutput(stack, level) : ItemStack.EMPTY;
                 if (!output.isEmpty()) {
+                    AEKey key = GenericStack.unwrapWhat(output);
+                    if(key != null && !(key instanceof AEItemKey)) {
+                        return EncodedPatternBakedModel.this.getBaseModel();
+                    }
                     return Minecraft.getMinecraft().getRenderItem()
                                     .getItemModelWithOverrides(output, world, entity);
                 }
