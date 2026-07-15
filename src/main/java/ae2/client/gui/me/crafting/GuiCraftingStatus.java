@@ -29,6 +29,7 @@ import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 
+import java.util.ArrayList;
 import java.util.Collection;
 
 public class GuiCraftingStatus extends GuiCraftingCPU<ContainerCraftingStatus> implements ITextFieldGui {
@@ -72,7 +73,10 @@ public class GuiCraftingStatus extends GuiCraftingCPU<ContainerCraftingStatus> i
 
     @Override
     public Collection<? extends GuiTextField> getTextFields() {
-        return this.cpuSelectionList.getTextFields();
+        Collection<GuiTextField> textFields = new ArrayList<>();
+        textFields.addAll(this.cpuSelectionList.getTextFields());
+        textFields.addAll(super.getTextFields());
+        return textFields;
     }
 
     @Override
