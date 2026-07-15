@@ -23,6 +23,7 @@ import ae2.api.config.Actionable;
 import ae2.api.config.PowerMultiplier;
 import ae2.api.config.PowerUnit;
 import ae2.api.networking.energy.IAEPowerStorage;
+import ae2.api.networking.events.GridPowerStorageChanged.ChangeType;
 import ae2.api.networking.events.GridPowerStorageStateChanged.PowerEventType;
 import ae2.integration.Integrations;
 import ae2.integration.abstraction.IC2PowerSink;
@@ -42,14 +43,15 @@ import java.util.Set;
 public abstract class AEBasePoweredTile extends AEBaseInvTile
     implements IAEPowerStorage, IExternalPowerSink {
 
-    private static final Set<EnumFacing> ALL_SIDES = ImmutableSet.copyOf(EnumSet.allOf(EnumFacing.class));
+    protected static final Set<EnumFacing> ALL_SIDES = ImmutableSet.copyOf(EnumSet.allOf(EnumFacing.class));
     // the current power buffer.
-    private final StoredEnergyAmount stored = new StoredEnergyAmount(0, 10000, this::emitPowerStateEvent);
+    private final StoredEnergyAmount stored = new StoredEnergyAmount(0, 10000, this::handlePowerStateEvent);
     private final IEnergyStorage forgeEnergyAdapter;
     private final IC2PowerSink ic2Sink;
     private boolean internalPublicPowerStorage = false;
     private AccessRestriction internalPowerFlow = AccessRestriction.READ_WRITE;
     private Set<EnumFacing> internalPowerSides = ALL_SIDES;
+    private boolean suppressPowerStateEvent;
 
     public AEBasePoweredTile() {
         this.forgeEnergyAdapter = new ForgeEnergyAdapter(this);
@@ -94,7 +96,12 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
     }
 
     protected double funnelPowerIntoStorage(double power, Actionable mode) {
-        return this.injectAEPower(power, mode);
+        double previousPower = this.stored.getAmount();
+        double overflow = this.injectAEPower(power, mode);
+        if (mode == Actionable.MODULATE && Double.compare(previousPower, this.stored.getAmount()) != 0) {
+            emitPowerStorageChanged(ChangeType.VALUES_CHANGED);
+        }
+        return overflow;
     }
 
     @Override
@@ -103,6 +110,15 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
     }
 
     protected void emitPowerStateEvent(PowerEventType x) {
+    }
+
+    protected void emitPowerStorageChanged(ChangeType type) {
+    }
+
+    private void handlePowerStateEvent(PowerEventType type) {
+        if (!this.suppressPowerStateEvent) {
+            emitPowerStateEvent(type);
+        }
     }
 
     @Override
@@ -157,7 +173,17 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
     }
 
     public void setInternalCurrentPower(double internalCurrentPower) {
-        this.stored.setStored(internalCurrentPower);
+        double previousPower = this.stored.getAmount();
+        boolean previouslySuppressed = this.suppressPowerStateEvent;
+        this.suppressPowerStateEvent = true;
+        try {
+            this.stored.setStored(internalCurrentPower);
+        } finally {
+            this.suppressPowerStateEvent = previouslySuppressed;
+        }
+        if (Double.compare(previousPower, this.stored.getAmount()) != 0) {
+            emitPowerStorageChanged(ChangeType.VALUES_CHANGED);
+        }
     }
 
     public double getInternalMaxPower() {
@@ -165,7 +191,21 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
     }
 
     public void setInternalMaxPower(double internalMaxPower) {
-        this.stored.setMaximum(internalMaxPower);
+        double previousMaximum = this.stored.getMaximum();
+        double previousPower = this.stored.getAmount();
+        boolean previouslySuppressed = this.suppressPowerStateEvent;
+        this.suppressPowerStateEvent = true;
+        try {
+            this.stored.setMaximum(internalMaxPower);
+        } finally {
+            this.suppressPowerStateEvent = previouslySuppressed;
+        }
+
+        if (Double.compare(previousMaximum, this.stored.getMaximum()) != 0) {
+            emitPowerStorageChanged(ChangeType.ROUTING_CHANGED);
+        } else if (Double.compare(previousPower, this.stored.getAmount()) != 0) {
+            emitPowerStorageChanged(ChangeType.VALUES_CHANGED);
+        }
     }
 
     private boolean isInternalPublicPowerStorage() {
@@ -173,7 +213,11 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
     }
 
     public void setInternalPublicPowerStorage(boolean internalPublicPowerStorage) {
+        if (this.internalPublicPowerStorage == internalPublicPowerStorage) {
+            return;
+        }
         this.internalPublicPowerStorage = internalPublicPowerStorage;
+        emitPowerStorageChanged(ChangeType.ROUTING_CHANGED);
     }
 
     private AccessRestriction getInternalPowerFlow() {
@@ -181,7 +225,11 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
     }
 
     public void setInternalPowerFlow(AccessRestriction internalPowerFlow) {
+        if (this.internalPowerFlow == internalPowerFlow) {
+            return;
+        }
         this.internalPowerFlow = internalPowerFlow;
+        emitPowerStorageChanged(ChangeType.ROUTING_CHANGED);
     }
 
 

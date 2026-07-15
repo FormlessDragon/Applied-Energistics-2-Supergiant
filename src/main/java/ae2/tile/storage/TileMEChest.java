@@ -32,7 +32,8 @@ import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.GridFlags;
 import ae2.api.networking.IGridNodeListener;
 import ae2.api.networking.IManagedGridNode;
-import ae2.api.networking.events.GridPowerStorageStateChanged;
+import ae2.api.networking.events.GridPowerStorageChanged;
+import ae2.api.networking.events.GridPowerStorageChanged.ChangeType;
 import ae2.api.networking.events.GridPowerStorageStateChanged.PowerEventType;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.orientation.RelativeSide;
@@ -156,10 +157,14 @@ public class TileMEChest extends AENetworkedPoweredTile
 
     @Override
     protected void emitPowerStateEvent(PowerEventType x) {
-        if (x == PowerEventType.RECEIVE_POWER) {
-            ifGridPresent(grid -> grid.postEvent(new GridPowerStorageStateChanged(this, x)));
-        } else {
-            recalculateDisplay();
+        recalculateDisplay();
+    }
+
+    @Override
+    protected void emitPowerStorageChanged(ChangeType type) {
+        var grid = getMainNode().getGrid();
+        if (grid != null) {
+            grid.postEvent(new GridPowerStorageChanged(this, type));
         }
     }
 
@@ -327,7 +332,11 @@ public class TileMEChest extends AENetworkedPoweredTile
                 return stash;
             }
         }
-        return super.extractAEPower(amt - stash, mode) + stash;
+        double extractedFromLocalStorage = super.extractAEPower(amt - stash, mode);
+        if (mode == Actionable.MODULATE && extractedFromLocalStorage > 0) {
+            emitPowerStorageChanged(ChangeType.VALUES_CHANGED);
+        }
+        return extractedFromLocalStorage + stash;
     }
 
     @Override
@@ -408,7 +417,7 @@ public class TileMEChest extends AENetworkedPoweredTile
         inputInventory.readFromNBT(data, "inputInventory");
         cellInventory.readFromNBT(data, "cellInventory");
         viewCellInventory.readFromNBT(data, "viewCellInventory");
-        priority = data.getInteger("priority");
+        updatePriority(data.getInteger("priority"));
         if (data.hasKey("paintedColor", Constants.NBT.TAG_ANY_NUMERIC)) {
             int colorOrdinal = data.getByte("paintedColor") & 0xFF;
             this.paintedColor = readColor(colorOrdinal);
@@ -538,11 +547,21 @@ public class TileMEChest extends AENetworkedPoweredTile
 
     @Override
     public void setPriority(int newValue) {
+        if (updatePriority(newValue)) {
+            saveChanges();
+        }
+    }
+
+    private boolean updatePriority(int newValue) {
+        if (this.priority == newValue) {
+            return false;
+        }
         this.priority = newValue;
         this.cellHandler = null;
         this.isCached = false;
         IStorageProvider.requestUpdate(getMainNode());
-        saveChanges();
+        emitPowerStorageChanged(ChangeType.ROUTING_CHANGED);
+        return true;
     }
 
     private void blinkCell() {

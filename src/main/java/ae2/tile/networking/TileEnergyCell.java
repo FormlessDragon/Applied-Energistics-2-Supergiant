@@ -23,6 +23,8 @@ import ae2.api.config.Actionable;
 import ae2.api.config.PowerMultiplier;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.energy.IAEPowerStorage;
+import ae2.api.networking.events.GridPowerStorageChanged;
+import ae2.api.networking.events.GridPowerStorageChanged.ChangeType;
 import ae2.api.networking.events.GridPowerStorageStateChanged;
 import ae2.api.networking.events.GridPowerStorageStateChanged.PowerEventType;
 import ae2.api.networking.ticking.IGridTickable;
@@ -54,6 +56,7 @@ public class TileEnergyCell extends AENetworkedTile implements IAEPowerStorage, 
     private final StoredEnergyAmount stored;
     private byte currentDisplayLevel;
     private boolean neighborChangePending;
+    private boolean suppressPowerStateEvent;
 
     public TileEnergyCell() {
         super();
@@ -112,7 +115,17 @@ public class TileEnergyCell extends AENetworkedTile implements IAEPowerStorage, 
     public void onReady() {
         super.onReady();
         this.getMainNode().setVisualRepresentation(getItemFromTile());
-        this.stored.setMaximum(this.getConfiguredMaxPower());
+        double previousMaximum = this.stored.getMaximum();
+        boolean previouslySuppressed = this.suppressPowerStateEvent;
+        this.suppressPowerStateEvent = true;
+        try {
+            this.stored.setMaximum(this.getConfiguredMaxPower());
+        } finally {
+            this.suppressPowerStateEvent = previouslySuppressed;
+        }
+        if (Double.compare(previousMaximum, this.stored.getMaximum()) != 0) {
+            emitPowerStorageChanged(ChangeType.ROUTING_CHANGED);
+        }
         IBlockState state = this.world.getBlockState(this.pos);
         if (state.getBlock() instanceof EnergyCellBlock) {
             this.currentDisplayLevel = (byte) state.getValue(EnergyCellBlock.ENERGY_STORAGE).intValue();
@@ -171,6 +184,25 @@ public class TileEnergyCell extends AENetworkedTile implements IAEPowerStorage, 
         }
     }
 
+    private void setStoredEnergy(double maximum, double amount) {
+        double previousMaximum = this.stored.getMaximum();
+        double previousAmount = this.stored.getAmount();
+        boolean previouslySuppressed = this.suppressPowerStateEvent;
+        this.suppressPowerStateEvent = true;
+        try {
+            this.stored.setMaximum(maximum);
+            this.stored.setStored(amount);
+        } finally {
+            this.suppressPowerStateEvent = previouslySuppressed;
+        }
+
+        if (Double.compare(previousMaximum, this.stored.getMaximum()) != 0) {
+            emitPowerStorageChanged(ChangeType.ROUTING_CHANGED);
+        } else if (Double.compare(previousAmount, this.stored.getAmount()) != 0) {
+            emitPowerStorageChanged(ChangeType.VALUES_CHANGED);
+        }
+    }
+
     @Override
     public void saveAdditional(NBTTagCompound data) {
         super.saveAdditional(data);
@@ -183,8 +215,7 @@ public class TileEnergyCell extends AENetworkedTile implements IAEPowerStorage, 
     public void loadTag(NBTTagCompound data) {
         super.loadTag(data);
         double storedEnergy = data.getDouble(INTERNAL_CURRENT_POWER_TAG);
-        this.stored.setMaximum(Math.max(readSavedMaxPower(data, this.stored.getMaximum()), storedEnergy));
-        this.stored.setStored(storedEnergy);
+        setStoredEnergy(Math.max(readSavedMaxPower(data, this.stored.getMaximum()), storedEnergy), storedEnergy);
         this.neighborChangePending = data.getBoolean("neighborChangePending");
     }
 
@@ -194,8 +225,7 @@ public class TileEnergyCell extends AENetworkedTile implements IAEPowerStorage, 
 
         if (mode == SettingsFrom.DISMANTLE_ITEM) {
             double storedEnergy = readStoredEnergy(input);
-            this.stored.setMaximum(Math.max(readMaxPower(input, this.getConfiguredMaxPower()), storedEnergy));
-            this.stored.setStored(storedEnergy);
+            setStoredEnergy(Math.max(readMaxPower(input, this.getConfiguredMaxPower()), storedEnergy), storedEnergy);
         }
     }
 
@@ -265,7 +295,16 @@ public class TileEnergyCell extends AENetworkedTile implements IAEPowerStorage, 
     }
 
     private void emitPowerEvent(PowerEventType type) {
-        getMainNode().ifPresent(grid -> grid.postEvent(new GridPowerStorageStateChanged(this, type)));
+        if (!this.suppressPowerStateEvent) {
+            getMainNode().ifPresent(grid -> grid.postEvent(new GridPowerStorageStateChanged(this, type)));
+        }
+    }
+
+    private void emitPowerStorageChanged(ChangeType type) {
+        var grid = getMainNode().getGrid();
+        if (grid != null) {
+            grid.postEvent(new GridPowerStorageChanged(this, type));
+        }
     }
 
     @Override

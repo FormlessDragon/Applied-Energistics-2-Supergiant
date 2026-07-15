@@ -23,6 +23,8 @@ import ae2.api.networking.GridFlags;
 import ae2.api.networking.GridHelper;
 import ae2.api.networking.IGridNodeListener;
 import ae2.api.networking.events.GridControllerChange;
+import ae2.api.networking.events.GridPowerStorageChanged;
+import ae2.api.networking.events.GridPowerStorageChanged.ChangeType;
 import ae2.api.networking.events.GridPowerStorageStateChanged;
 import ae2.api.networking.events.GridPowerStorageStateChanged.PowerEventType;
 import ae2.api.networking.pathing.ControllerState;
@@ -154,6 +156,14 @@ public class TileController extends AENetworkedPoweredTile {
     @Override
     protected void emitPowerStateEvent(PowerEventType type) {
         getMainNode().ifPresent(grid -> grid.postEvent(new GridPowerStorageStateChanged(this, type)));
+    }
+
+    @Override
+    protected void emitPowerStorageChanged(ChangeType type) {
+        var grid = getMainNode().getGrid();
+        if (grid != null) {
+            grid.postEvent(new GridPowerStorageChanged(this, type));
+        }
     }
 
     public boolean isOnline() {

@@ -76,16 +76,20 @@ public interface IEnergyService extends IGridService, IEnergySource {
     double injectPower(double amt, Actionable mode);
 
     /**
-     * This should be considered an estimate and not relied upon for real calculations.
+     * Outside creative/debug power mode, returns the exact power currently available from public storages that allow
+     * network extraction in the complete energy overlay, including grids connected through Quartz Fibers. Creative or
+     * debug power mode returns a fixed finite sentinel instead of inspecting storage values.
      *
-     * @return estimated available power.
+     * @return available power in the complete energy overlay
      */
     double getStoredPower();
 
     /**
-     * This should be considered an estimate and not relied upon for real calculations.
+     * Outside creative/debug power mode, returns the exact maximum power of public storages that allow network
+     * extraction in the complete energy overlay, including grids connected through Quartz Fibers. Creative or debug
+     * power mode returns the same fixed finite sentinel as {@link #getStoredPower()}.
      *
-     * @return estimated available power.
+     * @return maximum power in the complete energy overlay
      */
     double getMaxStoredPower();
 
