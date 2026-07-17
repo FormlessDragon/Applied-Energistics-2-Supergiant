@@ -493,7 +493,6 @@ public enum GuiText implements LocalizationEnum {
     TerminalSettingsPinDisplayLockedGrid,
     TerminalSettingsPinDisplayLockedGridTooltip,
     TerminalSettingsNotifyForFinishedJobs,
-    TerminalSettingsWindowsCraftingNotifications,
     TerminalSettingsClearGridOnClose,
     TerminalSettingsAutoFillBlankPatterns,
     TerminalSettingsRecursiveIngredientReserve,

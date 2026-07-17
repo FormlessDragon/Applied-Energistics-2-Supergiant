@@ -63,13 +63,8 @@ public final class PendingCraftingJobs {
             case FINISHED -> {
                 removeJob(id);
                 Minecraft minecraft = Minecraft.getMinecraft();
-                AEConfig config = AEConfig.instance();
-                boolean nativeNotificationScheduled = config.isWindowsCraftingNotificationsEnabled()
-                    && WindowsCraftingNotification.showWhenUnfocused(what, requestedAmount);
-                if (!nativeNotificationScheduled
-                    && config.isNotifyForFinishedCraftingJobs()
-                    && minecraft.player != null
-                    && hasNotificationEnablingItem(minecraft.player)) {
+                if (AEConfig.instance().isNotifyForFinishedCraftingJobs()
+                    && minecraft.player != null && hasNotificationEnablingItem(minecraft.player)) {
                     minecraft.getToastGui().add(new FinishedJobToast(what, requestedAmount));
                 }
             }

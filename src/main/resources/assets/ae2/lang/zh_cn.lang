@@ -774,7 +774,6 @@ gui.ae2.TankCapacity=容量：%d
 gui.ae2.Terminal=终端
 gui.ae2.TerminalSettingsClearGridOnClose=关闭终端时自动清空合成槽（如果可行）
 gui.ae2.TerminalSettingsNotifyForFinishedJobs=自动合成任务完成时发送提醒（需要无线终端）
-gui.ae2.TerminalSettingsWindowsCraftingNotifications=游戏窗口未聚焦时发送 Windows 通知
 gui.ae2.TerminalSettingsPinAutoCraftedItems=置顶自动合成得到的物品
 gui.ae2.TerminalSettingsPinDisplaySortTop=随列表滚动
 gui.ae2.TerminalSettingsPinDisplaySortTopTooltip=已置顶的物品会固定在列表顶端，并随滚动条一起移动。

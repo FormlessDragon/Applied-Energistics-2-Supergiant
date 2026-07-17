@@ -15,6 +15,15 @@
         "translate": "gui.ae2.TerminalSettingsTitle"
       }
     },
+    "player_pin_rows_label": {
+      "position": {
+        "left": 10,
+        "top": 68
+      },
+      "text": {
+        "translate": "gui.ae2.TerminalSettingsPlayerPinRows"
+      }
+    },
     "recursive_reserve_label": {
       "position": {
         "left": 10,
@@ -22,15 +31,6 @@
       },
       "text": {
         "translate": "gui.ae2.TerminalSettingsRecursiveIngredientReserve"
-      }
-    },
-    "player_pin_rows_label": {
-      "position": {
-        "left": 10,
-        "top": 172
-      },
-      "text": {
-        "translate": "gui.ae2.TerminalSettingsPlayerPinRows"
       }
     }
   },
@@ -56,12 +56,13 @@
       "top": 45,
       "width": 90
     },
-    "notifyForFinishedCraftingJobsCheckbox": {
-      "left": 10,
+    "playerPinRowsField": {
+      "left": 154,
       "top": 65,
-      "width": 180
+      "width": 36,
+      "height": 12
     },
-    "windowsCraftingNotificationsCheckbox": {
+    "notifyForFinishedCraftingJobsCheckbox": {
       "left": 10,
       "top": 85,
       "width": 180
@@ -79,12 +80,6 @@
     "recursiveReserveField": {
       "left": 154,
       "top": 147,
-      "width": 36,
-      "height": 12
-    },
-    "playerPinRowsField": {
-      "left": 154,
-      "top": 169,
       "width": 36,
       "height": 12
     },

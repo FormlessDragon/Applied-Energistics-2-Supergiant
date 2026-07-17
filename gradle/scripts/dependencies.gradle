@@ -65,7 +65,4 @@ dependencies {
     modCompileOnly "curse.maven:ctm-267602:2915363"
 
     modRuntimeOnly("curse.maven:spark-361579:3542217")
-
-    // Included by the Minecraft 1.12 runtime; used for in-process Windows shell notifications.
-    compileOnly "net.java.dev.jna:jna:4.4.0"
 }
