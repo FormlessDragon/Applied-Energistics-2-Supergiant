@@ -57,10 +57,13 @@ final class PlayerPinStorage {
 
     static Data loadFromTag(NBTTagCompound root) {
         int rows = Math.clamp(root.getInteger(TAG_ROWS), 0, PinnedKeys.MAX_PLAYER_PIN_ROWS);
-        ObjectArrayList<PinSlot> slots = root.hasKey(TAG_SLOTS, Constants.NBT.TAG_LIST)
+        boolean hasSlotData = root.hasKey(TAG_SLOTS, Constants.NBT.TAG_LIST);
+        ObjectArrayList<PinSlot> slots = hasSlotData
             ? loadSlots(root.getTagList(TAG_SLOTS, Constants.NBT.TAG_COMPOUND))
             : migrateLegacyKeys(root.getTagList(TAG_KEYS, Constants.NBT.TAG_COMPOUND));
-        rows = Math.max(rows, getRequiredRows(slots));
+        if (!hasSlotData) {
+            rows = Math.max(rows, getRequiredRows(slots));
+        }
         return new Data(rows, slots);
     }
 

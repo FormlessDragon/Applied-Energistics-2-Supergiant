@@ -437,6 +437,30 @@ public class AEConfig {
         }
     }
 
+    public int getCraftingPinRows() {
+        return Math.clamp(TERMINALS.craftingPinRows, 0, 8);
+    }
+
+    public void setCraftingPinRows(int rows) {
+        int clampedRows = Math.clamp(rows, 0, 8);
+        if (getCraftingPinRows() != clampedRows) {
+            TERMINALS.craftingPinRows = clampedRows;
+            this.save();
+        }
+    }
+
+    public int getPlayerPinRows() {
+        return Math.clamp(TERMINALS.playerPinRows, 0, 8);
+    }
+
+    public void setPlayerPinRows(int rows) {
+        int clampedRows = Math.clamp(rows, 0, 8);
+        if (getPlayerPinRows() != clampedRows) {
+            TERMINALS.playerPinRows = clampedRows;
+            this.save();
+        }
+    }
+
     public boolean isTerminalDisplayFrozen() {
         return TERMINALS.terminalDisplayFrozen;
     }
@@ -894,6 +918,14 @@ public class AEConfig {
         @Config.Name("pinDisplayMode")
         @Config.Comment("How player pins are displayed in ME terminals.")
         public PinDisplayMode pinDisplayMode = PinDisplayMode.SORT_TOP;
+        @Config.Name("craftingPinRows")
+        @Config.Comment("Number of rows reserved for crafting-job pins in ME terminals.")
+        @Config.RangeInt(min = 0, max = 8)
+        public int craftingPinRows = 1;
+        @Config.Name("playerPinRows")
+        @Config.Comment("Number of player pin rows shown in ME terminals.")
+        @Config.RangeInt(min = 0, max = 8)
+        public int playerPinRows = 0;
         @Config.Name("terminalDisplayFrozen")
         @Config.Comment("Keep ME terminal entries in their current positions between updates.")
         public boolean terminalDisplayFrozen;

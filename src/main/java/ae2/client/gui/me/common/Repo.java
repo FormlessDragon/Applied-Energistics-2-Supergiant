@@ -83,6 +83,7 @@ public class Repo implements IClientRepo {
     private final ObjectArrayList<GridInventoryEntry> craftingPinnedEntries = new ObjectArrayList<>();
     private final ObjectArrayList<GridInventoryEntry> playerPinnedEntries = new ObjectArrayList<>();
     private final Map<AEKey, PinnedKeys.PinReason> pinnedReasons = new Object2ObjectOpenHashMap<>();
+    private Set<AEKey> visibleCraftingPinKeys = Set.of();
     /**
      * Entries by item ID to speed up ingredient matching.
      */
@@ -186,6 +187,7 @@ public class Repo implements IClientRepo {
     }
 
     public final void updateView() {
+        this.visibleCraftingPinKeys = PinnedKeys.getVisibleCraftingPinnedKeys(this.rowSize);
         // While the view is paused, we try to only append to the view list in order to avoid mis-clicks by the
         // player due to items shifting under their mouse cursor.
         if (isPaused()) {
@@ -251,13 +253,13 @@ public class Repo implements IClientRepo {
 
     private void addEntriesToView(Collection<GridInventoryEntry> entries) {
         for (var entry : entries) {
-            if (PinnedKeys.isCraftingPinned(entry.what())) {
+            if (this.visibleCraftingPinKeys.contains(entry.what())) {
                 craftingPinnedEntries.add(entry);
             }
         }
 
         for (var entry : entries) {
-            if (PinnedKeys.isCraftingPinned(entry.what())) {
+            if (this.visibleCraftingPinKeys.contains(entry.what())) {
                 continue;
             }
 
@@ -302,14 +304,18 @@ public class Repo implements IClientRepo {
             return false;
         }
 
-        if (this.sortSrc.getPinDisplayMode() != PinDisplayMode.LOCKED_GRID) {
-            return true;
-        }
-
         AEKey what = Objects.requireNonNull(entry.what());
         int slotIndex = PinnedKeys.getPlayerPinSlotIndex(what);
         if (slotIndex < 0) {
             return false;
+        }
+
+        if (slotIndex / this.rowSize >= PinnedKeys.getPlayerPinRows()) {
+            return false;
+        }
+
+        if (this.sortSrc.getPinDisplayMode() != PinDisplayMode.LOCKED_GRID) {
+            return true;
         }
 
         return slotIndex / this.rowSize < getVisiblePlayerPinRowsForCurrentView();
@@ -385,7 +391,7 @@ public class Repo implements IClientRepo {
     @Nullable
     private GridInventoryEntry getVisibleUserPinEntry(int slotIndex) {
         PinnedKeys.PlayerPin pin = PinnedKeys.getPlayerPinSlot(slotIndex);
-        if (pin == null || PinnedKeys.isCraftingPinned(pin.key())) {
+        if (pin == null || this.visibleCraftingPinKeys.contains(pin.key())) {
             return null;
         }
 
@@ -522,6 +528,7 @@ public class Repo implements IClientRepo {
         this.craftingPinnedEntries.clear();
         this.playerPinnedEntries.clear();
         this.pinnedReasons.clear();
+        this.visibleCraftingPinKeys = Set.of();
         this.pinnedRowCount = 0;
         this.visiblePlayerPinRows = 0;
         this.configuredPlayerPinRows = 0;

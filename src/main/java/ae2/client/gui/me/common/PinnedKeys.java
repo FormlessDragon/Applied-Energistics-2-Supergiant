@@ -1,6 +1,7 @@
 package ae2.client.gui.me.common;
 
 import ae2.api.stacks.AEKey;
+import ae2.core.AEConfig;
 import com.google.common.collect.ImmutableSet;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -24,6 +25,7 @@ import java.util.Set;
 public final class PinnedKeys {
     // One rows worth of keys
     public static final int MAX_PINNED = 9;
+    public static final int MAX_CRAFTING_PIN_ROWS = 8;
     public static final int MAX_PLAYER_PIN_ROWS = 8;
 
     // Compares by time the entry was pinned in ascending order
@@ -63,6 +65,26 @@ public final class PinnedKeys {
             keys.add(entry.getKey());
         }
         return Collections.unmodifiableList(keys);
+    }
+
+    public static Set<AEKey> getVisibleCraftingPinnedKeys(int rowSize) {
+        if (rowSize <= 0) {
+            throw new IllegalArgumentException("Invalid crafting pin row size: " + rowSize);
+        }
+
+        int capacity = AEConfig.instance().getCraftingPinRows() * rowSize;
+        if (capacity <= 0 || craftingPins.isEmpty()) {
+            return Set.of();
+        }
+
+        ObjectArrayList<Map.Entry<AEKey, PinInfo>> sorted = new ObjectArrayList<>(craftingPins.entrySet());
+        sorted.sort(TIME_COMPARATOR);
+        int firstVisible = Math.max(0, sorted.size() - capacity);
+        ObjectLinkedOpenHashSet<AEKey> keys = new ObjectLinkedOpenHashSet<>(sorted.size() - firstVisible);
+        for (int i = firstVisible; i < sorted.size(); i++) {
+            keys.add(sorted.get(i).getKey());
+        }
+        return Collections.unmodifiableSet(keys);
     }
 
     public static List<AEKey> getPlayerPinnedKeys() {
@@ -114,9 +136,17 @@ public final class PinnedKeys {
         playerPinsLoaded = false;
     }
 
+    public static void clearCraftingPins() {
+        craftingPins.clear();
+    }
+
     public static void pinKey(AEKey key, PinReason reason) {
         if (reason == PinReason.PLAYER) {
             autoPin(key, MAX_PLAYER_PIN_ROWS * MAX_PINNED);
+            return;
+        }
+
+        if (AEConfig.instance().getCraftingPinRows() <= 0) {
             return;
         }
 
@@ -131,10 +161,11 @@ public final class PinnedKeys {
         }
 
         // Remove older keys if we exceed the max amount of pinned keys
-        if (craftingPins.size() > MAX_PINNED) {
+        int maximumCraftingPins = MAX_CRAFTING_PIN_ROWS * MAX_PINNED;
+        if (craftingPins.size() > maximumCraftingPins) {
             ObjectArrayList<Map.Entry<AEKey, PinInfo>> toRemove = new ObjectArrayList<>(craftingPins.entrySet());
             toRemove.sort(TIME_COMPARATOR);
-            for (Map.Entry<AEKey, PinInfo> entry : toRemove.subList(0, toRemove.size() - MAX_PINNED)) {
+            for (Map.Entry<AEKey, PinInfo> entry : toRemove.subList(0, toRemove.size() - maximumCraftingPins)) {
                 craftingPins.remove(entry.getKey());
             }
         }
@@ -221,21 +252,19 @@ public final class PinnedKeys {
         }
 
         int clampedRows = Math.clamp(rows, 0, MAX_PLAYER_PIN_ROWS);
-        if (clampedRows < playerPinRows) {
-            int maxSlotIndex = clampedRows * rowSize;
-            for (int i = playerPins.size() - 1; i >= 0; i--) {
-                PlayerPin pin = playerPins.get(i);
-                if (pin.slotIndex() >= maxSlotIndex) {
-                    removePlayerPin(pin);
-                }
-            }
-        }
-
         if (playerPinRows == clampedRows) {
             return false;
         }
 
         playerPinRows = clampedRows;
+        int maxSlotIndex = clampedRows * rowSize;
+        for (int i = playerPins.size() - 1; i >= 0; i--) {
+            PlayerPin pin = playerPins.get(i);
+            if (pin.slotIndex() >= maxSlotIndex) {
+                removePlayerPin(pin);
+            }
+        }
+        AEConfig.instance().setPlayerPinRows(clampedRows);
         savePlayerPins();
         return true;
     }
@@ -244,6 +273,7 @@ public final class PinnedKeys {
         ensurePlayerPinsLoaded();
         if (playerPinRows < MAX_PLAYER_PIN_ROWS) {
             playerPinRows++;
+            AEConfig.instance().setPlayerPinRows(playerPinRows);
             savePlayerPins();
         }
     }
@@ -254,6 +284,7 @@ public final class PinnedKeys {
             return false;
         }
         playerPinRows--;
+        AEConfig.instance().setPlayerPinRows(playerPinRows);
         savePlayerPins();
         return true;
     }
@@ -283,12 +314,25 @@ public final class PinnedKeys {
         }
         playerPinsLoaded = true;
         PlayerPinStorage.Data data = PlayerPinStorage.load();
-        playerPinRows = Math.clamp(data.rows(), 0, MAX_PLAYER_PIN_ROWS);
+        playerPinRows = Math.clamp(AEConfig.instance().getPlayerPinRows(), 0, MAX_PLAYER_PIN_ROWS);
         playerPins.clear();
         playerPinsByKey.clear();
         playerPinsBySlot.clear();
+        if (playerPinRows == 0) {
+            savePlayerPins();
+            return;
+        }
+        boolean discardedOutOfRangePins = false;
+        int maxSlotIndex = playerPinRows * MAX_PINNED;
         for (var slot : data.slots()) {
-            addPlayerPin(new PlayerPin(slot.slotIndex(), slot.key(), slot.kind()));
+            if (slot.slotIndex() < maxSlotIndex) {
+                addPlayerPin(new PlayerPin(slot.slotIndex(), slot.key(), slot.kind()));
+            } else {
+                discardedOutOfRangePins = true;
+            }
+        }
+        if (discardedOutOfRangePins) {
+            savePlayerPins();
         }
     }
 

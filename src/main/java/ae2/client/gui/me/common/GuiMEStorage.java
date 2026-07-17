@@ -49,6 +49,7 @@ import ae2.client.gui.widgets.ISortSource;
 import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.IconButton;
 import ae2.client.gui.widgets.ItemStackButton;
+import ae2.client.gui.widgets.PinSectionButton;
 import ae2.client.gui.widgets.PortableCellPickupFilterButton;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SettingToggleButton;
@@ -229,6 +230,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         this.displayFrozen = AEConfig.instance().isTerminalDisplayFrozen();
         this.displayFreezeButton.setState(this.displayFrozen);
         this.repo.setPaused(shouldPauseRepo());
+        this.addToLeftToolbar(new PinSectionButton(this::adjustPinRows, this::getPinSectionTooltip));
         this.addToLeftToolbar(new ActionButton(ActionItems.TERMINAL_SETTINGS, this::showSettings));
         this.addToLeftToolbar(new SettingToggleButton<>(
             Settings.TERMINAL_STYLE, AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
@@ -354,6 +356,44 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         AEConfig.instance().setTerminalDisplayFrozen(displayFrozen);
         this.repo.setPaused(shouldPauseRepo());
         updateScrollbar();
+    }
+
+    private void adjustPinRows(boolean backwards) {
+        if (isCtrlKeyDown()) {
+            int rows = AEConfig.instance().getCraftingPinRows();
+            int maxRows = Math.min(PinnedKeys.MAX_CRAFTING_PIN_ROWS, Math.max(0, this.rows - 1));
+            int nextRows = Math.clamp(rows + (backwards ? -1 : 1), 0, maxRows);
+            if (nextRows != rows) {
+                if (nextRows == 0) {
+                    PinnedKeys.clearCraftingPins();
+                }
+                AEConfig.instance().setCraftingPinRows(nextRows);
+                this.repo.updateView();
+                updateScrollbar();
+            }
+            return;
+        }
+
+        int rows = PinnedKeys.getPlayerPinRows();
+        int maxRows = PinnedKeys.MAX_PLAYER_PIN_ROWS;
+        if (getPinDisplayMode() == PinDisplayMode.LOCKED_GRID) {
+            int craftingRows = Math.min(AEConfig.instance().getCraftingPinRows(), Math.max(0, this.rows - 1));
+            maxRows = Math.min(maxRows, Math.max(0, this.rows - 1 - craftingRows));
+        }
+        int nextRows = Math.clamp(rows + (backwards ? -1 : 1), 0, maxRows);
+        if (nextRows != rows && PinnedKeys.setPlayerPinRows(nextRows, this.terminalStyle.getSlotsPerRow())) {
+            this.repo.updateView();
+            updateScrollbar();
+        }
+    }
+
+    private List<ITextComponent> getPinSectionTooltip() {
+        return List.of(
+            ButtonToolTips.PinsSection.text(),
+            ButtonToolTips.PinsSectionRows.text(
+                AEConfig.instance().getCraftingPinRows(), PinnedKeys.getPlayerPinRows()),
+            ButtonToolTips.PinsSectionPlayerHint.text(),
+            ButtonToolTips.PinsSectionCraftingHint.text());
     }
 
     @Override
@@ -549,9 +589,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
     @Override
     public void drawFG(int offsetX, int offsetY, int mouseX, int mouseY) {
-        if (this.repo.hasPinnedRow()) {
-            renderPinnedRowDecorations();
-        }
+        renderCraftingJobDecorations();
 
         if (this.craftingStatusButton != null && this.container.activeCraftingJobs != -1) {
             String label = Integer.toString(this.container.activeCraftingJobs);
@@ -621,19 +659,21 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         }
     }
 
-    private void renderPinnedRowDecorations() {
+    private void renderCraftingJobDecorations() {
         for (Slot slot : this.container.inventorySlots) {
             if (!(slot instanceof RepoSlot repoSlot)) {
                 continue;
             }
             GridInventoryEntry entry = repoSlot.getEntry();
-            if (entry == null || entry.what() == null
-                || this.repo.getPinReason(entry) != PinnedKeys.PinReason.CRAFTING) {
+            if (entry == null || entry.what() == null) {
                 continue;
             }
 
-            boolean animated = PendingCraftingJobs.hasPendingJob(entry.what());
-            renderRainbowBorder(slot.xPos - 1, slot.yPos - 1, animated);
+            boolean pending = PendingCraftingJobs.hasPendingJob(entry.what());
+            boolean craftingPin = PinnedKeys.isCraftingPinned(entry.what());
+            if (pending || craftingPin) {
+                renderRainbowBorder(slot.xPos - 1, slot.yPos - 1, pending);
+            }
         }
     }
 
