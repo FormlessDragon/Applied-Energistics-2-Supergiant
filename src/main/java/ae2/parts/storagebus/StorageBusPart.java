@@ -2,6 +2,7 @@ package ae2.parts.storagebus;
 
 import ae2.api.AECapabilities;
 import ae2.api.behaviors.ExternalStorageStrategy;
+import ae2.api.config.Actionable;
 import ae2.api.config.AccessRestriction;
 import ae2.api.config.FuzzyMode;
 import ae2.api.config.IncludeExclude;
@@ -21,16 +22,20 @@ import ae2.api.parts.IPartHost;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
 import ae2.api.stacks.AEKeyType;
+import ae2.api.stacks.AEKey;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.IStorageMounts;
 import ae2.api.storage.IStorageProvider;
 import ae2.api.storage.MEStorage;
+import ae2.api.storage.MEStorageChangeListener;
+import ae2.api.storage.MEStorageMonitor;
 import ae2.api.util.AECableType;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigManagerBuilder;
 import ae2.container.GuiIds;
 import ae2.container.ISubGui;
 import ae2.core.AppEng;
+import ae2.core.AELog;
 import ae2.core.definitions.AEItems;
 import ae2.core.gui.GuiOpener;
 import ae2.core.settings.TickRates;
@@ -55,6 +60,8 @@ import ae2.util.prioritylist.IPartitionList;
 import ae2.util.prioritylist.PrecisePriorityList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
@@ -112,6 +119,7 @@ public class StorageBusPart extends UpgradeablePart
                                                           .build();
     private int priority;
     private PendingUpdateStatus updateStatus = PendingUpdateStatus.FAST_UPDATE;
+    private boolean externalStorageExtractableOnly;
     @Nullable
     private ITickingMonitor monitor;
     public StorageBusPart(IPartItem<?> partItem) {
@@ -120,6 +128,12 @@ public class StorageBusPart extends UpgradeablePart
             this::onCapabilityInvalidation);
         this.source = new MachineSource(this);
         getMainNode().addService(IStorageProvider.class, this).addService(IGridTickable.class, this);
+    }
+
+    @Override
+    public void removeFromWorld() {
+        this.handler.removeAllListeners();
+        super.removeFromWorld();
     }
 
     private static synchronized StatBase getRecursiveNetworkingStat() {
@@ -335,12 +349,18 @@ public class StorageBusPart extends UpgradeablePart
             this.updateStatus = PendingUpdateStatus.SLOW_UPDATE;
         }
 
-        if (!forceFullUpdate && this.handler.getDelegate() instanceof CompositeStorage compositeStorage
-            && !foundExternalApi.isEmpty()) {
-            compositeStorage.setStorages(foundExternalApi);
+        boolean extractableOnly = isExtractableOnly();
+        if (this.handler.getDelegate() instanceof CompositeStorage compositeStorage
+            && !foundExternalApi.isEmpty()
+            && (!forceFullUpdate || this.externalStorageExtractableOnly == extractableOnly)) {
+            if (!forceFullUpdate) {
+                compositeStorage.setStorages(foundExternalApi);
+            }
             this.handlerDescription = compositeStorage.getDescription();
+            configureHandler();
             return;
-        } else if (!forceFullUpdate && foundMonitor == this.handler.getDelegate()) {
+        } else if (foundMonitor == this.handler.getDelegate()) {
+            configureHandler();
             return;
         }
 
@@ -354,27 +374,19 @@ public class StorageBusPart extends UpgradeablePart
             this.handlerDescription = newInventory.getDescription();
         } else if (!foundExternalApi.isEmpty()) {
             newInventory = new CompositeStorage(foundExternalApi);
+            this.externalStorageExtractableOnly = extractableOnly;
             this.handlerDescription = newInventory.getDescription();
         } else {
             newInventory = NullInventory.of();
             this.handlerDescription = null;
         }
         this.handler.setDelegate(newInventory);
-
-        this.handler.setAccessRestriction(this.getConfigManager().getSetting(Settings.ACCESS));
-        this.handler.setWhitelist(isUpgradedWith(AEItems.INVERTER_CARD) ? IncludeExclude.BLACKLIST
-            : IncludeExclude.WHITELIST);
-        var partitionList = createFilter();
-        this.handler.setPartitionList(partitionList);
-        this.handler.setReadPartitionFiltering(!partitionList.isEmpty());
-        this.handler.setVoidOverflow(this.isUpgradedWith(AEItems.VOID_CARD));
-        this.handler.setSticky(this.isUpgradedWith(AEItems.STICKY_CARD));
-
-        boolean filterOnExtract = this.getConfigManager().getSetting(Settings.FILTER_ON_EXTRACT) == YesNo.YES;
-        this.handler.setExtractFiltering(filterOnExtract, isExtractableOnly() && filterOnExtract);
+        configureHandler();
 
         if (newInventory instanceof ITickingMonitor) {
             this.monitor = (ITickingMonitor) newInventory;
+        } else if (!(newInventory instanceof NullInventory) && !(newInventory instanceof MEStorageMonitor)) {
+            this.monitor = this.handler;
         } else {
             this.monitor = null;
         }
@@ -392,6 +404,21 @@ public class StorageBusPart extends UpgradeablePart
         if (wasRegistered != this.hasRegisteredCellToNetwork()) {
             remountStorage();
         }
+    }
+
+    private void configureHandler() {
+        this.handler.setAccessRestriction(this.getConfigManager().getSetting(Settings.ACCESS));
+        this.handler.setWhitelist(isUpgradedWith(AEItems.INVERTER_CARD) ? IncludeExclude.BLACKLIST
+            : IncludeExclude.WHITELIST);
+        var partitionList = createFilter();
+        this.handler.setPartitionList(partitionList);
+        this.handler.setReadPartitionFiltering(!partitionList.isEmpty());
+        this.handler.setVoidOverflow(this.isUpgradedWith(AEItems.VOID_CARD));
+        this.handler.setSticky(this.isUpgradedWith(AEItems.STICKY_CARD));
+
+        boolean filterOnExtract = this.getConfigManager().getSetting(Settings.FILTER_ON_EXTRACT) == YesNo.YES;
+        this.handler.setExtractFiltering(filterOnExtract, isExtractableOnly() && filterOnExtract);
+        this.handler.configurationChanged();
     }
 
     protected boolean isExtractableOnly() {
@@ -527,7 +554,23 @@ public class StorageBusPart extends UpgradeablePart
         NO_UPDATE
     }
 
-    protected static class StorageBusInventory extends MEInventoryHandler {
+    protected static class StorageBusInventory extends MEInventoryHandler implements MEStorageMonitor, ITickingMonitor {
+        private final ObjectList<ListenerRegistration> listeners = new ObjectArrayList<>();
+        private final ObjectList<ListenerRegistration> listenerDispatchBuffer = new ObjectArrayList<>();
+        private final DelegateListener delegateListener = new DelegateListener();
+        private KeyCounter targetCache = KeyCounter.saturating();
+        private KeyCounter targetScratch = KeyCounter.saturating();
+        @Nullable
+        private MEStorageMonitor monitoredDelegate;
+        @Nullable
+        private Thread delegateThread;
+        private boolean cacheDirty = true;
+        private boolean cacheInitialized;
+        private boolean processingDelegateCallback;
+        private boolean dispatchingListeners;
+        private boolean dispatchingListUpdate;
+        private boolean listUpdatePending;
+
         protected StorageBusInventory(MEStorage inventory) {
             super(inventory);
         }
@@ -539,16 +582,365 @@ public class StorageBusPart extends UpgradeablePart
 
         @Override
         protected void setDelegate(MEStorage delegate) {
+            unbindDelegateMonitor();
             super.setDelegate(delegate);
+            this.cacheInitialized = false;
+            this.cacheDirty = true;
+            if (!this.listeners.isEmpty()) {
+                bindDelegateMonitor();
+                refreshTarget(false);
+            }
+            notifyListUpdate();
         }
 
         public void setAccessRestriction(AccessRestriction setting) {
             setAllowExtraction(setting.isAllowExtraction());
             setAllowInsertion(setting.isAllowInsertion());
         }
+
+        public void configurationChanged() {
+            notifyListUpdate();
+        }
+
+        protected long getCachedAmount(AEKey what) {
+            ensureCache();
+            return Math.max(0, this.targetCache.get(what));
+        }
+
+        @Override
+        public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
+            long inserted = super.insert(what, amount, mode, source);
+            if (inserted > 0 && mode == Actionable.MODULATE && this.monitoredDelegate == null) {
+                markCacheDirty();
+            }
+            return inserted;
+        }
+
+        @Override
+        public long extract(AEKey what, long amount, Actionable mode, IActionSource source) {
+            long extracted = super.extract(what, amount, mode, source);
+            if (extracted > 0 && mode == Actionable.MODULATE && this.monitoredDelegate == null) {
+                markCacheDirty();
+            }
+            return extracted;
+        }
+
+        @Override
+        public void getAvailableStacks(KeyCounter out) {
+            ensureCache();
+            for (var entry : this.targetCache) {
+                if (entry.getLongValue() > 0 && isVisibleInAvailableStacks(entry.getKey())) {
+                    out.add(entry.getKey(), entry.getLongValue());
+                }
+            }
+        }
+
+        @Override
+        public TickRateModulation onTick() {
+            if (this.monitoredDelegate != null) {
+                return TickRateModulation.SLEEP;
+            }
+
+            boolean publishChanges = this.cacheInitialized && !this.cacheDirty && !this.listeners.isEmpty();
+            boolean changed = refreshTarget(publishChanges);
+            return changed ? TickRateModulation.URGENT : TickRateModulation.SLOWER;
+        }
+
+        @Override
+        public void addListener(MEStorageChangeListener listener, Object verificationToken) {
+            for (int i = 0; i < this.listeners.size(); i++) {
+                var registration = this.listeners.get(i);
+                if (registration.listener == listener) {
+                    throw new IllegalStateException("The storage listener is already registered.");
+                }
+            }
+
+            boolean firstListener = this.listeners.isEmpty();
+            this.listeners.add(new ListenerRegistration(listener, verificationToken));
+            if (firstListener) {
+                bindDelegateMonitor();
+                refreshTarget(false);
+            }
+        }
+
+        @Override
+        public void removeListener(MEStorageChangeListener listener) {
+            for (int i = this.listeners.size() - 1; i >= 0; i--) {
+                var registration = this.listeners.get(i);
+                if (registration.listener == listener) {
+                    registration.active = false;
+                    this.listeners.remove(i);
+                }
+            }
+            if (this.listeners.isEmpty()) {
+                unbindDelegateMonitor();
+            }
+        }
+
+        private void removeAllListeners() {
+            for (int i = 0; i < this.listeners.size(); i++) {
+                this.listeners.get(i).active = false;
+            }
+            this.listeners.clear();
+            unbindDelegateMonitor();
+        }
+
+        private void bindDelegateMonitor() {
+            if (this.monitoredDelegate != null) {
+                throw new IllegalStateException("The storage bus delegate monitor is already bound.");
+            }
+            if (getDelegate() instanceof MEStorageMonitor monitor) {
+                this.monitoredDelegate = monitor;
+                this.delegateThread = Thread.currentThread();
+                monitor.addListener(this.delegateListener, getDelegate());
+            }
+        }
+
+        private void unbindDelegateMonitor() {
+            if (this.monitoredDelegate != null) {
+                this.monitoredDelegate.removeListener(this.delegateListener);
+                this.monitoredDelegate = null;
+                this.delegateThread = null;
+            }
+        }
+
+        private void ensureCache() {
+            if (!this.cacheInitialized || this.cacheDirty) {
+                refreshTarget(false);
+            }
+        }
+
+        private boolean refreshTarget(boolean publishChanges) {
+            this.targetScratch.reset();
+            getDelegate().getAvailableStacks(this.targetScratch);
+            this.targetScratch.removeZeros();
+            boolean changed = hasDifference(this.targetCache, this.targetScratch);
+            if (publishChanges) {
+                publishReplacement(this.targetCache, this.targetScratch);
+            }
+            var previous = this.targetCache;
+            this.targetCache = this.targetScratch;
+            this.targetScratch = previous;
+            this.cacheInitialized = true;
+            this.cacheDirty = false;
+            return changed;
+        }
+
+        private boolean hasDifference(KeyCounter previous, KeyCounter replacement) {
+            for (var entry : replacement) {
+                if (entry.getLongValue() != previous.get(entry.getKey())) {
+                    return true;
+                }
+            }
+            for (var entry : previous) {
+                if (entry.getLongValue() > 0 && replacement.get(entry.getKey()) == 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void publishReplacement(KeyCounter previous, KeyCounter replacement) {
+            for (var entry : replacement) {
+                long oldAmount = Math.max(0, previous.get(entry.getKey()));
+                long delta = entry.getLongValue() - oldAmount;
+                if (delta != 0) {
+                    if (isVisibleInAvailableStacks(entry.getKey())) {
+                        notifyDelta(entry.getKey(), delta);
+                    }
+                }
+            }
+            for (var entry : previous) {
+                if (entry.getLongValue() > 0 && replacement.get(entry.getKey()) == 0) {
+                    if (isVisibleInAvailableStacks(entry.getKey())) {
+                        notifyDelta(entry.getKey(), -entry.getLongValue());
+                    }
+                }
+            }
+        }
+
+        private void applyDelegateDelta(AEKey what, long delta) {
+            if (what == null || delta == 0) {
+                if (what == null) {
+                    AELog.error("Storage bus target reported a null storage key.");
+                    markCacheDirty();
+                }
+                return;
+            }
+            if (this.cacheDirty) {
+                requestListUpdate();
+                return;
+            }
+
+            long current = Math.max(0, this.targetCache.get(what));
+            if ((current == Long.MAX_VALUE && delta < 0)
+                || (delta < 0 && (delta == Long.MIN_VALUE || current < -delta))) {
+                AELog.error("Storage bus target reported delta %d for %s with cached amount %d.", delta, what, current);
+                markCacheDirty();
+                return;
+            }
+            long updated = delta > 0 && current > Long.MAX_VALUE - delta ? Long.MAX_VALUE : current + delta;
+            if (updated == 0) {
+                this.targetCache.remove(what);
+            } else {
+                this.targetCache.set(what, updated);
+            }
+            if (isVisibleInAvailableStacks(what)) {
+                notifyDelta(what, delta);
+            }
+        }
+
+        private void markCacheDirty() {
+            if (!this.cacheDirty) {
+                this.cacheDirty = true;
+                notifyListUpdate();
+            }
+        }
+
+        private void notifyDelta(AEKey what, long delta) {
+            dispatchListeners(what, delta, false);
+        }
+
+        private void notifyListUpdate() {
+            if (this.listeners.isEmpty()) {
+                return;
+            }
+            dispatchListeners(null, 0, true);
+        }
+
+        private void requestListUpdate() {
+            if (this.listeners.isEmpty()) {
+                return;
+            }
+            if (this.dispatchingListeners || this.processingDelegateCallback) {
+                if (!this.dispatchingListUpdate) {
+                    this.listUpdatePending = true;
+                }
+            } else {
+                notifyListUpdate();
+            }
+        }
+
+        private void dispatchListeners(@Nullable AEKey what, long delta, boolean listUpdate) {
+            if (this.dispatchingListeners) {
+                AELog.error("Reentrant storage bus listener notification; scheduling a target rescan.");
+                this.cacheDirty = true;
+                if (!this.dispatchingListUpdate) {
+                    this.listUpdatePending = true;
+                }
+                return;
+            }
+
+            this.dispatchingListeners = true;
+            this.dispatchingListUpdate = listUpdate;
+            this.listenerDispatchBuffer.clear();
+            this.listenerDispatchBuffer.addAll(this.listeners);
+            try {
+                for (int i = 0; i < this.listenerDispatchBuffer.size(); i++) {
+                    var registration = this.listenerDispatchBuffer.get(i);
+                    if (!registration.active) {
+                        continue;
+                    }
+                    if (!registration.listener.isValid(registration.verificationToken)) {
+                        registration.active = false;
+                        continue;
+                    }
+                    if (listUpdate) {
+                        registration.listener.onListUpdate();
+                    } else {
+                        registration.listener.onStackChange(what, delta);
+                    }
+                }
+            } finally {
+                this.listenerDispatchBuffer.clear();
+                this.dispatchingListUpdate = false;
+                this.dispatchingListeners = false;
+            }
+            removeInactiveListeners();
+
+            flushPendingListUpdate();
+        }
+
+        private void flushPendingListUpdate() {
+            if (this.listUpdatePending && !this.processingDelegateCallback && !this.dispatchingListeners) {
+                this.listUpdatePending = false;
+                notifyListUpdate();
+            }
+        }
+
+        private void removeInactiveListeners() {
+            for (int i = this.listeners.size() - 1; i >= 0; i--) {
+                if (!this.listeners.get(i).active) {
+                    this.listeners.remove(i);
+                }
+            }
+            if (this.listeners.isEmpty()) {
+                unbindDelegateMonitor();
+            }
+        }
+
+        private final class DelegateListener implements MEStorageChangeListener {
+            @Override
+            public boolean isValid(Object verificationToken) {
+                return verificationToken == getDelegate()
+                    && monitoredDelegate == getDelegate()
+                    && !listeners.isEmpty();
+            }
+
+            @Override
+            public void onStackChange(AEKey what, long delta) {
+                if (Thread.currentThread() != delegateThread) {
+                    AELog.error("Storage bus target invoked a callback from the wrong thread.");
+                    cacheDirty = true;
+                    return;
+                }
+                if (processingDelegateCallback || dispatchingListeners) {
+                    AELog.error("Reentrant storage bus target callback; scheduling a target rescan.");
+                    cacheDirty = true;
+                    requestListUpdate();
+                    return;
+                }
+                processingDelegateCallback = true;
+                try {
+                    applyDelegateDelta(what, delta);
+                } finally {
+                    processingDelegateCallback = false;
+                    flushPendingListUpdate();
+                }
+            }
+
+            @Override
+            public void onListUpdate() {
+                if (Thread.currentThread() != delegateThread) {
+                    AELog.error("Storage bus target invalidated its list from the wrong thread.");
+                    cacheDirty = true;
+                    return;
+                }
+                if (processingDelegateCallback || dispatchingListeners) {
+                    AELog.error("Reentrant storage bus target list update; scheduling a target rescan.");
+                    cacheDirty = true;
+                    requestListUpdate();
+                    return;
+                }
+                processingDelegateCallback = true;
+                try {
+                    markCacheDirty();
+                } finally {
+                    processingDelegateCallback = false;
+                    flushPendingListUpdate();
+                }
+            }
+        }
+
+        private static final class ListenerRegistration {
+            private final MEStorageChangeListener listener;
+            private final Object verificationToken;
+            private boolean active = true;
+
+            private ListenerRegistration(MEStorageChangeListener listener, Object verificationToken) {
+                this.listener = listener;
+                this.verificationToken = verificationToken;
+            }
+        }
     }
-
-
-
-
 }

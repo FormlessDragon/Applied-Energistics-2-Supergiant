@@ -178,6 +178,13 @@ public class MEInventoryHandler extends DelegatingMEInventory {
         return allowExtraction && passesBlackOrWhitelist(request);
     }
 
+    /**
+     * Tests whether a key from an already enumerated delegate cache is visible through this handler's read filters.
+     */
+    protected boolean isVisibleInAvailableStacks(AEKey what) {
+        return !shouldFilterVisibleContents() || canExtract(what);
+    }
+
     private boolean shouldFilterReads() {
         return this.readPartitionFiltering || this.filterOnExtraction;
     }

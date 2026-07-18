@@ -23,6 +23,9 @@ import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.MEStorage;
+import ae2.api.storage.MEStorageChangeListener;
+import ae2.api.storage.MEStorageMonitor;
+import ae2.core.AELog;
 import ae2.core.localization.GuiText;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2ObjectRBTreeMap;
@@ -35,18 +38,31 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
-import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
-public class NetworkStorage implements MEStorage {
+public class NetworkStorage implements MEStorageMonitor {
     private static final IntComparator PRIORITY_SORTER = (first, second) -> Integer.compare(second, first);
-    private final Int2ObjectSortedMap<List<MEStorage>> priorityInventory = new Int2ObjectRBTreeMap<>(PRIORITY_SORTER);
+    private final Int2ObjectSortedMap<ObjectList<MEStorage>> priorityInventory =
+        new Int2ObjectRBTreeMap<>(PRIORITY_SORTER);
     private final ObjectList<MEStorage> secondPassInventories = new ObjectArrayList<>();
+    private final ObjectList<ListenerRegistration> listeners = new ObjectArrayList<>();
+    private final ObjectList<ListenerRegistration> listenerDispatchBuffer = new ObjectArrayList<>();
+    private final Supplier<KeyCounter> cachedContents;
+    private final Runnable legacyMutationCallback;
     private boolean mountsInUse;
     @Nullable
-    private List<QueuedOperation> queuedOperations;
+    private ObjectList<QueuedOperation> queuedOperations;
     @Nullable
     private Set<MEStorage> queuedRemovals;
+    private boolean dispatchingListeners;
+    private boolean dispatchingListUpdate;
+    private boolean listUpdatePending;
+
+    public NetworkStorage(Supplier<KeyCounter> cachedContents, Runnable legacyMutationCallback) {
+        this.cachedContents = cachedContents;
+        this.legacyMutationCallback = legacyMutationCallback;
+    }
 
     public void mount(int priority, MEStorage inventory) {
         if (this.mountsInUse) {
@@ -76,8 +92,15 @@ public class NetworkStorage implements MEStorage {
         var iterator = this.priorityInventory.int2ObjectEntrySet().iterator();
         while (iterator.hasNext()) {
             var entry = iterator.next();
-            List<MEStorage> inventories = entry.getValue();
-            if (inventories.remove(inventory) && inventories.isEmpty()) {
+            var inventories = entry.getValue();
+            boolean removed = false;
+            for (int i = inventories.size() - 1; i >= 0; i--) {
+                if (inventories.get(i) == inventory) {
+                    inventories.remove(i);
+                    removed = true;
+                }
+            }
+            if (removed && inventories.isEmpty()) {
                 iterator.remove();
             }
         }
@@ -97,8 +120,9 @@ public class NetworkStorage implements MEStorage {
 
         this.mountsInUse = true;
         try {
-            for (List<MEStorage> inventories : this.priorityInventory.values()) {
-                for (MEStorage inventory : inventories) {
+            for (var inventories : this.priorityInventory.values()) {
+                for (int i = 0; i < inventories.size(); i++) {
+                    var inventory = inventories.get(i);
                     if (remaining <= 0) {
                         break;
                     }
@@ -106,16 +130,19 @@ public class NetworkStorage implements MEStorage {
                         continue;
                     }
                     if (inventory.isStickyStorageFor(what, source)) {
-                        remaining -= inventory.insert(what, remaining, mode, source);
+                        long inserted = inventory.insert(what, remaining, mode, source);
+                        remaining -= inserted;
+                        legacyStorageChanged(inventory, inserted, mode);
                         stickyStorageFound = true;
                     }
                 }
             }
 
             if (!stickyStorageFound) {
-                for (List<MEStorage> inventories : this.priorityInventory.values()) {
+                for (var inventories : this.priorityInventory.values()) {
                     this.secondPassInventories.clear();
-                    for (MEStorage inventory : inventories) {
+                    for (int i = 0; i < inventories.size(); i++) {
+                        var inventory = inventories.get(i);
                         if (remaining <= 0) {
                             break;
                         }
@@ -123,20 +150,25 @@ public class NetworkStorage implements MEStorage {
                             continue;
                         }
                         if (inventory.isPreferredStorageFor(what, source)) {
-                            remaining -= inventory.insert(what, remaining, mode, source);
+                            long inserted = inventory.insert(what, remaining, mode, source);
+                            remaining -= inserted;
+                            legacyStorageChanged(inventory, inserted, mode);
                         } else {
                             this.secondPassInventories.add(inventory);
                         }
                     }
 
-                    for (MEStorage inventory : this.secondPassInventories) {
+                    for (int i = 0; i < this.secondPassInventories.size(); i++) {
+                        var inventory = this.secondPassInventories.get(i);
                         if (remaining <= 0) {
                             break;
                         }
                         if (isQueuedForRemoval(inventory)) {
                             continue;
                         }
-                        remaining -= inventory.insert(what, remaining, mode, source);
+                        long inserted = inventory.insert(what, remaining, mode, source);
+                        remaining -= inserted;
+                        legacyStorageChanged(inventory, inserted, mode);
                     }
                 }
             }
@@ -161,15 +193,18 @@ public class NetworkStorage implements MEStorage {
 
         this.mountsInUse = true;
         try {
-            for (List<MEStorage> inventories : this.priorityInventory.values()) {
-                for (MEStorage inventory : inventories) {
+            for (var inventories : this.priorityInventory.values()) {
+                for (int i = 0; i < inventories.size(); i++) {
+                    var inventory = inventories.get(i);
                     if (extracted >= amount) {
                         break;
                     }
                     if (isQueuedForRemoval(inventory)) {
                         continue;
                     }
-                    extracted += inventory.extract(what, amount - extracted, mode, source);
+                    long extractedNow = inventory.extract(what, amount - extracted, mode, source);
+                    extracted += extractedNow;
+                    legacyStorageChanged(inventory, extractedNow, mode);
                 }
             }
         } finally {
@@ -182,10 +217,18 @@ public class NetworkStorage implements MEStorage {
 
     @Override
     public void getAvailableStacks(KeyCounter out) {
+        out.addAll(this.cachedContents.get());
+    }
+
+    /**
+     * Enumerates mounted storage directly. Only the owning storage service uses this to rebuild its aggregate cache.
+     */
+    public void getAvailableStacksRaw(KeyCounter out) {
         this.mountsInUse = true;
         try {
-            for (List<MEStorage> inventories : this.priorityInventory.values()) {
-                for (MEStorage inventory : inventories) {
+            for (var inventories : this.priorityInventory.values()) {
+                for (int i = 0; i < inventories.size(); i++) {
+                    var inventory = inventories.get(i);
                     if (isQueuedForRemoval(inventory)) {
                         continue;
                     }
@@ -206,6 +249,95 @@ public class NetworkStorage implements MEStorage {
     }
 
     @Override
+    public void addListener(MEStorageChangeListener listener, Object verificationToken) {
+        for (int i = 0; i < this.listeners.size(); i++) {
+            var registration = this.listeners.get(i);
+            if (registration.listener == listener) {
+                throw new IllegalStateException("The storage listener is already registered.");
+            }
+        }
+        this.listeners.add(new ListenerRegistration(listener, verificationToken));
+    }
+
+    @Override
+    public void removeListener(MEStorageChangeListener listener) {
+        for (int i = this.listeners.size() - 1; i >= 0; i--) {
+            var registration = this.listeners.get(i);
+            if (registration.listener == listener) {
+                registration.active = false;
+                this.listeners.remove(i);
+            }
+        }
+    }
+
+    public boolean hasListeners() {
+        return !this.listeners.isEmpty();
+    }
+
+    public boolean isDispatchingListeners() {
+        return this.dispatchingListeners;
+    }
+
+    public void postChange(AEKey what, long delta) {
+        dispatchListeners(what, delta, false);
+    }
+
+    public void postListUpdate() {
+        dispatchListeners(null, 0, true);
+    }
+
+    private void dispatchListeners(@Nullable AEKey what, long delta, boolean listUpdate) {
+        if (this.dispatchingListeners) {
+            AELog.error("Reentrant network storage listener notification; scheduling a full storage refresh.");
+            if (!this.listUpdatePending && !this.dispatchingListUpdate) {
+                this.listUpdatePending = true;
+                this.legacyMutationCallback.run();
+            }
+            return;
+        }
+
+        this.dispatchingListeners = true;
+        this.dispatchingListUpdate = listUpdate;
+        this.listenerDispatchBuffer.clear();
+        this.listenerDispatchBuffer.addAll(this.listeners);
+        try {
+            for (int i = 0; i < this.listenerDispatchBuffer.size(); i++) {
+                var registration = this.listenerDispatchBuffer.get(i);
+                if (!registration.active) {
+                    continue;
+                }
+                if (!registration.listener.isValid(registration.verificationToken)) {
+                    registration.active = false;
+                    continue;
+                }
+                if (listUpdate) {
+                    registration.listener.onListUpdate();
+                } else {
+                    registration.listener.onStackChange(what, delta);
+                }
+            }
+        } finally {
+            this.listenerDispatchBuffer.clear();
+            this.dispatchingListUpdate = false;
+            this.dispatchingListeners = false;
+        }
+        removeInactiveListeners();
+
+        if (this.listUpdatePending) {
+            this.listUpdatePending = false;
+            postListUpdate();
+        }
+    }
+
+    private void removeInactiveListeners() {
+        for (int i = this.listeners.size() - 1; i >= 0; i--) {
+            if (!this.listeners.get(i).active) {
+                this.listeners.remove(i);
+            }
+        }
+    }
+
+    @Override
     public ITextComponent getDescription() {
         return GuiText.MENetworkStorage.text();
     }
@@ -216,10 +348,11 @@ public class NetworkStorage implements MEStorage {
             return;
         }
 
-        List<QueuedOperation> queued = this.queuedOperations;
+        ObjectList<QueuedOperation> queued = this.queuedOperations;
         this.queuedOperations = null;
         this.queuedRemovals = null;
-        for (QueuedOperation operation : queued) {
+        for (int i = 0; i < queued.size(); i++) {
+            var operation = queued.get(i);
             if (operation.mount()) {
                 mount(operation.priority(), operation.inventory());
             } else {
@@ -232,6 +365,23 @@ public class NetworkStorage implements MEStorage {
         return this.queuedRemovals != null && this.queuedRemovals.contains(inventory);
     }
 
+    private void legacyStorageChanged(MEStorage inventory, long amount, Actionable mode) {
+        if (amount > 0 && mode == Actionable.MODULATE && !(inventory instanceof MEStorageMonitor)) {
+            this.legacyMutationCallback.run();
+        }
+    }
+
     private record QueuedOperation(boolean mount, int priority, MEStorage inventory) {
+    }
+
+    private static final class ListenerRegistration {
+        private final MEStorageChangeListener listener;
+        private final Object verificationToken;
+        private boolean active = true;
+
+        private ListenerRegistration(MEStorageChangeListener listener, Object verificationToken) {
+            this.listener = listener;
+            this.verificationToken = verificationToken;
+        }
     }
 }

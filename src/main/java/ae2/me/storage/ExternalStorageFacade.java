@@ -1,6 +1,8 @@
 package ae2.me.storage;
 
+import ae2.api.behaviors.ExternalStorageMonitor;
 import ae2.api.config.Actionable;
+import ae2.api.config.StorageFilter;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEFluidKey;
 import ae2.api.stacks.AEItemKey;
@@ -27,9 +29,15 @@ import java.util.Set;
  * Adapts external platform storage to behave like an {@link MEStorage}.
  */
 public abstract class ExternalStorageFacade implements MEStorage {
+    @Nullable
+    private final ExternalStorageMonitor externalMonitor;
     protected boolean extractableOnly;
     @Nullable
     private Runnable changeListener;
+
+    private ExternalStorageFacade(@Nullable ExternalStorageMonitor externalMonitor) {
+        this.externalMonitor = externalMonitor;
+    }
 
     public static ExternalStorageFacade of(IFluidHandler handler) {
         return new FluidHandlerFacade(handler);
@@ -42,6 +50,17 @@ public abstract class ExternalStorageFacade implements MEStorage {
     public void setChangeListener(@Nullable Runnable listener) {
         this.changeListener = listener;
     }
+
+    @Nullable
+    ExternalStorageMonitor getExternalMonitor() {
+        return this.externalMonitor;
+    }
+
+    StorageFilter getStorageFilter() {
+        return this.extractableOnly ? StorageFilter.EXTRACTABLE_ONLY : StorageFilter.NONE;
+    }
+
+    abstract boolean acceptsMonitorKey(AEKey what);
 
     public abstract int getSlots();
 
@@ -91,7 +110,13 @@ public abstract class ExternalStorageFacade implements MEStorage {
         private final IItemHandler handler;
 
         public ItemHandlerFacade(IItemHandler handler) {
+            super(handler instanceof ExternalStorageMonitor monitor ? monitor : null);
             this.handler = handler;
+        }
+
+        @Override
+        boolean acceptsMonitorKey(AEKey what) {
+            return what != null;
         }
 
         /**
@@ -325,7 +350,13 @@ public abstract class ExternalStorageFacade implements MEStorage {
         private final IFluidHandler handler;
 
         public FluidHandlerFacade(IFluidHandler handler) {
+            super(handler instanceof ExternalStorageMonitor monitor ? monitor : null);
             this.handler = handler;
+        }
+
+        @Override
+        boolean acceptsMonitorKey(AEKey what) {
+            return what instanceof AEFluidKey;
         }
 
         @Override

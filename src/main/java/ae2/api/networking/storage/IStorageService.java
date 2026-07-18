@@ -41,8 +41,8 @@ public interface IStorageService extends IGridService {
     MEStorage getInventory();
 
     /**
-     * Returns the cached content of the network inventory. The cache is <strong>updated at most once per tick</strong>.
-     * Changes to network inventory will not be reflected by the cache until the next tick.
+     * Returns the cached content of the network inventory. Event-driven storage updates this cache synchronously.
+     * Changes from legacy storage or invalidated storage lists are reflected when the cache is next rebuilt.
      * <p/>
      * Should be used when slightly outdated content is not a big deal. Preferred to
      * {@code getInventory().getAvailableStacks()} for performance reasons.

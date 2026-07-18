@@ -268,8 +268,14 @@ Storage in grids is organized as mounted `MEStorage` inventories. The storage se
 inventory through `getInventory()`, provides a cached inventory snapshot through `getCachedInventory()`, and manages
 `IStorageProvider` mounts from nodes and global providers.
 
-`getCachedInventory()` is updated at most once per tick and should be preferred when slightly outdated content is
-acceptable. This avoids repeatedly walking the full network inventory.
+`getInventory()` returns a network inventory whose runtime implementation also implements `MEStorageMonitor`.
+Consumers that need live content changes can register an `MEStorageChangeListener`, enumerate the inventory once, and
+then apply the synchronous signed deltas they receive. `onListUpdate()` means the list structure changed and the
+consumer should enumerate once again; it must not be used instead of an exact delta for an ordinary content change.
+
+`getCachedInventory()` uses the same mechanism internally. Event-driven mounts update it synchronously, while legacy
+mounts and invalidated lists are reflected by the next cache rebuild. It should be preferred when slightly outdated
+legacy content is acceptable because it avoids repeatedly walking the full network inventory.
 
 Node-backed storage should implement `IStorageProvider` as a node service. When the node joins or leaves a grid, the
 storage service will mount or unmount it automatically by calling `mountInventories(...)`. Global storage providers
@@ -279,6 +285,12 @@ than by an individual node.
 When a storage provider needs to remove, add, or rebuild its mounts due to an external event or config change, call
 `IStorageProvider.requestUpdate(managedNode)` for node providers, or `refreshGlobalStorageProvider(...)` for global
 providers.
+
+External item or fluid handlers may additionally implement `ExternalStorageMonitor`. A storage bus then enumerates
+that handler once while it is mounted and consumes exact signed deltas instead of polling it. The handler receives the
+active `StorageFilter` when a listener is registered and must synchronously report every later content change on the
+registering server thread. Structural changes that cannot be expressed as deltas use `onListUpdate()` and trigger one
+new enumeration. Handlers that do not implement this interface keep the legacy periodic scan behavior.
 
 #### Auto-Crafting
 
