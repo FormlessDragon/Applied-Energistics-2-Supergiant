@@ -100,7 +100,7 @@ public class PreciseStorageBusPart extends StorageBusPart {
             if (targetAmount <= 0) {
                 return 0;
             }
-            long missing = targetAmount - this.getDelegate().getAvailableStacks().get(what);
+            long missing = targetAmount - this.getCachedAmount(what);
             if (missing <= 0) {
                 return 0;
             }

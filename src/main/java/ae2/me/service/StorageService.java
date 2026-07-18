@@ -23,11 +23,13 @@ import ae2.api.networking.IGridServiceProvider;
 import ae2.api.networking.storage.IStorageService;
 import ae2.api.networking.storage.IStorageWatcherNode;
 import ae2.api.stacks.AEKey;
-import ae2.api.stacks.AEKey2LongMap;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.IStorageMounts;
 import ae2.api.storage.IStorageProvider;
 import ae2.api.storage.MEStorage;
+import ae2.api.storage.MEStorageChangeListener;
+import ae2.api.storage.MEStorageMonitor;
+import ae2.core.AELog;
 import ae2.me.helpers.InterestManager;
 import ae2.me.helpers.StackWatcher;
 import ae2.me.storage.NetworkStorage;
@@ -51,20 +53,24 @@ public class StorageService implements IStorageService, IGridServiceProvider {
     private final ObjectList<ProviderState> globalProviders = new ObjectArrayList<>();
     private final SetMultimap<AEKey, StackWatcher<IStorageWatcherNode>> interests = HashMultimap.create();
     private final InterestManager<StackWatcher<IStorageWatcherNode>> interestManager = new InterestManager<>(this.interests);
-    private final NetworkStorage storage = new NetworkStorage();
-    private final KeyCounter cachedAvailableStacks = KeyCounter.saturating();
-    private final AEKey2LongMap cachedAvailableAmounts = new AEKey2LongMap.OpenHashMap();
+    private final NetworkStorage storage = new NetworkStorage(this::getCachedInventory, this::invalidateCache);
+    private KeyCounter cachedAvailableStacks = KeyCounter.saturating();
+    private KeyCounter cachedAvailableScratch = KeyCounter.saturating();
     private final Reference2ObjectMap<IGridNode, StackWatcher<IStorageWatcherNode>> watchers =
         new Reference2ObjectOpenHashMap<>();
 
     private boolean cachedStacksNeedUpdate = true;
+    private boolean cacheInitialized;
+    private boolean processingMonitorCallback;
+    private int legacyMountCount;
 
     @Override
     public void onServerEndTick() {
-        if (this.interestManager.isEmpty()) {
-            this.cachedStacksNeedUpdate = true;
-        } else {
+        boolean cacheIsObserved = !this.interestManager.isEmpty() || this.storage.hasListeners();
+        if (cacheIsObserved && (this.cachedStacksNeedUpdate || this.legacyMountCount > 0)) {
             updateCachedStacks();
+        } else if (!cacheIsObserved && this.legacyMountCount > 0) {
+            this.cachedStacksNeedUpdate = true;
         }
     }
 
@@ -73,35 +79,77 @@ public class StorageService implements IStorageService, IGridServiceProvider {
     }
 
     private void updateCachedStacks() {
+        var previous = this.cachedAvailableStacks;
+        var replacement = this.cachedAvailableScratch;
+
+        replacement.reset();
+        this.storage.getAvailableStacksRaw(replacement);
+        replacement.removeZeros();
+        this.cachedAvailableStacks = replacement;
+        this.cachedAvailableScratch = previous;
         this.cachedStacksNeedUpdate = false;
 
-        this.cachedAvailableStacks.clear();
-        this.storage.getAvailableStacks(this.cachedAvailableStacks);
-        this.cachedAvailableStacks.removeEmptySubmaps();
-
-        for (var entry : this.cachedAvailableStacks) {
-            var what = entry.getKey();
-            var newAmount = sanitizeAmount(entry.getLongValue());
-            if (newAmount != this.cachedAvailableAmounts.getLong(what)) {
-                postWatcherUpdate(what, newAmount);
-            }
-        }
-
-        if (!this.cachedAvailableAmounts.isEmpty()) {
-            for (var what : this.cachedAvailableAmounts.keySet()) {
-                if (this.cachedAvailableStacks.get(what) == 0) {
-                    postWatcherUpdate(what, 0);
+        if (!this.cacheInitialized) {
+            this.cacheInitialized = true;
+            for (var entry : replacement) {
+                var amount = sanitizeAmount(entry.getLongValue());
+                if (amount > 0) {
+                    postWatcherUpdate(entry.getKey(), amount);
                 }
             }
+            return;
         }
 
-        this.cachedAvailableAmounts.clear();
-        for (var entry : this.cachedAvailableStacks) {
-            var amount = sanitizeAmount(entry.getLongValue());
-            if (amount > 0) {
-                this.cachedAvailableAmounts.put(entry.getKey(), amount);
+        for (var entry : replacement) {
+            var what = entry.getKey();
+            var newAmount = sanitizeAmount(entry.getLongValue());
+            var oldAmount = sanitizeAmount(previous.get(what));
+            if (newAmount != oldAmount) {
+                postWatcherUpdate(what, newAmount);
+                this.storage.postChange(what, newAmount - oldAmount);
             }
         }
+
+        for (var entry : previous) {
+            var what = entry.getKey();
+            var oldAmount = sanitizeAmount(entry.getLongValue());
+            if (oldAmount > 0 && replacement.get(what) == 0) {
+                postWatcherUpdate(what, 0);
+                this.storage.postChange(what, -oldAmount);
+            }
+        }
+    }
+
+    private void applyMonitorDelta(AEKey what, long delta, Object source) {
+        if (what == null) {
+            AELog.error("Storage monitor %s reported a null key; scheduling a full storage scan.", source);
+            invalidateCache();
+            return;
+        }
+        if (delta == 0) {
+            return;
+        }
+        if (this.cachedStacksNeedUpdate || !this.cacheInitialized) {
+            return;
+        }
+
+        long current = sanitizeAmount(this.cachedAvailableStacks.get(what));
+        if ((current == Long.MAX_VALUE && delta < 0)
+            || (delta < 0 && (delta == Long.MIN_VALUE || current < -delta))) {
+            AELog.error("Storage monitor %s reported delta %d for %s with cached amount %d; scheduling a full storage scan.",
+                source, delta, what, current);
+            invalidateCache();
+            return;
+        }
+
+        long updated = delta > 0 && current > Long.MAX_VALUE - delta ? Long.MAX_VALUE : current + delta;
+        if (updated == 0) {
+            this.cachedAvailableStacks.remove(what);
+        } else {
+            this.cachedAvailableStacks.set(what, updated);
+        }
+        postWatcherUpdate(what, updated);
+        this.storage.postChange(what, delta);
     }
 
     private void postWatcherUpdate(AEKey what, long newAmount) {
@@ -158,7 +206,8 @@ public class StorageService implements IStorageService, IGridServiceProvider {
 
     @Override
     public void addGlobalStorageProvider(IStorageProvider provider) {
-        for (var state : this.globalProviders) {
+        for (int i = 0; i < this.globalProviders.size(); i++) {
+            var state = this.globalProviders.get(i);
             if (state.provider == provider) {
                 throw new IllegalArgumentException("Duplicate storage provider registration for " + provider);
             }
@@ -171,12 +220,12 @@ public class StorageService implements IStorageService, IGridServiceProvider {
 
     @Override
     public void removeGlobalStorageProvider(IStorageProvider provider) {
-        var iterator = this.globalProviders.iterator();
-        while (iterator.hasNext()) {
-            var state = iterator.next();
+        for (int i = this.globalProviders.size() - 1; i >= 0; i--) {
+            var state = this.globalProviders.get(i);
             if (state.provider == provider) {
-                iterator.remove();
+                this.globalProviders.remove(i);
                 state.unmount();
+                return;
             }
         }
     }
@@ -192,7 +241,8 @@ public class StorageService implements IStorageService, IGridServiceProvider {
 
     @Override
     public void refreshGlobalStorageProvider(IStorageProvider provider) {
-        for (var state : this.globalProviders) {
+        for (int i = 0; i < this.globalProviders.size(); i++) {
+            var state = this.globalProviders.get(i);
             if (state.provider == provider) {
                 state.update();
                 return;
@@ -204,7 +254,10 @@ public class StorageService implements IStorageService, IGridServiceProvider {
 
     @Override
     public void invalidateCache() {
-        this.cachedStacksNeedUpdate = true;
+        if (!this.cachedStacksNeedUpdate) {
+            this.cachedStacksNeedUpdate = true;
+            this.storage.postListUpdate();
+        }
     }
 
     @Override
@@ -225,6 +278,8 @@ public class StorageService implements IStorageService, IGridServiceProvider {
     private class ProviderState implements IStorageMounts {
         private final IStorageProvider provider;
         private final ReferenceSet<MEStorage> inventories = new ReferenceOpenHashSet<>();
+        private final Reference2ObjectMap<MEStorage, SourceListener> monitorListeners =
+            new Reference2ObjectOpenHashMap<>();
         private boolean mounted;
 
         ProviderState(IStorageProvider provider) {
@@ -248,6 +303,13 @@ public class StorageService implements IStorageService, IGridServiceProvider {
             }
 
             storage.mount(priority, inventory);
+            if (inventory instanceof MEStorageMonitor monitor) {
+                var listener = new SourceListener(this, monitor, Thread.currentThread());
+                this.monitorListeners.put(inventory, listener);
+                monitor.addListener(listener, inventory);
+            } else {
+                legacyMountCount++;
+            }
             invalidateCache();
         }
 
@@ -263,10 +325,76 @@ public class StorageService implements IStorageService, IGridServiceProvider {
 
             this.mounted = false;
             for (var inventory : this.inventories) {
+                var listener = this.monitorListeners.remove(inventory);
+                if (listener != null) {
+                    listener.monitor.removeListener(listener);
+                } else {
+                    legacyMountCount--;
+                }
                 storage.unmount(inventory);
             }
             this.inventories.clear();
             invalidateCache();
+        }
+    }
+
+    private final class SourceListener implements MEStorageChangeListener {
+        private final ProviderState provider;
+        private final MEStorageMonitor monitor;
+        private final Thread ownerThread;
+
+        private SourceListener(ProviderState provider, MEStorageMonitor monitor, Thread ownerThread) {
+            this.provider = provider;
+            this.monitor = monitor;
+            this.ownerThread = ownerThread;
+        }
+
+        @Override
+        public boolean isValid(Object verificationToken) {
+            return verificationToken == this.monitor
+                && this.provider.mounted
+                && this.provider.monitorListeners.get(this.monitor) == this;
+        }
+
+        @Override
+        public void onStackChange(AEKey what, long delta) {
+            if (Thread.currentThread() != this.ownerThread) {
+                AELog.error("Storage monitor %s invoked a callback from the wrong thread; scheduling a full storage scan.",
+                    this.monitor);
+                cachedStacksNeedUpdate = true;
+                return;
+            }
+            if (processingMonitorCallback || storage.isDispatchingListeners()) {
+                AELog.error("Reentrant storage monitor callback from %s; scheduling a full storage scan.", this.monitor);
+                invalidateCache();
+                return;
+            }
+            processingMonitorCallback = true;
+            try {
+                applyMonitorDelta(what, delta, this.monitor);
+            } finally {
+                processingMonitorCallback = false;
+            }
+        }
+
+        @Override
+        public void onListUpdate() {
+            if (Thread.currentThread() != this.ownerThread) {
+                AELog.error("Storage monitor %s invalidated its list from the wrong thread.", this.monitor);
+                cachedStacksNeedUpdate = true;
+                return;
+            }
+            if (processingMonitorCallback || storage.isDispatchingListeners()) {
+                AELog.error("Reentrant storage list update from %s; scheduling a full storage scan.", this.monitor);
+                invalidateCache();
+                return;
+            }
+            processingMonitorCallback = true;
+            try {
+                invalidateCache();
+            } finally {
+                processingMonitorCallback = false;
+            }
         }
     }
 }
