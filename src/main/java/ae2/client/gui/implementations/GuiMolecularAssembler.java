@@ -9,7 +9,6 @@ import ae2.client.gui.Icon;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.PageNavigationButton;
 import ae2.client.gui.widgets.PatternModifierPanelWidget;
-import ae2.client.gui.widgets.ProgressBar;
 import ae2.client.gui.widgets.ToggleButton;
 import ae2.client.gui.widgets.UpgradesPanel;
 import ae2.container.SlotSemantics;
@@ -25,17 +24,14 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentString;
 
 import java.util.List;
 
 public class GuiMolecularAssembler extends AEBaseGui<ContainerMolecularAssembler> {
-    private final ProgressBar progressBar;
     private final PageNavigationButton previousPageButton;
     private final PageNavigationButton nextPageButton;
     private final ToggleButton showInPatternAccessTerminalButton;
     private final PatternModifierPanelWidget patternModifierPanel;
-    private int lastProgress = Integer.MIN_VALUE;
 
     public GuiMolecularAssembler(ContainerMolecularAssembler container, InventoryPlayer playerInventory, ITextComponent title,
                                  GuiStyle style) {
@@ -63,8 +59,6 @@ public class GuiMolecularAssembler extends AEBaseGui<ContainerMolecularAssembler
             () -> container.setPage(container.getCurrentPage() + 1));
         this.widgets.add("previousPage", this.previousPageButton);
         this.widgets.add("nextPage", this.nextPageButton);
-        this.progressBar = new ProgressBar(this.container, style.getImage("progressBar"), ProgressBar.Direction.HORIZONTAL);
-        this.widgets.add("progressBar", this.progressBar);
         this.patternModifierPanel = new PatternModifierPanelWidget(this, new AssemblerPanelHost());
         this.patternModifierPanel.addButtons();
         addToLeftToolbar(this.patternModifierPanel.getToolbarButton());
@@ -74,19 +68,11 @@ public class GuiMolecularAssembler extends AEBaseGui<ContainerMolecularAssembler
     protected void updateBeforeRender() {
         super.updateBeforeRender();
         this.repositionPatternPageSlots();
-        updateProgressTooltip(this.container.getCurrentProgress());
         this.showInPatternAccessTerminalButton.setState(this.container.getShowInAccessTerminal() == YesNo.YES);
         this.previousPageButton.setVisibility(this.container.getPageCount() > 1 && this.container.getCurrentPage() > 0);
         this.nextPageButton.setVisibility(this.container.getPageCount() > 1
             && this.container.getCurrentPage() + 1 < this.container.getPageCount());
         this.patternModifierPanel.update();
-    }
-
-    private void updateProgressTooltip(int progress) {
-        if (progress != this.lastProgress) {
-            this.lastProgress = progress;
-            this.progressBar.setFullMsg(new TextComponentString(progress + "%"));
-        }
     }
 
     @Override

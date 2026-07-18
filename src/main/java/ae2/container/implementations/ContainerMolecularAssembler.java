@@ -11,7 +11,6 @@ import ae2.api.util.IConfigurableObject;
 import ae2.container.AEBaseContainer;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
-import ae2.container.interfaces.IProgressProvider;
 import ae2.container.slot.AppEngSlot;
 import ae2.container.slot.RestrictedInputSlot;
 import ae2.helpers.patternprovider.PatternProviderCapacity;
@@ -27,17 +26,14 @@ import net.minecraft.item.ItemStack;
 import java.util.List;
 
 public class ContainerMolecularAssembler extends AEBaseContainer
-    implements IProgressProvider, IConfigurableObject, PatternModifierPanel.Host {
+    implements IConfigurableObject, PatternModifierPanel.Host {
     public static final String ACTION_SET_PAGE = "setPage";
-    private static final int MAX_CRAFT_PROGRESS = 100;
 
     private final TileMolecularAssembler host;
     private final List<AppEngSlot> patternSlots = new ObjectArrayList<>();
     private final PatternModifierPanel patternModifierPanel;
     private boolean patternModifierPanelVisible;
 
-    @GuiSync(4)
-    public int craftProgress;
     @GuiSync(5)
     public YesNo showInAccessTerminal = YesNo.YES;
     @GuiSync(6)
@@ -119,16 +115,6 @@ public class ContainerMolecularAssembler extends AEBaseContainer
     }
 
     @Override
-    public int getCurrentProgress() {
-        return this.craftProgress;
-    }
-
-    @Override
-    public int getMaxProgress() {
-        return MAX_CRAFT_PROGRESS;
-    }
-
-    @Override
     public IConfigManager getConfigManager() {
         return this.host.getConfigManager();
     }
@@ -156,7 +142,6 @@ public class ContainerMolecularAssembler extends AEBaseContainer
     @Override
     public void broadcastChanges() {
         if (isServerSide()) {
-            this.craftProgress = this.host.getCraftingProgress();
             this.showInAccessTerminal = this.host.getConfigManager().getSetting(Settings.PATTERN_ACCESS_TERMINAL);
             this.activePatternSlots = this.host.getActivePatternSlots();
             this.pageCount = this.host.getPatternPageCount();
