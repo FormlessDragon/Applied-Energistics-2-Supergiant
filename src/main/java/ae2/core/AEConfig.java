@@ -288,6 +288,10 @@ public class AEConfig {
         return CLIENT.enableEffects;
     }
 
+    public boolean isBeamFormerLowCostRendering() {
+        return CLIENT.beamFormerLowCostRendering;
+    }
+
     public boolean isPlacementPreviewEnabled() {
         return CLIENT.placementPreviewEnabled;
     }
@@ -836,6 +840,10 @@ public class AEConfig {
         @Config.Name("enableEffects")
         @Config.Comment("Enable AE2 particle and lightning effects.")
         public final boolean enableEffects = true;
+
+        @Config.Name("beamFormerLowCostRendering")
+        @Config.Comment("Use low-cost vanilla beacon beam rendering for Beam Formers.")
+        public final boolean beamFormerLowCostRendering = false;
 
         @Config.Name("placementPreviewEnabled")
         @Config.Comment("Show part and facade placement previews.")
