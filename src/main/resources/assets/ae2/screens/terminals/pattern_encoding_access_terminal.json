@@ -3,8 +3,8 @@
 	"includes": [
 		"../common/common.json",
 		"../common/player_inventory.json",
-		"accessEncoding/crafting.json",
-		"accessEncoding/processing.json"
+		"accessencoding/crafting.json",
+		"accessencoding/processing.json"
 	],
 	"text": {
 		"crafting_grid_title": {
