@@ -7,14 +7,12 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 
 public final class IngredientConverters {
-    private static List<IngredientConverter<?>> converters = ImmutableList.of();
+    private static List<IngredientConverter<?>> converters = ImmutableList.of(
+        new ItemIngredientConverter(),
+        new FluidIngredientConverter()
+    );
 
     private IngredientConverters() {
-    }
-
-    static {
-        IngredientConverters.register(new ItemIngredientConverter());
-        IngredientConverters.register(new FluidIngredientConverter());
     }
 
     public static synchronized void register(IngredientConverter<?> converter) {
