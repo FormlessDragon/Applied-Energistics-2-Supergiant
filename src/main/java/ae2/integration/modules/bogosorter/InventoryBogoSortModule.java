@@ -23,7 +23,7 @@ import ae2.container.implementations.ContainerSkyChest;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.me.items.ContainerBasicCellChest;
 import ae2.container.me.items.ContainerCraftingTerm;
-import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
 import ae2.container.me.items.ContainerWirelessCraftingTerm;
 import ae2.container.slot.DisabledSlot;
 import ae2.core.AELog;

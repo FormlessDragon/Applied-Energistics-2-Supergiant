@@ -5,6 +5,7 @@ import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
+import ae2.core.AELog;
 import ae2.core.definitions.AEItems;
 import ae2.crafting.pattern.AECraftingPattern;
 import ae2.crafting.pattern.AEProcessingPattern;
@@ -15,8 +16,12 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class PatternModifierLogic {
+    private static final int REENCODE_FAILURE_WARNING_LIMIT = 8;
+    private static final AtomicInteger REENCODE_FAILURE_WARNING_COUNT = new AtomicInteger();
+
     private PatternModifierLogic() {
     }
 
@@ -49,7 +54,8 @@ public final class PatternModifierLogic {
 
         ItemStack newPattern = PatternDetailsHelper.encodeProcessingPattern(
             modifyStacks(inputs, factor, divide),
-            modifyStacks(outputs, factor, divide));
+            modifyStacks(outputs, factor, divide),
+            pattern.getRecipeTypeUid());
         return isValidPattern(newPattern, world) ? newPattern : stack;
     }
 
@@ -69,9 +75,11 @@ public final class PatternModifierLogic {
             try {
                 ItemStack newPattern = PatternDetailsHelper.encodeProcessingPattern(
                     replaceStacks(pattern.getSparseInputs(), targetKey, replacementKey),
-                    replaceStacks(pattern.getSparseOutputs(), targetKey, replacementKey));
+                    replaceStacks(pattern.getSparseOutputs(), targetKey, replacementKey),
+                    pattern.getRecipeTypeUid());
                 return isValidPattern(newPattern, world) ? newPattern : stack;
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException exception) {
+                warnReencodeFailure("replacing processing-pattern contents", exception);
                 return stack;
             }
         }
@@ -86,7 +94,8 @@ public final class PatternModifierLogic {
                     pattern.canSubstitute(),
                     pattern.canSubstituteFluids());
                 return isValidPattern(newPattern, world) ? newPattern : stack;
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException exception) {
+                warnReencodeFailure("replacing crafting-pattern contents", exception);
                 return stack;
             }
         }
@@ -110,7 +119,8 @@ public final class PatternModifierLogic {
                 substitute,
                 substituteFluids);
             return isValidPattern(newPattern, world) ? newPattern : stack;
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            warnReencodeFailure("changing a crafting-pattern property", exception);
             return stack;
         }
     }
@@ -178,6 +188,16 @@ public final class PatternModifierLogic {
 
     private static boolean isValidPattern(ItemStack stack, World world) {
         return PatternDetailsHelper.decodePattern(stack, world) != null;
+    }
+
+    private static void warnReencodeFailure(String operation, RuntimeException exception) {
+        int warningIndex = REENCODE_FAILURE_WARNING_COUNT.getAndUpdate(
+            current -> current <= REENCODE_FAILURE_WARNING_LIMIT ? current + 1 : current);
+        if (warningIndex < REENCODE_FAILURE_WARNING_LIMIT) {
+            AELog.warn(exception, "Failed to re-encode a pattern while %s", operation);
+        } else if (warningIndex == REENCODE_FAILURE_WARNING_LIMIT) {
+            AELog.warn("Suppressing further pattern re-encoding failure warnings");
+        }
     }
 
     public enum CraftingProperty {

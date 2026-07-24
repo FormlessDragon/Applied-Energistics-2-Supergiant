@@ -10,7 +10,7 @@ import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SmallTextTooltipButton;
 import ae2.container.SlotSemantics;
-import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
 import ae2.core.localization.GuiText;
 import ae2.parts.encoding.ProcessingPatternAmountHelper;
 import net.minecraft.util.text.ITextComponent;

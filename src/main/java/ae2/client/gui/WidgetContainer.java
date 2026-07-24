@@ -464,6 +464,22 @@ public class WidgetContainer {
         return getMouseInteractionBlocker(mousePos) != null;
     }
 
+    public boolean blocksTooltips(int mouseX, int mouseY) {
+        for (int i = this.compositeWidgetOrder.size() - 1; i >= 0; i--) {
+            ICompositeWidget widget = this.compositeWidgetOrder.get(i);
+            if (!widget.isVisible()) {
+                continue;
+            }
+
+            Rectangle bounds = widget.getBounds();
+            if ((widget.wantsAllMouseDownEvents() || contains(bounds, mouseX, mouseY))
+                && widget.blocksTooltips(mouseX, mouseY)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Nullable
     public ICompositeWidget getMouseInteractionBlocker(Point mousePos) {
         for (int i = this.compositeWidgetOrder.size() - 1; i >= 0; i--) {

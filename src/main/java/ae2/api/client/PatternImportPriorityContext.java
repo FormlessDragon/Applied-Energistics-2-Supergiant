@@ -26,7 +26,7 @@ package ae2.api.client;
 import ae2.api.stacks.GenericStack;
 import ae2.container.me.common.GridInventoryEntry;
 import ae2.container.me.common.IClientRepo;
-import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import org.jetbrains.annotations.Nullable;

@@ -2,14 +2,14 @@ package ae2.core.network;
 
 import ae2.core.AELog;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import net.minecraft.network.PacketBuffer;
 import org.jetbrains.annotations.Nullable;
 
 public final class NetworkPacketHelper {
     private static final long LOG_INTERVAL_NANOS = 10_000_000_000L;
     private static final int MAX_PACKET_WARNING_KEYS = 256;
-    private static final Object2LongMap<String> LAST_PACKET_WARNING = new PacketWarningMap();
+    private static final PacketWarningLimiter PACKET_WARNING_LIMITER =
+        new PacketWarningLimiter(LOG_INTERVAL_NANOS, MAX_PACKET_WARNING_KEYS);
 
     private NetworkPacketHelper() {
     }
@@ -30,34 +30,46 @@ public final class NetworkPacketHelper {
     }
 
     private static void warnRateLimited(Throwable exception, String key, String message, Object... params) {
-        long now = System.nanoTime();
-        synchronized (LAST_PACKET_WARNING) {
-            long previous = LAST_PACKET_WARNING.getLong(key);
-            if (now - previous < LOG_INTERVAL_NANOS) {
-                return;
-            }
-            LAST_PACKET_WARNING.put(key, now);
+        if (!PACKET_WARNING_LIMITER.shouldLog(key, System.nanoTime())) {
+            return;
         }
         AELog.warn(exception, message, params);
     }
 
-    private static final class PacketWarningMap extends Object2LongLinkedOpenHashMap<String> {
-        private PacketWarningMap() {
-            super(MAX_PACKET_WARNING_KEYS, 0.75F);
-        }
+    static final class PacketWarningLimiter {
+        private final long intervalNanos;
+        private final int maxKeys;
+        private final Object2LongLinkedOpenHashMap<String> lastWarnings;
 
-        @Override
-        public long put(final String k, final long v) {
-            final long oldValue = super.put(k, v);
-            while (size() > MAX_PACKET_WARNING_KEYS) {
-                removeFirstLong();
+        PacketWarningLimiter(long intervalNanos, int maxKeys) {
+            if (intervalNanos <= 0) {
+                throw new IllegalArgumentException("intervalNanos must be positive");
             }
-            return oldValue;
+            if (maxKeys <= 0) {
+                throw new IllegalArgumentException("maxKeys must be positive");
+            }
+            this.intervalNanos = intervalNanos;
+            this.maxKeys = maxKeys;
+            this.lastWarnings = new Object2LongLinkedOpenHashMap<>(maxKeys, 0.75F);
         }
 
-        @Override
-        public Object2LongLinkedOpenHashMap<String> clone() {
-            throw new AssertionError();
+        synchronized boolean shouldLog(String key, long now) {
+            if (this.lastWarnings.containsKey(key)) {
+                long elapsed = now - this.lastWarnings.getLong(key);
+                if (elapsed >= 0 && elapsed < this.intervalNanos) {
+                    return false;
+                }
+            }
+
+            this.lastWarnings.putAndMoveToLast(key, now);
+            while (this.lastWarnings.size() > this.maxKeys) {
+                this.lastWarnings.removeFirstLong();
+            }
+            return true;
+        }
+
+        synchronized int trackedKeyCount() {
+            return this.lastWarnings.size();
         }
     }
 }

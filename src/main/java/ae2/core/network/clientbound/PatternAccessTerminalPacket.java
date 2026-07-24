@@ -17,6 +17,8 @@ import java.io.IOException;
 public class PatternAccessTerminalPacket extends ClientboundPacket {
     private static final int MAX_SLOT_UPDATES = 4096;
     private static final int MAX_INVENTORY_SIZE = 4096;
+    private static final int MAX_PROVIDER_LABEL_LENGTH = 4096;
+    private static final int MAX_PROVIDER_SEARCH_TEXT_LENGTH = 4096;
 
     private boolean fullUpdate;
     private long inventoryId;
@@ -24,7 +26,10 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
     private long sortBy;
     private boolean canEditTerminalName;
     private boolean canModifyTerminalVisibility;
+    private boolean acceptsProcessingPatterns;
     private PatternContainerGroup group;
+    private String providerLabel = "";
+    private String providerSearchText = "";
     private Int2ObjectMap<ItemStack> slots = new Int2ObjectOpenHashMap<>();
 
     public PatternAccessTerminalPacket() {
@@ -32,7 +37,8 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
 
     private PatternAccessTerminalPacket(boolean fullUpdate, long inventoryId, int inventorySize, long sortBy,
                                         boolean canEditTerminalName, boolean canModifyTerminalVisibility,
-                                        PatternContainerGroup group,
+                                        boolean acceptsProcessingPatterns, PatternContainerGroup group,
+                                        String providerLabel, String providerSearchText,
                                         Int2ObjectMap<ItemStack> slots) {
         this.fullUpdate = fullUpdate;
         this.inventoryId = inventoryId;
@@ -40,20 +46,25 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
         this.sortBy = sortBy;
         this.canEditTerminalName = canEditTerminalName;
         this.canModifyTerminalVisibility = canModifyTerminalVisibility;
+        this.acceptsProcessingPatterns = acceptsProcessingPatterns;
         this.group = group;
+        this.providerLabel = requireProviderText("providerLabel", providerLabel, MAX_PROVIDER_LABEL_LENGTH);
+        this.providerSearchText = requireProviderText("providerSearchText", providerSearchText,
+            MAX_PROVIDER_SEARCH_TEXT_LENGTH);
         this.slots = slots;
     }
 
     public static PatternAccessTerminalPacket fullUpdate(long inventoryId, int inventorySize, long sortBy,
                                                          boolean canEditTerminalName, boolean canModifyTerminalVisibility,
-                                                         PatternContainerGroup group,
+                                                         boolean acceptsProcessingPatterns, PatternContainerGroup group,
+                                                         String providerLabel, String providerSearchText,
                                                          Int2ObjectMap<ItemStack> slots) {
         return new PatternAccessTerminalPacket(true, inventoryId, inventorySize, sortBy, canEditTerminalName,
-            canModifyTerminalVisibility, group, slots);
+            canModifyTerminalVisibility, acceptsProcessingPatterns, group, providerLabel, providerSearchText, slots);
     }
 
     public static PatternAccessTerminalPacket incrementalUpdate(long inventoryId, Int2ObjectMap<ItemStack> slots) {
-        return new PatternAccessTerminalPacket(false, inventoryId, 0, 0, false, false, null, slots);
+        return new PatternAccessTerminalPacket(false, inventoryId, 0, 0, false, false, false, null, "", "", slots);
     }
 
     @Override
@@ -70,7 +81,10 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
             this.sortBy = packetBuffer.readVarLong();
             this.canEditTerminalName = packetBuffer.readBoolean();
             this.canModifyTerminalVisibility = packetBuffer.readBoolean();
+            this.acceptsProcessingPatterns = packetBuffer.readBoolean();
             this.group = PatternContainerGroup.readFromPacket(packetBuffer);
+            this.providerLabel = packetBuffer.readString(MAX_PROVIDER_LABEL_LENGTH);
+            this.providerSearchText = packetBuffer.readString(MAX_PROVIDER_SEARCH_TEXT_LENGTH);
         }
 
         var slotCount = packetBuffer.readVarInt();
@@ -101,7 +115,12 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
             packetBuffer.writeVarLong(this.sortBy);
             packetBuffer.writeBoolean(this.canEditTerminalName);
             packetBuffer.writeBoolean(this.canModifyTerminalVisibility);
+            packetBuffer.writeBoolean(this.acceptsProcessingPatterns);
             this.group.writeToPacket(packetBuffer);
+            packetBuffer.writeString(requireProviderText("providerLabel", this.providerLabel,
+                MAX_PROVIDER_LABEL_LENGTH));
+            packetBuffer.writeString(requireProviderText("providerSearchText", this.providerSearchText,
+                MAX_PROVIDER_SEARCH_TEXT_LENGTH));
         }
 
         packetBuffer.writeVarInt(this.slots.size());
@@ -117,11 +136,21 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
         if (minecraft.currentScreen instanceof IPatternProviderDisplay display) {
             if (this.fullUpdate) {
                 display.postFullUpdate(this.inventoryId, this.sortBy, this.canEditTerminalName,
-                    this.canModifyTerminalVisibility,
-                    this.group, this.inventorySize, this.slots);
+                    this.canModifyTerminalVisibility, this.acceptsProcessingPatterns,
+                    this.group, this.providerLabel, this.providerSearchText, this.inventorySize, this.slots);
             } else {
                 display.postIncrementalUpdate(this.inventoryId, this.slots);
             }
         }
+    }
+
+    private static String requireProviderText(String fieldName, String value, int maxLength) {
+        if (value == null) {
+            throw new IllegalArgumentException(fieldName + " must not be null");
+        }
+        if (value.length() > maxLength) {
+            throw new IllegalArgumentException(fieldName + " exceeds " + maxLength + " characters");
+        }
+        return value;
     }
 }

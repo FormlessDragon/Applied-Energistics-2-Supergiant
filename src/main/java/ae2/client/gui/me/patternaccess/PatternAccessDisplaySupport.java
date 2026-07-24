@@ -107,8 +107,9 @@ final class PatternAccessDisplaySupport {
      * @return true when the update was accepted and the row list should be rebuilt
      */
     public boolean postFullUpdate(long inventoryId, long sortBy, boolean canEditTerminalName,
-                                  boolean canModifyTerminalVisibility, @Nullable PatternContainerGroup group,
-                                  int inventorySize, Int2ObjectMap<ItemStack> slots) {
+                                  boolean canModifyTerminalVisibility, boolean acceptsProcessingPatterns,
+                                  @Nullable PatternContainerGroup group, String providerLabel,
+                                  String providerSearchText, int inventorySize, Int2ObjectMap<ItemStack> slots) {
         if (group == null) {
             AELog.warn("Ignoring %s full update without a provider group for inventory id %d", this.logName,
                 inventoryId);
@@ -116,7 +117,8 @@ final class PatternAccessDisplaySupport {
         }
 
         PatternContainerEntry entry = new PatternContainerEntry(inventoryId, inventorySize, sortBy,
-            canEditTerminalName, canModifyTerminalVisibility, group);
+            acceptsProcessingPatterns, canEditTerminalName, canModifyTerminalVisibility, group, providerLabel,
+            providerSearchText);
         this.byId.put(inventoryId, entry);
         applySlotUpdates(entry.getInventory(), slots);
         this.patternSearchText.clear();
@@ -186,6 +188,12 @@ final class PatternAccessDisplaySupport {
 
     public ObjectList<Row> rows() {
         return this.rows;
+    }
+
+    public ObjectList<PatternContainerEntry> getProviderEntries() {
+        ObjectArrayList<PatternContainerEntry> entries = new ObjectArrayList<>(this.byId.values());
+        entries.sort(null);
+        return entries;
     }
 
     public Collection<PatternContainerEntry> getGroupEntries(PatternContainerGroup group) {

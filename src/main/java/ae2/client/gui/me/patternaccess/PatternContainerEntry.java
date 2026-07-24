@@ -19,10 +19,11 @@
 package ae2.client.gui.me.patternaccess;
 
 import ae2.api.implementations.blockentities.PatternContainerGroup;
-import ae2.container.implementations.ContainerPatternAccessTerm;
+import ae2.container.me.patternaccess.ContainerPatternAccessTerm;
 import ae2.util.inv.AppEngInternalInventory;
 
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * This class is used on the client-side to represent a pattern provider and its inventory as it is shown in the
@@ -33,22 +34,45 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
 
     private final PatternContainerGroup group;
     private final String searchName;
+    private final String providerLabel;
+    private final String providerSearchText;
     private final long serverId;
     private final AppEngInternalInventory inventory;
     private final long order;
+    private final boolean acceptsProcessingPatterns;
     private final boolean editableTerminalName;
     private final boolean terminalVisibilityModifiable;
 
-    public PatternContainerEntry(long serverId, int slots, long order, boolean editableTerminalName,
-                                 boolean terminalVisibilityModifiable,
+    public PatternContainerEntry(long serverId, int slots, long order, boolean acceptsProcessingPatterns,
+                                 boolean editableTerminalName, boolean terminalVisibilityModifiable,
                                  PatternContainerGroup group) {
+        this(serverId, slots, order, acceptsProcessingPatterns, editableTerminalName, terminalVisibilityModifiable,
+            group, defaultProviderLabel(group, slots), defaultProviderSearchText(group, slots));
+    }
+
+    public PatternContainerEntry(long serverId, int slots, long order, boolean acceptsProcessingPatterns,
+                                 boolean editableTerminalName, boolean terminalVisibilityModifiable,
+                                 PatternContainerGroup group, String providerLabel, String providerSearchText) {
         this.inventory = new AppEngInternalInventory(Math.clamp(slots, 0, MAX_INVENTORY_SIZE));
         this.group = group;
         this.searchName = group.name().getFormattedText().toLowerCase(Locale.ROOT);
+        this.providerLabel = Objects.requireNonNull(providerLabel, "providerLabel");
+        this.providerSearchText = Objects.requireNonNull(providerSearchText, "providerSearchText")
+            .toLowerCase(Locale.ROOT);
         this.serverId = serverId;
         this.order = order;
+        this.acceptsProcessingPatterns = acceptsProcessingPatterns;
         this.editableTerminalName = editableTerminalName;
         this.terminalVisibilityModifiable = terminalVisibilityModifiable;
+    }
+
+    private static String defaultProviderLabel(PatternContainerGroup group, int slots) {
+        return group.name().getFormattedText() + " (" + Math.clamp(slots, 0, MAX_INVENTORY_SIZE) + ")";
+    }
+
+    private static String defaultProviderSearchText(PatternContainerGroup group, int slots) {
+        String providerName = group.name().getFormattedText();
+        return defaultProviderLabel(group, slots) + "\n" + providerName;
     }
 
     public PatternContainerGroup getGroup() {
@@ -57,6 +81,14 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
 
     public String getSearchName() {
         return searchName;
+    }
+
+    public String getProviderLabel() {
+        return this.providerLabel;
+    }
+
+    public String getProviderSearchText() {
+        return this.providerSearchText;
     }
 
     @Override
@@ -70,6 +102,10 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
 
     public AppEngInternalInventory getInventory() {
         return inventory;
+    }
+
+    public boolean acceptsProcessingPatterns() {
+        return this.acceptsProcessingPatterns;
     }
 
     public boolean canEditTerminalName() {

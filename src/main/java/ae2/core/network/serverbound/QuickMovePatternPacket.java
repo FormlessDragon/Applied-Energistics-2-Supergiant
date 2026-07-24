@@ -1,6 +1,6 @@
 package ae2.core.network.serverbound;
 
-import ae2.container.implementations.IPatternAccess;
+import ae2.container.me.patternaccess.IPatternAccess;
 import ae2.core.network.ServerboundPacket;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.longs.LongArrayList;

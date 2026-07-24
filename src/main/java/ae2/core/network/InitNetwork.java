@@ -30,6 +30,8 @@ import ae2.core.network.clientbound.OpenGuiPacket;
 import ae2.core.network.clientbound.PatternAccessTerminalInfoPacket;
 import ae2.core.network.clientbound.PatternAccessTerminalPacket;
 import ae2.core.network.clientbound.ProfileDataUpdatePacket;
+import ae2.core.network.clientbound.ProviderDirectoryPagePacket;
+import ae2.core.network.clientbound.ProviderMappingPagePacket;
 import ae2.core.network.clientbound.RecursiveIngredientReserveAmountPacket;
 import ae2.core.network.clientbound.RequesterSyncPacket;
 import ae2.core.network.clientbound.RestorePreviousGuiPacket;
@@ -75,6 +77,8 @@ import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import net.minecraftforge.fml.relauncher.Side;
 
 public final class InitNetwork {
+
+    private static final int REMOVED_PROVIDER_MAPPING_PAGE_PACKET_ID = 66;
 
     public static final SimpleNetworkWrapper CHANNEL = NetworkRegistry.INSTANCE.newSimpleChannel(Tags.MOD_ID);
 
@@ -154,6 +158,13 @@ public final class InitNetwork {
         registerServerbound(AppEngPayloadHandler.Server.class, TickConfigSavePacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, TickProfilerRequestPacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, ConfigValueServerPacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, ProviderDirectoryPagePacket.class);
+        if (nextPacketId != REMOVED_PROVIDER_MAPPING_PAGE_PACKET_ID) {
+            throw new IllegalStateException("Provider mapping page packet tombstone moved from discriminator "
+                + REMOVED_PROVIDER_MAPPING_PAGE_PACKET_ID + " to " + nextPacketId);
+        }
+        nextPacketId++;
+        registerClientbound(AppEngPayloadHandler.Client.class, ProviderMappingPagePacket.class);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
