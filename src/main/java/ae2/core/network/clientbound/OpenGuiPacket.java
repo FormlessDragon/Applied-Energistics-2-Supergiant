@@ -27,7 +27,6 @@ import ae2.client.gui.implementations.GuiOutputSides;
 import ae2.client.gui.implementations.GuiPortableCellPickupFilter;
 import ae2.client.gui.implementations.GuiPriority;
 import ae2.client.gui.implementations.GuiPriorityTuner;
-import ae2.client.gui.implementations.GuiProviderSelect;
 import ae2.client.gui.implementations.GuiWirelessMagnet;
 import ae2.client.gui.implementations.GuiWorkInterval;
 import ae2.client.gui.me.crafting.GuiCraftAmount;
@@ -45,7 +44,6 @@ import ae2.container.implementations.ContainerOutputSides;
 import ae2.container.implementations.ContainerPortableCellPickupFilter;
 import ae2.container.implementations.ContainerPriority;
 import ae2.container.implementations.ContainerPriorityTuner;
-import ae2.container.implementations.ContainerProviderSelect;
 import ae2.container.implementations.ContainerSetStockAmount;
 import ae2.container.implementations.ContainerWirelessMagnet;
 import ae2.container.implementations.ContainerWorkInterval;
@@ -55,7 +53,6 @@ import ae2.core.gui.locator.GuiHostLocators;
 import ae2.core.network.ClientboundPacket;
 import ae2.helpers.ICellWorkbenchHost;
 import ae2.helpers.IOutputSideConfigHost;
-import ae2.helpers.IPatternTerminalGuiHost;
 import ae2.helpers.IPriorityHost;
 import ae2.helpers.IWorkIntervalHost;
 import ae2.helpers.InterfaceLogicHost;
@@ -143,9 +140,6 @@ public class OpenGuiPacket extends ClientboundPacket {
         }
         if (guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
             return ICellWorkbenchHost.class;
-        }
-        if (guiKey == GuiIds.GuiKey.PROVIDER_SELECT) {
-            return IPatternTerminalGuiHost.class;
         }
         return null;
     }
@@ -309,9 +303,6 @@ public class OpenGuiPacket extends ClientboundPacket {
         if (this.guiKey == GuiIds.GuiKey.CELL_RESTRICTION && host instanceof ICellWorkbenchHost cellWorkbench) {
             return new ContainerCellRestriction(inventory, cellWorkbench);
         }
-        if (this.guiKey == GuiIds.GuiKey.PROVIDER_SELECT && host instanceof IPatternTerminalGuiHost patternTerm) {
-            return new ContainerProviderSelect(inventory, patternTerm);
-        }
         return null;
     }
 
@@ -361,10 +352,6 @@ public class OpenGuiPacket extends ClientboundPacket {
         if (this.guiKey == GuiIds.GuiKey.CELL_RESTRICTION) {
             return new GuiCellRestriction((ContainerCellRestriction) container, inventory,
                 GuiStyleManager.loadStyleDoc("/screens/cell_restriction.json"));
-        }
-        if (this.guiKey == GuiIds.GuiKey.PROVIDER_SELECT) {
-            return new GuiProviderSelect((ContainerProviderSelect) container, inventory,
-                GuiStyleManager.loadStyleDoc("/screens/provider_select.json"));
         }
         return null;
     }

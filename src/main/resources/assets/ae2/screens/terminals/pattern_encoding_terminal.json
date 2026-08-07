@@ -88,6 +88,12 @@
       "width": 8,
       "height": 8
     },
+    "providerSelectOverlay": {
+      "left": 0,
+      "top": 0,
+      "width": 0,
+      "height": 0
+    },
     "patternModifierPanel": {
       "left": -126,
       "top": 59,

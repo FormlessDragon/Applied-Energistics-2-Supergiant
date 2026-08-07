@@ -918,11 +918,11 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
         suppressLockedOffhandSwapKey(keyCode);
-        if (shouldReturnToPreviousGui(keyCode)) {
-            AESubGui.goBack();
+        if (widgets.onKeyTyped(typedChar, keyCode)) {
             return;
         }
-        if (widgets.onKeyTyped(typedChar, keyCode)) {
+        if (shouldReturnToPreviousGui(keyCode)) {
+            AESubGui.goBack();
             return;
         }
         super.keyTyped(typedChar, keyCode);

@@ -31,6 +31,8 @@ import ae2.core.network.clientbound.PatternAccessTerminalChunkPacket;
 import ae2.core.network.clientbound.PatternAccessTerminalInfoPacket;
 import ae2.core.network.clientbound.PatternAccessTerminalPacket;
 import ae2.core.network.clientbound.ProfileDataUpdatePacket;
+import ae2.core.network.clientbound.ProviderDirectoryPagePacket;
+import ae2.core.network.clientbound.ProviderMappingPagePacket;
 import ae2.core.network.clientbound.RecursiveIngredientReserveAmountPacket;
 import ae2.core.network.clientbound.RequesterSyncPacket;
 import ae2.core.network.clientbound.RestorePreviousGuiPacket;
@@ -156,6 +158,8 @@ public final class InitNetwork {
         registerServerbound(AppEngPayloadHandler.Server.class, TickConfigSavePacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, TickProfilerRequestPacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, ConfigValueServerPacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, ProviderDirectoryPagePacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, ProviderMappingPagePacket.class);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

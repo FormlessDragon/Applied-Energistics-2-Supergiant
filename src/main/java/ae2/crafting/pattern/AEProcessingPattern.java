@@ -55,9 +55,7 @@ public class AEProcessingPattern implements IPatternDetails {
             throw new IllegalArgumentException("At least one output must be present.");
         }
         Objects.requireNonNull(this.sparseOutputs.getFirst(), "The first (primary) output must be non-null.");
-        this.recipeTypeUid = encodedPattern.hasKey(TAG_RECIPE_TYPE_UID, 8)
-            ? encodedPattern.getString(TAG_RECIPE_TYPE_UID)
-            : null;
+        this.recipeTypeUid = readRecipeTypeUid(encodedPattern);
         var condensedInputs = AEPatternHelper.condenseStacks(sparseInputs);
         this.inputs = new Input[condensedInputs.size()];
         for (int i = 0; i < inputs.length; ++i) {
@@ -111,7 +109,7 @@ public class AEProcessingPattern implements IPatternDetails {
                     tooltip.addOutput(output);
                 }
             }
-            addRecipeTypeProperty(tooltip, tag.hasKey(TAG_RECIPE_TYPE_UID, 8) ? tag.getString(TAG_RECIPE_TYPE_UID) : null);
+            addRecipeTypeProperty(tooltip, readRecipeTypeUid(tag));
         }
         return tooltip;
     }
@@ -125,6 +123,18 @@ public class AEProcessingPattern implements IPatternDetails {
         if (title != null && !title.isEmpty()) {
             tooltip.addProperty(GuiText.RecipeType.text(), new TextComponentString(title));
         }
+    }
+
+    @Nullable
+    private static String readRecipeTypeUid(NBTTagCompound encodedPattern) {
+        if (!encodedPattern.hasKey(TAG_RECIPE_TYPE_UID)) {
+            return null;
+        }
+        if (!encodedPattern.hasKey(TAG_RECIPE_TYPE_UID, Constants.NBT.TAG_STRING)) {
+            return null;
+        }
+
+        return encodedPattern.getString(TAG_RECIPE_TYPE_UID);
     }
 
     @Nullable
@@ -214,6 +224,11 @@ public class AEProcessingPattern implements IPatternDetails {
     @Nullable
     public String getRecipeType() {
         return Integrations.hei().getRecipeCategoryTitle(recipeTypeUid);
+    }
+
+    @Nullable
+    public String getRecipeTypeUid() {
+        return this.recipeTypeUid;
     }
 
     public List<GenericStack> getSparseInputs() {

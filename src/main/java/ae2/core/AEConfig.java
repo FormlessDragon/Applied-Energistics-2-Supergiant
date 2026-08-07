@@ -233,6 +233,10 @@ public class AEConfig {
         return Math.max(0, AUTOMATION.patternProviderExpansionCardLimit);
     }
 
+    public int getPatternProviderMappingLimit() {
+        return Math.clamp(AUTOMATION.patternProviderMappingLimit, 0, 32);
+    }
+
     public int getMolecularAssemblerPatternExpansionCardLimit() {
         return Math.max(0, AUTOMATION.molecularAssemblerPatternExpansionCardLimit);
     }
@@ -716,6 +720,11 @@ public class AEConfig {
         @Config.RequiresWorldRestart
         @Config.RequiresMcRestart
         public int patternProviderExpansionCardLimit = 3;
+
+        @Config.Name("PatternProviderMappingLimit")
+        @Config.Comment("Maximum number of recipe mappings per Pattern Provider. Set to 0 to disable mapping.")
+        @Config.RangeInt(min = 0, max = 32)
+        public int patternProviderMappingLimit = 8;
 
         @Config.Name("MolecularAssemblerPatternExpansionCardLimit")
         @Config.Comment("Maximum number of Pattern Expansion Cards that can be installed in one Molecular Assembler.")

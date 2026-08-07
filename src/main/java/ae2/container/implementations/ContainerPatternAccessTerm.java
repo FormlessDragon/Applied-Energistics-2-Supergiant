@@ -28,6 +28,7 @@ import ae2.container.AEBaseContainer;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
 import ae2.container.guisync.ILinkStatusAwareContainer;
+import ae2.container.implementations.PatternModifierPanel;
 import ae2.container.slot.RestrictedInputSlot;
 import ae2.core.network.clientbound.SetLinkStatusPacket;
 import ae2.helpers.InventoryAction;
@@ -172,6 +173,9 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
 
     @Nullable
     private IGrid getGrid() {
+        if (!this.host.getLinkStatus().connected()) {
+            return null;
+        }
         IGridNode node = this.host.getGridNode();
         if (node != null && node.isActive()) {
             return node.grid();
