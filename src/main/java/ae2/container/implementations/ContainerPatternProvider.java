@@ -17,6 +17,7 @@ import ae2.api.util.IConfigurableObject;
 import ae2.container.AEBaseContainer;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
+import ae2.container.me.patternaccess.ContainerPatternAccessTerm;
 import ae2.container.slot.AppEngSlot;
 import ae2.container.slot.RestrictedInputSlot;
 import ae2.helpers.patternprovider.PatternProviderCapacity;

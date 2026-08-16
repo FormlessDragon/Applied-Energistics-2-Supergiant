@@ -19,7 +19,7 @@
 package ae2.client.gui.me.patternaccess;
 
 import ae2.client.gui.style.GuiStyle;
-import ae2.container.implementations.ContainerPatternAccessTerm;
+import ae2.container.me.patternaccess.ContainerPatternAccessTerm;
 import ae2.core.AppEng;
 import ae2.core.localization.GuiText;
 import net.minecraft.entity.player.InventoryPlayer;

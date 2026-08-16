@@ -1,4 +1,4 @@
-package ae2.container.me.items;
+package ae2.container.me.patternencode;
 
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
@@ -7,6 +7,7 @@ import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGrid;
+import ae2.api.networking.IGridNode;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
@@ -15,8 +16,9 @@ import ae2.api.storage.StorageHelper;
 import ae2.container.GuiIds;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
-import ae2.container.implementations.ContainerProviderSelect;
 import ae2.container.implementations.PatternModifierPanel;
+import ae2.container.me.patternencode.PatternProviderUploadService.ProcessingPatternUploadPreparation;
+import ae2.container.me.patternencode.PatternProviderUploadService.ProcessingPatternUploadResult;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.slot.FakeSlot;
 import ae2.container.slot.PatternTermSlot;
@@ -24,11 +26,15 @@ import ae2.container.slot.RestrictedInputSlot;
 import ae2.container.slot.SlotBackgroundIcon;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.PlayerMessages;
-import ae2.core.network.serverbound.SwitchGuisPacket;
+import ae2.core.network.NetworkPacketHelper;
+import ae2.core.network.clientbound.ProviderDirectoryPagePacket;
+import ae2.core.network.clientbound.ProviderMappingPagePacket;
+import ae2.core.worlddata.PatternProviderMappingData;
 import ae2.crafting.pattern.AECraftingPattern;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.helpers.IPatternTerminalGuiHost;
 import ae2.helpers.patternprovider.PatternContainer;
+import ae2.me.service.ActivePatternProviderDirectory.ProviderKey;
 import ae2.parts.encoding.EncodingMode;
 import ae2.parts.encoding.PatternEncodingLogic;
 import ae2.parts.encoding.ProcessingPatternAmountHelper;
@@ -41,7 +47,6 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.shorts.ShortSet;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.InventoryCrafting;
@@ -58,8 +63,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
-public class ContainerPatternEncodingTerm extends ContainerMEStorage implements PatternModifierPanel.Host {
+public class ContainerPatternEncodingTerm extends ContainerMEStorage
+    implements PatternModifierPanel.Host, IProviderSelectionEndpoint {
     private static final int CRAFTING_GRID_WIDTH = 3;
     private static final int CRAFTING_GRID_HEIGHT = 3;
     private static final int CRAFTING_GRID_SLOTS = CRAFTING_GRID_WIDTH * CRAFTING_GRID_HEIGHT;
@@ -82,10 +89,23 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     private static final String ACTION_SET_HEI_PROCESSING_RECIPE = "setHeiProcessingRecipe";
     private static final String ACTION_UPLOAD_PATTERN = "uploadPattern";
     private static final String ACTION_SET_PATTERN_MODIFIER_PANEL_VISIBLE = "setPatternModifierPanelVisible";
+    private static final String ACTION_UPLOAD_PROCESSING_PATTERN_TO_PROVIDER = "uploadProcessingPatternToProvider";
+    private static final String ACTION_BIND_PROVIDER_MAPPING = "bindProviderMapping";
+    private static final String ACTION_BIND_AND_UPLOAD_PROVIDER_MAPPING = "bindAndUploadProviderMapping";
+    private static final String ACTION_UNBIND_PROVIDER_MAPPING = "unbindProviderMapping";
+    private static final String ACTION_REQUEST_PROVIDER_DIRECTORY_PAGE = "requestProviderDirectoryPage";
+    private static final String ACTION_REQUEST_PROVIDER_MAPPING_PAGE = "requestProviderMappingPage";
+    private static final String ACTION_REBUILD_MAPPINGS_FROM_ACTIVE_PROVIDERS = "rebuildMappingsFromActiveProviders";
     private static final int MAX_RENAME_PROCESSING_PATTERN_ITEM_PAYLOAD_LENGTH = 512;
     private static final int MAX_SET_HEI_PROCESSING_RECIPE_PAYLOAD_LENGTH = 16384;
+    static final int MAX_PROVIDER_MAPPING_ACTION_PAYLOAD_LENGTH = MAX_SET_HEI_PROCESSING_RECIPE_PAYLOAD_LENGTH;
+    // Fixed JSON syntax, field names and the longest decimal forms in a valid focused request.
+    private static final int MAX_PROVIDER_DIRECTORY_PAGE_REQUEST_FIXED_JSON_LENGTH = 158;
+    private static final int MAX_PROVIDER_DIRECTORY_PAGE_REQUEST_PAYLOAD_LENGTH =
+        MAX_PROVIDER_DIRECTORY_PAGE_REQUEST_FIXED_JSON_LENGTH
+            + ProviderPageLimits.MAX_QUERY_UTF16_LENGTH * 6;
+    private static final int MAX_PROVIDER_MAPPING_PAGE_REQUEST_PAYLOAD_LENGTH = 128;
     private static final int MAX_CUSTOM_NAME_LENGTH = 32;
-    private static final int MAX_HEI_PROCESSING_RECIPE_TYPE_UID_LENGTH = 256;
     private static final int MAX_HEI_PROCESSING_RECIPE_INPUT_SLOTS = AEProcessingPattern.MAX_INPUT_SLOTS;
     private static final int MAX_HEI_PROCESSING_RECIPE_CANDIDATES_PER_SLOT = 256;
     private static final int MAX_HEI_PROCESSING_RECIPE_TOTAL_CANDIDATES =
@@ -109,6 +129,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     private final ConfigInventory encodedInputsInv;
     private final ConfigInventory encodedOutputsInv;
     private final PatternModifierPanel patternModifierPanel;
+    private final ProviderSelectionSession providerSelectionSession;
     private boolean patternModifierPanelVisible;
     @GuiSync(97)
     public EncodingMode mode;
@@ -122,10 +143,19 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     public boolean patternModifierPanelAvailable;
     @GuiSync(92)
     public long networkBlankPatternCount;
+    @GuiSync(86)
+    private long providerDirectoryRevision;
+    @GuiSync(85)
+    private int providerSelectionOverlayRequestNonce;
+    @GuiSync(84)
+    private String providerSelectionOverlaySearchText = "";
+    @GuiSync(83)
+    private String providerSelectionOverlayMappingText = "";
     @Nullable
     private IRecipe currentRecipe;
     @Nullable
     private HeiProcessingRecipeSnapshot heiProcessingRecipeSnapshot;
+    private boolean changingEncodedPatternSlotInternally;
     private boolean clearOnClose;
 
     public ContainerPatternEncodingTerm(InventoryPlayer ip, IPatternTerminalGuiHost host) {
@@ -134,6 +164,11 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
 
     public ContainerPatternEncodingTerm(GuiIds.GuiKey guiKey, InventoryPlayer ip, IPatternTerminalGuiHost host,
                                         boolean bindInventory) {
+        this(guiKey, ip, host, bindInventory, true);
+    }
+
+    protected ContainerPatternEncodingTerm(GuiIds.GuiKey guiKey, InventoryPlayer ip, IPatternTerminalGuiHost host,
+                                           boolean bindInventory, boolean registerProviderSelectionActions) {
         super(guiKey, ip, host, bindInventory);
         this.encodingLogic = host.getLogic();
         this.encodedInputsInv = this.encodingLogic.getEncodedInputInv();
@@ -167,6 +202,91 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         this.addSlot(this.encodedPatternSlot = new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.ENCODED_PATTERN,
             this.encodingLogic.getEncodedPatternInv(), 0), SlotSemantics.ENCODED_PATTERN);
         this.encodedPatternSlot.setStackLimit(1);
+        this.providerSelectionSession = new ProviderSelectionSession(new ProviderSelectionSession.Host() {
+            @Override
+            public boolean isLinkConnected() {
+                return ContainerPatternEncodingTerm.this.getHost().getLinkStatus().connected();
+            }
+
+            @Override
+            public IGrid getProviderSelectionGrid() {
+                return ContainerPatternEncodingTerm.this.getProviderSelectionGrid();
+            }
+
+            @Override
+            public IGrid requireProviderSelectionGrid() {
+                return ContainerPatternEncodingTerm.this.requireProviderSelectionGrid();
+            }
+
+            @Override
+            public PatternProviderMappingData getProviderMappingData() {
+                return ContainerPatternEncodingTerm.this.getPatternProviderMappingData();
+            }
+
+            @Override
+            public EntityPlayer getPlayer() {
+                return ContainerPatternEncodingTerm.this.getPlayer();
+            }
+
+            @Override
+            public World getWorld() {
+                return ContainerPatternEncodingTerm.this.getPlayer().world;
+            }
+
+            @Override
+            public int getWindowId() {
+                return ContainerPatternEncodingTerm.this.windowId;
+            }
+
+            @Override
+            public ItemStack getEncodedPattern() {
+                return ContainerPatternEncodingTerm.this.encodedPatternSlot.getStack().copy();
+            }
+
+            @Override
+            public void setEncodedPattern(ItemStack encodedPattern) {
+                ContainerPatternEncodingTerm.this.putEncodedPatternStackFromContainer(encodedPattern);
+            }
+
+            @Override
+            public ProcessingPatternUploadResult uploadProcessingPattern(ItemStack encodedPattern, IGrid grid,
+                                                                          ProviderKey target) {
+                return PatternProviderUploadService.tryUploadProcessingPatternToProvider(
+                    ContainerPatternEncodingTerm.this.getPlayer(),
+                    (IPatternTerminalGuiHost) ContainerPatternEncodingTerm.this.getHost(), grid, target, encodedPattern);
+            }
+
+            @Override
+            public ProcessingPatternUploadPreparation prepareProcessingPatternUpload(ItemStack encodedPattern,
+                                                                                      IGrid grid,
+                                                                                      ProviderKey target) {
+                return PatternProviderUploadService.prepareProcessingPatternUpload(
+                    ContainerPatternEncodingTerm.this.getPlayer(),
+                    (IPatternTerminalGuiHost) ContainerPatternEncodingTerm.this.getHost(), grid, target, encodedPattern);
+            }
+
+            @Override
+            public void sendProviderDirectoryPage(ProviderDirectoryPage page) {
+                ContainerPatternEncodingTerm.this.sendProviderDirectoryPage(page);
+            }
+
+            @Override
+            public void sendProviderMappingPage(ProviderMappingPage page) {
+                ContainerPatternEncodingTerm.this.sendProviderMappingPage(page);
+            }
+
+            @Override
+            public void syncProviderDirectoryRevision(long revision) {
+                ContainerPatternEncodingTerm.this.providerDirectoryRevision = revision;
+            }
+
+            @Override
+            public void syncProviderSelectionOverlay(ProviderSelectionSession.ProviderSelectionOverlayOpenRequest request) {
+                ContainerPatternEncodingTerm.this.providerSelectionOverlayRequestNonce = request.nonce();
+                ContainerPatternEncodingTerm.this.providerSelectionOverlaySearchText = request.searchText();
+                ContainerPatternEncodingTerm.this.providerSelectionOverlayMappingText = request.mappingText();
+            }
+        });
 
         registerClientAction(ACTION_ENCODE, Boolean.class, this::encode);
         registerClientAction(ACTION_CLEAR, this::clear);
@@ -197,6 +317,9 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         registerClientAction(ACTION_UPLOAD_PATTERN, Boolean.class, this::uploadPattern);
         registerClientAction(ACTION_SET_PATTERN_MODIFIER_PANEL_VISIBLE, Boolean.class,
             this::setPatternModifierPanelVisibleFromClient);
+        if (registerProviderSelectionActions) {
+            registerProviderSelectionActions();
+        }
         this.patternModifierPanel = new PatternModifierPanel(this);
         this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
 
@@ -204,6 +327,65 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         getAndUpdateOutput();
 
         tryAutoFillBlankPatterns();
+    }
+
+    private void registerProviderSelectionActions() {
+        registerClientAction(ACTION_UPLOAD_PROCESSING_PATTERN_TO_PROVIDER,
+            ProviderSelectionSession.ProviderEntryAction.class, this::handleProviderEntryUpload);
+        registerClientAction(ACTION_BIND_PROVIDER_MAPPING, ProviderSelectionSession.ProviderMappingAction.class,
+            MAX_PROVIDER_MAPPING_ACTION_PAYLOAD_LENGTH, this::handleProviderMappingBind);
+        registerClientAction(ACTION_BIND_AND_UPLOAD_PROVIDER_MAPPING, ProviderSelectionSession.ProviderMappingAction.class,
+            MAX_PROVIDER_MAPPING_ACTION_PAYLOAD_LENGTH, this::handleProviderMappingBindAndUpload);
+        registerClientAction(ACTION_UNBIND_PROVIDER_MAPPING, ProviderSelectionSession.ProviderMappingAction.class,
+            MAX_PROVIDER_MAPPING_ACTION_PAYLOAD_LENGTH, this::handleProviderMappingUnbind);
+        registerClientAction(ACTION_REQUEST_PROVIDER_DIRECTORY_PAGE, ProviderDirectoryPageRequest.class,
+            MAX_PROVIDER_DIRECTORY_PAGE_REQUEST_PAYLOAD_LENGTH, this::handleProviderDirectoryPageRequest);
+        registerClientAction(ACTION_REQUEST_PROVIDER_MAPPING_PAGE, ProviderMappingPageRequest.class,
+            MAX_PROVIDER_MAPPING_PAGE_REQUEST_PAYLOAD_LENGTH, this::handleProviderMappingPageRequest);
+        registerClientAction(ACTION_REBUILD_MAPPINGS_FROM_ACTIVE_PROVIDERS,
+            this::handleRebuildMappingsFromActiveProviders);
+    }
+
+    private void handleProviderEntryUpload(ProviderSelectionSession.ProviderEntryAction action) {
+        if (isServerSide()) {
+            this.providerSelectionSession.uploadProcessingPatternToProvider(action);
+        }
+    }
+
+    private void handleProviderMappingBind(ProviderSelectionSession.ProviderMappingAction action) {
+        if (isServerSide()) {
+            this.providerSelectionSession.bindProviderMapping(action);
+        }
+    }
+
+    private void handleProviderMappingBindAndUpload(ProviderSelectionSession.ProviderMappingAction action) {
+        if (isServerSide()) {
+            this.providerSelectionSession.bindAndUploadProcessingPatternToProvider(action);
+        }
+    }
+
+    private void handleProviderMappingUnbind(ProviderSelectionSession.ProviderMappingAction action) {
+        if (isServerSide()) {
+            this.providerSelectionSession.unbindProviderMapping(action);
+        }
+    }
+
+    private void handleProviderDirectoryPageRequest(ProviderDirectoryPageRequest request) {
+        if (isServerSide()) {
+            this.providerSelectionSession.requestProviderDirectoryPage(request);
+        }
+    }
+
+    private void handleProviderMappingPageRequest(ProviderMappingPageRequest request) {
+        if (isServerSide()) {
+            this.providerSelectionSession.requestProviderMappingPage(request);
+        }
+    }
+
+    private void handleRebuildMappingsFromActiveProviders() {
+        if (isServerSide()) {
+            this.providerSelectionSession.rebuildMappingsFromActiveProviders();
+        }
     }
 
     private static String actionForProcessingAmountOperation(ProcessingPatternAmountHelper.Operation operation) {
@@ -232,6 +414,9 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
 
     @Override
     public void broadcastChanges() {
+        if (isServerSide()) {
+            this.providerSelectionSession.onBroadcastChanges();
+        }
         super.broadcastChanges();
         if (isServerSide()) {
             this.mode = this.encodingLogic.getMode();
@@ -398,7 +583,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
 
         if (preferModifierAndInventory && insertEncodedPatternIntoModifierOrInventory(encodedPattern.copy())) {
             if (usedOutputPattern) {
-                this.encodedPatternSlot.putStack(ItemStack.EMPTY);
+                putEncodedPatternStackFromContainer(ItemStack.EMPTY);
             }
             return;
         }
@@ -421,7 +606,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     }
 
     private void insertEncodedPatternIntoOutputSlot(ItemStack encodedPattern) {
-        this.encodedPatternSlot.putStack(encodedPattern);
+        putEncodedPatternStackFromContainer(encodedPattern);
     }
 
     public void uploadPattern(boolean shiftDown) {
@@ -430,11 +615,16 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
             return;
         }
 
-        ILinkStatus linkStatus = getLinkStatus();
+        ILinkStatus linkStatus = getHost().getLinkStatus();
         if (!linkStatus.connected()) {
             if (linkStatus.statusDescription() != null) {
                 getPlayer().sendStatusMessage(linkStatus.statusDescription(), false);
             }
+            return;
+        }
+
+        if (this.mode == EncodingMode.PROCESSING && shiftDown) {
+            openProcessingPatternProviderSelection("", getValidHeiProcessingRecipeTypeUid());
             return;
         }
 
@@ -445,7 +635,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         }
 
         IPatternDetails details = PatternDetailsHelper.decodePattern(encodedPattern, getPlayer().world);
-        IGrid grid = getGridNode() == null ? null : getGridNode().grid();
+        IGrid grid = getProviderSelectionGrid();
         if (this.mode == EncodingMode.PROCESSING) {
             if (!(details instanceof AEProcessingPattern processingPattern)) {
                 getPlayer().sendStatusMessage(PlayerMessages.PatternUploadProcessingOnly.text(), false);
@@ -492,7 +682,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
 
             nonDuplicateCandidateFound = true;
             if (movePatternToFirstAvailableSlot(container, encodedPattern.copy())) {
-                this.encodedPatternSlot.putStack(ItemStack.EMPTY);
+                putEncodedPatternStackFromContainer(ItemStack.EMPTY);
                 return;
             }
         }
@@ -507,47 +697,251 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
 
     private void uploadProcessingPattern(ItemStack encodedPattern, AEProcessingPattern processingPattern,
                                          @Nullable IGrid grid) {
-        String recipeType = processingPattern.getRecipeType();
-        if (recipeType == null || recipeType.trim().isEmpty()) {
-            openProviderSelect("", false);
-            return;
-        }
-        recipeType = recipeType.trim();
+        uploadProcessingPattern(encodedPattern, grid, processingPattern.getRecipeTypeUid(),
+            processingPattern.getRecipeType(), new ProcessingPatternUploadActions() {
+                @Override
+                public List<PatternContainer> findProcessingPatternUploadTargets(IGrid grid, String recipeTypeUid) {
+                    return PatternProviderUploadService.findProcessingPatternUploadTargets(
+                        getPatternProviderMappingData(), grid, recipeTypeUid);
+                }
 
-        if (grid == null) {
-            openProviderSelect(recipeType, true);
-            return;
-        }
+                @Override
+                public ProcessingPatternUploadResult uploadProcessingPatternToProvider(ItemStack encodedPattern,
+                                                                                       IGrid grid,
+                                                                                       PatternContainer uploadTarget) {
+                    return ContainerPatternEncodingTerm.this.uploadProcessingPatternToProvider(encodedPattern, grid,
+                        uploadTarget);
+                }
 
-        List<PatternContainer> uploadTargets = ContainerProviderSelect.findProcessingPatternUploadTargets(
-            getPlayer().world, grid, recipeType);
-        if (uploadTargets.isEmpty()) {
-            if (!ContainerProviderSelect.hasAvailableProvider(grid)) {
-                getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
-                return;
-            }
-            openProviderSelect(recipeType, true);
-            return;
-        }
+                @Override
+                public void openProcessingPatternProviderSelection(String initialSearchText, String initialMappingText) {
+                    ContainerPatternEncodingTerm.this.openProcessingPatternProviderSelection(initialSearchText,
+                        initialMappingText);
+                }
 
-        ContainerProviderSelect.tryUploadProcessingPatternToProvider(getPlayer(),
-            (IPatternTerminalGuiHost) getHost(), grid, uploadTargets.getFirst(), encodedPattern);
+                @Override
+                public void sendNoProviderTargetMessage() {
+                    getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
+                }
+            });
     }
 
-    private void openProviderSelect(@Nullable String initialSearchText, boolean mappingMode) {
-        if (!(getPlayer() instanceof EntityPlayerMP serverPlayer) || getLocator() == null) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
+    static void uploadProcessingPattern(ItemStack encodedPattern, @Nullable IGrid grid,
+                                        @Nullable String recipeTypeUid, @Nullable String recipeTypeTitle,
+                                        ProcessingPatternUploadActions actions) {
+        Objects.requireNonNull(actions, "actions");
+        PatternProviderUploadService.UploadPlan uploadPlan =
+            PatternProviderUploadService.getImmediateProcessingPatternUploadPlan(recipeTypeUid, recipeTypeTitle);
+        if (uploadPlan.openProviderSelection()) {
+            actions.openProcessingPatternProviderSelection(uploadPlan.initialSearchText(),
+                uploadPlan.initialMappingText());
             return;
         }
 
-        if (!SwitchGuisPacket.openSubGui(serverPlayer, getLocator(), GuiIds.GuiKey.PROVIDER_SELECT, this)) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
+        String automaticRecipeTypeUid = uploadPlan.recipeTypeUid();
+
+        if (grid == null) {
+            PatternProviderUploadService.UploadPlan fallbackPlan =
+                PatternProviderUploadService.getProcessingPatternFallbackPlan(recipeTypeUid, recipeTypeTitle, true);
+            actions.openProcessingPatternProviderSelection(fallbackPlan.initialSearchText(),
+                fallbackPlan.initialMappingText());
             return;
         }
-        if (serverPlayer.openContainer instanceof ContainerProviderSelect providerSelect) {
-            providerSelect.setInitialState(initialSearchText, mappingMode);
-            providerSelect.broadcastChanges();
+
+        List<PatternContainer> uploadTargets = actions.findProcessingPatternUploadTargets(grid,
+            automaticRecipeTypeUid);
+        if (uploadTargets.isEmpty()) {
+            handleNoProcessingPatternAutomaticTarget(grid, automaticRecipeTypeUid, recipeTypeTitle, actions);
+            return;
         }
+
+        uploadProcessingPatternToProviders(encodedPattern, grid, uploadTargets, automaticRecipeTypeUid,
+            recipeTypeTitle, actions);
+    }
+
+    protected void openProcessingPatternProviderSelection(@Nullable String initialSearchText,
+                                                       @Nullable String initialMappingText) {
+        openProviderSelection(initialSearchText, initialMappingText);
+    }
+
+    private static void handleNoProcessingPatternAutomaticTarget(@Nullable IGrid grid, String recipeTypeUid,
+                                                                 @Nullable String recipeTypeTitle,
+                                                                 ProcessingPatternUploadActions actions) {
+        PatternProviderUploadService.UploadPlan fallbackPlan =
+            PatternProviderUploadService.getProcessingPatternUploadTargetPlan(0, recipeTypeUid, recipeTypeTitle,
+                grid != null && PatternProviderUploadService.hasAvailableProvider(grid));
+        if (!fallbackPlan.openProviderSelection()) {
+            actions.sendNoProviderTargetMessage();
+            return;
+        }
+        actions.openProcessingPatternProviderSelection(fallbackPlan.initialSearchText(),
+            fallbackPlan.initialMappingText());
+    }
+
+    private static void uploadProcessingPatternToProviders(ItemStack encodedPattern, IGrid grid,
+                                                           List<PatternContainer> uploadTargets,
+                                                           String recipeTypeUid,
+                                                           @Nullable String recipeTypeTitle,
+                                                           ProcessingPatternUploadActions actions) {
+        PatternProviderUploadService.UploadPlan uploadPlan =
+            PatternProviderUploadService.getProcessingPatternUploadTargetPlan(uploadTargets.size(), recipeTypeUid,
+                recipeTypeTitle, PatternProviderUploadService.hasAvailableProvider(grid));
+        if (uploadPlan.openProviderSelection()) {
+            actions.openProcessingPatternProviderSelection(uploadPlan.initialSearchText(),
+                uploadPlan.initialMappingText());
+            return;
+        }
+
+        if (uploadTargets.size() != 1) {
+            actions.sendNoProviderTargetMessage();
+            return;
+        }
+
+        ProcessingPatternUploadResult result = actions.uploadProcessingPatternToProvider(encodedPattern, grid,
+            uploadTargets.getFirst());
+        if (result == ProcessingPatternUploadResult.NO_PROVIDER_TARGET
+            && PatternProviderUploadService.hasAvailableProvider(grid)) {
+            PatternProviderUploadService.UploadPlan fallbackPlan =
+                PatternProviderUploadService.getProcessingPatternFallbackPlan(recipeTypeUid, recipeTypeTitle, true);
+            actions.openProcessingPatternProviderSelection(fallbackPlan.initialSearchText(),
+                fallbackPlan.initialMappingText());
+        }
+    }
+
+    protected ProcessingPatternUploadResult uploadProcessingPatternToProvider(ItemStack encodedPattern, IGrid grid,
+                                                                              PatternContainer uploadTarget) {
+        return PatternProviderUploadService.tryUploadProcessingPatternToProvider(getPlayer(),
+            (IPatternTerminalGuiHost) getHost(), grid, uploadTarget, encodedPattern);
+    }
+
+    @Override
+    public void uploadProcessingPatternToProvider(long directoryRevision, long providerEntryId) {
+        ProviderSelectionSession.ProviderEntryAction action =
+            new ProviderSelectionSession.ProviderEntryAction(directoryRevision, providerEntryId);
+        if (isClientSide()) {
+            sendClientAction(ACTION_UPLOAD_PROCESSING_PATTERN_TO_PROVIDER, action);
+            return;
+        }
+        this.providerSelectionSession.uploadProcessingPatternToProvider(action);
+    }
+
+    @Override
+    public void bindProviderMapping(long directoryRevision, long providerEntryId, String mappingText) {
+        ProviderSelectionSession.ProviderMappingAction action =
+            new ProviderSelectionSession.ProviderMappingAction(directoryRevision, providerEntryId, mappingText);
+        if (isClientSide()) {
+            sendClientAction(ACTION_BIND_PROVIDER_MAPPING, action);
+            return;
+        }
+        this.providerSelectionSession.bindProviderMapping(action);
+    }
+
+    @Override
+    public void bindAndUploadProcessingPatternToProvider(long directoryRevision, long providerEntryId,
+                                                          String recipeTypeUid) {
+        ProviderSelectionSession.ProviderMappingAction action =
+            new ProviderSelectionSession.ProviderMappingAction(directoryRevision, providerEntryId, recipeTypeUid);
+        if (isClientSide()) {
+            sendClientAction(ACTION_BIND_AND_UPLOAD_PROVIDER_MAPPING, action);
+            return;
+        }
+        this.providerSelectionSession.bindAndUploadProcessingPatternToProvider(action);
+    }
+
+    @Override
+    public void unbindProviderMapping(long directoryRevision, long providerEntryId) {
+        unbindProviderMapping(directoryRevision, providerEntryId, null);
+    }
+
+    @Override
+    public void unbindProviderMapping(long directoryRevision, long providerEntryId, @Nullable String recipeType) {
+        ProviderSelectionSession.ProviderMappingAction action =
+            new ProviderSelectionSession.ProviderMappingAction(directoryRevision, providerEntryId, recipeType);
+        if (isClientSide()) {
+            sendClientAction(ACTION_UNBIND_PROVIDER_MAPPING, action);
+            return;
+        }
+        this.providerSelectionSession.unbindProviderMapping(action);
+    }
+
+    @Override
+    public void rebuildMappingsFromActiveProviders() {
+        if (isClientSide()) {
+            sendClientAction(ACTION_REBUILD_MAPPINGS_FROM_ACTIVE_PROVIDERS);
+            return;
+        }
+        this.providerSelectionSession.rebuildMappingsFromActiveProviders();
+    }
+
+    @Override
+    public void requestProviderDirectoryPage(long nonce, String query, int page,
+                                             @Nullable ProviderDirectoryPageRequest.Focus focus) {
+        ProviderDirectoryPageRequest request = new ProviderDirectoryPageRequest(nonce, query, page, focus);
+        if (isClientSide()) {
+            sendClientAction(ACTION_REQUEST_PROVIDER_DIRECTORY_PAGE, request);
+            return;
+        }
+        this.providerSelectionSession.requestProviderDirectoryPage(request);
+    }
+
+    @Override
+    public void requestProviderMappingPage(long nonce, long directoryRevision, long providerEntryId, int page) {
+        ProviderMappingPageRequest request =
+            new ProviderMappingPageRequest(nonce, directoryRevision, providerEntryId, page);
+        if (isClientSide()) {
+            sendClientAction(ACTION_REQUEST_PROVIDER_MAPPING_PAGE, request);
+            return;
+        }
+        this.providerSelectionSession.requestProviderMappingPage(request);
+    }
+
+    private void openProviderSelection(@Nullable String initialSearchText, @Nullable String initialMappingText) {
+        if (isClientSide()) {
+            return;
+        }
+
+        this.providerSelectionSession.open(initialSearchText, initialMappingText);
+    }
+
+    @Nullable
+    protected IGrid getProviderSelectionGrid() {
+        if (!getHost().getLinkStatus().connected()) {
+            return null;
+        }
+        IGridNode node = getGridNode();
+        if (node == null || !node.isActive()) {
+            return null;
+        }
+
+        return node.grid();
+    }
+
+    @Nullable
+    private IGrid requireProviderSelectionGrid() {
+        ILinkStatus linkStatus = getHost().getLinkStatus();
+        if (!linkStatus.connected()) {
+            getPlayer().sendStatusMessage(linkStatus.statusDescription() != null
+                ? linkStatus.statusDescription()
+                : PlayerMessages.PatternUploadNoProviderTarget.text(), false);
+            return null;
+        }
+        IGrid grid = getProviderSelectionGrid();
+        if (grid == null) {
+            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
+        }
+        return grid;
+    }
+
+    protected PatternProviderMappingData getPatternProviderMappingData() {
+        return PatternProviderMappingData.get(getPlayer().world);
+    }
+
+    protected void sendProviderDirectoryPage(ProviderDirectoryPage page) {
+        sendPacketToClient(new ProviderDirectoryPagePacket(page));
+    }
+
+    protected void sendProviderMappingPage(ProviderMappingPage page) {
+        sendPacketToClient(new ProviderMappingPagePacket(page));
     }
 
     private List<PatternContainer> collectAssemblerPatternContainers(IGrid grid) {
@@ -593,7 +987,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         }
 
         ItemStack blankPattern = AEItems.BLANK_PATTERN.stack(encodedPattern.getCount());
-        this.encodedPatternSlot.putStack(ItemStack.EMPTY);
+        putEncodedPatternStackFromContainer(ItemStack.EMPTY);
         blankPattern = insertBlankPatternIntoBlankSlot(blankPattern);
         blankPattern = insertBlankPatternIntoPlayerInventory(blankPattern);
         blankPattern = insertBlankPatternIntoNetwork(blankPattern);
@@ -649,10 +1043,6 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         if (drop != null) {
             drop.setNoPickupDelay();
         }
-    }
-
-    public ItemStack getEncodedPatternStack() {
-        return this.encodedPatternSlot.getStack();
     }
 
     private boolean consumeBlankPatternForEncoding() {
@@ -712,7 +1102,20 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     private void clearPattern() {
         ItemStack encodedPattern = this.encodedPatternSlot.getStack();
         if (PatternDetailsHelper.isEncodedPattern(encodedPattern)) {
-            this.encodedPatternSlot.putStack(AEItems.BLANK_PATTERN.stack(encodedPattern.getCount()));
+            putEncodedPatternStackFromContainer(AEItems.BLANK_PATTERN.stack(encodedPattern.getCount()));
+        }
+    }
+
+    private void putEncodedPatternStackFromContainer(ItemStack stack) {
+        Objects.requireNonNull(stack, "stack");
+        if (this.changingEncodedPatternSlotInternally) {
+            throw new IllegalStateException("Nested encoded pattern slot mutation");
+        }
+        this.changingEncodedPatternSlotInternally = true;
+        try {
+            this.encodedPatternSlot.putStack(stack);
+        } finally {
+            this.changingEncodedPatternSlotInternally = false;
         }
     }
 
@@ -813,13 +1216,12 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
     }
 
     @Nullable
-    private static HeiProcessingRecipeSnapshot parseHeiProcessingRecipeSnapshot(@Nullable HeiProcessingRecipeRequest request) {
+    private HeiProcessingRecipeSnapshot parseHeiProcessingRecipeSnapshot(@Nullable HeiProcessingRecipeRequest request) {
         if (request == null || request.recipeTypeUid == null || request.recipeTypeUid.isEmpty()
             || request.inputCandidateKeyTags == null || request.inputCandidateKeyTags.isEmpty()) {
             return null;
         }
-        if (request.recipeTypeUid.length() > MAX_HEI_PROCESSING_RECIPE_TYPE_UID_LENGTH
-            || request.inputCandidateKeyTags.size() > MAX_HEI_PROCESSING_RECIPE_INPUT_SLOTS) {
+        if (request.inputCandidateKeyTags.size() > MAX_HEI_PROCESSING_RECIPE_INPUT_SLOTS) {
             return null;
         }
 
@@ -942,6 +1344,26 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
         return this.networkBlankPatternCount;
     }
 
+    @Override
+    public long getProviderDirectoryRevision() {
+        return this.providerDirectoryRevision;
+    }
+
+    @Override
+    public int getProviderSelectionOverlayRequestNonce() {
+        return this.providerSelectionOverlayRequestNonce;
+    }
+
+    @Override
+    public String getProviderSelectionOverlaySearchText() {
+        return this.providerSelectionOverlaySearchText;
+    }
+
+    @Override
+    public String getProviderSelectionOverlayMappingText() {
+        return this.providerSelectionOverlayMappingText;
+    }
+
     private record PatternSlotFilter(PatternContainer container, World level) implements IAEItemFilter {
 
         @Override
@@ -1035,6 +1457,9 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
 
     public void setHeiProcessingRecipe(String recipeTypeUid, List<List<String>> inputCandidateKeyTags) {
         if (isClientSide()) {
+            if (recipeTypeUid == null || recipeTypeUid.isEmpty()) {
+                return;
+            }
             sendClientAction(ACTION_SET_HEI_PROCESSING_RECIPE,
                 new HeiProcessingRecipeRequest(recipeTypeUid, inputCandidateKeyTags));
         }
@@ -1057,13 +1482,18 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
 
         try {
             return AEKey.fromTagGeneric(JsonToNBT.getTagFromJson(serializedKey));
-        } catch (NBTException | RuntimeException ignored) {
+        } catch (NBTException | RuntimeException e) {
+            NetworkPacketHelper.warnMalformedPacket(e, "hei-processing-recipe-key",
+                "Ignoring malformed HEI processing recipe key");
             return null;
         }
     }
 
     @Override
     public void onContainerClosed(EntityPlayer player) {
+        if (isServerSide()) {
+            this.providerSelectionSession.close();
+        }
         if (isServerSide() && this.clearOnClose) {
             clear();
         }
@@ -1292,6 +1722,17 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage implements 
             this.recipeTypeUid = recipeTypeUid;
             this.inputCandidateKeyTags = inputCandidateKeyTags;
         }
+    }
+
+    interface ProcessingPatternUploadActions {
+        List<PatternContainer> findProcessingPatternUploadTargets(IGrid grid, String recipeTypeUid);
+
+        ProcessingPatternUploadResult uploadProcessingPatternToProvider(ItemStack encodedPattern, IGrid grid,
+                                                                        PatternContainer uploadTarget);
+
+        void openProcessingPatternProviderSelection(String initialSearchText, String initialMappingText);
+
+        void sendNoProviderTargetMessage();
     }
 
     private record HeiProcessingRecipeSnapshot(String recipeTypeUid, List<List<AEKey>> inputCandidatesBySlot) {

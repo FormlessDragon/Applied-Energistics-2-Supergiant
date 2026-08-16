@@ -1,7 +1,7 @@
 package ae2.core.network.clientbound;
 
 import ae2.client.gui.me.patternaccess.IPatternProviderDisplay;
-import ae2.container.implementations.IPatternAccess;
+import ae2.container.me.patternaccess.IPatternAccess;
 import ae2.core.AELog;
 import ae2.core.network.ClientboundPacket;
 import io.netty.buffer.ByteBuf;

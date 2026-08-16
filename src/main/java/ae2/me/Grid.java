@@ -69,6 +69,7 @@ public class Grid implements IGrid {
     @Nullable
     private GridNode pivot;
     private int priority; // how import is this network?
+    private long activeMachineSetRevision;
 
     private Grid(GridNode center) {
         this.pivot = Objects.requireNonNull(center);
@@ -120,6 +121,11 @@ public class Grid implements IGrid {
         return this.machines.size();
     }
 
+    @Override
+    public long getActiveMachineSetRevision() {
+        return this.activeMachineSetRevision;
+    }
+
     void remove(GridNode gridNode) {
         for (var c : services.services().values()) {
             c.removeNode(gridNode);
@@ -127,6 +133,7 @@ public class Grid implements IGrid {
 
         var machineClass = gridNode.getOwner().getClass();
         this.machines.remove(machineClass, gridNode);
+        this.activeMachineSetRevision++;
 
         if (this.pivot == gridNode) {
             var nodesIt = machines.values().iterator();
@@ -144,6 +151,7 @@ public class Grid implements IGrid {
     void add(GridNode gridNode, @Nullable NBTTagCompound savedData) {
         // track node.
         this.machines.put(gridNode.getOwner().getClass(), gridNode);
+        this.activeMachineSetRevision++;
 
         for (var service : services.services().values()) {
             service.addNode(gridNode, savedData);
@@ -277,6 +285,9 @@ public class Grid implements IGrid {
             throw new IllegalStateException("Recursively trying to notify all nodes is not allowed");
         }
 
+        // Power and grid-boot notifications can change the result of IGridNode.isActive().
+        markMachineStateChanged();
+
         try {
             // We're copying the nodes to a temporary buffer here because changing the power state of a node
             // may actually cause adjacent nodes to suddenly boot (i.e. QNBs) and modify the grid while
@@ -284,13 +295,16 @@ public class Grid implements IGrid {
             ITERATION_BUFFER.ensureCapacity(this.machines.size());
             ITERATION_BUFFER.addAll(getNodes());
 
-            for (int i = 0, size = ITERATION_BUFFER.size(); i < size; i++) {
-                IGridNode node = ITERATION_BUFFER.get(i);
+            for (IGridNode node : ITERATION_BUFFER) {
                 ((GridNode) node).notifyStatusChange(state);
             }
         } finally {
             ITERATION_BUFFER.clear();
         }
+    }
+
+    void markMachineStateChanged() {
+        this.activeMachineSetRevision++;
     }
 
     public void fillCrashReportCategory(CrashReportCategory category) {

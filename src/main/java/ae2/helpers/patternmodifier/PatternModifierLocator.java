@@ -33,7 +33,7 @@ public final class PatternModifierLocator {
     }
 
     public static boolean isPatternModifier(ItemStack stack) {
-        return AEItems.PATTERN_MODIFIER.is(stack) && stack.getItem() instanceof PatternModifierItem;
+        return stack.getItem() instanceof PatternModifierItem && AEItems.PATTERN_MODIFIER.is(stack);
     }
 
     public record LocatedPatternModifier(ItemStack stack, ItemGuiHostLocator locator,

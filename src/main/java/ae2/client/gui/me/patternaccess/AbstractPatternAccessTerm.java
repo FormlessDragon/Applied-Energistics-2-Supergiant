@@ -35,7 +35,7 @@ import ae2.client.render.overlay.OverlayHighlightLocation;
 import ae2.client.render.overlay.OverlayHighlightShape;
 import ae2.container.AEBaseContainer;
 import ae2.container.SlotSemantics;
-import ae2.container.implementations.IPatternAccess;
+import ae2.container.me.patternaccess.IPatternAccess;
 import ae2.core.AEConfig;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
@@ -413,6 +413,12 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
             return;
         }
 
+        Point mousePos = new Point(mouseX - this.guiLeft, mouseY - this.guiTop);
+        if (this.widgets.blocksMouseInteraction(mousePos)) {
+            this.widgets.onMouseDown(mousePos, mouseButton);
+            return;
+        }
+
         if (this.activeGroupRenameField != null && this.activeGroupRenameField.getVisible()
             && this.activeGroupRenameField.isMouseOver(mouseX, mouseY)) {
             clearSearchFieldOnRightClick(this.activeGroupRenameField, mouseX, mouseY, mouseButton);
@@ -747,6 +753,10 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
             return;
         }
         if (!this.container.getLinkStatus().connected() && this.getSlotUnderMouse() instanceof GuiPatternSlot) {
+            return;
+        }
+
+        if (isMouseOverTooltipBlockingWidget(mouseX, mouseY)) {
             return;
         }
 

@@ -699,6 +699,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
             this.lastUsedChannels = this.usedChannels;
 
             if (this.getInternalGrid() != null) {
+                this.getInternalGrid().markMachineStateChanged();
                 notifyStatusChange(IGridNodeListener.State.CHANNEL);
             }
         }

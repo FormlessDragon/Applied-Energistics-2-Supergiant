@@ -104,7 +104,7 @@ public final class GuiIds {
         CELL_RESTRICTION,
         RENAMER,
         WORK_INTERVAL,
-        PROVIDER_SELECT,
+        PROVIDER_SELECTION,
         PORTABLE_CELL_PICKUP_FILTER,
         CELL_TERMINAL,
         WIRELESS_CELL_TERMINAL,

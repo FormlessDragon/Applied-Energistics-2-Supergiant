@@ -1,0 +1,70 @@
+{
+  "$schema": "schema.json",
+  "includes": ["common/common.json"],
+  "generatedBackground": {
+    "width": 135,
+    "height": 145
+  },
+  "widgets": {
+    "back": {
+      "left": 111,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "search": {
+      "left": 8,
+      "top": 23,
+      "width": 112,
+      "height": 10
+    },
+    "entry0": {
+      "left": 8,
+      "top": 36,
+      "width": 112,
+      "height": 16
+    },
+    "entry1": {
+      "left": 8,
+      "top": 54,
+      "width": 112,
+      "height": 16
+    },
+    "entry2": {
+      "left": 8,
+      "top": 72,
+      "width": 112,
+      "height": 16
+    },
+    "entry3": {
+      "left": 8,
+      "top": 90,
+      "width": 112,
+      "height": 16
+    },
+    "entry4": {
+      "left": 8,
+      "top": 108,
+      "width": 112,
+      "height": 16
+    },
+    "mapping": {
+      "left": 8,
+      "top": 128,
+      "width": 112,
+      "height": 9
+    },
+    "reload": {
+      "left": 124,
+      "top": 128,
+      "width": 8,
+      "height": 8
+    },
+    "scrollbar": {
+      "left": 124,
+      "top": 36,
+      "width": 7,
+      "height": 88
+    }
+  }
+}

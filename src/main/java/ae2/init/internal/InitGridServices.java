@@ -25,6 +25,7 @@ import ae2.api.networking.pathing.IPathingService;
 import ae2.api.networking.spatial.ISpatialService;
 import ae2.api.networking.storage.IStorageService;
 import ae2.api.networking.ticking.ITickManager;
+import ae2.me.service.ActivePatternProviderDirectory;
 import ae2.me.service.CraftingService;
 import ae2.me.service.EnergyService;
 import ae2.me.service.P2PService;
@@ -48,5 +49,6 @@ public final class InitGridServices {
         GridServices.register(ISpatialService.class, SpatialPylonService.class);
         GridServices.register(ICraftingService.class, CraftingService.class);
         GridServices.register(StatisticsService.class, StatisticsService.class);
+        GridServices.register(ActivePatternProviderDirectory.class, ActivePatternProviderDirectory.class);
     }
 }

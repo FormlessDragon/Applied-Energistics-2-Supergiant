@@ -1,4 +1,4 @@
-package ae2.container.implementations;
+package ae2.container.me.patternencode;
 
 import ae2.api.config.Settings;
 import ae2.api.config.ShowPatternProviders;
@@ -10,8 +10,10 @@ import ae2.api.util.IConfigManager;
 import ae2.container.GuiIds;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
-import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.me.patternaccess.IPatternAccess;
+import ae2.container.me.patternaccess.PatternAccessSession;
 import ae2.helpers.InventoryAction;
+import ae2.helpers.patternprovider.PatternContainer;
 import it.unimi.dsi.fastutil.longs.LongList;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -27,13 +29,14 @@ public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IP
     private static final String ACTION_RENAME_PROVIDER = "renameProvider";
 
     private final IPEATermContainerHost host;
-    private final IConfigManager clientConfigManager = IConfigManager.builder(() -> {})
-                                                                    .registerSetting(Settings.PATTERN_AUTO_FILL, YesNo.NO)
-                                                                    .registerSetting(
-                                                                        Settings.TERMINAL_SHOW_PATTERN_PROVIDERS,
-                                                                        ShowPatternProviders.VISIBLE)
-                                                                    .build();
-    private final PatternAccessSupport<ContainerPEATerm> patternAccessSupport;
+    private final IConfigManager clientConfigManager = IConfigManager.builder(() -> {
+        })
+        .registerSetting(Settings.PATTERN_AUTO_FILL, YesNo.NO)
+        .registerSetting(
+            Settings.TERMINAL_SHOW_PATTERN_PROVIDERS,
+            ShowPatternProviders.VISIBLE)
+        .build();
+    private final PatternAccessSession<ContainerPEATerm> patternAccessSession;
     @GuiSync(91)
     public ShowPatternProviders showPatternProviders = ShowPatternProviders.VISIBLE;
 
@@ -44,13 +47,13 @@ public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IP
     public ContainerPEATerm(GuiIds.GuiKey guiKey, InventoryPlayer ip, IPEATermContainerHost host) {
         super(guiKey, ip, host, true);
         this.host = host;
-        this.patternAccessSupport = new PatternAccessSupport<>(
+        this.patternAccessSession = new PatternAccessSession<>(
             this::getPatternProviderGrid,
             this::getShownProviders,
             () -> getPlayer().world,
             slot -> isPlayerSideSlot(slot) || isEncodedPatternSlot(slot),
             this::sendPacketToClient,
-            new PatternAccessSupport.PlayerHandAccess() {
+            new PatternAccessSession.PlayerHandAccess() {
                 @Override
                 public ItemStack getCarried() {
                     return ContainerPEATerm.this.getCarried();
@@ -64,9 +67,9 @@ public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IP
             this);
         registerClientAction(ACTION_OPEN_PROVIDER, Long.class, this::openPatternProvider);
         registerClientAction(ACTION_TOGGLE_PROVIDER_VISIBILITY, Long.class, this::togglePatternProviderVisibility);
-        registerClientAction(ACTION_RENAME_GROUP, PatternAccessSupport.RenamePatternGroupPayload.class,
+        registerClientAction(ACTION_RENAME_GROUP, PatternAccessSession.RenamePatternGroupPayload.class,
             this::renamePatternGroup);
-        registerClientAction(ACTION_RENAME_PROVIDER, PatternAccessSupport.RenamePatternProviderPayload.class,
+        registerClientAction(ACTION_RENAME_PROVIDER, PatternAccessSession.RenamePatternProviderPayload.class,
             this::renamePatternProvider);
     }
 
@@ -77,17 +80,17 @@ public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IP
             return;
         }
 
-        this.patternAccessSupport.openProvider(getPlayer(), inventoryId);
+        this.patternAccessSession.openProvider(getPlayer(), inventoryId);
     }
 
     @Override
     public void renamePatternProvider(long inventoryId, String name) {
-        renamePatternProvider(new PatternAccessSupport.RenamePatternProviderPayload(inventoryId, name));
+        renamePatternProvider(new PatternAccessSession.RenamePatternProviderPayload(inventoryId, name));
     }
 
     @Override
     public void renamePatternGroup(long[] inventoryIds, String name) {
-        renamePatternGroup(new PatternAccessSupport.RenamePatternGroupPayload(inventoryIds, name));
+        renamePatternGroup(new PatternAccessSession.RenamePatternGroupPayload(inventoryIds, name));
     }
 
     @Override
@@ -97,25 +100,25 @@ public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IP
             return;
         }
 
-        this.patternAccessSupport.toggleProviderVisibility(inventoryId);
+        this.patternAccessSession.toggleProviderVisibility(inventoryId);
     }
 
-    private void renamePatternGroup(PatternAccessSupport.RenamePatternGroupPayload payload) {
+    private void renamePatternGroup(PatternAccessSession.RenamePatternGroupPayload payload) {
         if (isClientSide()) {
             sendClientAction(ACTION_RENAME_GROUP, payload);
             return;
         }
 
-        this.patternAccessSupport.renameGroup(payload);
+        this.patternAccessSession.renameGroup(payload);
     }
 
-    private void renamePatternProvider(PatternAccessSupport.RenamePatternProviderPayload payload) {
+    private void renamePatternProvider(PatternAccessSession.RenamePatternProviderPayload payload) {
         if (isClientSide()) {
             sendClientAction(ACTION_RENAME_PROVIDER, payload);
             return;
         }
 
-        this.patternAccessSupport.renameProvider(payload);
+        this.patternAccessSession.renameProvider(payload);
     }
 
     @Override
@@ -133,6 +136,9 @@ public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IP
 
     @Nullable
     private IGrid getPatternProviderGrid() {
+        if (!this.host.getLinkStatus().connected()) {
+            return null;
+        }
         IGridNode node = this.host.getGridNode();
         if (node != null && node.isActive()) {
             return node.grid();
@@ -149,20 +155,20 @@ public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IP
 
         this.showPatternProviders =
             this.host.getConfigManager().getSetting(Settings.TERMINAL_SHOW_PATTERN_PROVIDERS);
-        this.patternAccessSupport.updateProviderVisibility();
+        this.patternAccessSession.updateProviderVisibility();
     }
 
     @Override
     public void doAction(EntityPlayerMP player, InventoryAction action, int slot, long id) {
-        if (!this.patternAccessSupport.doAction(player, action, slot, id)) {
+        if (!this.patternAccessSession.doAction(player, action, slot, id)) {
             super.doAction(player, action, slot, id);
         }
     }
 
     @Override
     public void quickMovePattern(EntityPlayerMP player, Slot sourceSlot, LongList allowedPatternContainerIds,
-                                  LongList allowedPatternSlots) {
-        this.patternAccessSupport.quickMovePattern(player, sourceSlot, allowedPatternContainerIds,
+                                 LongList allowedPatternSlots) {
+        this.patternAccessSession.quickMovePattern(player, sourceSlot, allowedPatternContainerIds,
             allowedPatternSlots);
     }
 
@@ -174,4 +180,14 @@ public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IP
     public boolean isEncodedPatternSlot(Slot slot) {
         return getSlots(SlotSemantics.ENCODED_PATTERN).contains(slot);
     }
+
+    @Override
+    protected PatternProviderUploadService.ProcessingPatternUploadResult uploadProcessingPatternToProvider(
+        ItemStack encodedPattern,
+        IGrid grid,
+        PatternContainer uploadTarget) {
+        return PatternProviderUploadService.tryUploadProcessingPatternToProvider(getPlayer(), this.host, grid,
+            uploadTarget, encodedPattern);
+    }
+
 }
