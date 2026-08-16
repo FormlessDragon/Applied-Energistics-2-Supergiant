@@ -1,4 +1,4 @@
-package ae2.container.me.items;
+package ae2.container.me.patternencode;
 
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
@@ -7,6 +7,7 @@ import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGrid;
+import ae2.api.networking.provider.ProviderSnapshot;
 import ae2.api.networking.IGridNode;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
@@ -17,18 +18,11 @@ import ae2.container.GuiIds;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
 import ae2.container.implementations.PatternModifierPanel;
-import ae2.container.implementations.PatternAccessSupport;
-import ae2.container.me.patternencode.IPatternProviderSelection;
-import ae2.container.me.patternencode.PatternProviderSelectionSupport;
+import ae2.container.me.patternaccess.PatternAccessSession;
 import ae2.container.me.patternencode.PatternProviderSelectionSupport.ProcessingPatternUploadPreparation;
 import ae2.container.me.patternencode.PatternProviderSelectionSupport.ProcessingPatternUploadResult;
 import ae2.container.me.patternencode.PatternProviderSelectionSupport.ProviderDirectoryEntry;
 import ae2.container.me.patternencode.PatternProviderSelectionSupport.ProviderMappingValidationResult;
-import ae2.container.me.patternencode.ProviderDirectoryPage;
-import ae2.container.me.patternencode.ProviderDirectoryPageRequest;
-import ae2.container.me.patternencode.ProviderMappingPage;
-import ae2.container.me.patternencode.ProviderMappingPageRequest;
-import ae2.container.me.patternencode.ProviderPageLimits;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.slot.FakeSlot;
 import ae2.container.slot.PatternTermSlot;
@@ -192,7 +186,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     private boolean changingEncodedPatternSlotInternally;
     private boolean clearOnClose;
     @Nullable
-    private PatternAccessSupport.ProviderDiscoverySnapshot providerDiscoverySnapshot;
+    private ProviderSnapshot providerDiscoverySnapshot;
 
     public ContainerPatternEncodingTerm(InventoryPlayer ip, IPatternTerminalGuiHost host) {
         this(GuiIds.GuiKey.PATTERN_ENCODING_TERMINAL, ip, host, true);
@@ -844,8 +838,11 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         BindResult bindResult = mappingData.bind(mappingText, reference);
         if (bindResult == BindResult.ADDED) {
             refreshProviderDirectory(false);
+        } else if (bindResult == BindResult.DISABLED) {
+            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingDisabled.text(), false);
         } else if (bindResult == BindResult.LIMIT_REACHED) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingLimitReached.text(), false);
+            getPlayer().sendStatusMessage(
+                PlayerMessages.PatternProviderMappingLimitReached.text(PatternProviderMappingData.getMappingLimit()), false);
         }
     }
 
@@ -902,7 +899,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
 
         if (mappingData.getRecipeTypeCount(reference) >= PatternProviderMappingData.getMappingLimit()
             && !mappingData.getRecipeTypes(reference).contains(recipeTypeUid)) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingLimitReached.text(), false);
+            getPlayer().sendStatusMessage(
+                PlayerMessages.PatternProviderMappingLimitReached.text(PatternProviderMappingData.getMappingLimit()), false);
             return;
         }
 
@@ -1027,6 +1025,10 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
             return;
         }
         if (!allowProviderAction("reload-mappings")) {
+            return;
+        }
+        if (!PatternProviderMappingData.isMappingEnabled()) {
+            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingDisabled.text(), false);
             return;
         }
         if (requireProviderSelectGrid() == null) {
@@ -1177,7 +1179,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     }
 
     private List<ProviderSelectEntry> collectProviderDirectorySnapshot(IGrid grid) {
-        PatternAccessSupport.ProviderDiscoverySnapshot discovery = this.providerDiscoverySnapshot;
+        ProviderSnapshot discovery = this.providerDiscoverySnapshot;
         List<ProviderDirectoryEntry> providers = discovery == null
             ? PatternProviderSelectionSupport.collectProcessingPatternUploadProviders(grid)
             : discovery.providers().stream().filter(PatternProviderSelectionSupport::isSelectableProvider)
@@ -1203,7 +1205,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         return List.copyOf(entries);
     }
 
-    protected void setProviderDiscoverySnapshot(@Nullable PatternAccessSupport.ProviderDiscoverySnapshot snapshot) {
+    protected void setProviderDiscoverySnapshot(@Nullable ProviderSnapshot snapshot) {
         this.providerDiscoverySnapshot = snapshot;
     }
 

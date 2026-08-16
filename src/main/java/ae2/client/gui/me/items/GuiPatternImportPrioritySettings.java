@@ -8,7 +8,7 @@ import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.ITooltip;
 import ae2.client.gui.widgets.TabButton;
 import ae2.client.patternimport.PatternImportPriorityOrder;
-import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
 import ae2.core.localization.GuiText;
 import ae2.text.TextComponentItemStack;
 import net.minecraft.util.text.ITextComponent;

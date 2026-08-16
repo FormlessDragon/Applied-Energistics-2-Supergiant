@@ -19,7 +19,7 @@
 package ae2.client.gui.me.patternaccess;
 
 import ae2.api.implementations.blockentities.PatternContainerGroup;
-import ae2.container.implementations.ContainerPatternAccessTerm;
+import ae2.container.me.patternaccess.ContainerPatternAccessTerm;
 import ae2.util.inv.AppEngInternalInventory;
 
 import java.util.Locale;

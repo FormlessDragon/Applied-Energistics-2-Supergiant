@@ -1,6 +1,5 @@
-package ae2.container.implementations;
+package ae2.container.me.patternaccess;
 
-import ae2.container.me.patternaccess.IPatternAccessDisplay;
 import ae2.container.implementations.PatternModifierPanel;
 import it.unimi.dsi.fastutil.longs.LongList;
 import net.minecraft.entity.player.EntityPlayerMP;

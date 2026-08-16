@@ -1,4 +1,4 @@
-package ae2.container.implementations;
+package ae2.container.me.patternaccess;
 
 import ae2.api.config.ShowPatternProviders;
 import ae2.api.crafting.IAssemblerPattern;
@@ -7,6 +7,7 @@ import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGrid;
+import ae2.api.networking.provider.ProviderSnapshot;
 import ae2.api.stacks.AEItemKey;
 import ae2.container.AEBaseContainer;
 import ae2.core.AELog;
@@ -45,7 +46,6 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -58,7 +58,7 @@ import java.util.function.Supplier;
  * PAT and PEAT own their GUI-specific state. This support owns only provider discovery, provider state indexes,
  * provider inventory interaction, server validation, and packet emission.
  */
-public final class PatternAccessSupport<C extends AEBaseContainer & IPatternAccess> {
+public final class PatternAccessSession<C extends AEBaseContainer & IPatternAccess> {
     private static final int MAX_CUSTOM_NAME_LENGTH = 32;
     private static final int PROVIDER_DIRECTORY_SCAN_INTERVAL_TICKS = 10;
     private static long inventorySerial = Long.MIN_VALUE;
@@ -84,7 +84,7 @@ public final class PatternAccessSupport<C extends AEBaseContainer & IPatternAcce
     private int ticksUntilProviderDirectoryScan;
     private boolean providerDirectoryInitialized;
 
-    public PatternAccessSupport(Supplier<@Nullable IGrid> gridSupplier,
+    public PatternAccessSession(Supplier<@Nullable IGrid> gridSupplier,
                                 Supplier<ShowPatternProviders> shownProvidersSupplier,
                                 Supplier<@Nullable World> worldSupplier,
                                 Predicate<Slot> sourceSlotAllowed,
@@ -103,10 +103,10 @@ public final class PatternAccessSupport<C extends AEBaseContainer & IPatternAcce
 
     public void updateProviderVisibility() {
         IGrid grid = this.gridSupplier.get();
-        updateProviderVisibility(grid == null ? null : ProviderDiscoverySnapshot.discover(grid));
+        updateProviderVisibility(grid == null ? null : getProviderSnapshot(grid));
     }
 
-    public void updateProviderVisibility(@Nullable ProviderDiscoverySnapshot discovery) {
+    public void updateProviderVisibility(@Nullable ProviderSnapshot discovery) {
         IGrid grid = this.gridSupplier.get();
         ShowPatternProviders shownProviders = getShownProviders();
         if (grid == null || discovery == null) {
@@ -417,7 +417,7 @@ public final class PatternAccessSupport<C extends AEBaseContainer & IPatternAcce
             return;
         }
 
-        List<ProviderDirectoryEntry> providers = collectPatternAccessProviders(ProviderDiscoverySnapshot.discover(grid).providers(), shownProviders);
+        List<ProviderDirectoryEntry> providers = collectPatternAccessProviders(getProviderSnapshot(grid).providers(), shownProviders);
         List<ProviderStamp> signature = createProviderSignature(providers);
         rememberProviderDirectory(grid, shownProviders, signature);
         sendFullUpdate(grid, providers);
@@ -505,6 +505,10 @@ public final class PatternAccessSupport<C extends AEBaseContainer & IPatternAcce
         this.ticksUntilProviderDirectoryScan = 0;
     }
 
+    private static ProviderSnapshot getProviderSnapshot(IGrid grid) {
+        return ProviderSnapshot.get(grid);
+    }
+
     private static boolean isAcceptedByContainer(PatternContainer container, @Nullable IPatternDetails details) {
         return details != null && (details instanceof IAssemblerPattern) == container.isAssemblerPatternContainer();
     }
@@ -536,7 +540,7 @@ public final class PatternAccessSupport<C extends AEBaseContainer & IPatternAcce
 
         this.pinnedHosts.removeIf(container -> !activeProviders.contains(container));
         this.providerIdentityOrdinals.keySet().removeIf(container -> !activeProviders.contains(container));
-        providers.sort(PatternAccessSupport::compareProviderEntries);
+        providers.sort(PatternAccessSession::compareProviderEntries);
         return List.copyOf(providers);
     }
 
@@ -993,24 +997,4 @@ public final class PatternAccessSupport<C extends AEBaseContainer & IPatternAcce
         }
     }
 
-    public record ProviderDiscoverySnapshot(List<PatternContainer> providers) {
-        public ProviderDiscoverySnapshot {
-            providers = List.copyOf(Objects.requireNonNull(providers, "providers"));
-        }
-
-        public static ProviderDiscoverySnapshot discover(IGrid grid) {
-            Objects.requireNonNull(grid, "grid");
-            List<PatternContainer> result = new ArrayList<>();
-            for (Class<?> type : grid.getMachineClasses()) {
-                if (PatternContainer.class.isAssignableFrom(type)) {
-                    for (Object object : grid.getActiveMachines(type.asSubclass(PatternContainer.class))) {
-                        if (object instanceof PatternContainer provider) {
-                            result.add(provider);
-                        }
-                    }
-                }
-            }
-            return new ProviderDiscoverySnapshot(result);
-        }
-    }
 }

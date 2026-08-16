@@ -39,7 +39,7 @@ import ae2.container.AEBaseContainer;
 import ae2.container.GuiIds;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.me.items.ContainerCraftingTerm;
-import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
 import ae2.core.AEConfig;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.GuiText;

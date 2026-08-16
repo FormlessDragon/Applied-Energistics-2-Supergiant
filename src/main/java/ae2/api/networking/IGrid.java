@@ -120,6 +120,11 @@ public interface IGrid {
      */
     int size();
 
+    /** Monotonically increasing revision for changes that can affect active machine queries. */
+    default long getMachineRevision() {
+        return -1;
+    }
+
     /**
      * Get this grids {@link ITickManager}.
      *

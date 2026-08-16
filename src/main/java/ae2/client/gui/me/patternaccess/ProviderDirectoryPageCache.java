@@ -1,6 +1,5 @@
 package ae2.client.gui.me.patternaccess;
 
-import ae2.client.gui.implementations.GuiProviderSelect;
 import ae2.container.me.patternencode.ProviderDirectoryPage;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
@@ -66,7 +65,7 @@ public final class ProviderDirectoryPageCache {
         return created;
     }
 
-    public static GuiProviderSelect.ProviderEntry convert(ProviderDirectoryPage.Entry entry) {
+    static GuiProviderSelect.ProviderEntry convert(ProviderDirectoryPage.Entry entry) {
         GuiProviderSelect.ProviderLocation location = null;
         if (entry.hasLocation()) {
             EnumFacing side = entry.locationSide() < 0 ? null : EnumFacing.byIndex(entry.locationSide());

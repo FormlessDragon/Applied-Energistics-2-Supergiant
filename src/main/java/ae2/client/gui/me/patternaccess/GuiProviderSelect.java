@@ -1,4 +1,4 @@
-package ae2.client.gui.implementations;
+package ae2.client.gui.me.patternaccess;
 
 import ae2.api.client.AEKeyRendering;
 import ae2.api.stacks.AEItemKey;
@@ -20,7 +20,6 @@ import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SimpleIconButton;
 import ae2.client.gui.widgets.TooltipButton;
 import ae2.container.AEBaseContainer;
-import ae2.client.gui.me.patternaccess.ProviderDirectoryPageCache;
 import ae2.container.me.patternencode.IPatternProviderSelection;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;

@@ -1,6 +1,7 @@
-package ae2.container.me.patternencode;
+package ae2.core.network.clientbound;
 
-import ae2.client.gui.implementations.GuiProviderSelect;
+import ae2.container.me.patternencode.ProviderDirectoryPage;
+import ae2.container.me.patternencode.ProviderMappingPage;
 
 /**
  * Client-screen boundary for revisioned provider-directory page responses.
@@ -11,20 +12,14 @@ import ae2.client.gui.implementations.GuiProviderSelect;
  */
 public interface IProviderSelectPageReceiver {
 
-    GuiProviderSelect<?> getProviderSelectionOverlay();
-
     /**
      * Receives one provider-directory page for client-side revision and nonce validation.
      *
      * @param page immutable directory page decoded from the server response
      */
-    default void receiveProviderDirectoryPage(ProviderDirectoryPage page) {
-        this.getProviderSelectionOverlay().receiveProviderDirectoryPage(page);
-    }
+    void receiveProviderDirectoryPage(ProviderDirectoryPage page);
 
     /** Receives one mapping-management page after window, nonce and revision validation. */
-    default void receiveProviderMappingPage(ProviderMappingPage page) {
-        this.getProviderSelectionOverlay().receiveProviderMappingPage(page);
-    }
+    void receiveProviderMappingPage(ProviderMappingPage page);
 
 }

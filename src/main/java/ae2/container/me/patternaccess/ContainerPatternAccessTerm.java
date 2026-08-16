@@ -16,7 +16,7 @@
  * along with Applied Energistics 2.  If not, see <http://www.gnu.org/licenses/lgpl>.
  */
 
-package ae2.container.implementations;
+package ae2.container.me.patternaccess;
 
 import ae2.api.config.Settings;
 import ae2.api.config.ShowPatternProviders;
@@ -51,7 +51,7 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
     private static final String ACTION_RENAME_PROVIDER = "renameProvider";
 
     private final IPatternAccessTermContainerHost host;
-    private final PatternAccessSupport<ContainerPatternAccessTerm> patternAccessSupport;
+    private final PatternAccessSession<ContainerPatternAccessTerm> patternAccessSession;
     private final PatternModifierPanel patternModifierPanel;
     @GuiSync(1)
     public ShowPatternProviders showPatternProviders = ShowPatternProviders.VISIBLE;
@@ -62,13 +62,13 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
     public ContainerPatternAccessTerm(InventoryPlayer playerInventory, IPatternAccessTermContainerHost host) {
         super(playerInventory, host);
         this.host = host;
-        this.patternAccessSupport = new PatternAccessSupport<>(
+        this.patternAccessSession = new PatternAccessSession<>(
             this::getGrid,
             this::getShownProviders,
             () -> getPlayer().world,
             this::isPlayerSideSlot,
             this::sendPacketToClient,
-            new PatternAccessSupport.PlayerHandAccess() {
+            new PatternAccessSession.PlayerHandAccess() {
                 @Override
                 public ItemStack getCarried() {
                     return ContainerPatternAccessTerm.this.getCarried();
@@ -82,9 +82,9 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
             this);
         registerClientAction(ACTION_OPEN_PROVIDER, Long.class, this::openPatternProvider);
         registerClientAction(ACTION_TOGGLE_PROVIDER_VISIBILITY, Long.class, this::togglePatternProviderVisibility);
-        registerClientAction(ACTION_RENAME_GROUP, PatternAccessSupport.RenamePatternGroupPayload.class,
+        registerClientAction(ACTION_RENAME_GROUP, PatternAccessSession.RenamePatternGroupPayload.class,
             this::renamePatternGroup);
-        registerClientAction(ACTION_RENAME_PROVIDER, PatternAccessSupport.RenamePatternProviderPayload.class,
+        registerClientAction(ACTION_RENAME_PROVIDER, PatternAccessSession.RenamePatternProviderPayload.class,
             this::renamePatternProvider);
         if (host instanceof WirelessTerminalGuiHost<?> wirelessHost) {
             setupUpgrades(wirelessHost.getUpgrades());
@@ -105,17 +105,17 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
             return;
         }
 
-        this.patternAccessSupport.openProvider(getPlayer(), inventoryId);
+        this.patternAccessSession.openProvider(getPlayer(), inventoryId);
     }
 
     @Override
     public void renamePatternProvider(long inventoryId, String name) {
-        renamePatternProvider(new PatternAccessSupport.RenamePatternProviderPayload(inventoryId, name));
+        renamePatternProvider(new PatternAccessSession.RenamePatternProviderPayload(inventoryId, name));
     }
 
     @Override
     public void renamePatternGroup(long[] inventoryIds, String name) {
-        renamePatternGroup(new PatternAccessSupport.RenamePatternGroupPayload(inventoryIds, name));
+        renamePatternGroup(new PatternAccessSession.RenamePatternGroupPayload(inventoryIds, name));
     }
 
     @Override
@@ -125,25 +125,25 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
             return;
         }
 
-        this.patternAccessSupport.toggleProviderVisibility(inventoryId);
+        this.patternAccessSession.toggleProviderVisibility(inventoryId);
     }
 
-    private void renamePatternGroup(PatternAccessSupport.RenamePatternGroupPayload payload) {
+    private void renamePatternGroup(PatternAccessSession.RenamePatternGroupPayload payload) {
         if (isClientSide()) {
             sendClientAction(ACTION_RENAME_GROUP, payload);
             return;
         }
 
-        this.patternAccessSupport.renameGroup(payload);
+        this.patternAccessSession.renameGroup(payload);
     }
 
-    private void renamePatternProvider(PatternAccessSupport.RenamePatternProviderPayload payload) {
+    private void renamePatternProvider(PatternAccessSession.RenamePatternProviderPayload payload) {
         if (isClientSide()) {
             sendClientAction(ACTION_RENAME_PROVIDER, payload);
             return;
         }
 
-        this.patternAccessSupport.renameProvider(payload);
+        this.patternAccessSession.renameProvider(payload);
     }
 
     @Override
@@ -195,18 +195,18 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
         super.broadcastChanges();
 
         updateLinkStatus();
-        this.patternAccessSupport.updateProviderVisibility();
+        this.patternAccessSession.updateProviderVisibility();
     }
 
     @Override
     public void doAction(EntityPlayerMP player, InventoryAction action, int slot, long id) {
-        this.patternAccessSupport.doAction(player, action, slot, id);
+        this.patternAccessSession.doAction(player, action, slot, id);
     }
 
     @Override
     public void quickMovePattern(EntityPlayerMP player, Slot sourceSlot, LongList allowedPatternContainerIds,
                                  LongList allowedPatternSlots) {
-        this.patternAccessSupport.quickMovePattern(player, sourceSlot, allowedPatternContainerIds,
+        this.patternAccessSession.quickMovePattern(player, sourceSlot, allowedPatternContainerIds,
             allowedPatternSlots);
     }
 

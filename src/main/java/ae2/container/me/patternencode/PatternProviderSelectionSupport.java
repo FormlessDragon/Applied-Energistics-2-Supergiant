@@ -6,9 +6,10 @@ import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGrid;
+import ae2.api.networking.provider.ProviderSnapshot;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.storage.ILinkStatus;
-import ae2.container.implementations.PatternAccessSupport;
+import ae2.container.me.patternaccess.PatternAccessSession;
 import ae2.core.AELog;
 import ae2.core.localization.PlayerMessages;
 import ae2.core.worlddata.PatternProviderMappingData;
@@ -55,6 +56,7 @@ public final class PatternProviderSelectionSupport {
     private static final int MAX_PROVIDER_ACTION_WARNING_KEYS = 256;
     private static final ProviderActionWarningLimiter PROVIDER_ACTION_WARNING_LIMITER =
         new ProviderActionWarningLimiter(MAX_PROVIDER_ACTION_WARNING_KEYS, WARNING_INTERVAL_NANOS);
+    private static final AtomicLong LAST_INVALID_RECIPE_TYPE_WARNING = new AtomicLong(Long.MIN_VALUE);
     private static final AtomicLong LAST_PROVIDER_SCAN_WARNING = new AtomicLong(Long.MIN_VALUE);
     private static final AtomicLong LAST_PROVIDER_UPLOAD_WARNING = new AtomicLong(Long.MIN_VALUE);
 
@@ -82,13 +84,17 @@ public final class PatternProviderSelectionSupport {
 
     public static List<PatternContainer> collectSelectableProviders(IGrid grid) {
         List<PatternContainer> containers = new ObjectArrayList<>();
-        for (PatternContainer container : PatternAccessSupport.ProviderDiscoverySnapshot.discover(grid).providers()) {
+        for (PatternContainer container : getProviderSnapshot(grid).providers()) {
             if (isSelectableProvider(container)) {
                 containers.add(container);
             }
         }
         containers.sort(SELECTABLE_PROVIDER_ORDER);
         return containers;
+    }
+
+    private static ProviderSnapshot getProviderSnapshot(IGrid grid) {
+        return ProviderSnapshot.get(grid);
     }
 
     public static List<ProviderDirectoryEntry> collectProcessingPatternUploadProviders(IGrid grid) {

@@ -8,7 +8,7 @@ import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
 import ae2.client.Point;
-import ae2.client.gui.implementations.GuiProviderSelect;
+import ae2.client.gui.me.patternaccess.GuiProviderSelect;
 import ae2.client.gui.Icon;
 import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.client.gui.me.items.GuiPatternImportPrioritySettings;
@@ -19,14 +19,16 @@ import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.DynamicIconButton;
 import ae2.client.gui.widgets.PatternModifierPanelWidget;
 import ae2.client.gui.widgets.TabButton;
-import ae2.container.me.items.ContainerPatternEncodingTerm;
+import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
+import ae2.container.me.patternencode.ProviderDirectoryPage;
 import ae2.container.slot.AppEngSlot;
 import ae2.core.AEConfig;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
-import ae2.container.me.patternencode.IProviderSelectPageReceiver;
+import ae2.core.network.clientbound.IProviderSelectPageReceiver;
+import ae2.container.me.patternencode.ProviderMappingPage;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.patternmodifier.PatternModifierToolboxLayout;
@@ -314,8 +316,13 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     }
 
     @Override
-    public GuiProviderSelect<?> getProviderSelectionOverlay() {
-        return this.providerSelectOverlay;
+    public void receiveProviderDirectoryPage(ProviderDirectoryPage page) {
+        this.providerSelectOverlay.receiveProviderDirectoryPage(page);
+    }
+
+    @Override
+    public void receiveProviderMappingPage(ProviderMappingPage page) {
+        this.providerSelectOverlay.receiveProviderMappingPage(page);
     }
 
 }

@@ -1,6 +1,5 @@
 package ae2.core.network.clientbound;
 
-import ae2.container.me.patternencode.IProviderSelectPageReceiver;
 import ae2.container.me.patternencode.ProviderMappingPage;
 import ae2.container.me.patternencode.ProviderPageLimits;
 import ae2.core.network.ClientboundPacket;

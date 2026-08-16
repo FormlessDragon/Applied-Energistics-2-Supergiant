@@ -35,7 +35,7 @@ import ae2.client.render.overlay.OverlayHighlightLocation;
 import ae2.client.render.overlay.OverlayHighlightShape;
 import ae2.container.AEBaseContainer;
 import ae2.container.SlotSemantics;
-import ae2.container.implementations.IPatternAccess;
+import ae2.container.me.patternaccess.IPatternAccess;
 import ae2.core.AEConfig;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;

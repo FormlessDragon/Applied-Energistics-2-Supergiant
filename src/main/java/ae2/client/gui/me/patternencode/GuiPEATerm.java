@@ -17,13 +17,14 @@ import ae2.client.gui.me.items.GuiPatternItemRenamer;
 import ae2.client.gui.me.items.GuiSetProcessingPatternAmount;
 import ae2.client.gui.me.patternaccess.AbstractPatternAccessTerm;
 import ae2.client.gui.me.patternaccess.GuiPatternSlot;
-import ae2.client.gui.implementations.GuiProviderSelect;
+import ae2.client.gui.me.patternaccess.GuiProviderSelect;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.DynamicIconButton;
 import ae2.client.gui.widgets.TabButton;
 import ae2.container.SlotSemantics;
-import ae2.container.implementations.ContainerPEATerm;
+import ae2.container.me.patternencode.ContainerPEATerm;
+import ae2.container.me.patternencode.ProviderDirectoryPage;
 import ae2.container.slot.AppEngSlot;
 import ae2.core.AEConfig;
 import ae2.core.AppEng;
@@ -32,7 +33,8 @@ import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
-import ae2.container.me.patternencode.IProviderSelectPageReceiver;
+import ae2.core.network.clientbound.IProviderSelectPageReceiver;
+import ae2.container.me.patternencode.ProviderMappingPage;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
@@ -323,8 +325,13 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> impl
     }
 
     @Override
-    public GuiProviderSelect<?> getProviderSelectionOverlay() {
-        return this.providerSelectOverlay;
+    public void receiveProviderDirectoryPage(ProviderDirectoryPage page) {
+        this.providerSelectOverlay.receiveProviderDirectoryPage(page);
+    }
+
+    @Override
+    public void receiveProviderMappingPage(ProviderMappingPage page) {
+        this.providerSelectOverlay.receiveProviderMappingPage(page);
     }
 
 }

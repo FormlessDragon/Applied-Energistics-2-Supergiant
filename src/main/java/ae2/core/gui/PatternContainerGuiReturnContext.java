@@ -1,7 +1,7 @@
 package ae2.core.gui;
 
 import ae2.container.AEBaseContainer;
-import ae2.container.implementations.IPatternAccess;
+import ae2.container.me.patternaccess.IPatternAccess;
 import ae2.core.AELog;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.clientbound.RestorePreviousGuiPacket;
