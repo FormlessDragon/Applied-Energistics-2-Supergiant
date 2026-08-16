@@ -65,16 +65,16 @@ public final class ProviderDirectoryPageCache {
         return created;
     }
 
-    static GuiProviderSelection.ProviderEntry convert(ProviderDirectoryPage.Entry entry) {
-        GuiProviderSelection.ProviderLocation location = null;
+    static ProviderSelectionOverlay.ProviderEntry convert(ProviderDirectoryPage.Entry entry) {
+        ProviderSelectionOverlay.ProviderLocation location = null;
         if (entry.hasLocation()) {
             EnumFacing side = entry.locationSide() < 0 ? null : EnumFacing.byIndex(entry.locationSide());
-            location = new GuiProviderSelection.ProviderLocation(
+            location = new ProviderSelectionOverlay.ProviderLocation(
                 entry.locationDimension(),
                 BlockPos.fromLong(entry.locationPos()),
                 side);
         }
-        return new GuiProviderSelection.ProviderEntry(
+        return new ProviderSelectionOverlay.ProviderEntry(
             entry.providerEntryId(),
             entry.icon(),
             location,
@@ -93,7 +93,7 @@ public final class ProviderDirectoryPageCache {
     }
 
     public record DirectoryPageView(DirectoryPageKey key, int total,
-                                    List<GuiProviderSelection.ProviderEntry> entries) {
+                                    List<ProviderSelectionOverlay.ProviderEntry> entries) {
         public DirectoryPageView {
             Objects.requireNonNull(key, "key");
             entries = List.copyOf(Objects.requireNonNull(entries, "entries"));

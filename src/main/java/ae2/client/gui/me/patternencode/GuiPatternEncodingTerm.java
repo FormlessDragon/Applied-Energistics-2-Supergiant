@@ -8,7 +8,7 @@ import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
 import ae2.client.Point;
-import ae2.client.gui.me.patternaccess.GuiProviderSelection;
+import ae2.client.gui.me.patternaccess.ProviderSelectionOverlay;
 import ae2.client.gui.Icon;
 import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.client.gui.me.items.GuiPatternImportPrioritySettings;
@@ -20,7 +20,6 @@ import ae2.client.gui.widgets.DynamicIconButton;
 import ae2.client.gui.widgets.PatternModifierPanelWidget;
 import ae2.client.gui.widgets.TabButton;
 import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
-import ae2.container.me.patternencode.ProviderDirectoryPage;
 import ae2.container.slot.AppEngSlot;
 import ae2.core.AEConfig;
 import ae2.core.definitions.AEItems;
@@ -28,7 +27,6 @@ import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.clientbound.IProviderSelectionPageReceiver;
-import ae2.container.me.patternencode.ProviderMappingPage;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.patternmodifier.PatternModifierToolboxLayout;
@@ -36,6 +34,7 @@ import ae2.integration.Integrations;
 import ae2.parts.encoding.EncodingMode;
 import ae2.text.TextComponentItemStack;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.ClickType;
 import net.minecraft.inventory.Slot;
@@ -46,24 +45,26 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
 public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodingTerm> implements IProviderSelectionPageReceiver {
     private static final EncodingMode[] ENCODING_MODES = EncodingMode.values();
-    private static final String PROVIDER_SELECTION_OVERLAY_WIDGET = GuiProviderSelection.WIDGET_ID;
+    private static final String PROVIDER_SELECTION_OVERLAY_WIDGET = ProviderSelectionOverlay.WIDGET_ID;
     private final Map<EncodingMode, EncodingModePanel> modePanels = new EnumMap<>(EncodingMode.class);
     private final Map<EncodingMode, TabButton> modeTabButtons = new EnumMap<>(EncodingMode.class);
     private final DynamicIconButton uploadPatternButton;
     private final PatternModifierPanelWidget patternModifierPanel;
-    private final GuiProviderSelection<?> providerSelectionOverlay;
+    private final ProviderSelectionOverlay<?> providerSelectionOverlay;
     private int providerSelectionOverlayRequestNonce;
 
     public GuiPatternEncodingTerm(ContainerPatternEncodingTerm container, InventoryPlayer playerInventory,
                                   @Nullable ITextComponent title, GuiStyle style) {
         super(container, playerInventory, resolveTitle(container, title), style);
-        this.providerSelectionOverlay = new GuiProviderSelection<>(this);
+        this.providerSelectionOverlay = new ProviderSelectionOverlay<>(this);
         addMode(EncodingMode.CRAFTING, new CraftingEncodingPanel(this, widgets), 0);
         addMode(EncodingMode.PROCESSING, new ProcessingEncodingPanel(this, widgets), 1);
         this.uploadPatternButton = new DynamicIconButton(
@@ -316,13 +317,16 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     }
 
     @Override
-    public void receiveProviderDirectoryPage(ProviderDirectoryPage page) {
-        this.providerSelectionOverlay.receiveProviderDirectoryPage(page);
+    public ProviderSelectionOverlay<?> getProviderSelectionOverlay() {
+        return this.providerSelectionOverlay;
     }
 
     @Override
-    public void receiveProviderMappingPage(ProviderMappingPage page) {
-        this.providerSelectionOverlay.receiveProviderMappingPage(page);
+    public Collection<? extends GuiTextField> getTextFields() {
+        Collection<GuiTextField> textFields = new ArrayList<>(super.getTextFields());
+        if(providerSelectionOverlay.isVisible()) {
+            textFields.addAll(providerSelectionOverlay.getTextFields());
+        }
+        return textFields;
     }
-
 }

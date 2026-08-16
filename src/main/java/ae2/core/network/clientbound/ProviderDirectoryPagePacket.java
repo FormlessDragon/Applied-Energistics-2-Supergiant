@@ -46,7 +46,6 @@ public final class ProviderDirectoryPagePacket extends ClientboundPacket {
             long directoryRevision = data.readVarLong();
             int pageIndex = data.readVarInt();
             int total = data.readVarInt();
-            boolean mappingEnabled = data.readBoolean();
             int entryCount = data.readVarInt();
             if (entryCount < 0 || entryCount > ProviderPageLimits.PAGE_SIZE) {
                 throw new IllegalArgumentException("Invalid provider directory page entry count: " + entryCount);
@@ -62,7 +61,7 @@ public final class ProviderDirectoryPagePacket extends ClientboundPacket {
             }
 
             this.page = new ProviderDirectoryPage(
-                windowId, nonce, directoryRevision, pageIndex, total, mappingEnabled, entries);
+                windowId, nonce, directoryRevision, pageIndex, total, entries);
         } catch (RuntimeException e) {
             reject(buf, e);
         }
@@ -79,7 +78,6 @@ public final class ProviderDirectoryPagePacket extends ClientboundPacket {
             data.writeVarLong(currentPage.directoryRevision());
             data.writeVarInt(currentPage.page());
             data.writeVarInt(currentPage.total());
-            data.writeBoolean(currentPage.mappingEnabled());
             data.writeVarInt(currentPage.entries().size());
             for (ProviderDirectoryPage.Entry entry : currentPage.entries()) {
                 writeEntry(data, entry);

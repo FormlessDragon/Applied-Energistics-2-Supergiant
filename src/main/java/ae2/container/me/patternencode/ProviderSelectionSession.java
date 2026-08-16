@@ -118,8 +118,7 @@ public final class ProviderSelectionSession {
         }
         refreshDirectory(true, false);
         this.overlayRequestNonce = Math.incrementExact(this.overlayRequestNonce);
-        this.host.syncProviderSelectionOverlay(new ProviderSelectionOverlayOpenRequest(
-            this.overlayRequestNonce, searchText, mappingText));
+        this.host.syncProviderSelectionOverlay(new ProviderSelectionOverlayOpenRequest(this.overlayRequestNonce, searchText, mappingText));
     }
 
     void uploadProcessingPatternToProvider(@Nullable ProviderEntryAction action) {
@@ -343,8 +342,7 @@ public final class ProviderSelectionSession {
                 mappingData, query));
         }
         this.host.sendProviderDirectoryPage(new ProviderDirectoryPage(this.host.getWindowId(), request.nonce(),
-            this.directoryRevision, request.page(), matches.size(), PatternProviderMappingData.isMappingEnabled(),
-            pageEntries));
+            this.directoryRevision, request.page(), matches.size(), pageEntries));
     }
 
     void requestProviderMappingPage(@Nullable ProviderMappingPageRequest request) {

@@ -14,7 +14,6 @@ import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.style.WidgetStyle;
 import ae2.client.gui.widgets.AETextField;
 import ae2.client.gui.widgets.DynamicIconButton;
-import ae2.client.gui.widgets.ITextFieldGui;
 import ae2.client.gui.widgets.ITooltip;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SimpleIconButton;
@@ -23,6 +22,7 @@ import ae2.container.AEBaseContainer;
 import ae2.container.me.patternencode.IProviderSelectionEndpoint;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
+import ae2.core.localization.Tooltips;
 import ae2.core.worlddata.PatternProviderMappingData;
 import ae2.container.me.patternencode.ProviderDirectoryPage;
 import ae2.container.me.patternencode.ProviderDirectoryPageRequest;
@@ -63,7 +63,7 @@ import java.util.function.Supplier;
 /**
  * Provider Selection overlay shown on top of the current Pattern Encoding GUI.
  */
-public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSelectionEndpoint> implements ICompositeWidget, ITextFieldGui {
+public final class ProviderSelectionOverlay<C extends AEBaseContainer & IProviderSelectionEndpoint> implements ICompositeWidget {
 
     public static final String WIDGET_ID = "providerSelectionOverlay";
     private static final String STYLE_PATH = "/screens/provider_selection.json";
@@ -84,7 +84,7 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
     private static final int TITLE_INFO_GAP = 4;
     private static final int TITLE_INFO_ICON_SIZE = 16;
     private static final int TITLE_INFO_ICON_TOP = 2;
-    private static final long SEARCH_DEBOUNCE_NANOS = 150_000_000L;
+    private static final long SEARCH_DEBOUNCE_NANOS = 100_000_000L;
     private static final long PAGE_REQUEST_RETRY_NANOS = 1_000_000_000L;
 
     private final AEBaseGui<C> parent;
@@ -106,7 +106,7 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
     private final AETextField searchField;
     private final AETextField mappingField;
 
-    public GuiProviderSelection(AEBaseGui<C> parent) {
+    public ProviderSelectionOverlay(AEBaseGui<C> parent) {
         this.parent = parent;
         this.searchField = addTextField(
             GuiText.SearchPlaceholder.text(),
@@ -149,6 +149,7 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
         Objects.requireNonNull(initialMappingText, "initialMappingText");
         this.directory.searchText = initialSearchText;
         this.mapping.text = initialMappingText;
+        this.mapping.enabled = PatternProviderMappingData.isMappingEnabled();
         this.textInputTarget = TextInputTarget.NONE;
         exitMappingManagement();
         this.directory.scrollOffset = 0;
@@ -161,14 +162,15 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
         }
         this.screenOrigin = Point.fromTopLeft(this.parent.getBounds(true));
         applyPendingOpenPositionReset();
-        syncTextFieldsFromState();
         layoutCommandButtons();
         moveTextFields();
-        beginRequestGeneration(readHostDirectoryRevision(), true, true);
+        syncTextFieldsFromState();
+        beginRequestGeneration(readHostDirectoryRevision(), true, false);
     }
 
     private void close() {
         this.buttonPressState.clearPressedButton();
+        this.dynamicButtons.clear();
         this.visible = false;
         this.closeButton.setVisibility(false);
         this.reloadButton.setVisibility(false);
@@ -716,35 +718,24 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
                 tooltip.add(new TextComponentString(getRecipeTypeDisplayName(uid)));
             }
         }
-        if (!entry.hasMappingTarget()) {
-            tooltip.add(ButtonToolTips.ProviderSelectionEntryUpload.text());
+        tooltip.add(Tooltips.muted(ButtonToolTips.ProviderSelectionEntryUpload.text()));
+        if (!entry.hasMappingTarget() && !this.mapping.enabled) {
             return tooltip;
         }
-        if (!this.mapping.enabled) {
-            tooltip.add(ButtonToolTips.ProviderSelectionEntryUpload.text());
-            return tooltip;
+
+        if (!this.mapping.text.isEmpty()) {
+            ITextComponent mappingComponent = new TextComponentString(this.mapping.text);
+            tooltip.add(Tooltips.muted(ButtonToolTips.ProviderSelectionMappingBind.text(mappingComponent)));
+            tooltip.add(Tooltips.muted(ButtonToolTips.ProviderSelectionMappingBindAndUpload.text(mappingComponent)));
         }
-        tooltip.addAll(getProviderEntryTooltip(this.mapping.text));
-        tooltip.add(ButtonToolTips.ProviderSelectionMappingManage.text());
+        tooltip.add(Tooltips.muted(ButtonToolTips.ProviderSelectionMappingUnbind.text()));
+        tooltip.add(Tooltips.muted(ButtonToolTips.ProviderSelectionMappingManage.text()));
         return tooltip;
     }
 
     private static String getRecipeTypeDisplayName(String uid) {
         String title = Integrations.hei().getRecipeCategoryTitle(uid);
         return title == null || title.isEmpty() ? uid : title;
-    }
-
-    private static List<ITextComponent> getProviderEntryTooltip(String mappingInputText) {
-        Objects.requireNonNull(mappingInputText, "mappingInputText");
-
-        List<ITextComponent> tooltip = new ArrayList<>();
-        tooltip.add(ButtonToolTips.ProviderSelectionEntryUpload.text());
-        if (!mappingInputText.isEmpty()) {
-            tooltip.add(ButtonToolTips.ProviderSelectionMappingBind.text(new TextComponentString(mappingInputText)));
-            tooltip.add(ButtonToolTips.ProviderSelectionMappingBindAndUpload.text());
-        }
-        tooltip.add(ButtonToolTips.ProviderSelectionMappingUnbind.text());
-        return tooltip;
     }
 
     private static ITextComponent getMappingAddTooltip(String mappingInputText, String providerName) {
@@ -811,6 +802,10 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
     }
 
     boolean acceptSearchTextInput(String text) {
+        return acceptSearchTextInput(text, false);
+    }
+
+    private boolean acceptSearchTextInput(String text, boolean requestImmediately) {
         if (this.mapping.managedProvider != null) {
             return false;
         }
@@ -823,7 +818,7 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
             return false;
         }
         this.directory.searchText = boundedText;
-        scheduleSearchRequest();
+        scheduleSearchRequest(requestImmediately);
         return true;
     }
 
@@ -843,6 +838,7 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
 
     private void updateMappingInputVisibility() {
         this.mappingField.setVisible(this.mapping.enabled);
+        this.mappingField.setEnabled(this.mapping.enabled);
         if (!this.mapping.enabled && this.textInputTarget == TextInputTarget.MAPPING) {
             this.textInputTarget = TextInputTarget.NONE;
         }
@@ -1079,23 +1075,8 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
         }
 
         if (this.mapping.managedProvider != null) {
-            this.mapping.enabled = page.mappingEnabled();
-            if (!this.mapping.enabled) {
-                exitMappingManagement();
-                updateMappingInputVisibility();
-                rebuildButtons();
-                return;
-            }
             receiveManagedProviderDirectoryPage(page);
             return;
-        }
-
-        boolean wasMappingEnabled = this.mapping.enabled;
-        boolean mappingDisabledTransition = wasMappingEnabled && !page.mappingEnabled();
-        this.mapping.enabled = page.mappingEnabled();
-        if (mappingDisabledTransition) {
-            this.mapping.text = "";
-            updateMappingInputVisibility();
         }
 
         if (page.directoryRevision() > this.directory.activeRevision) {
@@ -1106,9 +1087,6 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
             page.windowId(), page.nonce(), page.directoryRevision(), page.page());
         this.directory.pendingPages.remove(page.page());
         if (existing != null) {
-            if (mappingDisabledTransition) {
-                rebuildButtons();
-            }
             return;
         }
 
@@ -1383,16 +1361,17 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
         });
     }
 
-    private void scheduleSearchRequest() {
+    private void scheduleSearchRequest(boolean requestImmediately) {
         this.directory.scrollOffset = 0;
         this.directory.searchRequestPending = true;
         this.directory.searchChangedAtNanos = System.nanoTime();
         if (this.mapping.managedProvider != null && this.mapping.directoryRefreshPending) {
             beginManagedDirectoryRefresh(
-                Math.max(this.directory.activeRevision, readHostDirectoryRevision()), false);
+                Math.max(this.directory.activeRevision, readHostDirectoryRevision()), requestImmediately);
             return;
         }
-        beginRequestGeneration(Math.max(this.directory.activeRevision, readHostDirectoryRevision()), false, false);
+        beginRequestGeneration(Math.max(this.directory.activeRevision, readHostDirectoryRevision()),
+            requestImmediately, false);
     }
 
     private void requestVisiblePages() {
@@ -1491,8 +1470,7 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
             focusSearchInput();
             if (button == 1) {
                 this.searchField.setText("");
-                updateSearchText();
-                rebuildButtons();
+                acceptSearchTextInput("", true);
                 return true;
             }
             return this.searchField.mouseClicked(mouseX, mouseY, button);
@@ -1724,6 +1702,7 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
         }
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private boolean isCurrentProviderDirectory(ProviderViewKey viewKey) {
         return this.visible
             && !this.mapping.directoryRefreshPending
@@ -1790,7 +1769,6 @@ public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSel
         return Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
     }
 
-    @Override
     public Collection<? extends GuiTextField> getTextFields() {
         return this.visible ? List.of(this.searchField, this.mappingField) : List.of();
     }

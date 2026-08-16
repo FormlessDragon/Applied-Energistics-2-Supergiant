@@ -18,11 +18,10 @@ import java.util.Set;
  * @param directoryRevision server directory revision represented by this page
  * @param page              zero-based page index
  * @param total             total number of providers in the complete directory
- * @param mappingEnabled    whether server-side pattern provider mapping is enabled
  * @param entries           entries carried by this page
  */
 public record ProviderDirectoryPage(int windowId, long nonce, long directoryRevision, int page, int total,
-                                    boolean mappingEnabled, List<Entry> entries) {
+                                    List<Entry> entries) {
     public ProviderDirectoryPage {
         if (windowId < 0) {
             throw new IllegalArgumentException("Provider directory window id must not be negative");
