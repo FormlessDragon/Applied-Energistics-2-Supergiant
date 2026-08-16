@@ -7,7 +7,6 @@ import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGrid;
-import ae2.api.networking.provider.ProviderSnapshot;
 import ae2.api.stacks.AEItemKey;
 import ae2.container.AEBaseContainer;
 import ae2.core.AELog;
@@ -20,6 +19,7 @@ import ae2.core.worlddata.PatternProviderMappingData.ProviderReference;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.patternprovider.PatternContainer;
 import ae2.helpers.patternprovider.PatternProviderLogicHost;
+import ae2.me.service.ActivePatternProviderDirectory;
 import ae2.parts.AEBasePart;
 import ae2.util.inv.AppEngInternalInventory;
 import ae2.util.inv.FilteredInternalInventory;
@@ -103,10 +103,11 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
 
     public void updateProviderVisibility() {
         IGrid grid = this.gridSupplier.get();
-        updateProviderVisibility(grid == null ? null : getProviderSnapshot(grid));
+        updateProviderVisibility(grid == null ? null
+            : grid.getService(ActivePatternProviderDirectory.class).getActiveProviders());
     }
 
-    public void updateProviderVisibility(@Nullable ProviderSnapshot discovery) {
+    public void updateProviderVisibility(@Nullable List<PatternContainer> discovery) {
         IGrid grid = this.gridSupplier.get();
         ShowPatternProviders shownProviders = getShownProviders();
         if (grid == null || discovery == null) {
@@ -126,7 +127,7 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
             rebuildTrackers = true;
         }
 
-        List<ProviderDirectoryEntry> providers = collectPatternAccessProviders(discovery.providers(), shownProviders);
+        List<ProviderDirectoryEntry> providers = collectPatternAccessProviders(discovery, shownProviders);
         List<ProviderStamp> signature = createProviderSignature(providers);
         boolean directoryChanged = rebuildTrackers
             || !this.providerDirectorySignature.equals(signature);
@@ -417,7 +418,8 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
             return;
         }
 
-        List<ProviderDirectoryEntry> providers = collectPatternAccessProviders(getProviderSnapshot(grid).providers(), shownProviders);
+        List<ProviderDirectoryEntry> providers = collectPatternAccessProviders(
+            grid.getService(ActivePatternProviderDirectory.class).getActiveProviders(), shownProviders);
         List<ProviderStamp> signature = createProviderSignature(providers);
         rememberProviderDirectory(grid, shownProviders, signature);
         sendFullUpdate(grid, providers);
@@ -503,10 +505,6 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
     private void scheduleProviderDirectoryRebuild() {
         this.providerDirectoryInitialized = false;
         this.ticksUntilProviderDirectoryScan = 0;
-    }
-
-    private static ProviderSnapshot getProviderSnapshot(IGrid grid) {
-        return ProviderSnapshot.get(grid);
     }
 
     private static boolean isAcceptedByContainer(PatternContainer container, @Nullable IPatternDetails details) {

@@ -7,7 +7,6 @@ import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGrid;
-import ae2.api.networking.provider.ProviderSnapshot;
 import ae2.api.networking.IGridNode;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
@@ -18,11 +17,8 @@ import ae2.container.GuiIds;
 import ae2.container.SlotSemantics;
 import ae2.container.guisync.GuiSync;
 import ae2.container.implementations.PatternModifierPanel;
-import ae2.container.me.patternaccess.PatternAccessSession;
-import ae2.container.me.patternencode.PatternProviderSelectionSupport.ProcessingPatternUploadPreparation;
-import ae2.container.me.patternencode.PatternProviderSelectionSupport.ProcessingPatternUploadResult;
-import ae2.container.me.patternencode.PatternProviderSelectionSupport.ProviderDirectoryEntry;
-import ae2.container.me.patternencode.PatternProviderSelectionSupport.ProviderMappingValidationResult;
+import ae2.container.me.patternencode.PatternProviderUploadService.ProcessingPatternUploadPreparation;
+import ae2.container.me.patternencode.PatternProviderUploadService.ProcessingPatternUploadResult;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.slot.FakeSlot;
 import ae2.container.slot.PatternTermSlot;
@@ -34,12 +30,11 @@ import ae2.core.network.NetworkPacketHelper;
 import ae2.core.network.clientbound.ProviderDirectoryPagePacket;
 import ae2.core.network.clientbound.ProviderMappingPagePacket;
 import ae2.core.worlddata.PatternProviderMappingData;
-import ae2.core.worlddata.PatternProviderMappingData.BindResult;
-import ae2.core.worlddata.PatternProviderMappingData.ProviderReference;
 import ae2.crafting.pattern.AECraftingPattern;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.helpers.IPatternTerminalGuiHost;
 import ae2.helpers.patternprovider.PatternContainer;
+import ae2.me.service.ActivePatternProviderDirectory.ProviderKey;
 import ae2.parts.encoding.EncodingMode;
 import ae2.parts.encoding.PatternEncodingLogic;
 import ae2.parts.encoding.ProcessingPatternAmountHelper;
@@ -49,12 +44,6 @@ import ae2.util.inv.FilteredInternalInventory;
 import ae2.util.inv.filter.IAEItemFilter;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
-import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.Reference2LongMap;
-import it.unimi.dsi.fastutil.objects.Reference2LongOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import it.unimi.dsi.fastutil.shorts.ShortSet;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
@@ -77,7 +66,7 @@ import java.util.List;
 import java.util.Objects;
 
 public class ContainerPatternEncodingTerm extends ContainerMEStorage
-    implements PatternModifierPanel.Host, IPatternProviderSelection {
+    implements PatternModifierPanel.Host, IProviderSelectionEndpoint {
     private static final int CRAFTING_GRID_WIDTH = 3;
     private static final int CRAFTING_GRID_HEIGHT = 3;
     private static final int CRAFTING_GRID_SLOTS = CRAFTING_GRID_WIDTH * CRAFTING_GRID_HEIGHT;
@@ -106,7 +95,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     private static final String ACTION_UNBIND_PROVIDER_MAPPING = "unbindProviderMapping";
     private static final String ACTION_REQUEST_PROVIDER_DIRECTORY_PAGE = "requestProviderDirectoryPage";
     private static final String ACTION_REQUEST_PROVIDER_MAPPING_PAGE = "requestProviderMappingPage";
-    private static final String ACTION_RELOAD_ALL_CURRENT_PROVIDERS = "reloadAllCurrentProviders";
+    private static final String ACTION_REBUILD_MAPPINGS_FROM_ACTIVE_PROVIDERS = "rebuildMappingsFromActiveProviders";
     private static final int MAX_RENAME_PROCESSING_PATTERN_ITEM_PAYLOAD_LENGTH = 512;
     private static final int MAX_SET_HEI_PROCESSING_RECIPE_PAYLOAD_LENGTH = 16384;
     static final int MAX_PROVIDER_MAPPING_ACTION_PAYLOAD_LENGTH = MAX_SET_HEI_PROCESSING_RECIPE_PAYLOAD_LENGTH;
@@ -116,9 +105,6 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         MAX_PROVIDER_DIRECTORY_PAGE_REQUEST_FIXED_JSON_LENGTH
             + ProviderPageLimits.MAX_QUERY_UTF16_LENGTH * 6;
     private static final int MAX_PROVIDER_MAPPING_PAGE_REQUEST_PAYLOAD_LENGTH = 128;
-    private static final int PROVIDER_DIRECTORY_SCAN_INTERVAL_TICKS = 10;
-    private static final int MAX_PROVIDER_ACTIONS_PER_WINDOW = 32;
-    private static final long PROVIDER_ACTION_WINDOW_NANOS = 1_000_000_000L;
     private static final int MAX_CUSTOM_NAME_LENGTH = 32;
     private static final int MAX_HEI_PROCESSING_RECIPE_INPUT_SLOTS = AEProcessingPattern.MAX_INPUT_SLOTS;
     private static final int MAX_HEI_PROCESSING_RECIPE_CANDIDATES_PER_SLOT = 256;
@@ -143,21 +129,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     private final ConfigInventory encodedInputsInv;
     private final ConfigInventory encodedOutputsInv;
     private final PatternModifierPanel patternModifierPanel;
-    private final Long2ObjectMap<ProviderSelectEntry> providerSelectEntriesById = new Long2ObjectLinkedOpenHashMap<>();
-    private final Reference2LongMap<PatternContainer> providerSelectIdsByContainer = new Reference2LongOpenHashMap<>();
-    private final Reference2LongMap<PatternContainer> providerIdentityOrdinals = new Reference2LongOpenHashMap<>();
-    private List<ProviderStamp> providerDirectorySignature = List.of();
-    private List<ProviderSelectEntry> providerDirectorySnapshot = List.of();
-    @Nullable
-    private IGrid observedProviderGrid;
-    private long observedMappingRevision = Long.MIN_VALUE;
-    private long nextProviderIdentityOrdinal;
-    private long nextProviderSelectEntryId;
-    private int ticksUntilProviderDirectoryScan;
-    private boolean observedProviderLinkConnected;
-    private boolean providerDirectoryInitialized;
-    private long providerActionWindowStartNanos = Long.MIN_VALUE;
-    private int providerActionCount;
+    private final ProviderSelectionSession providerSelectionSession;
     private boolean patternModifierPanelVisible;
     @GuiSync(97)
     public EncodingMode mode;
@@ -174,19 +146,17 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     @GuiSync(86)
     private long providerDirectoryRevision;
     @GuiSync(85)
-    private int providerSelectOverlayRequestNonce;
+    private int providerSelectionOverlayRequestNonce;
     @GuiSync(84)
-    private String providerSelectOverlaySearchText = "";
+    private String providerSelectionOverlaySearchText = "";
     @GuiSync(83)
-    private String providerSelectOverlayMappingText = "";
+    private String providerSelectionOverlayMappingText = "";
     @Nullable
     private IRecipe currentRecipe;
     @Nullable
     private HeiProcessingRecipeSnapshot heiProcessingRecipeSnapshot;
     private boolean changingEncodedPatternSlotInternally;
     private boolean clearOnClose;
-    @Nullable
-    private ProviderSnapshot providerDiscoverySnapshot;
 
     public ContainerPatternEncodingTerm(InventoryPlayer ip, IPatternTerminalGuiHost host) {
         this(GuiIds.GuiKey.PATTERN_ENCODING_TERMINAL, ip, host, true);
@@ -198,7 +168,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     }
 
     protected ContainerPatternEncodingTerm(GuiIds.GuiKey guiKey, InventoryPlayer ip, IPatternTerminalGuiHost host,
-                                           boolean bindInventory, boolean registerProviderSelectActions) {
+                                           boolean bindInventory, boolean registerProviderSelectionActions) {
         super(guiKey, ip, host, bindInventory);
         this.encodingLogic = host.getLogic();
         this.encodedInputsInv = this.encodingLogic.getEncodedInputInv();
@@ -232,6 +202,91 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         this.addSlot(this.encodedPatternSlot = new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.ENCODED_PATTERN,
             this.encodingLogic.getEncodedPatternInv(), 0), SlotSemantics.ENCODED_PATTERN);
         this.encodedPatternSlot.setStackLimit(1);
+        this.providerSelectionSession = new ProviderSelectionSession(new ProviderSelectionSession.Host() {
+            @Override
+            public boolean isLinkConnected() {
+                return ContainerPatternEncodingTerm.this.getHost().getLinkStatus().connected();
+            }
+
+            @Override
+            public IGrid getProviderSelectionGrid() {
+                return ContainerPatternEncodingTerm.this.getProviderSelectionGrid();
+            }
+
+            @Override
+            public IGrid requireProviderSelectionGrid() {
+                return ContainerPatternEncodingTerm.this.requireProviderSelectionGrid();
+            }
+
+            @Override
+            public PatternProviderMappingData getProviderMappingData() {
+                return ContainerPatternEncodingTerm.this.getPatternProviderMappingData();
+            }
+
+            @Override
+            public EntityPlayer getPlayer() {
+                return ContainerPatternEncodingTerm.this.getPlayer();
+            }
+
+            @Override
+            public World getWorld() {
+                return ContainerPatternEncodingTerm.this.getPlayer().world;
+            }
+
+            @Override
+            public int getWindowId() {
+                return ContainerPatternEncodingTerm.this.windowId;
+            }
+
+            @Override
+            public ItemStack getEncodedPattern() {
+                return ContainerPatternEncodingTerm.this.encodedPatternSlot.getStack().copy();
+            }
+
+            @Override
+            public void setEncodedPattern(ItemStack encodedPattern) {
+                ContainerPatternEncodingTerm.this.putEncodedPatternStackFromContainer(encodedPattern);
+            }
+
+            @Override
+            public ProcessingPatternUploadResult uploadProcessingPattern(ItemStack encodedPattern, IGrid grid,
+                                                                          ProviderKey target) {
+                return PatternProviderUploadService.tryUploadProcessingPatternToProvider(
+                    ContainerPatternEncodingTerm.this.getPlayer(),
+                    (IPatternTerminalGuiHost) ContainerPatternEncodingTerm.this.getHost(), grid, target, encodedPattern);
+            }
+
+            @Override
+            public ProcessingPatternUploadPreparation prepareProcessingPatternUpload(ItemStack encodedPattern,
+                                                                                      IGrid grid,
+                                                                                      ProviderKey target) {
+                return PatternProviderUploadService.prepareProcessingPatternUpload(
+                    ContainerPatternEncodingTerm.this.getPlayer(),
+                    (IPatternTerminalGuiHost) ContainerPatternEncodingTerm.this.getHost(), grid, target, encodedPattern);
+            }
+
+            @Override
+            public void sendProviderDirectoryPage(ProviderDirectoryPage page) {
+                ContainerPatternEncodingTerm.this.sendProviderDirectoryPage(page);
+            }
+
+            @Override
+            public void sendProviderMappingPage(ProviderMappingPage page) {
+                ContainerPatternEncodingTerm.this.sendProviderMappingPage(page);
+            }
+
+            @Override
+            public void syncProviderDirectoryRevision(long revision) {
+                ContainerPatternEncodingTerm.this.providerDirectoryRevision = revision;
+            }
+
+            @Override
+            public void syncProviderSelectionOverlay(ProviderSelectionSession.ProviderSelectionOverlayOpenRequest request) {
+                ContainerPatternEncodingTerm.this.providerSelectionOverlayRequestNonce = request.nonce();
+                ContainerPatternEncodingTerm.this.providerSelectionOverlaySearchText = request.searchText();
+                ContainerPatternEncodingTerm.this.providerSelectionOverlayMappingText = request.mappingText();
+            }
+        });
 
         registerClientAction(ACTION_ENCODE, Boolean.class, this::encode);
         registerClientAction(ACTION_CLEAR, this::clear);
@@ -262,8 +317,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         registerClientAction(ACTION_UPLOAD_PATTERN, Boolean.class, this::uploadPattern);
         registerClientAction(ACTION_SET_PATTERN_MODIFIER_PANEL_VISIBLE, Boolean.class,
             this::setPatternModifierPanelVisibleFromClient);
-        if (registerProviderSelectActions) {
-            registerProviderSelectActions();
+        if (registerProviderSelectionActions) {
+            registerProviderSelectionActions();
         }
         this.patternModifierPanel = new PatternModifierPanel(this);
         this.patternModifierPanelAvailable = this.patternModifierPanel.isAvailable();
@@ -274,41 +329,63 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         tryAutoFillBlankPatterns();
     }
 
-    private void registerProviderSelectActions() {
-        registerClientAction(ACTION_UPLOAD_PROCESSING_PATTERN_TO_PROVIDER, Long.class,
-            this::uploadProcessingPatternToProvider);
-        registerClientAction(ACTION_BIND_PROVIDER_MAPPING, ProviderMappingByIdAction.class,
-            MAX_PROVIDER_MAPPING_ACTION_PAYLOAD_LENGTH, this::bindProviderMapping);
-        registerClientAction(ACTION_BIND_AND_UPLOAD_PROVIDER_MAPPING, ProviderMappingByIdAction.class,
-            MAX_PROVIDER_MAPPING_ACTION_PAYLOAD_LENGTH, this::bindAndUploadProcessingPatternToProvider);
-        registerClientAction(ACTION_UNBIND_PROVIDER_MAPPING, ProviderMappingByIdAction.class,
-            MAX_PROVIDER_MAPPING_ACTION_PAYLOAD_LENGTH, this::unbindProviderMapping);
+    private void registerProviderSelectionActions() {
+        registerClientAction(ACTION_UPLOAD_PROCESSING_PATTERN_TO_PROVIDER,
+            ProviderSelectionSession.ProviderEntryAction.class, this::handleProviderEntryUpload);
+        registerClientAction(ACTION_BIND_PROVIDER_MAPPING, ProviderSelectionSession.ProviderMappingAction.class,
+            MAX_PROVIDER_MAPPING_ACTION_PAYLOAD_LENGTH, this::handleProviderMappingBind);
+        registerClientAction(ACTION_BIND_AND_UPLOAD_PROVIDER_MAPPING, ProviderSelectionSession.ProviderMappingAction.class,
+            MAX_PROVIDER_MAPPING_ACTION_PAYLOAD_LENGTH, this::handleProviderMappingBindAndUpload);
+        registerClientAction(ACTION_UNBIND_PROVIDER_MAPPING, ProviderSelectionSession.ProviderMappingAction.class,
+            MAX_PROVIDER_MAPPING_ACTION_PAYLOAD_LENGTH, this::handleProviderMappingUnbind);
         registerClientAction(ACTION_REQUEST_PROVIDER_DIRECTORY_PAGE, ProviderDirectoryPageRequest.class,
-            MAX_PROVIDER_DIRECTORY_PAGE_REQUEST_PAYLOAD_LENGTH, this::requestProviderDirectoryPage);
+            MAX_PROVIDER_DIRECTORY_PAGE_REQUEST_PAYLOAD_LENGTH, this::handleProviderDirectoryPageRequest);
         registerClientAction(ACTION_REQUEST_PROVIDER_MAPPING_PAGE, ProviderMappingPageRequest.class,
-            MAX_PROVIDER_MAPPING_PAGE_REQUEST_PAYLOAD_LENGTH, this::requestProviderMappingPage);
-        registerClientAction(ACTION_RELOAD_ALL_CURRENT_PROVIDERS, this::reloadAllCurrentProviders);
+            MAX_PROVIDER_MAPPING_PAGE_REQUEST_PAYLOAD_LENGTH, this::handleProviderMappingPageRequest);
+        registerClientAction(ACTION_REBUILD_MAPPINGS_FROM_ACTIVE_PROVIDERS,
+            this::handleRebuildMappingsFromActiveProviders);
     }
 
-    private boolean allowProviderAction(String action) {
-        if (isClientSide()) {
-            return true;
+    private void handleProviderEntryUpload(ProviderSelectionSession.ProviderEntryAction action) {
+        if (isServerSide()) {
+            this.providerSelectionSession.uploadProcessingPatternToProvider(action);
         }
+    }
 
-        long now = System.nanoTime();
-        if (this.providerActionWindowStartNanos == Long.MIN_VALUE
-            || now < this.providerActionWindowStartNanos
-            || now - this.providerActionWindowStartNanos >= PROVIDER_ACTION_WINDOW_NANOS) {
-            this.providerActionWindowStartNanos = now;
-            this.providerActionCount = 0;
+    private void handleProviderMappingBind(ProviderSelectionSession.ProviderMappingAction action) {
+        if (isServerSide()) {
+            this.providerSelectionSession.bindProviderMapping(action);
         }
-        if (this.providerActionCount >= MAX_PROVIDER_ACTIONS_PER_WINDOW) {
-            PatternProviderSelectionSupport.warnProviderAction("rate-limit:" + action,
-                "Ignoring provider action after exceeding the per-container request rate limit: %s", action);
-            return false;
+    }
+
+    private void handleProviderMappingBindAndUpload(ProviderSelectionSession.ProviderMappingAction action) {
+        if (isServerSide()) {
+            this.providerSelectionSession.bindAndUploadProcessingPatternToProvider(action);
         }
-        this.providerActionCount++;
-        return true;
+    }
+
+    private void handleProviderMappingUnbind(ProviderSelectionSession.ProviderMappingAction action) {
+        if (isServerSide()) {
+            this.providerSelectionSession.unbindProviderMapping(action);
+        }
+    }
+
+    private void handleProviderDirectoryPageRequest(ProviderDirectoryPageRequest request) {
+        if (isServerSide()) {
+            this.providerSelectionSession.requestProviderDirectoryPage(request);
+        }
+    }
+
+    private void handleProviderMappingPageRequest(ProviderMappingPageRequest request) {
+        if (isServerSide()) {
+            this.providerSelectionSession.requestProviderMappingPage(request);
+        }
+    }
+
+    private void handleRebuildMappingsFromActiveProviders() {
+        if (isServerSide()) {
+            this.providerSelectionSession.rebuildMappingsFromActiveProviders();
+        }
     }
 
     private static String actionForProcessingAmountOperation(ProcessingPatternAmountHelper.Operation operation) {
@@ -338,7 +415,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     @Override
     public void broadcastChanges() {
         if (isServerSide()) {
-            refreshProviderDirectory(false, true);
+            this.providerSelectionSession.onBroadcastChanges();
         }
         super.broadcastChanges();
         if (isServerSide()) {
@@ -547,7 +624,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         }
 
         if (this.mode == EncodingMode.PROCESSING && shiftDown) {
-            openProcessingPatternProviderSelect("", getValidHeiProcessingRecipeTypeUid());
+            openProcessingPatternProviderSelection("", getValidHeiProcessingRecipeTypeUid());
             return;
         }
 
@@ -558,7 +635,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         }
 
         IPatternDetails details = PatternDetailsHelper.decodePattern(encodedPattern, getPlayer().world);
-        IGrid grid = getProviderSelectGrid();
+        IGrid grid = getProviderSelectionGrid();
         if (this.mode == EncodingMode.PROCESSING) {
             if (!(details instanceof AEProcessingPattern processingPattern)) {
                 getPlayer().sendStatusMessage(PlayerMessages.PatternUploadProcessingOnly.text(), false);
@@ -624,7 +701,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
             processingPattern.getRecipeType(), new ProcessingPatternUploadActions() {
                 @Override
                 public List<PatternContainer> findProcessingPatternUploadTargets(IGrid grid, String recipeTypeUid) {
-                    return PatternProviderSelectionSupport.findProcessingPatternUploadTargets(
+                    return PatternProviderUploadService.findProcessingPatternUploadTargets(
                         getPatternProviderMappingData(), grid, recipeTypeUid);
                 }
 
@@ -637,8 +714,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
                 }
 
                 @Override
-                public void openProcessingPatternProviderSelect(String initialSearchText, String initialMappingText) {
-                    ContainerPatternEncodingTerm.this.openProcessingPatternProviderSelect(initialSearchText,
+                public void openProcessingPatternProviderSelection(String initialSearchText, String initialMappingText) {
+                    ContainerPatternEncodingTerm.this.openProcessingPatternProviderSelection(initialSearchText,
                         initialMappingText);
                 }
 
@@ -653,10 +730,10 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
                                         @Nullable String recipeTypeUid, @Nullable String recipeTypeTitle,
                                         ProcessingPatternUploadActions actions) {
         Objects.requireNonNull(actions, "actions");
-        PatternProviderSelectionSupport.UploadPlan uploadPlan =
-            PatternProviderSelectionSupport.getImmediateProcessingPatternUploadPlan(recipeTypeUid, recipeTypeTitle);
-        if (uploadPlan.openProviderSelect()) {
-            actions.openProcessingPatternProviderSelect(uploadPlan.initialSearchText(),
+        PatternProviderUploadService.UploadPlan uploadPlan =
+            PatternProviderUploadService.getImmediateProcessingPatternUploadPlan(recipeTypeUid, recipeTypeTitle);
+        if (uploadPlan.openProviderSelection()) {
+            actions.openProcessingPatternProviderSelection(uploadPlan.initialSearchText(),
                 uploadPlan.initialMappingText());
             return;
         }
@@ -664,9 +741,9 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         String automaticRecipeTypeUid = uploadPlan.recipeTypeUid();
 
         if (grid == null) {
-            PatternProviderSelectionSupport.UploadPlan fallbackPlan =
-                PatternProviderSelectionSupport.getProcessingPatternFallbackPlan(recipeTypeUid, recipeTypeTitle, true);
-            actions.openProcessingPatternProviderSelect(fallbackPlan.initialSearchText(),
+            PatternProviderUploadService.UploadPlan fallbackPlan =
+                PatternProviderUploadService.getProcessingPatternFallbackPlan(recipeTypeUid, recipeTypeTitle, true);
+            actions.openProcessingPatternProviderSelection(fallbackPlan.initialSearchText(),
                 fallbackPlan.initialMappingText());
             return;
         }
@@ -682,22 +759,22 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
             recipeTypeTitle, actions);
     }
 
-    protected void openProcessingPatternProviderSelect(@Nullable String initialSearchText,
+    protected void openProcessingPatternProviderSelection(@Nullable String initialSearchText,
                                                        @Nullable String initialMappingText) {
-        openProviderSelect(initialSearchText, initialMappingText);
+        openProviderSelection(initialSearchText, initialMappingText);
     }
 
     private static void handleNoProcessingPatternAutomaticTarget(@Nullable IGrid grid, String recipeTypeUid,
                                                                  @Nullable String recipeTypeTitle,
                                                                  ProcessingPatternUploadActions actions) {
-        PatternProviderSelectionSupport.UploadPlan fallbackPlan =
-            PatternProviderSelectionSupport.getProcessingPatternUploadTargetPlan(0, recipeTypeUid, recipeTypeTitle,
-                grid != null && PatternProviderSelectionSupport.hasAvailableProvider(grid));
-        if (!fallbackPlan.openProviderSelect()) {
+        PatternProviderUploadService.UploadPlan fallbackPlan =
+            PatternProviderUploadService.getProcessingPatternUploadTargetPlan(0, recipeTypeUid, recipeTypeTitle,
+                grid != null && PatternProviderUploadService.hasAvailableProvider(grid));
+        if (!fallbackPlan.openProviderSelection()) {
             actions.sendNoProviderTargetMessage();
             return;
         }
-        actions.openProcessingPatternProviderSelect(fallbackPlan.initialSearchText(),
+        actions.openProcessingPatternProviderSelection(fallbackPlan.initialSearchText(),
             fallbackPlan.initialMappingText());
     }
 
@@ -706,11 +783,11 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
                                                            String recipeTypeUid,
                                                            @Nullable String recipeTypeTitle,
                                                            ProcessingPatternUploadActions actions) {
-        PatternProviderSelectionSupport.UploadPlan uploadPlan =
-            PatternProviderSelectionSupport.getProcessingPatternUploadTargetPlan(uploadTargets.size(), recipeTypeUid,
-                recipeTypeTitle, PatternProviderSelectionSupport.hasAvailableProvider(grid));
-        if (uploadPlan.openProviderSelect()) {
-            actions.openProcessingPatternProviderSelect(uploadPlan.initialSearchText(),
+        PatternProviderUploadService.UploadPlan uploadPlan =
+            PatternProviderUploadService.getProcessingPatternUploadTargetPlan(uploadTargets.size(), recipeTypeUid,
+                recipeTypeTitle, PatternProviderUploadService.hasAvailableProvider(grid));
+        if (uploadPlan.openProviderSelection()) {
+            actions.openProcessingPatternProviderSelection(uploadPlan.initialSearchText(),
                 uploadPlan.initialMappingText());
             return;
         }
@@ -723,348 +800,111 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         ProcessingPatternUploadResult result = actions.uploadProcessingPatternToProvider(encodedPattern, grid,
             uploadTargets.getFirst());
         if (result == ProcessingPatternUploadResult.NO_PROVIDER_TARGET
-            && PatternProviderSelectionSupport.hasAvailableProvider(grid)) {
-            PatternProviderSelectionSupport.UploadPlan fallbackPlan =
-                PatternProviderSelectionSupport.getProcessingPatternFallbackPlan(recipeTypeUid, recipeTypeTitle, true);
-            actions.openProcessingPatternProviderSelect(fallbackPlan.initialSearchText(),
+            && PatternProviderUploadService.hasAvailableProvider(grid)) {
+            PatternProviderUploadService.UploadPlan fallbackPlan =
+                PatternProviderUploadService.getProcessingPatternFallbackPlan(recipeTypeUid, recipeTypeTitle, true);
+            actions.openProcessingPatternProviderSelection(fallbackPlan.initialSearchText(),
                 fallbackPlan.initialMappingText());
         }
     }
 
     protected ProcessingPatternUploadResult uploadProcessingPatternToProvider(ItemStack encodedPattern, IGrid grid,
                                                                               PatternContainer uploadTarget) {
-        return PatternProviderSelectionSupport.tryUploadProcessingPatternToProvider(getPlayer(),
-            (IPatternTerminalGuiHost) getHost(), grid, uploadTarget, encodedPattern);
-    }
-
-    protected ProcessingPatternUploadPreparation prepareProcessingPatternUpload(ItemStack encodedPattern,
-                                                                                IGrid grid,
-                                                                                PatternContainer uploadTarget) {
-        return PatternProviderSelectionSupport.prepareProcessingPatternUpload(getPlayer(),
+        return PatternProviderUploadService.tryUploadProcessingPatternToProvider(getPlayer(),
             (IPatternTerminalGuiHost) getHost(), grid, uploadTarget, encodedPattern);
     }
 
     @Override
-    public void uploadProcessingPatternToProvider(long inventoryId) {
+    public void uploadProcessingPatternToProvider(long directoryRevision, long providerEntryId) {
+        ProviderSelectionSession.ProviderEntryAction action =
+            new ProviderSelectionSession.ProviderEntryAction(directoryRevision, providerEntryId);
         if (isClientSide()) {
-            sendClientAction(ACTION_UPLOAD_PROCESSING_PATTERN_TO_PROVIDER, inventoryId);
+            sendClientAction(ACTION_UPLOAD_PROCESSING_PATTERN_TO_PROVIDER, action);
             return;
         }
-        if (!allowProviderAction("upload")) {
-            return;
-        }
-
-        IGrid grid = requireProviderSelectGrid();
-        if (grid == null) {
-            return;
-        }
-        refreshProviderDirectory(true);
-        ProviderSelectEntry entry = getProviderSelectActionEntry(inventoryId, "upload processing pattern to");
-        if (entry == null) {
-            return;
-        }
-
-        ProcessingPatternUploadResult result = uploadProcessingPatternToProvider(
-            this.encodedPatternSlot.getStack(), grid, entry.container);
-        if (result == ProcessingPatternUploadResult.SUCCESS) {
-            refreshProviderDirectory(true);
-        }
-    }
-
-    private static String getProcessingRecipeTypeUid(@Nullable String value) {
-        return value == null ? "" : value;
-    }
-
-    private static String trimProcessingRecipeText(@Nullable String value) {
-        return value == null ? "" : value.trim();
+        this.providerSelectionSession.uploadProcessingPatternToProvider(action);
     }
 
     @Override
-    public void bindProviderMapping(long inventoryId, String mappingText) {
-        ProviderMappingByIdAction action = new ProviderMappingByIdAction(inventoryId, mappingText);
+    public void bindProviderMapping(long directoryRevision, long providerEntryId, String mappingText) {
+        ProviderSelectionSession.ProviderMappingAction action =
+            new ProviderSelectionSession.ProviderMappingAction(directoryRevision, providerEntryId, mappingText);
         if (isClientSide()) {
             sendClientAction(ACTION_BIND_PROVIDER_MAPPING, action);
             return;
         }
-
-        bindProviderMapping(action);
-    }
-
-    private void bindProviderMapping(ProviderMappingByIdAction action) {
-        if (isClientSide()) {
-            sendClientAction(ACTION_BIND_PROVIDER_MAPPING, action);
-            return;
-        }
-        if (!allowProviderAction("bind-mapping")) {
-            return;
-        }
-        if (!PatternProviderMappingData.isMappingEnabled()) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingDisabled.text(), false);
-            return;
-        }
-        if (action == null || action.inventoryId == null) {
-            PatternProviderSelectionSupport.warnProviderAction("bind-mapping:missing-id",
-                "Ignoring provider mapping action without a provider-select target id");
-            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
-            return;
-        }
-
-        String mappingText = normalizeProviderMappingText(action.mappingText());
-        if (mappingText == null) {
-            return;
-        }
-
-        IGrid grid = requireProviderSelectGrid();
-        if (grid == null) {
-            return;
-        }
-        refreshProviderDirectory(true);
-        ProviderSelectEntry entry = getProviderSelectActionEntry(action.inventoryId(), "bind mapping for");
-        if (entry == null) {
-            return;
-        }
-
-        PatternProviderMappingData mappingData = getPatternProviderMappingData();
-        ProviderReference reference = requireProviderReference(entry, "bind mapping for");
-        if (reference == null) {
-            return;
-        }
-        ProviderMappingValidationResult validation = PatternProviderSelectionSupport.validateProviderMapping(
-            mappingData, entry.container, reference, mappingText);
-        if (validation != ProviderMappingValidationResult.SUCCESS) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingInvalid.text(), false);
-            return;
-        }
-        BindResult bindResult = mappingData.bind(mappingText, reference);
-        if (bindResult == BindResult.ADDED) {
-            refreshProviderDirectory(false);
-        } else if (bindResult == BindResult.DISABLED) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingDisabled.text(), false);
-        } else if (bindResult == BindResult.LIMIT_REACHED) {
-            getPlayer().sendStatusMessage(
-                PlayerMessages.PatternProviderMappingLimitReached.text(PatternProviderMappingData.getMappingLimit()), false);
-        }
+        this.providerSelectionSession.bindProviderMapping(action);
     }
 
     @Override
-    public void bindAndUploadProcessingPatternToProvider(long inventoryId, String recipeTypeUid) {
-        ProviderMappingByIdAction action = new ProviderMappingByIdAction(inventoryId, recipeTypeUid);
+    public void bindAndUploadProcessingPatternToProvider(long directoryRevision, long providerEntryId,
+                                                          String recipeTypeUid) {
+        ProviderSelectionSession.ProviderMappingAction action =
+            new ProviderSelectionSession.ProviderMappingAction(directoryRevision, providerEntryId, recipeTypeUid);
         if (isClientSide()) {
             sendClientAction(ACTION_BIND_AND_UPLOAD_PROVIDER_MAPPING, action);
             return;
         }
-        bindAndUploadProcessingPatternToProvider(action);
-    }
-
-    private void bindAndUploadProcessingPatternToProvider(ProviderMappingByIdAction action) {
-        if (!allowProviderAction("bind-and-upload")) {
-            return;
-        }
-        if (!PatternProviderMappingData.isMappingEnabled()) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingDisabled.text(), false);
-            return;
-        }
-        if (action == null || action.inventoryId == null) {
-            PatternProviderSelectionSupport.warnProviderAction("bind-and-upload:missing-id",
-                "Ignoring provider bind-and-upload action without a provider-select target id");
-            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
-            return;
-        }
-        String recipeTypeUid = normalizeProviderMappingText(action.mappingText());
-        if (recipeTypeUid == null) {
-            return;
-        }
-
-        IGrid grid = requireProviderSelectGrid();
-        if (grid == null) {
-            return;
-        }
-        refreshProviderDirectory(true);
-        ProviderSelectEntry entry = getProviderSelectActionEntry(action.inventoryId(), "bind mapping and upload to");
-        if (entry == null) {
-            return;
-        }
-
-        PatternProviderMappingData mappingData = getPatternProviderMappingData();
-        ProviderReference reference = requireProviderReference(entry, "bind mapping and upload to");
-        if (reference == null) {
-            return;
-        }
-        ProviderMappingValidationResult mappingValidation = PatternProviderSelectionSupport.validateProviderMapping(
-            mappingData, entry.container, reference, recipeTypeUid);
-        if (mappingValidation != ProviderMappingValidationResult.SUCCESS) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingInvalid.text(), false);
-            return;
-        }
-
-        if (mappingData.getRecipeTypeCount(reference) >= PatternProviderMappingData.getMappingLimit()
-            && !mappingData.getRecipeTypes(reference).contains(recipeTypeUid)) {
-            getPlayer().sendStatusMessage(
-                PlayerMessages.PatternProviderMappingLimitReached.text(PatternProviderMappingData.getMappingLimit()), false);
-            return;
-        }
-
-        IPatternTerminalGuiHost host = (IPatternTerminalGuiHost) getHost();
-        ProcessingPatternUploadPreparation upload = prepareProcessingPatternUpload(
-            this.encodedPatternSlot.getStack(), grid, entry.container);
-        if (!upload.ready()) {
-            return;
-        }
-
-        ItemStack sourceBeforeCommit = host.getLogic().getEncodedPatternInv().getStackInSlot(0).copy();
-        try {
-            if (!upload.commit()) {
-                throw new IllegalStateException(
-                    "Provider rejected a processing pattern after accepting the simulated insertion");
-            }
-            host.getLogic().getEncodedPatternInv().setItemDirect(0, ItemStack.EMPTY);
-            BindResult bindResult = mappingData.bind(recipeTypeUid, reference);
-            if (bindResult == BindResult.LIMIT_REACHED) {
-                throw new IllegalStateException("Provider mapping limit reached after upload");
-            }
-        } catch (RuntimeException e) {
-            upload.restoreTargetSlotAfterFailure(e);
-            try {
-                host.getLogic().getEncodedPatternInv().setItemDirect(0, sourceBeforeCommit);
-            } catch (RuntimeException restoreFailure) {
-                e.addSuppressed(restoreFailure);
-            }
-            NetworkPacketHelper.warnFailedPacket(e, "provider-bind-and-upload",
-                "Failed to atomically bind and upload a processing pattern to provider %s",
-                reference);
-            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderBindAndUploadFailed.text(), false);
-            refreshProviderDirectory(true);
-            return;
-        }
-        refreshProviderDirectory(true);
-    }
-
-    @Nullable
-    private String normalizeProviderMappingText(@Nullable String mappingText) {
-        if (mappingText == null) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingBlank.text(), false);
-            return null;
-        }
-        try {
-            return PatternProviderMappingData.normalizeRecipeTypeUid(mappingText);
-        } catch (IllegalArgumentException e) {
-            getPlayer().sendStatusMessage(mappingText.trim().isEmpty()
-                ? PlayerMessages.PatternProviderMappingBlank.text()
-                : PlayerMessages.PatternProviderMappingInvalid.text(), false);
-            return null;
-        }
+        this.providerSelectionSession.bindAndUploadProcessingPatternToProvider(action);
     }
 
     @Override
-    public void unbindProviderMapping(long inventoryId) {
-        unbindProviderMapping(inventoryId, null);
+    public void unbindProviderMapping(long directoryRevision, long providerEntryId) {
+        unbindProviderMapping(directoryRevision, providerEntryId, null);
     }
 
     @Override
-    public void unbindProviderMapping(long inventoryId, @Nullable String recipeType) {
-        ProviderMappingByIdAction action = new ProviderMappingByIdAction(inventoryId, recipeType);
+    public void unbindProviderMapping(long directoryRevision, long providerEntryId, @Nullable String recipeType) {
+        ProviderSelectionSession.ProviderMappingAction action =
+            new ProviderSelectionSession.ProviderMappingAction(directoryRevision, providerEntryId, recipeType);
         if (isClientSide()) {
             sendClientAction(ACTION_UNBIND_PROVIDER_MAPPING, action);
             return;
         }
-        unbindProviderMapping(action);
-    }
-
-    private void unbindProviderMapping(ProviderMappingByIdAction action) {
-        if (!allowProviderAction("unbind-mapping")) {
-            return;
-        }
-        if (!PatternProviderMappingData.isMappingEnabled()) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingDisabled.text(), false);
-            return;
-        }
-        if (action == null || action.inventoryId == null) {
-            PatternProviderSelectionSupport.warnProviderAction("unbind-mapping:missing-id",
-                "Ignoring provider mapping unbind action without a provider-select target id");
-            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
-            return;
-        }
-        IGrid grid = requireProviderSelectGrid();
-        if (grid == null) {
-            return;
-        }
-        refreshProviderDirectory(true);
-        ProviderSelectEntry entry = getProviderSelectActionEntry(action.inventoryId(), "unbind mapping for");
-        if (entry == null) {
-            return;
-        }
-
-        PatternProviderMappingData mappingData = getPatternProviderMappingData();
-        ProviderReference reference = requireProviderReference(entry, "unbind mapping for");
-        if (reference == null) {
-            return;
-        }
-        String requestedRecipeType = action.mappingText();
-        boolean unbindAll = requestedRecipeType == null;
-        String recipeType = unbindAll ? null : normalizeProviderMappingText(requestedRecipeType);
-        if (!unbindAll && recipeType == null) {
-            return;
-        }
-        boolean changed = unbindAll
-            ? mappingData.unbindAll(reference)
-            : mappingData.unbind(reference, Objects.requireNonNull(recipeType, "recipeType"));
-        if (!changed) {
-            PatternProviderSelectionSupport.warnProviderAction("unbind-mapping:no-match:" + action.inventoryId(),
-                "Cannot unbind provider mapping for provider-select target without matching mappings: %d",
-                action.inventoryId());
-            getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
-            return;
-        }
-        refreshProviderDirectory(false);
+        this.providerSelectionSession.unbindProviderMapping(action);
     }
 
     @Override
-    public void reloadAllCurrentProviders() {
+    public void rebuildMappingsFromActiveProviders() {
         if (isClientSide()) {
-            sendClientAction(ACTION_RELOAD_ALL_CURRENT_PROVIDERS);
+            sendClientAction(ACTION_REBUILD_MAPPINGS_FROM_ACTIVE_PROVIDERS);
             return;
         }
-        if (!allowProviderAction("reload-mappings")) {
-            return;
-        }
-        if (!PatternProviderMappingData.isMappingEnabled()) {
-            getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingDisabled.text(), false);
-            return;
-        }
-        if (requireProviderSelectGrid() == null) {
-            return;
-        }
-
-        refreshProviderDirectory(true);
-        List<PatternProviderSelectionSupport.ProviderMappingReloadTarget> targets = new ObjectArrayList<>();
-        for (ProviderSelectEntry entry : this.providerDirectorySnapshot) {
-            if (entry.reference != null) {
-                targets.add(new PatternProviderSelectionSupport.ProviderMappingReloadTarget(
-                    entry.container, entry.reference));
-            }
-        }
-        PatternProviderSelectionSupport.reloadProviderMappings(
-            getPatternProviderMappingData(), getPlayer().world, targets);
-        refreshProviderDirectory(false);
+        this.providerSelectionSession.rebuildMappingsFromActiveProviders();
     }
 
-    private void openProviderSelect(@Nullable String initialSearchText, @Nullable String initialMappingText) {
+    @Override
+    public void requestProviderDirectoryPage(long nonce, String query, int page,
+                                             @Nullable ProviderDirectoryPageRequest.Focus focus) {
+        ProviderDirectoryPageRequest request = new ProviderDirectoryPageRequest(nonce, query, page, focus);
+        if (isClientSide()) {
+            sendClientAction(ACTION_REQUEST_PROVIDER_DIRECTORY_PAGE, request);
+            return;
+        }
+        this.providerSelectionSession.requestProviderDirectoryPage(request);
+    }
+
+    @Override
+    public void requestProviderMappingPage(long nonce, long directoryRevision, long providerEntryId, int page) {
+        ProviderMappingPageRequest request =
+            new ProviderMappingPageRequest(nonce, directoryRevision, providerEntryId, page);
+        if (isClientSide()) {
+            sendClientAction(ACTION_REQUEST_PROVIDER_MAPPING_PAGE, request);
+            return;
+        }
+        this.providerSelectionSession.requestProviderMappingPage(request);
+    }
+
+    private void openProviderSelection(@Nullable String initialSearchText, @Nullable String initialMappingText) {
         if (isClientSide()) {
             return;
         }
 
-        refreshProviderDirectory(true);
-        ProviderSelectOverlayOpenRequest request = createProviderSelectOverlayOpenRequest(
-            initialSearchText,
-            initialMappingText,
-            this.providerSelectOverlayRequestNonce);
-        this.providerSelectOverlayRequestNonce = request.nonce();
-        this.providerSelectOverlaySearchText = request.searchText();
-        this.providerSelectOverlayMappingText = request.mappingText();
+        this.providerSelectionSession.open(initialSearchText, initialMappingText);
     }
 
     @Nullable
-    protected IGrid getProviderSelectGrid() {
+    protected IGrid getProviderSelectionGrid() {
         if (!getHost().getLinkStatus().connected()) {
             return null;
         }
@@ -1077,7 +917,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     }
 
     @Nullable
-    private IGrid requireProviderSelectGrid() {
+    private IGrid requireProviderSelectionGrid() {
         ILinkStatus linkStatus = getHost().getLinkStatus();
         if (!linkStatus.connected()) {
             getPlayer().sendStatusMessage(linkStatus.statusDescription() != null
@@ -1085,7 +925,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
                 : PlayerMessages.PatternUploadNoProviderTarget.text(), false);
             return null;
         }
-        IGrid grid = getProviderSelectGrid();
+        IGrid grid = getProviderSelectionGrid();
         if (grid == null) {
             getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
         }
@@ -1102,357 +942,6 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
 
     protected void sendProviderMappingPage(ProviderMappingPage page) {
         sendPacketToClient(new ProviderMappingPagePacket(page));
-    }
-
-    private void refreshProviderDirectory(boolean forceProviderScan) {
-        refreshProviderDirectory(forceProviderScan, false);
-    }
-
-    private void refreshProviderDirectory(boolean forceProviderScan, boolean advanceScheduledScan) {
-        boolean linkConnected = getHost().getLinkStatus().connected();
-        IGrid grid = linkConnected ? getProviderSelectGrid() : null;
-        boolean contextChanged = !this.providerDirectoryInitialized
-            || linkConnected != this.observedProviderLinkConnected
-            || grid != this.observedProviderGrid;
-
-        if (grid == null) {
-            updateDisconnectedProviderDirectory(linkConnected, contextChanged);
-            return;
-        }
-
-        PatternProviderMappingData mappingData = getPatternProviderMappingData();
-        long mappingRevision = mappingData.getRevision();
-        boolean mappingChanged = mappingRevision != this.observedMappingRevision;
-        boolean scheduledScan = forceProviderScan
-            || advanceScheduledScan && --this.ticksUntilProviderDirectoryScan <= 0;
-        if (!contextChanged && !mappingChanged && !scheduledScan) {
-            return;
-        }
-
-        boolean scannedProviders = contextChanged || scheduledScan;
-        List<ProviderSelectEntry> currentSnapshot = this.providerDirectorySnapshot;
-        List<ProviderStamp> currentSignature;
-        if (scannedProviders) {
-            currentSnapshot = collectProviderDirectorySnapshot(grid);
-        }
-        currentSignature = createProviderSignature(currentSnapshot, mappingData);
-
-        boolean directoryChanged = contextChanged
-            || !this.providerDirectorySignature.equals(currentSignature);
-        this.observedProviderLinkConnected = linkConnected;
-        this.observedProviderGrid = grid;
-        this.observedMappingRevision = mappingRevision;
-        this.providerDirectoryInitialized = true;
-        if (scannedProviders) {
-            this.ticksUntilProviderDirectoryScan = PROVIDER_DIRECTORY_SCAN_INTERVAL_TICKS;
-        }
-
-        if (!directoryChanged) {
-            return;
-        }
-
-        if (scannedProviders) {
-            rebuildProviderDirectorySnapshot(currentSnapshot);
-        }
-        this.providerDirectorySignature = currentSignature;
-        incrementProviderDirectoryRevision();
-    }
-
-    private void updateDisconnectedProviderDirectory(boolean linkConnected, boolean contextChanged) {
-        boolean directoryChanged = this.providerDirectoryInitialized
-            && (contextChanged || !this.providerDirectorySnapshot.isEmpty());
-        this.observedProviderLinkConnected = linkConnected;
-        this.observedProviderGrid = null;
-        this.observedMappingRevision = Long.MIN_VALUE;
-        this.ticksUntilProviderDirectoryScan = PROVIDER_DIRECTORY_SCAN_INTERVAL_TICKS;
-        this.providerDirectoryInitialized = true;
-        if (!directoryChanged) {
-            return;
-        }
-
-        this.providerDirectorySignature = List.of();
-        this.providerDirectorySnapshot = List.of();
-        this.providerSelectEntriesById.clear();
-        this.providerSelectIdsByContainer.clear();
-        this.providerIdentityOrdinals.clear();
-        incrementProviderDirectoryRevision();
-    }
-
-    private List<ProviderSelectEntry> collectProviderDirectorySnapshot(IGrid grid) {
-        ProviderSnapshot discovery = this.providerDiscoverySnapshot;
-        List<ProviderDirectoryEntry> providers = discovery == null
-            ? PatternProviderSelectionSupport.collectProcessingPatternUploadProviders(grid)
-            : discovery.providers().stream().filter(PatternProviderSelectionSupport::isSelectableProvider)
-            .map(ProviderDirectoryEntry::of).toList();
-        ReferenceOpenHashSet<PatternContainer> currentProviders = new ReferenceOpenHashSet<>();
-        for (ProviderDirectoryEntry provider : providers) {
-            currentProviders.add(provider.container());
-        }
-        this.providerSelectIdsByContainer.keySet().removeIf(container -> !currentProviders.contains(container));
-        this.providerIdentityOrdinals.keySet().removeIf(container -> !currentProviders.contains(container));
-
-        List<ProviderSelectEntry> entries = new ObjectArrayList<>(providers.size());
-        for (ProviderDirectoryEntry provider : providers) {
-            PatternContainer container = provider.container();
-            entries.add(new ProviderSelectEntry(
-                getOrCreateProviderSelectEntryId(container),
-                container,
-                provider.reference(),
-                getOrCreateProviderIdentityOrdinal(container),
-                provider));
-        }
-        entries.sort(ContainerPatternEncodingTerm::compareProviderDirectoryEntries);
-        return List.copyOf(entries);
-    }
-
-    protected void setProviderDiscoverySnapshot(@Nullable ProviderSnapshot snapshot) {
-        this.providerDiscoverySnapshot = snapshot;
-    }
-
-    private void rebuildProviderDirectorySnapshot(List<ProviderSelectEntry> snapshot) {
-        this.providerDirectorySnapshot = List.copyOf(snapshot);
-        this.providerSelectEntriesById.clear();
-        for (ProviderSelectEntry entry : snapshot) {
-            this.providerSelectEntriesById.put(entry.id, entry);
-        }
-    }
-
-    private void incrementProviderDirectoryRevision() {
-        this.providerDirectoryRevision = Math.incrementExact(this.providerDirectoryRevision);
-    }
-
-    private long getOrCreateProviderIdentityOrdinal(PatternContainer container) {
-        if (this.providerIdentityOrdinals.containsKey(container)) {
-            return this.providerIdentityOrdinals.getLong(container);
-        }
-        long ordinal = this.nextProviderIdentityOrdinal;
-        this.nextProviderIdentityOrdinal = Math.incrementExact(this.nextProviderIdentityOrdinal);
-        this.providerIdentityOrdinals.put(container, ordinal);
-        return ordinal;
-    }
-
-    private static int compareProviderDirectoryEntries(ProviderSelectEntry left, ProviderSelectEntry right) {
-        int comparison = Long.compare(left.provider.sortBy(), right.provider.sortBy());
-        if (comparison != 0) {
-            return comparison;
-        }
-        comparison = compareProviderReferences(left.reference, right.reference);
-        return comparison != 0 ? comparison : Long.compare(left.identityOrdinal, right.identityOrdinal);
-    }
-
-    private static int compareProviderReferences(@Nullable ProviderReference left,
-                                                 @Nullable ProviderReference right) {
-        if (left == right) {
-            return 0;
-        }
-        if (left == null) {
-            return 1;
-        }
-        if (right == null) {
-            return -1;
-        }
-        int comparison = Integer.compare(left.dimension(), right.dimension());
-        if (comparison != 0) {
-            return comparison;
-        }
-        comparison = Long.compare(left.pos(), right.pos());
-        return comparison != 0 ? comparison : Integer.compare(left.side(), right.side());
-    }
-
-    private static List<ProviderStamp> createProviderSignature(List<ProviderSelectEntry> entries,
-                                                               PatternProviderMappingData mappingData) {
-        Objects.requireNonNull(mappingData, "mappingData");
-        List<ProviderStamp> signature = new ObjectArrayList<>(entries.size());
-        for (ProviderSelectEntry entry : entries) {
-            signature.add(new ProviderStamp(entry, mappingData));
-        }
-        return List.copyOf(signature);
-    }
-
-    @Override
-    public void requestProviderDirectoryPage(long nonce, String query, int page,
-                                             @Nullable ProviderDirectoryPageRequest.Focus focus) {
-        ProviderDirectoryPageRequest request = new ProviderDirectoryPageRequest(nonce, query, page, focus);
-        if (isClientSide()) {
-            sendClientAction(ACTION_REQUEST_PROVIDER_DIRECTORY_PAGE, request);
-            return;
-        }
-        requestProviderDirectoryPage(request);
-    }
-
-    private void requestProviderDirectoryPage(@Nullable ProviderDirectoryPageRequest request) {
-        if (request == null || request.nonce() == null || request.query() == null || request.page() == null) {
-            PatternProviderSelectionSupport.warnProviderAction("directory-page-request:missing-field",
-                "Ignoring provider directory page request with missing fields");
-            return;
-        }
-        long nonce = request.nonce();
-        int page = request.page();
-        if (nonce <= 0 || page < 0 || request.focus() != null && page != 0) {
-            PatternProviderSelectionSupport.warnProviderAction("directory-page-request:invalid-number",
-                "Ignoring provider directory page request with invalid nonce, page or focus page");
-            return;
-        }
-        if (!allowProviderAction("directory-page")) {
-            return;
-        }
-
-        String query;
-        ProviderDirectoryPageRequest.Focus focus;
-        try {
-            query = ProviderPageLimits.requireBoundedText("provider directory query", request.query().trim(),
-                ProviderPageLimits.MAX_QUERY_UTF16_LENGTH, ProviderPageLimits.MAX_QUERY_UTF8_BYTES);
-            focus = validateDirectoryFocus(request.focus());
-        } catch (RuntimeException e) {
-            PatternProviderSelectionSupport.warnProviderAction("directory-page-request:invalid-content",
-                "Ignoring provider directory page request with invalid query or focus: %s", e.getMessage());
-            return;
-        }
-
-        refreshProviderDirectory(false);
-        PatternProviderMappingData mappingData = getPatternProviderMappingData();
-        List<ProviderSelectEntry> matches = new ObjectArrayList<>();
-        for (ProviderSelectEntry entry : this.providerDirectorySnapshot) {
-            if (PatternProviderSelectionSupport.matchesProviderDirectoryQuery(entry.provider, mappingData, query)) {
-                matches.add(entry);
-            }
-        }
-        promoteFocusedProvider(matches, focus);
-        List<ProviderDirectoryPage.Entry> pageEntries = new ObjectArrayList<>();
-        for (ProviderSelectEntry entry : getPage(matches, page)) {
-            pageEntries.add(PatternProviderSelectionSupport.createProviderDirectoryPageEntry(
-                entry.id, entry.provider, mappingData, query));
-        }
-        sendProviderDirectoryPage(new ProviderDirectoryPage(
-            this.windowId, nonce, this.providerDirectoryRevision, page,
-            matches.size(), PatternProviderMappingData.isMappingEnabled(), pageEntries));
-    }
-
-    @Override
-    public void requestProviderMappingPage(long nonce, long directoryRevision, long providerId, int page) {
-        ProviderMappingPageRequest request = new ProviderMappingPageRequest(nonce, directoryRevision, providerId, page);
-        if (isClientSide()) {
-            sendClientAction(ACTION_REQUEST_PROVIDER_MAPPING_PAGE, request);
-            return;
-        }
-        requestProviderMappingPage(request);
-    }
-
-    private void requestProviderMappingPage(@Nullable ProviderMappingPageRequest request) {
-        if (request == null || request.nonce() == null || request.directoryRevision() == null
-            || request.providerId() == null || request.page() == null) {
-            return;
-        }
-        if (!allowProviderAction("mapping-page")) {
-            return;
-        }
-        refreshProviderDirectory(false);
-        if (request.nonce() <= 0 || request.directoryRevision() != this.providerDirectoryRevision
-            || request.page() < 0 || request.page() > Integer.MAX_VALUE / ProviderPageLimits.PAGE_SIZE) {
-            return;
-        }
-        ProviderSelectEntry entry = this.providerSelectEntriesById.get(request.providerId().longValue());
-        if (entry == null || entry.reference == null) {
-            return;
-        }
-        PatternProviderMappingData data = getPatternProviderMappingData();
-        int total = data.getRecipeTypeCount(entry.reference);
-        int first = request.page() * ProviderPageLimits.PAGE_SIZE;
-        if (first > total || first == total && total != 0) {
-            return;
-        }
-        sendProviderMappingPage(new ProviderMappingPage(this.windowId, request.nonce(), this.providerDirectoryRevision,
-            request.providerId(), request.page(), total,
-            data.getRecipeTypePage(entry.reference, request.page(), ProviderPageLimits.PAGE_SIZE)));
-    }
-
-    @Nullable
-    private static ProviderDirectoryPageRequest.Focus validateDirectoryFocus(
-        @Nullable ProviderDirectoryPageRequest.Focus focus) {
-        if (focus == null) {
-            return null;
-        }
-        return new ProviderDirectoryPageRequest.Focus(
-            focus.providerId(), focus.dimension(), focus.position(), focus.side());
-    }
-
-    private static void promoteFocusedProvider(List<ProviderSelectEntry> entries,
-                                               @Nullable ProviderDirectoryPageRequest.Focus focus) {
-        if (focus == null || entries.isEmpty()) {
-            return;
-        }
-
-        int focusedIndex = -1;
-        for (int index = 0; index < entries.size(); index++) {
-            if (entries.get(index).id == focus.providerId()) {
-                focusedIndex = index;
-                break;
-            }
-        }
-        if (focusedIndex < 0) {
-            ProviderReference focusedReference =
-                new ProviderReference(focus.dimension(), focus.position(), focus.side());
-            for (int index = 0; index < entries.size(); index++) {
-                if (Objects.equals(entries.get(index).reference, focusedReference)) {
-                    focusedIndex = index;
-                    break;
-                }
-            }
-        }
-        if (focusedIndex > 0) {
-            entries.addFirst(entries.remove(focusedIndex));
-        }
-    }
-
-    private static <T> List<T> getPage(List<T> values, int page) {
-        long start = (long) page * ProviderPageLimits.PAGE_SIZE;
-        if (start >= values.size()) {
-            return List.of();
-        }
-        int fromIndex = (int) start;
-        int toIndex = Math.min(values.size(), fromIndex + ProviderPageLimits.PAGE_SIZE);
-        return List.copyOf(values.subList(fromIndex, toIndex));
-    }
-
-    private long getOrCreateProviderSelectEntryId(PatternContainer container) {
-        if (this.providerSelectIdsByContainer.containsKey(container)) {
-            return this.providerSelectIdsByContainer.getLong(container);
-        }
-        if (this.nextProviderSelectEntryId == Long.MAX_VALUE) {
-            PatternProviderSelectionSupport.warnProviderAction("directory-id-exhausted:" + this.windowId,
-                "Provider-select target id space exhausted for container window %d", this.windowId);
-            throw new IllegalStateException("Provider-select target id space exhausted");
-        }
-        long providerId = this.nextProviderSelectEntryId++;
-        this.providerSelectIdsByContainer.put(container, providerId);
-        return providerId;
-    }
-
-    @Nullable
-    private ProviderSelectEntry getProviderSelectActionEntry(long inventoryId, String actionDescription) {
-        ProviderSelectEntry entry = this.providerSelectEntriesById.get(inventoryId);
-        if (entry != null) {
-            return entry;
-        }
-
-        PatternProviderSelectionSupport.warnProviderAction(
-            "provider-action:unknown-id:" + actionDescription + ":" + inventoryId,
-            "Cannot %s unknown provider-select target id: %d", actionDescription, inventoryId);
-        getPlayer().sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
-        return null;
-    }
-
-    @Nullable
-    private ProviderReference requireProviderReference(ProviderSelectEntry entry, String actionDescription) {
-        if (entry.reference != null) {
-            return entry.reference;
-        }
-        PatternProviderSelectionSupport.warnProviderAction(
-            "provider-action:missing-reference:" + actionDescription + ":" + entry.id,
-            "Cannot %s provider-select target without a stable provider reference: %d",
-            actionDescription, entry.id);
-        getPlayer().sendStatusMessage(PlayerMessages.PatternProviderMappingInvalid.text(), false);
-        return null;
     }
 
     private List<PatternContainer> collectAssemblerPatternContainers(IGrid grid) {
@@ -1861,18 +1350,18 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     }
 
     @Override
-    public int getProviderSelectOverlayRequestNonce() {
-        return this.providerSelectOverlayRequestNonce;
+    public int getProviderSelectionOverlayRequestNonce() {
+        return this.providerSelectionOverlayRequestNonce;
     }
 
     @Override
-    public String getProviderSelectOverlaySearchText() {
-        return this.providerSelectOverlaySearchText;
+    public String getProviderSelectionOverlaySearchText() {
+        return this.providerSelectionOverlaySearchText;
     }
 
     @Override
-    public String getProviderSelectOverlayMappingText() {
-        return this.providerSelectOverlayMappingText;
+    public String getProviderSelectionOverlayMappingText() {
+        return this.providerSelectionOverlayMappingText;
     }
 
     private record PatternSlotFilter(PatternContainer container, World level) implements IAEItemFilter {
@@ -2002,6 +1491,9 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
 
     @Override
     public void onContainerClosed(EntityPlayer player) {
+        if (isServerSide()) {
+            this.providerSelectionSession.close();
+        }
         if (isServerSide() && this.clearOnClose) {
             clear();
         }
@@ -2238,123 +1730,9 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         ProcessingPatternUploadResult uploadProcessingPatternToProvider(ItemStack encodedPattern, IGrid grid,
                                                                         PatternContainer uploadTarget);
 
-        void openProcessingPatternProviderSelect(String initialSearchText, String initialMappingText);
+        void openProcessingPatternProviderSelection(String initialSearchText, String initialMappingText);
 
         void sendNoProviderTargetMessage();
-    }
-
-    public static ProviderSelectOverlayOpenRequest createProviderSelectOverlayOpenRequest(@Nullable String searchText,
-                                                                                          @Nullable String mappingText,
-                                                                                          int currentNonce) {
-        int nextNonce = currentNonce + 1;
-        return new ProviderSelectOverlayOpenRequest(nextNonce, searchText, mappingText);
-    }
-
-    public record ProviderSelectOverlayOpenRequest(int nonce, String searchText, String mappingText) {
-        public ProviderSelectOverlayOpenRequest {
-            if (nonce == 0) {
-                throw new IllegalArgumentException("Provider select overlay nonce must not be zero");
-            }
-            searchText = trimProcessingRecipeText(searchText);
-            mappingText = getProcessingRecipeTypeUid(mappingText);
-        }
-    }
-
-    public static final class ProviderMappingByIdAction {
-        private Long inventoryId;
-        private String mappingText;
-
-        @SuppressWarnings("unused")
-        public ProviderMappingByIdAction() {
-        }
-
-        public ProviderMappingByIdAction(long inventoryId, String mappingText) {
-            this.inventoryId = inventoryId;
-            this.mappingText = mappingText;
-        }
-
-        public long inventoryId() {
-            if (this.inventoryId == null) {
-                PatternProviderSelectionSupport.warnProviderAction("mapping-action-accessor:missing-id",
-                    "Provider mapping action has no provider-select target id");
-                return Long.MIN_VALUE;
-            }
-            return this.inventoryId;
-        }
-
-        public String mappingText() {
-            return this.mappingText;
-        }
-    }
-
-    private record ProviderSelectEntry(long id, PatternContainer container, @Nullable ProviderReference reference,
-                                       long identityOrdinal, ProviderDirectoryEntry provider) {
-        private ProviderSelectEntry {
-            if (id < 0) {
-                throw new IllegalArgumentException("Provider-select entry id must not be negative");
-            }
-            Objects.requireNonNull(container, "container");
-            Objects.requireNonNull(provider, "provider");
-            if (provider.container() != container || !Objects.equals(provider.reference(), reference)) {
-                throw new IllegalArgumentException("Provider-select entry does not match its directory metadata");
-            }
-        }
-    }
-
-    private static final class ProviderStamp {
-        private final ProviderSelectEntry entry;
-        private final int recipeTypeCount;
-        private final List<String> recipeTypes;
-
-        private ProviderStamp(ProviderSelectEntry entry, PatternProviderMappingData mappingData) {
-            this.entry = Objects.requireNonNull(entry, "entry");
-            Objects.requireNonNull(mappingData, "mappingData");
-            this.recipeTypeCount = entry.reference == null ? 0 : mappingData.getRecipeTypeCount(entry.reference);
-            this.recipeTypes = entry.reference == null ? List.of()
-                : List.copyOf(mappingData.getRecipeTypes(entry.reference));
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof ProviderStamp that)) {
-                return false;
-            }
-            ProviderSelectEntry leftEntry = this.entry;
-            ProviderSelectEntry rightEntry = that.entry;
-            ProviderDirectoryEntry left = leftEntry.provider;
-            ProviderDirectoryEntry right = rightEntry.provider;
-            return leftEntry.id == rightEntry.id
-                && leftEntry.container == rightEntry.container
-                && leftEntry.identityOrdinal == rightEntry.identityOrdinal
-                && left.sortBy() == right.sortBy()
-                && left.inventorySize() == right.inventorySize()
-                && left.emptySlots() == right.emptySlots()
-                && left.acceptsProcessingPatterns() == right.acceptsProcessingPatterns()
-                && left.canEditTerminalName() == right.canEditTerminalName()
-                && left.canModifyTerminalVisibility() == right.canModifyTerminalVisibility()
-                && left.hasLocation() == right.hasLocation()
-                && left.locationDimension() == right.locationDimension()
-                && left.locationPos() == right.locationPos()
-                && left.locationSide() == right.locationSide()
-                && Objects.equals(left.group(), right.group())
-                && Objects.equals(left.reference(), right.reference())
-                && this.recipeTypeCount == that.recipeTypeCount
-                && this.recipeTypes.equals(that.recipeTypes);
-        }
-
-        @Override
-        public int hashCode() {
-            ProviderSelectEntry valueEntry = this.entry;
-            ProviderDirectoryEntry value = valueEntry.provider;
-            return Objects.hash(valueEntry.id, System.identityHashCode(valueEntry.container),
-                valueEntry.identityOrdinal, value.sortBy(), value.group(), value.inventorySize(), value.emptySlots(),
-                value.acceptsProcessingPatterns(), value.canEditTerminalName(), value.canModifyTerminalVisibility(),
-                value.reference(), value.hasLocation(), value.locationDimension(), value.locationPos(),
-                value.locationSide(), this.recipeTypeCount, this.recipeTypes);
-        }
     }
 
     private record HeiProcessingRecipeSnapshot(String recipeTypeUid, List<List<AEKey>> inputCandidatesBySlot) {

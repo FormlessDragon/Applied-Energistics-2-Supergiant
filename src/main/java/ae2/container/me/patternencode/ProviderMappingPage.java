@@ -10,10 +10,10 @@ import java.util.Set;
 /**
  * Immutable page of a single provider's mapped recipe type UIDs.
  */
-public record ProviderMappingPage(int windowId, long nonce, long directoryRevision, long providerId, int page,
+public record ProviderMappingPage(int windowId, long nonce, long directoryRevision, long providerEntryId, int page,
                                   int total, List<String> recipeTypeUids) {
     public ProviderMappingPage {
-        if (windowId < 0 || nonce <= 0 || directoryRevision < 0 || providerId < 0 || page < 0 || total < 0) {
+        if (windowId < 0 || nonce <= 0 || directoryRevision < 0 || providerEntryId < 0 || page < 0 || total < 0) {
             throw new IllegalArgumentException("Invalid provider mapping page header");
         }
         recipeTypeUids = List.copyOf(Objects.requireNonNull(recipeTypeUids, "recipeTypeUids"));

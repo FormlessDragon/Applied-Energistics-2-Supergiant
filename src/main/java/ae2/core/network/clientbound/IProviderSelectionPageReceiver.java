@@ -10,7 +10,7 @@ import ae2.container.me.patternencode.ProviderMappingPage;
  * depending on concrete GUI classes. Implementations own nonce/revision rejection and page caching after the packet
  * has verified the active container window.
  */
-public interface IProviderSelectPageReceiver {
+public interface IProviderSelectionPageReceiver {
 
     /**
      * Receives one provider-directory page for client-side revision and nonce validation.

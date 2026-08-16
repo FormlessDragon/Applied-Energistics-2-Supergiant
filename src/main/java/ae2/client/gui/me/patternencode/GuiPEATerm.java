@@ -17,7 +17,7 @@ import ae2.client.gui.me.items.GuiPatternItemRenamer;
 import ae2.client.gui.me.items.GuiSetProcessingPatternAmount;
 import ae2.client.gui.me.patternaccess.AbstractPatternAccessTerm;
 import ae2.client.gui.me.patternaccess.GuiPatternSlot;
-import ae2.client.gui.me.patternaccess.GuiProviderSelect;
+import ae2.client.gui.me.patternaccess.GuiProviderSelection;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.DynamicIconButton;
@@ -33,7 +33,7 @@ import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
-import ae2.core.network.clientbound.IProviderSelectPageReceiver;
+import ae2.core.network.clientbound.IProviderSelectionPageReceiver;
 import ae2.container.me.patternencode.ProviderMappingPage;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.helpers.InventoryAction;
@@ -55,11 +55,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> implements IProviderSelectPageReceiver {
+public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> implements IProviderSelectionPageReceiver {
 
     private static final ResourceLocation ACCESS_TEXTURE = AppEng.makeId("textures/guis/ex_pattern_access_terminal.png");
     private static final ResourceLocation ENCODING_TEXTURE = AppEng.makeId("textures/guis/ex_pattern.png");
-    private static final String PROVIDER_SELECT_OVERLAY_WIDGET = GuiProviderSelect.WIDGET_ID;
+    private static final String PROVIDER_SELECTION_OVERLAY_WIDGET = GuiProviderSelection.WIDGET_ID;
     private static final int GUI_FOOTER_HEIGHT = 178;
     private static final int GUI_FOOTER_TEXTURE_Y = 73;
     private static final Set<GeneralSetting> PEAT_GENERAL_SETTINGS = Set.of(
@@ -71,15 +71,15 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> impl
     private final Map<EncodingMode, EncodingModePanel> modePanels = new EnumMap<>(EncodingMode.class);
     private final Map<EncodingMode, TabButton> modeTabButtons = new EnumMap<>(EncodingMode.class);
     private final DynamicIconButton uploadPatternButton;
-    private final GuiProviderSelect<?> providerSelectOverlay;
-    private int providerSelectOverlayRequestNonce;
+    private final GuiProviderSelection<?> providerSelectionOverlay;
+    private int providerSelectionOverlayRequestNonce;
 
     public GuiPEATerm(ContainerPEATerm container, InventoryPlayer playerInventory, @Nullable ITextComponent title,
                       GuiStyle style) {
         super(container, playerInventory, title, GuiText.PatternEncodingAccessTerminalShort.text(), style,
             "pattern encoding access terminal", GUI_FOOTER_HEIGHT);
 
-        this.providerSelectOverlay = new GuiProviderSelect<>(this);
+        this.providerSelectionOverlay = new GuiProviderSelection<>(this);
         addMode(EncodingMode.CRAFTING, new CraftingEncodingPanel(this, widgets), 0);
         addMode(EncodingMode.PROCESSING, new ProcessingEncodingPanel(this, widgets), 1);
         this.uploadPatternButton = new DynamicIconButton(
@@ -90,7 +90,7 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> impl
         this.uploadPatternButton.setHalfSize(true);
         this.uploadPatternButton.setIconScale(0.5F);
         this.uploadPatternButton.setVisibility(false);
-        widgets.add(PROVIDER_SELECT_OVERLAY_WIDGET, this.providerSelectOverlay);
+        widgets.add(PROVIDER_SELECTION_OVERLAY_WIDGET, this.providerSelectionOverlay);
         widgets.add("uploadPattern", this.uploadPatternButton);
         widgets.add("encodePattern", new ActionButton(ActionItems.ENCODE,
             () -> container.encode(isShiftDown())));
@@ -202,7 +202,7 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> impl
 
     @Override
     protected void beforePatternAccessUpdate() {
-        syncProviderSelectOverlayOpenRequest();
+        syncProviderSelectionOverlayOpenRequest();
         for (EncodingMode mode : ENCODING_MODES) {
             boolean selected = this.container.getMode() == mode;
             TabButton tabButton = this.modeTabButtons.get(mode);
@@ -217,20 +217,20 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> impl
         this.uploadPatternButton.setVisibility(true);
     }
 
-    private void syncProviderSelectOverlayOpenRequest() {
-        int requestNonce = this.container.getProviderSelectOverlayRequestNonce();
-        if (requestNonce == this.providerSelectOverlayRequestNonce) {
+    private void syncProviderSelectionOverlayOpenRequest() {
+        int requestNonce = this.container.getProviderSelectionOverlayRequestNonce();
+        if (requestNonce <= this.providerSelectionOverlayRequestNonce) {
             return;
         }
 
-        this.providerSelectOverlayRequestNonce = requestNonce;
+        this.providerSelectionOverlayRequestNonce = requestNonce;
         if (requestNonce == 0) {
             return;
         }
 
-        this.providerSelectOverlay.open(
-            this.container.getProviderSelectOverlaySearchText(),
-            this.container.getProviderSelectOverlayMappingText());
+        this.providerSelectionOverlay.open(
+            this.container.getProviderSelectionOverlaySearchText(),
+            this.container.getProviderSelectionOverlayMappingText());
     }
 
     @Override
@@ -326,12 +326,12 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> impl
 
     @Override
     public void receiveProviderDirectoryPage(ProviderDirectoryPage page) {
-        this.providerSelectOverlay.receiveProviderDirectoryPage(page);
+        this.providerSelectionOverlay.receiveProviderDirectoryPage(page);
     }
 
     @Override
     public void receiveProviderMappingPage(ProviderMappingPage page) {
-        this.providerSelectOverlay.receiveProviderMappingPage(page);
+        this.providerSelectionOverlay.receiveProviderMappingPage(page);
     }
 
 }

@@ -103,7 +103,7 @@ public final class ProviderDirectoryPagePacket extends ClientboundPacket {
     }
 
     private static ProviderDirectoryPage.Entry readEntry(PacketBuffer data) {
-        long providerId = data.readVarLong();
+        long providerEntryId = data.readVarLong();
         AEItemKey icon = readIcon(data);
         String providerName = readBoundedString(
             data,
@@ -137,7 +137,7 @@ public final class ProviderDirectoryPagePacket extends ClientboundPacket {
             locationSide = data.readByte();
         }
         return new ProviderDirectoryPage.Entry(
-            providerId,
+            providerEntryId,
             icon,
             providerName,
             emptySlots,
@@ -151,8 +151,8 @@ public final class ProviderDirectoryPagePacket extends ClientboundPacket {
     }
 
     private static void writeEntry(PacketBuffer data, ProviderDirectoryPage.Entry entry) {
-        data.writeVarLong(entry.providerId());
-        writeIcon(data, entry.providerId(), entry.icon());
+        data.writeVarLong(entry.providerEntryId());
+        writeIcon(data, entry.providerEntryId(), entry.icon());
         writeBoundedString(
             data,
             "provider directory provider name",
@@ -204,8 +204,8 @@ public final class ProviderDirectoryPagePacket extends ClientboundPacket {
         }
     }
 
-    private static void writeIcon(PacketBuffer data, long providerId, @Nullable AEItemKey icon) {
-        byte[] encodedIcon = encodeIcon(providerId, icon);
+    private static void writeIcon(PacketBuffer data, long providerEntryId, @Nullable AEItemKey icon) {
+        byte[] encodedIcon = encodeIcon(providerEntryId, icon);
         if (encodedIcon == null) {
             data.writeVarInt(0);
             return;
@@ -214,7 +214,7 @@ public final class ProviderDirectoryPagePacket extends ClientboundPacket {
         data.writeBytes(encodedIcon);
     }
 
-    private static byte @Nullable [] encodeIcon(long providerId, @Nullable AEItemKey icon) {
+    private static byte @Nullable [] encodeIcon(long providerEntryId, @Nullable AEItemKey icon) {
         if (icon == null) {
             return null;
         }
@@ -227,7 +227,7 @@ public final class ProviderDirectoryPagePacket extends ClientboundPacket {
                 IllegalArgumentException exception = new IllegalArgumentException(
                     "Provider directory icon exceeds " + ProviderPageLimits.MAX_ICON_BYTES
                         + " bytes: " + encodedBytes);
-                warnOmittedIcon(exception, providerId);
+                warnOmittedIcon(exception, providerEntryId);
                 return null;
             }
 
@@ -235,19 +235,19 @@ public final class ProviderDirectoryPagePacket extends ClientboundPacket {
             iconBuffer.getBytes(iconBuffer.readerIndex(), encoded);
             return encoded;
         } catch (RuntimeException e) {
-            warnOmittedIcon(e, providerId);
+            warnOmittedIcon(e, providerEntryId);
             return null;
         } finally {
             iconBuffer.release();
         }
     }
 
-    private static void warnOmittedIcon(RuntimeException exception, long providerId) {
+    private static void warnOmittedIcon(RuntimeException exception, long providerEntryId) {
         NetworkPacketHelper.warnFailedPacket(
             exception,
             "provider-directory-page:icon",
             "Omitting provider directory icon that could not fit the packet budget for provider %s",
-            providerId);
+            providerEntryId);
     }
 
     private static String readBoundedString(PacketBuffer data, String fieldName, int maxUtf16Length,
@@ -289,12 +289,12 @@ public final class ProviderDirectoryPagePacket extends ClientboundPacket {
             || minecraft.player.openContainer == null) {
             return;
         }
-        if (minecraft.currentScreen instanceof IProviderSelectPageReceiver receiver) {
+        if (minecraft.currentScreen instanceof IProviderSelectionPageReceiver receiver) {
             dispatchToReceiver(receiver, minecraft.player.openContainer.windowId, this.page);
         }
     }
 
-    static void dispatchToReceiver(IProviderSelectPageReceiver receiver, int openWindowId,
+    static void dispatchToReceiver(IProviderSelectionPageReceiver receiver, int openWindowId,
                                    ProviderDirectoryPage page) {
         if (openWindowId == page.windowId()) {
             receiver.receiveProviderDirectoryPage(page);

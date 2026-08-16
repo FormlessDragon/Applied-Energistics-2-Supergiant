@@ -8,7 +8,7 @@ import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
 import ae2.client.Point;
-import ae2.client.gui.me.patternaccess.GuiProviderSelect;
+import ae2.client.gui.me.patternaccess.GuiProviderSelection;
 import ae2.client.gui.Icon;
 import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.client.gui.me.items.GuiPatternImportPrioritySettings;
@@ -27,7 +27,7 @@ import ae2.core.definitions.AEItems;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
-import ae2.core.network.clientbound.IProviderSelectPageReceiver;
+import ae2.core.network.clientbound.IProviderSelectionPageReceiver;
 import ae2.container.me.patternencode.ProviderMappingPage;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.helpers.InventoryAction;
@@ -50,20 +50,20 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
-public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodingTerm> implements IProviderSelectPageReceiver {
+public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodingTerm> implements IProviderSelectionPageReceiver {
     private static final EncodingMode[] ENCODING_MODES = EncodingMode.values();
-    private static final String PROVIDER_SELECT_OVERLAY_WIDGET = GuiProviderSelect.WIDGET_ID;
+    private static final String PROVIDER_SELECTION_OVERLAY_WIDGET = GuiProviderSelection.WIDGET_ID;
     private final Map<EncodingMode, EncodingModePanel> modePanels = new EnumMap<>(EncodingMode.class);
     private final Map<EncodingMode, TabButton> modeTabButtons = new EnumMap<>(EncodingMode.class);
     private final DynamicIconButton uploadPatternButton;
     private final PatternModifierPanelWidget patternModifierPanel;
-    private final GuiProviderSelect<?> providerSelectOverlay;
-    private int providerSelectOverlayRequestNonce;
+    private final GuiProviderSelection<?> providerSelectionOverlay;
+    private int providerSelectionOverlayRequestNonce;
 
     public GuiPatternEncodingTerm(ContainerPatternEncodingTerm container, InventoryPlayer playerInventory,
                                   @Nullable ITextComponent title, GuiStyle style) {
         super(container, playerInventory, resolveTitle(container, title), style);
-        this.providerSelectOverlay = new GuiProviderSelect<>(this);
+        this.providerSelectionOverlay = new GuiProviderSelection<>(this);
         addMode(EncodingMode.CRAFTING, new CraftingEncodingPanel(this, widgets), 0);
         addMode(EncodingMode.PROCESSING, new ProcessingEncodingPanel(this, widgets), 1);
         this.uploadPatternButton = new DynamicIconButton(
@@ -83,7 +83,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
         }
         this.patternModifierPanel = new PatternModifierPanelWidget(this, new EncodingTerminalPanelHost());
         this.patternModifierPanel.addButtons();
-        widgets.add(PROVIDER_SELECT_OVERLAY_WIDGET, this.providerSelectOverlay);
+        widgets.add(PROVIDER_SELECTION_OVERLAY_WIDGET, this.providerSelectionOverlay);
         addToLeftToolbar(this.patternModifierPanel.getToolbarButton());
     }
 
@@ -132,7 +132,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
-        syncProviderSelectOverlayOpenRequest();
+        syncProviderSelectionOverlayOpenRequest();
         for (var mode : ENCODING_MODES) {
             boolean selected = this.container.getMode() == mode;
             var tabButton = this.modeTabButtons.get(mode);
@@ -148,20 +148,20 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
         this.patternModifierPanel.update();
     }
 
-    private void syncProviderSelectOverlayOpenRequest() {
-        int requestNonce = this.container.getProviderSelectOverlayRequestNonce();
-        if (requestNonce == this.providerSelectOverlayRequestNonce) {
+    private void syncProviderSelectionOverlayOpenRequest() {
+        int requestNonce = this.container.getProviderSelectionOverlayRequestNonce();
+        if (requestNonce <= this.providerSelectionOverlayRequestNonce) {
             return;
         }
 
-        this.providerSelectOverlayRequestNonce = requestNonce;
+        this.providerSelectionOverlayRequestNonce = requestNonce;
         if (requestNonce == 0) {
             return;
         }
 
-        this.providerSelectOverlay.open(
-            this.container.getProviderSelectOverlaySearchText(),
-            this.container.getProviderSelectOverlayMappingText());
+        this.providerSelectionOverlay.open(
+            this.container.getProviderSelectionOverlaySearchText(),
+            this.container.getProviderSelectionOverlayMappingText());
     }
 
     @Override
@@ -317,12 +317,12 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
 
     @Override
     public void receiveProviderDirectoryPage(ProviderDirectoryPage page) {
-        this.providerSelectOverlay.receiveProviderDirectoryPage(page);
+        this.providerSelectionOverlay.receiveProviderDirectoryPage(page);
     }
 
     @Override
     public void receiveProviderMappingPage(ProviderMappingPage page) {
-        this.providerSelectOverlay.receiveProviderMappingPage(page);
+        this.providerSelectionOverlay.receiveProviderMappingPage(page);
     }
 
 }

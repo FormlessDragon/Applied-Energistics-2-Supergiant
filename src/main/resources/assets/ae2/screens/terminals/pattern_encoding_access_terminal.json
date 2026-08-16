@@ -40,7 +40,7 @@
 			"width": 65,
 			"height": 10
 		},
-		"providerSelectOverlay": {
+		"providerSelectionOverlay": {
 			"left": 0,
 			"top": 0,
 			"width": 0,

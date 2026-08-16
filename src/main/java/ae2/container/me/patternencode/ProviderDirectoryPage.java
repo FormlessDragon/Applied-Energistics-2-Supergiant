@@ -49,12 +49,12 @@ public record ProviderDirectoryPage(int windowId, long nonce, long directoryRevi
             throw new IllegalArgumentException("Provider directory page contains more entries than its total");
         }
 
-        Set<Long> providerIds = new HashSet<>(entries.size());
+        Set<Long> providerEntryIds = new HashSet<>(entries.size());
         for (Entry entry : entries) {
             Objects.requireNonNull(entry, "provider directory entry");
-            if (!providerIds.add(entry.providerId())) {
-                throw new IllegalArgumentException("Provider directory page contains duplicate provider id "
-                    + entry.providerId());
+            if (!providerEntryIds.add(entry.providerEntryId())) {
+                throw new IllegalArgumentException("Provider directory page contains duplicate provider entry id "
+                    + entry.providerEntryId());
             }
         }
     }
@@ -62,7 +62,7 @@ public record ProviderDirectoryPage(int windowId, long nonce, long directoryRevi
     /**
      * Immutable display and action identity for one provider directory row.
      *
-     * @param providerId                current server-side provider directory identifier
+     * @param providerEntryId                current server-side provider directory identifier
      * @param icon                      optional provider icon
      * @param providerName              bounded provider name used for display and search
      * @param emptySlots                number of currently empty pattern slots
@@ -74,12 +74,12 @@ public record ProviderDirectoryPage(int windowId, long nonce, long directoryRevi
      * @param locationPos               packed provider block position when a location is present
      * @param locationSide              provider side ordinal, or {@code -1} when no side applies
      */
-    public record Entry(long providerId, @Nullable AEItemKey icon, String providerName,
+    public record Entry(long providerEntryId, @Nullable AEItemKey icon, String providerName,
                         int emptySlots, int recipeTypeCount, List<String> recipeTypeUids,
                         boolean acceptsProcessingPatterns,
                         boolean hasLocation, int locationDimension, long locationPos, int locationSide) {
         public Entry {
-            if (providerId < 0) {
+            if (providerEntryId < 0) {
                 throw new IllegalArgumentException("Provider directory entry id must not be negative");
             }
             providerName = ProviderPageLimits.requireBoundedText(

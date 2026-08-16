@@ -40,18 +40,18 @@ public record ProviderDirectoryPageRequest(Long nonce, String query, Integer pag
      * provider after a directory rebuild assigns it a new id. Boxed components deliberately reject fields omitted by
      * deserialization.
      *
-     * @param providerId transient provider id from the last directory page
+     * @param providerEntryId transient provider id from the last directory page
      * @param dimension  provider dimension id
      * @param position   packed provider block position
      * @param side       provider side ordinal, or {@code -1} when no side applies
      */
-    public record Focus(Long providerId, Integer dimension, Long position, Integer side) {
+    public record Focus(Long providerEntryId, Integer dimension, Long position, Integer side) {
         public Focus {
-            Objects.requireNonNull(providerId, "providerId");
+            Objects.requireNonNull(providerEntryId, "providerEntryId");
             Objects.requireNonNull(dimension, "dimension");
             Objects.requireNonNull(position, "position");
             Objects.requireNonNull(side, "side");
-            if (providerId < 0) {
+            if (providerEntryId < 0) {
                 throw new IllegalArgumentException("Provider directory focus id must not be negative");
             }
             if (side < -1 || side >= EnumFacing.VALUES.length) {

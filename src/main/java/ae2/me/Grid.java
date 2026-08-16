@@ -69,7 +69,7 @@ public class Grid implements IGrid {
     @Nullable
     private GridNode pivot;
     private int priority; // how import is this network?
-    private long machineRevision;
+    private long activeMachineSetRevision;
 
     private Grid(GridNode center) {
         this.pivot = Objects.requireNonNull(center);
@@ -122,8 +122,8 @@ public class Grid implements IGrid {
     }
 
     @Override
-    public long getMachineRevision() {
-        return this.machineRevision;
+    public long getActiveMachineSetRevision() {
+        return this.activeMachineSetRevision;
     }
 
     void remove(GridNode gridNode) {
@@ -133,7 +133,7 @@ public class Grid implements IGrid {
 
         var machineClass = gridNode.getOwner().getClass();
         this.machines.remove(machineClass, gridNode);
-        this.machineRevision++;
+        this.activeMachineSetRevision++;
 
         if (this.pivot == gridNode) {
             var nodesIt = machines.values().iterator();
@@ -151,7 +151,7 @@ public class Grid implements IGrid {
     void add(GridNode gridNode, @Nullable NBTTagCompound savedData) {
         // track node.
         this.machines.put(gridNode.getOwner().getClass(), gridNode);
-        this.machineRevision++;
+        this.activeMachineSetRevision++;
 
         for (var service : services.services().values()) {
             service.addNode(gridNode, savedData);
@@ -295,8 +295,7 @@ public class Grid implements IGrid {
             ITERATION_BUFFER.ensureCapacity(this.machines.size());
             ITERATION_BUFFER.addAll(getNodes());
 
-            for (int i = 0, size = ITERATION_BUFFER.size(); i < size; i++) {
-                IGridNode node = ITERATION_BUFFER.get(i);
+            for (IGridNode node : ITERATION_BUFFER) {
                 ((GridNode) node).notifyStatusChange(state);
             }
         } finally {
@@ -305,7 +304,7 @@ public class Grid implements IGrid {
     }
 
     void markMachineStateChanged() {
-        this.machineRevision++;
+        this.activeMachineSetRevision++;
     }
 
     public void fillCrashReportCategory(CrashReportCategory category) {

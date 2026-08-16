@@ -42,7 +42,7 @@ public final class ProviderMappingPagePacket extends ClientboundPacket {
             int windowId = data.readVarInt();
             long nonce = data.readVarLong();
             long revision = data.readVarLong();
-            long providerId = data.readVarLong();
+            long providerEntryId = data.readVarLong();
             int pageIndex = data.readVarInt();
             int total = data.readVarInt();
             int count = data.readVarInt();
@@ -56,7 +56,7 @@ public final class ProviderMappingPagePacket extends ClientboundPacket {
             if (data.isReadable()) {
                 throw new IllegalArgumentException("Trailing provider mapping page bytes");
             }
-            this.page = new ProviderMappingPage(windowId, nonce, revision, providerId, pageIndex, total,
+            this.page = new ProviderMappingPage(windowId, nonce, revision, providerEntryId, pageIndex, total,
                 recipeTypeUids);
         } catch (RuntimeException e) {
             this.malformed = true;
@@ -77,7 +77,7 @@ public final class ProviderMappingPagePacket extends ClientboundPacket {
             data.writeVarInt(current.windowId());
             data.writeVarLong(current.nonce());
             data.writeVarLong(current.directoryRevision());
-            data.writeVarLong(current.providerId());
+            data.writeVarLong(current.providerEntryId());
             data.writeVarInt(current.page());
             data.writeVarInt(current.total());
             data.writeVarInt(current.recipeTypeUids().size());
@@ -105,12 +105,12 @@ public final class ProviderMappingPagePacket extends ClientboundPacket {
             || minecraft.player.openContainer == null) {
             return;
         }
-        if (minecraft.currentScreen instanceof IProviderSelectPageReceiver receiver) {
+        if (minecraft.currentScreen instanceof IProviderSelectionPageReceiver receiver) {
             dispatchToReceiver(receiver, minecraft.player.openContainer.windowId, this.page);
         }
     }
 
-    static void dispatchToReceiver(IProviderSelectPageReceiver receiver, int openWindowId,
+    static void dispatchToReceiver(IProviderSelectionPageReceiver receiver, int openWindowId,
                                    ProviderMappingPage page) {
         if (openWindowId == page.windowId()) {
             receiver.receiveProviderMappingPage(page);

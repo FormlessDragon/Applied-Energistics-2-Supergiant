@@ -20,7 +20,7 @@ import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SimpleIconButton;
 import ae2.client.gui.widgets.TooltipButton;
 import ae2.container.AEBaseContainer;
-import ae2.container.me.patternencode.IPatternProviderSelection;
+import ae2.container.me.patternencode.IProviderSelectionEndpoint;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.worlddata.PatternProviderMappingData;
@@ -61,12 +61,12 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * Provider-select overlay shown on top of the current Pattern Encoding GUI.
+ * Provider Selection overlay shown on top of the current Pattern Encoding GUI.
  */
-public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProviderSelection> implements ICompositeWidget, ITextFieldGui {
+public final class GuiProviderSelection<C extends AEBaseContainer & IProviderSelectionEndpoint> implements ICompositeWidget, ITextFieldGui {
 
-    public static final String WIDGET_ID = "providerSelectOverlay";
-    private static final String STYLE_PATH = "/screens/provider_select.json";
+    public static final String WIDGET_ID = "providerSelectionOverlay";
+    private static final String STYLE_PATH = "/screens/provider_selection.json";
     private static final String BACK_WIDGET = "back";
     private static final String SEARCH_WIDGET = "search";
     private static final String MAPPING_INPUT_WIDGET = "mapping";
@@ -106,15 +106,15 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
     private final AETextField searchField;
     private final AETextField mappingField;
 
-    public GuiProviderSelect(AEBaseGui<C> parent) {
+    public GuiProviderSelection(AEBaseGui<C> parent) {
         this.parent = parent;
         this.searchField = addTextField(
             GuiText.SearchPlaceholder.text(),
             Collections.singletonList(GuiText.SearchTooltip.text())
         );
         this.mappingField = addTextField(
-            GuiText.ProviderSelectMappingInputPlaceholder.text(),
-            Collections.singletonList(ButtonToolTips.ProviderSelectMappingInput.text())
+            GuiText.ProviderSelectionMappingInputPlaceholder.text(),
+            Collections.singletonList(ButtonToolTips.ProviderSelectionMappingInput.text())
         );
         this.closeButton = new DynamicIconButton(
             this::getCloseButtonIcon,
@@ -125,7 +125,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
         this.closeButton.setVisibility(false);
         this.reloadButton = new SimpleIconButton(
             Icon.S_CYCLE,
-            ButtonToolTips.ProviderSelectMappingReload.text(),
+            ButtonToolTips.ProviderSelectionMappingReload.text(),
             () -> reloadProviderMappings(currentViewKey()));
         this.reloadButton.setHalfSize(true);
         this.reloadButton.setVisibility(false);
@@ -218,7 +218,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
     @Override
     public void setSize(int width, int height) {
         if (width < 0 || height < 0) {
-            throw new IllegalArgumentException("Provider select overlay size must not be negative");
+            throw new IllegalArgumentException("Provider Selection overlay size must not be negative");
         }
         int nextWidth = width == 0 ? this.bounds.width : width;
         int nextHeight = height == 0 ? this.bounds.height : height;
@@ -533,7 +533,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
             return;
         }
         for (GuiButton button : this.dynamicButtons) {
-            if (!(button instanceof ProviderSnapshotButton row) || !row.isProviderRow()) {
+            if (!(button instanceof ProviderEntryButton row) || !row.isProviderRow()) {
                 continue;
             }
             ProviderEntry entry = row.providerEntry();
@@ -550,7 +550,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
             return null;
         }
         for (GuiButton button : this.dynamicButtons) {
-            if (!(button instanceof ProviderSnapshotButton row) || !row.isProviderRow()) {
+            if (!(button instanceof ProviderEntryButton row) || !row.isProviderRow()) {
                 continue;
             }
             ProviderEntry entry = row.providerEntry();
@@ -591,8 +591,8 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
 
     private ITextComponent getTitleText() {
         return this.mapping.managedProvider != null
-            ? GuiText.ProviderSelectMappingManagement.text()
-            : GuiText.ProviderSelect.text();
+            ? GuiText.ProviderSelectionMappingManagement.text()
+            : GuiText.ProviderSelection.text();
     }
 
     private void drawTitleText(Minecraft minecraft, int x, int y) {
@@ -717,15 +717,15 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
             }
         }
         if (!entry.hasMappingTarget()) {
-            tooltip.add(ButtonToolTips.ProviderSelectEntryUpload.text());
+            tooltip.add(ButtonToolTips.ProviderSelectionEntryUpload.text());
             return tooltip;
         }
         if (!this.mapping.enabled) {
-            tooltip.add(ButtonToolTips.ProviderSelectEntryUpload.text());
+            tooltip.add(ButtonToolTips.ProviderSelectionEntryUpload.text());
             return tooltip;
         }
         tooltip.addAll(getProviderEntryTooltip(this.mapping.text));
-        tooltip.add(ButtonToolTips.ProviderSelectMappingManage.text());
+        tooltip.add(ButtonToolTips.ProviderSelectionMappingManage.text());
         return tooltip;
     }
 
@@ -738,12 +738,12 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
         Objects.requireNonNull(mappingInputText, "mappingInputText");
 
         List<ITextComponent> tooltip = new ArrayList<>();
-        tooltip.add(ButtonToolTips.ProviderSelectEntryUpload.text());
+        tooltip.add(ButtonToolTips.ProviderSelectionEntryUpload.text());
         if (!mappingInputText.isEmpty()) {
-            tooltip.add(ButtonToolTips.ProviderSelectMappingBind.text(new TextComponentString(mappingInputText)));
-            tooltip.add(ButtonToolTips.ProviderSelectMappingBindAndUpload.text());
+            tooltip.add(ButtonToolTips.ProviderSelectionMappingBind.text(new TextComponentString(mappingInputText)));
+            tooltip.add(ButtonToolTips.ProviderSelectionMappingBindAndUpload.text());
         }
-        tooltip.add(ButtonToolTips.ProviderSelectMappingUnbind.text());
+        tooltip.add(ButtonToolTips.ProviderSelectionMappingUnbind.text());
         return tooltip;
     }
 
@@ -751,23 +751,23 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
         Objects.requireNonNull(mappingInputText, "mappingInputText");
         Objects.requireNonNull(providerName, "providerName");
         if (mappingInputText.isEmpty()) {
-            return ButtonToolTips.ProviderSelectMappingInputRequired.text();
+            return ButtonToolTips.ProviderSelectionMappingInputRequired.text();
         }
-        return ButtonToolTips.ProviderSelectMappingAdd.text(
+        return ButtonToolTips.ProviderSelectionMappingAdd.text(
             new TextComponentString(mappingInputText),
             new TextComponentString(providerName));
     }
 
     private static int getMaxScrollOffset(int entryCount) {
         if (entryCount < 0) {
-            throw new IllegalArgumentException("Provider select entry count must not be negative");
+            throw new IllegalArgumentException("Provider Selection entry count must not be negative");
         }
         return Math.max(0, entryCount - PAGE_SIZE);
     }
 
     private static int getMaxManagedMappingScrollOffset(int entryCount) {
         if (entryCount < 0) {
-            throw new IllegalArgumentException("Provider select managed mapping entry count must not be negative");
+            throw new IllegalArgumentException("Provider Selection managed mapping entry count must not be negative");
         }
         if (entryCount <= PAGE_SIZE) {
             return 0;
@@ -913,7 +913,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
             int visibleIndex = start + i;
             ProviderEntry entry = getDirectoryEntry(visibleIndex);
             if (entry != null) {
-                ProviderSnapshotButton entryButton = ProviderSnapshotButton.provider(
+                ProviderEntryButton entryButton = ProviderEntryButton.provider(
                     new TextComponentString(entry.providerName() + " (" + entry.emptySlots() + ")"),
                     () -> handleProviderEntryLeftClick(viewKey, entry),
                     () -> getProviderRowTooltip(entry),
@@ -933,7 +933,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
     private void repositionPreservedDirectoryButtons() {
         int providerRow = 0;
         for (GuiButton button : this.dynamicButtons) {
-            if (button instanceof ProviderSnapshotButton snapshotButton && snapshotButton.isProviderRow()) {
+            if (button instanceof ProviderEntryButton entryButton && entryButton.isProviderRow()) {
                 moveButton(button, ENTRY_WIDGET_PREFIX + providerRow++);
                 button.x += 18;
                 button.width -= 18;
@@ -964,18 +964,18 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
             int visibleIndex = start + i;
             String recipeTypeUid = getCachedMappingUid(visibleIndex);
             if (recipeTypeUid != null) {
-                ProviderSnapshotButton entryButton = ProviderSnapshotButton.mapping(
+                ProviderEntryButton entryButton = ProviderEntryButton.mapping(
                     new TextComponentString(getRecipeTypeDisplayName(recipeTypeUid)),
-                    () -> unbindManagedRecipeType(viewKey, providerEntry.inventoryId(), recipeTypeUid),
+                    () -> unbindManagedRecipeType(viewKey, providerEntry.providerEntryId(), recipeTypeUid),
                     () -> List.of(new TextComponentString(recipeTypeUid),
-                        ButtonToolTips.ProviderSelectMappingUnbindRecipe.text(new TextComponentString(recipeTypeUid))),
+                        ButtonToolTips.ProviderSelectionMappingUnbindRecipe.text(new TextComponentString(recipeTypeUid))),
                     viewKey);
                 moveButton(entryButton, ENTRY_WIDGET_PREFIX + i);
                 this.dynamicButtons.add(entryButton);
             } else if (visibleIndex == providerEntry.recipeTypeCount()) {
-                ProviderSnapshotButton entryButton = ProviderSnapshotButton.mapping(
-                    GuiText.ProviderSelectMappingAdd.text(),
-                    () -> addManagedRecipeType(viewKey, providerEntry.inventoryId()),
+                ProviderEntryButton entryButton = ProviderEntryButton.mapping(
+                    GuiText.ProviderSelectionMappingAdd.text(),
+                    () -> addManagedRecipeType(viewKey, providerEntry.providerEntryId()),
                     () -> Collections.singletonList(getMappingAddTooltip(this.mapping.text,
                         providerEntry.providerName())),
                     viewKey);
@@ -1131,7 +1131,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
         ProviderEntry provider = this.mapping.managedProvider;
         if (!this.visible || provider == null || page.windowId() != this.directory.activeWindowId
             || page.nonce() != this.directory.activeRequestNonce || page.directoryRevision() != this.directory.activeRevision
-            || page.providerId() != provider.inventoryId()) {
+            || page.providerEntryId() != provider.providerEntryId()) {
             return;
         }
         this.mapping.pendingPages.remove(page.page());
@@ -1139,7 +1139,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
         while (this.mapping.pages.size() > MAX_MAPPING_CACHE_PAGES) {
             this.mapping.pages.remove(this.mapping.pages.keySet().iterator().next());
         }
-        this.mapping.managedProvider = new ProviderEntry(provider.inventoryId(), provider.icon(), provider.location(),
+        this.mapping.managedProvider = new ProviderEntry(provider.providerEntryId(), provider.icon(), provider.location(),
             provider.hasMappingTarget(), provider.providerName(), provider.emptySlots(), page.total(),
             provider.recipeTypeUids(), provider.acceptsProcessingPatterns());
         rebuildButtons();
@@ -1169,7 +1169,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
             }
             this.mapping.pendingPages.put(protocolPage, System.nanoTime());
             this.parent.getContainer().requestProviderMappingPage(this.directory.activeRequestNonce, this.directory.activeRevision,
-                provider.inventoryId(), protocolPage);
+                provider.providerEntryId(), protocolPage);
         }
     }
 
@@ -1201,7 +1201,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
 
     private static boolean matchesManagedDirectoryFocus(ProviderEntry entry,
                                                         ProviderDirectoryPageRequest.Focus focus) {
-        if (entry.inventoryId() == focus.providerId()) {
+        if (entry.providerEntryId() == focus.providerEntryId()) {
             return true;
         }
         ProviderLocation location = entry.location();
@@ -1341,7 +1341,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
             return null;
         }
         return new ProviderDirectoryPageRequest.Focus(
-            provider.inventoryId(),
+            provider.providerEntryId(),
             location.dimensionId(),
             location.pos().toLong(),
             sideOrdinal(location.side()));
@@ -1354,7 +1354,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
     private long incrementRequestNonce() {
         this.directory.nextRequestNonce = Math.incrementExact(this.directory.nextRequestNonce);
         if (this.directory.nextRequestNonce <= 0) {
-            throw new IllegalStateException("Provider-select request nonce space exhausted");
+            throw new IllegalStateException("Provider Selection request nonce space exhausted");
         }
         return this.directory.nextRequestNonce;
     }
@@ -1469,11 +1469,11 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
     }
 
     private ProviderViewKey currentViewKey() {
-        long providerId = this.mapping.managedProvider == null
+        long providerEntryId = this.mapping.managedProvider == null
             ? Long.MIN_VALUE
-            : this.mapping.managedProvider.inventoryId();
+            : this.mapping.managedProvider.providerEntryId();
         return new ProviderViewKey(this.directory.activeWindowId, this.directory.activeRequestNonce, this.directory.activeRevision,
-            this.directory.scrollOffset, providerId);
+            this.directory.scrollOffset, providerEntryId);
     }
 
     private void applyScrollbarScroll() {
@@ -1520,7 +1520,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
         }
         Point absoluteMouse = this.screenOrigin.move(mousePos.x(), mousePos.y());
         for (GuiButton widget : this.dynamicButtons) {
-            if (!(widget instanceof ProviderSnapshotButton entryButton)
+            if (!(widget instanceof ProviderEntryButton entryButton)
                 || !entryButton.isProviderRow()
                 || !entryButton.visible
                 || !entryButton.enabled
@@ -1620,7 +1620,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
     }
 
     private void handleProviderEntryLeftClick(ProviderViewKey viewKey, ProviderEntry entry) {
-        if (!isCurrentProviderSnapshot(viewKey)) {
+        if (!isCurrentProviderDirectory(viewKey)) {
             return;
         }
         if (isCtrlKeyDown()) {
@@ -1632,7 +1632,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
         if (isShiftKeyDown()) {
             String mappingText = getMappingText();
             if (this.mapping.enabled && entry.hasMappingTarget() && !mappingText.isEmpty()) {
-                this.parent.getContainer().bindAndUploadProcessingPatternToProvider(entry.inventoryId(), mappingText);
+                this.parent.getContainer().bindAndUploadProcessingPatternToProvider(viewKey.revision(), entry.providerEntryId(), mappingText);
                 close();
                 return;
             }
@@ -1644,37 +1644,37 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
     }
 
     private void uploadToProvider(ProviderViewKey viewKey, ProviderEntry entry) {
-        if (!isCurrentProviderSnapshot(viewKey)) {
+        if (!isCurrentProviderDirectory(viewKey)) {
             return;
         }
-        this.parent.getContainer().uploadProcessingPatternToProvider(entry.inventoryId());
+        this.parent.getContainer().uploadProcessingPatternToProvider(viewKey.revision(), entry.providerEntryId());
         close();
     }
 
     private void bindProviderMapping(ProviderViewKey viewKey, ProviderEntry entry) {
-        if (!this.mapping.enabled || !isCurrentProviderSnapshot(viewKey)) {
+        if (!this.mapping.enabled || !isCurrentProviderDirectory(viewKey)) {
             return;
         }
         String mappingText = getMappingText();
         if (entry.hasMappingTarget() && !mappingText.isEmpty()) {
-            this.parent.getContainer().bindProviderMapping(entry.inventoryId(), mappingText);
+            this.parent.getContainer().bindProviderMapping(viewKey.revision(), entry.providerEntryId(), mappingText);
         }
     }
 
     private void unbindProviderMapping(ProviderViewKey viewKey, ProviderEntry entry) {
-        if (!this.mapping.enabled || !isCurrentProviderSnapshot(viewKey)) {
+        if (!this.mapping.enabled || !isCurrentProviderDirectory(viewKey)) {
             return;
         }
         if (entry.hasMappingTarget()) {
-            this.parent.getContainer().unbindProviderMapping(entry.inventoryId());
+            this.parent.getContainer().unbindProviderMapping(viewKey.revision(), entry.providerEntryId());
         }
     }
 
     private void reloadProviderMappings(ProviderViewKey viewKey) {
-        if (!this.mapping.enabled || !isCurrentProviderSnapshot(viewKey)) {
+        if (!this.mapping.enabled || !isCurrentProviderDirectory(viewKey)) {
             return;
         }
-        this.parent.getContainer().reloadAllCurrentProviders();
+        this.parent.getContainer().rebuildMappingsFromActiveProviders();
     }
 
     private void enterMappingManagement(ProviderEntry entry) {
@@ -1699,32 +1699,32 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
         clearMappingPageState();
     }
 
-    private void unbindManagedRecipeType(ProviderViewKey viewKey, long providerId, String recipeTypeUid) {
-        if (!this.mapping.enabled || !isCurrentProviderSnapshot(viewKey)) {
+    private void unbindManagedRecipeType(ProviderViewKey viewKey, long providerEntryId, String recipeTypeUid) {
+        if (!this.mapping.enabled || !isCurrentProviderDirectory(viewKey)) {
             return;
         }
         ProviderEntry providerEntry = this.mapping.managedProvider;
-        if (providerEntry == null || providerEntry.inventoryId() != providerId) {
+        if (providerEntry == null || providerEntry.providerEntryId() != providerEntryId) {
             return;
         }
-        this.parent.getContainer().unbindProviderMapping(providerId, recipeTypeUid);
+        this.parent.getContainer().unbindProviderMapping(viewKey.revision(), providerEntryId, recipeTypeUid);
     }
 
-    private void addManagedRecipeType(ProviderViewKey viewKey, long providerId) {
+    private void addManagedRecipeType(ProviderViewKey viewKey, long providerEntryId) {
         if (!this.mapping.enabled) {
             return;
         }
         ProviderEntry provider = this.mapping.managedProvider;
-        if (!isCurrentProviderSnapshot(viewKey) || provider == null || provider.inventoryId() != providerId) {
+        if (!isCurrentProviderDirectory(viewKey) || provider == null || provider.providerEntryId() != providerEntryId) {
             return;
         }
         String mappingText = getMappingText();
         if (!mappingText.isEmpty()) {
-            this.parent.getContainer().bindProviderMapping(providerId, mappingText);
+            this.parent.getContainer().bindProviderMapping(viewKey.revision(), providerEntryId, mappingText);
         }
     }
 
-    private boolean isCurrentProviderSnapshot(ProviderViewKey viewKey) {
+    private boolean isCurrentProviderDirectory(ProviderViewKey viewKey) {
         return this.visible
             && !this.mapping.directoryRefreshPending
             && Objects.equals(viewKey, currentViewKey());
@@ -1863,7 +1863,7 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
         MAPPING
     }
 
-    public record ProviderEntry(long inventoryId,
+    public record ProviderEntry(long providerEntryId,
                                 @Nullable AEItemKey icon,
                                 @Nullable ProviderLocation location,
                                 boolean hasMappingTarget,
@@ -1905,12 +1905,12 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
     public record ProviderLocation(int dimensionId, BlockPos pos, @Nullable EnumFacing side) {
     }
 
-    private static final class ProviderSnapshotButton extends TooltipButton {
+    private static final class ProviderEntryButton extends TooltipButton {
         private final ProviderViewKey viewKey;
         @Nullable
         private final ProviderEntry providerEntry;
 
-        private ProviderSnapshotButton(ITextComponent component, Runnable onPress,
+        private ProviderEntryButton(ITextComponent component, Runnable onPress,
                                        Supplier<List<ITextComponent>> tooltipSupplier,
                                        ProviderViewKey viewKey,
                                        @Nullable ProviderEntry providerEntry) {
@@ -1919,17 +1919,17 @@ public final class GuiProviderSelect<C extends AEBaseContainer & IPatternProvide
             this.providerEntry = providerEntry;
         }
 
-        static ProviderSnapshotButton provider(ITextComponent component, Runnable onPress,
+        static ProviderEntryButton provider(ITextComponent component, Runnable onPress,
                                                Supplier<List<ITextComponent>> tooltipSupplier,
                                                ProviderViewKey viewKey, ProviderEntry providerEntry) {
             Objects.requireNonNull(providerEntry, "providerEntry");
-            return new ProviderSnapshotButton(component, onPress, tooltipSupplier, viewKey, providerEntry);
+            return new ProviderEntryButton(component, onPress, tooltipSupplier, viewKey, providerEntry);
         }
 
-        static ProviderSnapshotButton mapping(ITextComponent component, Runnable onPress,
+        static ProviderEntryButton mapping(ITextComponent component, Runnable onPress,
                                               Supplier<List<ITextComponent>> tooltipSupplier,
                                               ProviderViewKey viewKey) {
-            return new ProviderSnapshotButton(component, onPress, tooltipSupplier, viewKey, null);
+            return new ProviderEntryButton(component, onPress, tooltipSupplier, viewKey, null);
         }
 
         ProviderViewKey viewKey() {

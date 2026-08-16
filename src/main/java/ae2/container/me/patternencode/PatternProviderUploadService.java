@@ -3,13 +3,10 @@ package ae2.container.me.patternencode;
 import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.PatternDetailsHelper;
-import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGrid;
-import ae2.api.networking.provider.ProviderSnapshot;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.storage.ILinkStatus;
-import ae2.container.me.patternaccess.PatternAccessSession;
 import ae2.core.AELog;
 import ae2.core.localization.PlayerMessages;
 import ae2.core.worlddata.PatternProviderMappingData;
@@ -17,50 +14,33 @@ import ae2.core.worlddata.PatternProviderMappingData.ProviderReference;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.helpers.IPatternTerminalGuiHost;
 import ae2.helpers.patternprovider.PatternContainer;
-import ae2.helpers.patternprovider.PatternProviderLogicHost;
-import ae2.parts.AEBasePart;
+import ae2.me.service.ActivePatternProviderDirectory;
+import ae2.me.service.ActivePatternProviderDirectory.ProviderDescriptor;
+import ae2.me.service.ActivePatternProviderDirectory.ProviderKey;
 import ae2.util.inv.FilteredInternalInventory;
 import ae2.util.inv.filter.IAEItemFilter;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.EnumFacing;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
-public final class PatternProviderSelectionSupport {
-    private static final Comparator<ProviderReference> PROVIDER_REFERENCE_ORDER = Comparator
-        .comparingInt(ProviderReference::dimension)
-        .thenComparingLong(ProviderReference::pos)
-        .thenComparingInt(ProviderReference::side);
-    private static final Comparator<PatternContainer> SELECTABLE_PROVIDER_ORDER = Comparator
-        .comparingLong(PatternContainer::getTerminalSortOrder)
-        .thenComparing(PatternProviderSelectionSupport::createProviderReference,
-            Comparator.nullsLast(PROVIDER_REFERENCE_ORDER))
-        .thenComparing(PatternProviderSelectionSupport::getProviderName)
-        .thenComparing(container -> container.getClass().getName());
+public final class PatternProviderUploadService {
     private static final long WARNING_INTERVAL_NANOS = 10_000_000_000L;
     private static final int MAX_PROVIDER_ACTION_WARNING_KEYS = 256;
     private static final ProviderActionWarningLimiter PROVIDER_ACTION_WARNING_LIMITER =
         new ProviderActionWarningLimiter(MAX_PROVIDER_ACTION_WARNING_KEYS, WARNING_INTERVAL_NANOS);
-    private static final AtomicLong LAST_INVALID_RECIPE_TYPE_WARNING = new AtomicLong(Long.MIN_VALUE);
     private static final AtomicLong LAST_PROVIDER_SCAN_WARNING = new AtomicLong(Long.MIN_VALUE);
     private static final AtomicLong LAST_PROVIDER_UPLOAD_WARNING = new AtomicLong(Long.MIN_VALUE);
 
-    private PatternProviderSelectionSupport() {
+    private PatternProviderUploadService() {
     }
 
     public enum ProcessingPatternUploadResult {
@@ -73,182 +53,9 @@ public final class PatternProviderSelectionSupport {
 
     public enum ProviderMappingValidationResult {
         SUCCESS,
+        NO_PROVIDER_TARGET,
         INVALID_RECIPE_TYPE,
         ASSEMBLER_PROVIDER
-    }
-
-    public static boolean isSelectableProvider(PatternContainer container) {
-        Objects.requireNonNull(container, "container");
-        return container.isVisibleInTerminal() && !container.isAssemblerPatternContainer();
-    }
-
-    public static List<PatternContainer> collectSelectableProviders(IGrid grid) {
-        List<PatternContainer> containers = new ObjectArrayList<>();
-        for (PatternContainer container : getProviderSnapshot(grid).providers()) {
-            if (isSelectableProvider(container)) {
-                containers.add(container);
-            }
-        }
-        containers.sort(SELECTABLE_PROVIDER_ORDER);
-        return containers;
-    }
-
-    private static ProviderSnapshot getProviderSnapshot(IGrid grid) {
-        return ProviderSnapshot.get(grid);
-    }
-
-    public static List<ProviderDirectoryEntry> collectProcessingPatternUploadProviders(IGrid grid) {
-        Objects.requireNonNull(grid, "grid");
-
-        List<ProviderDirectoryEntry> providers = new ObjectArrayList<>();
-        for (PatternContainer container : collectSelectableProviders(grid)) {
-            providers.add(ProviderDirectoryEntry.of(container));
-        }
-        return List.copyOf(providers);
-    }
-
-    public static boolean isActiveProviderOnGrid(IGrid grid, PatternContainer container) {
-        Objects.requireNonNull(grid, "grid");
-        Objects.requireNonNull(container, "container");
-
-        for (Class<?> machineClass : grid.getMachineClasses()) {
-            Class<? extends PatternContainer> containerClass = tryCastMachineToContainer(machineClass);
-            if (containerClass == null || !containerClass.isInstance(container)) {
-                continue;
-            }
-            for (PatternContainer activeContainer : grid.getActiveMachines(containerClass)) {
-                if (activeContainer == container) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    @Nullable
-    public static ProviderReference createProviderReference(PatternContainer container) {
-        Objects.requireNonNull(container, "container");
-        ProviderLocation location = getProviderLocation(container);
-        if (location == null) {
-            return null;
-        }
-
-        return new ProviderReference(location.dimensionId(), location.pos(), location.side());
-    }
-
-    private static int countEmptySlots(PatternContainer container) {
-        Objects.requireNonNull(container, "container");
-
-        InternalInventory inventory = container.getTerminalPatternInventory();
-        int emptySlots = 0;
-        for (int slot = 0; slot < inventory.size(); slot++) {
-            if (inventory.getStackInSlot(slot).isEmpty()) {
-                emptySlots++;
-            }
-        }
-        return emptySlots;
-    }
-
-    private static String getProviderName(PatternContainer container) {
-        Objects.requireNonNull(container, "container");
-
-        ITextComponent name = container.getTerminalGroup().name();
-        if (name == null) {
-            return container.getClass().getSimpleName();
-        }
-        return name.getUnformattedText();
-    }
-
-    private static String getProviderName(ProviderDirectoryEntry provider) {
-        Objects.requireNonNull(provider, "provider");
-
-        ITextComponent name = provider.group().name();
-        if (name == null) {
-            return provider.container().getClass().getSimpleName();
-        }
-        return name.getUnformattedText();
-    }
-
-    public static ProviderDirectoryPage.Entry createProviderDirectoryPageEntry(long id, ProviderDirectoryEntry provider,
-                                                                               PatternProviderMappingData mappingData,
-                                                                               String query) {
-        Objects.requireNonNull(provider, "provider");
-        Objects.requireNonNull(mappingData, "mappingData");
-        ProviderReference reference = provider.reference();
-
-        String providerName = limitPageText("provider-name", getProviderName(provider), id,
-            ProviderPageLimits.MAX_PROVIDER_NAME_UTF16_LENGTH,
-            ProviderPageLimits.MAX_PROVIDER_NAME_UTF8_BYTES);
-        int recipeTypeCount = reference == null ? 0 : mappingData.getRecipeTypeCount(reference);
-        List<String> recipeTypeUids = reference == null ? List.of()
-            : mappingData.getRecipeTypePreview(reference, query.trim().toLowerCase(Locale.ROOT));
-        return new ProviderDirectoryPage.Entry(id, provider.group().icon(), providerName,
-            provider.emptySlots(), recipeTypeCount, recipeTypeUids, provider.acceptsProcessingPatterns(), provider.hasLocation(),
-            provider.locationDimension(), provider.locationPos(), provider.locationSide());
-    }
-
-
-    public static boolean matchesProviderDirectoryQuery(ProviderDirectoryEntry provider,
-                                                        PatternProviderMappingData mappingData,
-                                                        String query) {
-        Objects.requireNonNull(provider, "provider");
-        Objects.requireNonNull(mappingData, "mappingData");
-        String normalizedQuery = Objects.requireNonNull(query, "query").trim().toLowerCase(Locale.ROOT);
-        if (normalizedQuery.isEmpty()) {
-            return true;
-        }
-        if (getProviderName(provider).toLowerCase(Locale.ROOT).contains(normalizedQuery)) {
-            return true;
-        }
-        if (provider.hasLocation() && formatLocationSearchText(provider).contains(normalizedQuery)) {
-            return true;
-        }
-        ProviderReference reference = provider.reference();
-        if (reference != null) {
-            for (String recipeType : mappingData.getRecipeTypes(reference)) {
-                if (recipeType.toLowerCase(Locale.ROOT).contains(normalizedQuery)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private static String formatLocationSearchText(ProviderDirectoryEntry provider) {
-        BlockPos pos = BlockPos.fromLong(provider.locationPos());
-        String side = provider.locationSide() < 0
-            ? ""
-            : EnumFacing.VALUES[provider.locationSide()].getName().toLowerCase(Locale.ROOT);
-        return (provider.locationDimension() + ":" + pos.getX() + "," + pos.getY() + "," + pos.getZ()
-            + " " + provider.locationDimension() + " " + pos.getX() + " " + pos.getY() + " " + pos.getZ()
-            + " " + side).toLowerCase(Locale.ROOT);
-    }
-
-    private static String limitPageText(String field, String value, Object providerIdentity,
-                                        int maxUtf16Length, int maxUtf8Bytes) {
-        if (value.length() <= maxUtf16Length
-            && value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= maxUtf8Bytes) {
-            return value;
-        }
-
-        StringBuilder result = new StringBuilder(Math.min(value.length(), maxUtf16Length));
-        int utf8Bytes = 0;
-        for (int offset = 0; offset < value.length(); ) {
-            int codePoint = value.codePointAt(offset);
-            String character = new String(Character.toChars(codePoint));
-            int characterBytes = character.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
-            if (result.length() + character.length() > maxUtf16Length
-                || utf8Bytes + characterBytes > maxUtf8Bytes) {
-                break;
-            }
-            result.append(character);
-            utf8Bytes += characterBytes;
-            offset += character.length();
-        }
-        warnProviderAction("directory-" + field + "-truncation:" + providerIdentity,
-            "Truncated provider directory %s for provider identity %s to fit packet bounds", field,
-            providerIdentity);
-        return result.toString();
     }
 
     public static List<String> collectProcessingPatternRecipeTypeUids(PatternContainer container, World world) {
@@ -282,28 +89,26 @@ public final class PatternProviderSelectionSupport {
         return List.copyOf(recipeTypes);
     }
 
-    public static void reloadProviderMappings(PatternProviderMappingData mappingData, World world,
-                                              List<ProviderMappingReloadTarget> targets) {
+    /** Rebuilds persisted mappings from every currently selectable provider in the active directory. */
+    public static void rebuildMappingsFromActiveProviders(PatternProviderMappingData mappingData, World world,
+                                                          IGrid grid) {
         Objects.requireNonNull(mappingData, "mappingData");
         Objects.requireNonNull(world, "world");
-        Objects.requireNonNull(targets, "targets");
+        Objects.requireNonNull(grid, "grid");
 
-        List<ProviderMappingReplacement> replacements = new ObjectArrayList<>(targets.size());
-        for (ProviderMappingReloadTarget target : targets) {
-            Objects.requireNonNull(target, "target");
-            replacements.add(new ProviderMappingReplacement(target.reference(),
-                collectProcessingPatternRecipeTypeUids(target.container(), world)));
+        ActivePatternProviderDirectory directory = grid.getService(ActivePatternProviderDirectory.class);
+        List<ProviderMappingReplacement> replacements = new ObjectArrayList<>();
+        for (ProviderDescriptor descriptor : directory.getSelectableProviderDescriptors()) {
+            ProviderReference reference = descriptor.reference();
+            PatternContainer container = directory.resolveSelectableProvider(descriptor.providerKey());
+            if (reference != null && container != null) {
+                replacements.add(new ProviderMappingReplacement(reference,
+                    collectProcessingPatternRecipeTypeUids(container, world)));
+            }
         }
 
         for (ProviderMappingReplacement replacement : replacements) {
             mappingData.replaceProviderMappings(replacement.reference(), replacement.recipeTypes());
-        }
-    }
-
-    public record ProviderMappingReloadTarget(PatternContainer container, ProviderReference reference) {
-        public ProviderMappingReloadTarget {
-            Objects.requireNonNull(container, "container");
-            Objects.requireNonNull(reference, "reference");
         }
     }
 
@@ -322,19 +127,22 @@ public final class PatternProviderSelectionSupport {
         Objects.requireNonNull(recipeTypeUid, "recipeTypeUid");
 
         if (!PatternProviderMappingData.isMappingEnabled()) {
-            return Collections.emptyList();
+            return List.of();
         }
 
         List<ProviderReference> mappedReferences = mappingData.getReferences(recipeTypeUid);
         if (mappedReferences.isEmpty()) {
-            return Collections.emptyList();
+            return List.of();
         }
 
         Set<ProviderReference> mappedReferenceSet = new ObjectLinkedOpenHashSet<>(mappedReferences);
         List<PatternContainer> uploadTargets = new ObjectArrayList<>();
-        for (PatternContainer container : collectSelectableProviders(grid)) {
-            ProviderReference reference = createProviderReference(container);
-            if (reference != null && mappedReferenceSet.contains(reference) && countEmptySlots(container) > 0) {
+        ActivePatternProviderDirectory directory = grid.getService(ActivePatternProviderDirectory.class);
+        for (ProviderDescriptor descriptor : directory.getSelectableProviderDescriptors()) {
+            ProviderReference reference = descriptor.reference();
+            PatternContainer container = directory.resolveSelectableProvider(descriptor.providerKey());
+            if (reference != null && mappedReferenceSet.contains(reference) && descriptor.emptySlots() > 0
+                && container != null) {
                 uploadTargets.add(container);
             }
         }
@@ -344,12 +152,23 @@ public final class PatternProviderSelectionSupport {
     public static boolean hasAvailableProvider(IGrid grid) {
         Objects.requireNonNull(grid, "grid");
 
-        for (PatternContainer container : collectSelectableProviders(grid)) {
-            if (countEmptySlots(container) > 0) {
+        for (ProviderDescriptor descriptor : grid.getService(ActivePatternProviderDirectory.class)
+            .getSelectableProviderDescriptors()) {
+            if (descriptor.emptySlots() > 0) {
                 return true;
             }
         }
         return false;
+    }
+
+    public static ProcessingPatternUploadResult tryUploadProcessingPatternToProvider(EntityPlayer player,
+                                                                                     @Nullable IPatternTerminalGuiHost host,
+                                                                                     @Nullable IGrid grid,
+                                                                                     ProviderKey providerKey,
+                                                                                     ItemStack encodedPattern) {
+        PatternContainer container = resolveSelectableProvider(player, grid, providerKey);
+        return container == null ? ProcessingPatternUploadResult.NO_PROVIDER_TARGET
+            : tryUploadProcessingPatternToProvider(player, host, grid, container, encodedPattern);
     }
 
     public static ProcessingPatternUploadResult tryUploadProcessingPatternToProvider(EntityPlayer player,
@@ -384,6 +203,16 @@ public final class PatternProviderSelectionSupport {
     public static ProcessingPatternUploadPreparation prepareProcessingPatternUpload(EntityPlayer player,
                                                                                     @Nullable IPatternTerminalGuiHost host,
                                                                                     @Nullable IGrid grid,
+                                                                                    ProviderKey providerKey,
+                                                                                    ItemStack encodedPattern) {
+        PatternContainer container = resolveSelectableProvider(player, grid, providerKey);
+        return container == null ? ProcessingPatternUploadPreparation.failure(ProcessingPatternUploadResult.NO_PROVIDER_TARGET)
+            : prepareProcessingPatternUpload(player, host, grid, container, encodedPattern);
+    }
+
+    public static ProcessingPatternUploadPreparation prepareProcessingPatternUpload(EntityPlayer player,
+                                                                                    @Nullable IPatternTerminalGuiHost host,
+                                                                                    @Nullable IGrid grid,
                                                                                     PatternContainer container,
                                                                                     ItemStack encodedPattern) {
         Objects.requireNonNull(player, "player");
@@ -403,7 +232,7 @@ public final class PatternProviderSelectionSupport {
             return ProcessingPatternUploadPreparation.failure(ProcessingPatternUploadResult.NO_PROVIDER_TARGET);
         }
 
-        if (grid == null || !isSelectableProvider(container) || !isActiveProviderOnGrid(grid, container)) {
+        if (grid == null || !grid.getService(ActivePatternProviderDirectory.class).isSelectableActiveProvider(container)) {
             player.sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
             return ProcessingPatternUploadPreparation.failure(ProcessingPatternUploadResult.NO_PROVIDER_TARGET);
         }
@@ -461,14 +290,19 @@ public final class PatternProviderSelectionSupport {
         return ProcessingPatternUploadPreparation.failure(ProcessingPatternUploadResult.NO_PROVIDER_TARGET);
     }
 
-    public static ProviderMappingValidationResult validateProviderMapping(PatternProviderMappingData mappingData,
-                                                                          PatternContainer container,
+    public static ProviderMappingValidationResult validateProviderMapping(IGrid grid, ProviderKey providerKey,
                                                                           ProviderReference reference,
                                                                           String recipeType) {
-        Objects.requireNonNull(mappingData, "mappingData");
-        Objects.requireNonNull(container, "container");
+        Objects.requireNonNull(grid, "grid");
+        Objects.requireNonNull(providerKey, "providerKey");
         Objects.requireNonNull(reference, "reference");
         Objects.requireNonNull(recipeType, "recipeType");
+
+        PatternContainer container = grid.getService(ActivePatternProviderDirectory.class)
+            .resolveSelectableProvider(providerKey);
+        if (container == null) {
+            return ProviderMappingValidationResult.NO_PROVIDER_TARGET;
+        }
 
         if (container.isAssemblerPatternContainer()) {
             warnProviderAction("mapping-assembler:" + reference,
@@ -477,6 +311,19 @@ public final class PatternProviderSelectionSupport {
         }
 
         return ProviderMappingValidationResult.SUCCESS;
+    }
+
+    @Nullable
+    private static PatternContainer resolveSelectableProvider(EntityPlayer player, @Nullable IGrid grid,
+                                                               ProviderKey providerKey) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(providerKey, "providerKey");
+        PatternContainer container = grid == null ? null
+            : grid.getService(ActivePatternProviderDirectory.class).resolveSelectableProvider(providerKey);
+        if (container == null) {
+            player.sendStatusMessage(PlayerMessages.PatternUploadNoProviderTarget.text(), false);
+        }
+        return container;
     }
 
     public static void warnProviderAction(Object key, String message, Object... params) {
@@ -506,11 +353,8 @@ public final class PatternProviderSelectionSupport {
     }
 
     private static boolean shouldLog(AtomicLong lastWarning) {
-        return shouldLogWarning(lastWarning, System.nanoTime());
-    }
-
-    public static boolean shouldLogWarning(AtomicLong lastWarning, long now) {
         Objects.requireNonNull(lastWarning, "lastWarning");
+        long now = System.nanoTime();
         while (true) {
             long previous = lastWarning.get();
             if (previous != Long.MIN_VALUE && now - previous < WARNING_INTERVAL_NANOS) {
@@ -558,38 +402,6 @@ public final class PatternProviderSelectionSupport {
 
     }
 
-    @Nullable
-    private static ProviderLocation getProviderLocation(PatternContainer container) {
-        if (container instanceof TileEntity tile) {
-            return getProviderLocation(tile, null);
-        }
-        if (container instanceof AEBasePart part) {
-            return getProviderLocation(part.getTileEntity(), part.getSide());
-        }
-        if (container instanceof PatternProviderLogicHost host) {
-            return getProviderLocation(host.getTileEntity(), null);
-        }
-        return null;
-    }
-
-    @Nullable
-    private static ProviderLocation getProviderLocation(@Nullable TileEntity tile, @Nullable EnumFacing side) {
-        if (tile == null || tile.getWorld() == null) {
-            return null;
-        }
-
-        return new ProviderLocation(tile.getWorld().provider.getDimension(), tile.getPos().toLong(),
-            side == null ? -1 : side.ordinal());
-    }
-
-    @Nullable
-    private static Class<? extends PatternContainer> tryCastMachineToContainer(Class<?> machineClass) {
-        if (PatternContainer.class.isAssignableFrom(machineClass)) {
-            return machineClass.asSubclass(PatternContainer.class);
-        }
-        return null;
-    }
-
     private static boolean isAcceptedByContainer(PatternContainer container, @Nullable IPatternDetails details) {
         return details != null && (details instanceof IAssemblerPattern) == container.isAssemblerPatternContainer();
     }
@@ -599,7 +411,7 @@ public final class PatternProviderSelectionSupport {
         String recipeTypeUidOrEmpty = recipeTypeUid == null ? "" : recipeTypeUid;
         String initialSearchText = getInitialSearchText(recipeTypeUid, recipeTypeTitle);
         return recipeTypeUidOrEmpty.isEmpty()
-            ? UploadPlan.openProviderSelect(recipeTypeUidOrEmpty, initialSearchText)
+            ? UploadPlan.openProviderSelection(recipeTypeUidOrEmpty, initialSearchText)
             : UploadPlan.continueAutomaticUpload(recipeTypeUidOrEmpty, initialSearchText);
     }
 
@@ -611,7 +423,7 @@ public final class PatternProviderSelectionSupport {
         if (!hasAvailableProvider) {
             return UploadPlan.noProviderTarget(recipeTypeUidOrEmpty, initialSearchText);
         }
-        return UploadPlan.openProviderSelect(recipeTypeUidOrEmpty, "",
+        return UploadPlan.openProviderSelection(recipeTypeUidOrEmpty, "",
             recipeTypeUid == null ? "" : recipeTypeUid);
     }
 
@@ -635,7 +447,7 @@ public final class PatternProviderSelectionSupport {
         if (!hasAvailableProvider) {
             return UploadPlan.noProviderTarget(recipeTypeUidOrEmpty, initialSearchText);
         }
-        return UploadPlan.openProviderSelect(recipeTypeUidOrEmpty,
+        return UploadPlan.openProviderSelection(recipeTypeUidOrEmpty,
             getRecipeTypeUidSearchText(recipeTypeUid, recipeTypeTitle), "");
     }
 
@@ -655,21 +467,21 @@ public final class PatternProviderSelectionSupport {
     }
 
     public record UploadPlan(String recipeTypeUid, String initialSearchText, String initialMappingText,
-                             boolean openProviderSelect) {
+                             boolean openProviderSelection) {
         public UploadPlan {
             Objects.requireNonNull(recipeTypeUid, "recipeTypeUid");
             Objects.requireNonNull(initialSearchText, "initialSearchText");
             Objects.requireNonNull(initialMappingText, "initialMappingText");
-            if (!openProviderSelect && !initialMappingText.isEmpty()) {
+            if (!openProviderSelection && !initialMappingText.isEmpty()) {
                 throw new IllegalArgumentException("Automatic processing upload cannot carry provider mapping text");
             }
         }
 
-        private static UploadPlan openProviderSelect(String recipeTypeUid, String initialSearchText) {
-            return openProviderSelect(recipeTypeUid, initialSearchText, "");
+        private static UploadPlan openProviderSelection(String recipeTypeUid, String initialSearchText) {
+            return openProviderSelection(recipeTypeUid, initialSearchText, "");
         }
 
-        private static UploadPlan openProviderSelect(String recipeTypeUid, String initialSearchText,
+        private static UploadPlan openProviderSelection(String recipeTypeUid, String initialSearchText,
                                                      String initialMappingText) {
             return new UploadPlan(recipeTypeUid, initialSearchText, initialMappingText, true);
         }
@@ -750,41 +562,6 @@ public final class PatternProviderSelectionSupport {
             } catch (RuntimeException restoreFailure) {
                 originalFailure.addSuppressed(restoreFailure);
             }
-        }
-    }
-
-    private record ProviderLocation(int dimensionId, long pos, int side) {
-    }
-
-    public record ProviderDirectoryEntry(PatternContainer container, long sortBy, PatternContainerGroup group,
-                                         int inventorySize, int emptySlots, boolean acceptsProcessingPatterns,
-                                         boolean canEditTerminalName, boolean canModifyTerminalVisibility,
-                                         @Nullable ProviderReference reference, boolean hasLocation,
-                                         int locationDimension, long locationPos, int locationSide) {
-        public ProviderDirectoryEntry {
-            Objects.requireNonNull(container, "container");
-            Objects.requireNonNull(group, "group");
-            if (inventorySize < 0) {
-                throw new IllegalArgumentException("inventorySize must not be negative");
-            }
-            if (emptySlots < 0 || emptySlots > inventorySize) {
-                throw new IllegalArgumentException("emptySlots must be between zero and inventorySize");
-            }
-        }
-
-        public static ProviderDirectoryEntry of(PatternContainer container) {
-            Objects.requireNonNull(container, "container");
-
-            ProviderLocation location = getProviderLocation(container);
-            ProviderReference reference = location == null
-                ? null
-                : new ProviderReference(location.dimensionId(), location.pos(), location.side());
-            return new ProviderDirectoryEntry(container, container.getTerminalSortOrder(), container.getTerminalGroup(),
-                container.getTerminalPatternInventory().size(), countEmptySlots(container),
-                !container.isAssemblerPatternContainer(),
-                container.canEditTerminalName(), container.canModifyTerminalVisibility(), reference,
-                location != null, location == null ? 0 : location.dimensionId(),
-                location == null ? 0L : location.pos(), location == null ? -1 : location.side());
         }
     }
 

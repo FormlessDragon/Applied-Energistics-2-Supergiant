@@ -4,7 +4,6 @@ import ae2.api.config.Settings;
 import ae2.api.config.ShowPatternProviders;
 import ae2.api.config.YesNo;
 import ae2.api.networking.IGrid;
-import ae2.api.networking.provider.ProviderSnapshot;
 import ae2.api.networking.IGridNode;
 import ae2.api.storage.IPEATermContainerHost;
 import ae2.api.util.IConfigManager;
@@ -149,24 +148,14 @@ public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IP
 
     @Override
     public void broadcastChanges() {
-        ProviderSnapshot discovery = null;
-        IGrid grid = getPatternProviderGrid();
-        if (isServerSide() && grid != null) {
-            discovery = ProviderSnapshot.get(grid);
-        }
-        setProviderDiscoverySnapshot(discovery);
-        try {
-            super.broadcastChanges();
-        } finally {
-            setProviderDiscoverySnapshot(null);
-        }
+        super.broadcastChanges();
         if (isClientSide()) {
             return;
         }
 
         this.showPatternProviders =
             this.host.getConfigManager().getSetting(Settings.TERMINAL_SHOW_PATTERN_PROVIDERS);
-        this.patternAccessSession.updateProviderVisibility(discovery);
+        this.patternAccessSession.updateProviderVisibility();
     }
 
     @Override
@@ -193,20 +182,12 @@ public class ContainerPEATerm extends ContainerPatternEncodingTerm implements IP
     }
 
     @Override
-    protected PatternProviderSelectionSupport.ProcessingPatternUploadResult uploadProcessingPatternToProvider(
+    protected PatternProviderUploadService.ProcessingPatternUploadResult uploadProcessingPatternToProvider(
         ItemStack encodedPattern,
         IGrid grid,
         PatternContainer uploadTarget) {
-        return PatternProviderSelectionSupport.tryUploadProcessingPatternToProvider(getPlayer(), this.host, grid,
+        return PatternProviderUploadService.tryUploadProcessingPatternToProvider(getPlayer(), this.host, grid,
             uploadTarget, encodedPattern);
     }
 
-    @Override
-    protected PatternProviderSelectionSupport.ProcessingPatternUploadPreparation prepareProcessingPatternUpload(
-        ItemStack encodedPattern,
-        IGrid grid,
-        PatternContainer uploadTarget) {
-        return PatternProviderSelectionSupport.prepareProcessingPatternUpload(getPlayer(), this.host, grid,
-            uploadTarget, encodedPattern);
-    }
 }

@@ -28,7 +28,7 @@ public final class ProviderDirectoryPageCache {
 
     ProviderDirectoryPageCache(int maximumPages) {
         if (maximumPages <= 0) {
-            throw new IllegalArgumentException("Provider-select cache page limit must be positive");
+            throw new IllegalArgumentException("Provider Selection cache page limit must be positive");
         }
         this.maximumPages = maximumPages;
     }
@@ -65,17 +65,17 @@ public final class ProviderDirectoryPageCache {
         return created;
     }
 
-    static GuiProviderSelect.ProviderEntry convert(ProviderDirectoryPage.Entry entry) {
-        GuiProviderSelect.ProviderLocation location = null;
+    static GuiProviderSelection.ProviderEntry convert(ProviderDirectoryPage.Entry entry) {
+        GuiProviderSelection.ProviderLocation location = null;
         if (entry.hasLocation()) {
             EnumFacing side = entry.locationSide() < 0 ? null : EnumFacing.byIndex(entry.locationSide());
-            location = new GuiProviderSelect.ProviderLocation(
+            location = new GuiProviderSelection.ProviderLocation(
                 entry.locationDimension(),
                 BlockPos.fromLong(entry.locationPos()),
                 side);
         }
-        return new GuiProviderSelect.ProviderEntry(
-            entry.providerId(),
+        return new GuiProviderSelection.ProviderEntry(
+            entry.providerEntryId(),
             entry.icon(),
             location,
             entry.hasLocation(),
@@ -93,7 +93,7 @@ public final class ProviderDirectoryPageCache {
     }
 
     public record DirectoryPageView(DirectoryPageKey key, int total,
-                                    List<GuiProviderSelect.ProviderEntry> entries) {
+                                    List<GuiProviderSelection.ProviderEntry> entries) {
         public DirectoryPageView {
             Objects.requireNonNull(key, "key");
             entries = List.copyOf(Objects.requireNonNull(entries, "entries"));

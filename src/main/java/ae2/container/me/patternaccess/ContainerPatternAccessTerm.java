@@ -200,7 +200,9 @@ public class ContainerPatternAccessTerm extends AEBaseContainer
 
     @Override
     public void doAction(EntityPlayerMP player, InventoryAction action, int slot, long id) {
-        this.patternAccessSession.doAction(player, action, slot, id);
+        if (!this.patternAccessSession.doAction(player, action, slot, id)) {
+            super.doAction(player, action, slot, id);
+        }
     }
 
     @Override
