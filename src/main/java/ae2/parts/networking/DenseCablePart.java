@@ -81,4 +81,3 @@ public abstract class DenseCablePart extends CablePart {
         return false;
     }
 }
-

@@ -95,5 +95,3 @@ public interface IPartHost extends ICustomCableConnection {
 
     boolean isInWorld();
 }
-
-

@@ -34,4 +34,3 @@ public class ClientDisplaySlot extends ClientReadOnlySlot {
         return this.item;
     }
 }
-

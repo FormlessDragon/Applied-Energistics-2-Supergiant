@@ -54,4 +54,3 @@ public enum PushDirection implements IStringSerializable {
         return name().toLowerCase();
     }
 }
-

@@ -43,4 +43,3 @@ public class GuiMEChest extends AEBaseGui<ContainerMEChest> {
         }
     }
 }
-

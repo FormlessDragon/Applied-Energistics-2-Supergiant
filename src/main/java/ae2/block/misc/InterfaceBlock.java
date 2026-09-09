@@ -71,5 +71,3 @@ public class InterfaceBlock extends AEBaseTileBlock<TileInterface> {
         }
     }
 }
-
-

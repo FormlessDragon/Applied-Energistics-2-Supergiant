@@ -74,4 +74,3 @@ public class ToolboxPanel implements ICompositeWidget {
         return new Tooltip(this.toolbeltName, hint);
     }
 }
-

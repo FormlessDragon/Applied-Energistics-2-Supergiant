@@ -47,4 +47,3 @@ public class ServerSettingToggleButton<T extends Enum<T>> extends SettingToggleB
         }
     }
 }
-

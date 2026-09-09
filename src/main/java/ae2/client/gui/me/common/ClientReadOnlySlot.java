@@ -42,4 +42,3 @@ public class ClientReadOnlySlot extends Slot {
         return false;
     }
 }
-

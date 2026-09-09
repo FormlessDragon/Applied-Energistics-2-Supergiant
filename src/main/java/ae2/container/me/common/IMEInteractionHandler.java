@@ -23,4 +23,3 @@ import ae2.helpers.InventoryAction;
 public interface IMEInteractionHandler {
     void handleInteraction(long serial, InventoryAction action);
 }
-

@@ -711,32 +711,39 @@ class GridPathingTest {
     private record MeshResult(int channelsInUse, int channelsByBlocks) {
     }
 
-    public record TestPathingService(ChannelMode channelMode) implements IPathingService, IGridServiceProvider {
-            private static ChannelMode nextMode = ChannelMode.DEFAULT;
+    @SuppressWarnings("ClassCanBeRecord")
+    public static final class TestPathingService implements IPathingService, IGridServiceProvider {
+        private static ChannelMode nextMode = ChannelMode.DEFAULT;
+        private final ChannelMode channelMode;
 
         public TestPathingService(IGrid grid) {
-                this(nextMode);
-            }
-
-            @Override
-            public boolean isNetworkBooting() {
-                return false;
-            }
-
-            @Override
-            public ControllerState getControllerState() {
-                return ControllerState.CONTROLLER_ONLINE;
-            }
-
-            @Override
-            public void repath() {
-            }
-
-            @Override
-            public int getUsedChannels() {
-                return 0;
-            }
+            this.channelMode = nextMode;
         }
+
+        @Override
+        public ChannelMode channelMode() {
+            return channelMode;
+        }
+
+        @Override
+        public boolean isNetworkBooting() {
+            return false;
+        }
+
+        @Override
+        public ControllerState getControllerState() {
+            return ControllerState.CONTROLLER_ONLINE;
+        }
+
+        @Override
+        public void repath() {
+        }
+
+        @Override
+        public int getUsedChannels() {
+            return 0;
+        }
+    }
 
     public static final class TestEnergyService implements IEnergyService, IGridServiceProvider {
         public TestEnergyService(IGrid grid) {

@@ -74,4 +74,3 @@ public class AEBaseBlockItem extends ItemBlock {
         return this.blockType;
     }
 }
-

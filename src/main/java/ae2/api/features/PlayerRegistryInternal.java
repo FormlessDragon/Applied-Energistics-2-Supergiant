@@ -157,4 +157,3 @@ public final class PlayerRegistryInternal extends AESavedData implements IPlayer
         return compound;
     }
 }
-

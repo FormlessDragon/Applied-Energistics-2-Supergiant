@@ -189,8 +189,3 @@ public class PortableCellGuiHost<T extends AbstractPortableCell> extends ItemGui
         }
     }
 }
-
-
-
-
-

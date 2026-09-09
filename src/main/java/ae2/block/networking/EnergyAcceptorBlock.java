@@ -31,5 +31,3 @@ public class EnergyAcceptorBlock extends AEBaseTileBlock<TileEnergyAcceptor> {
         this.setTileEntity(TileEnergyAcceptor.class);
     }
 }
-
-

@@ -91,4 +91,3 @@ public class GuiStorageLevelEmitter extends GuiUpgradeable<ContainerStorageLevel
         this.level.getLongValue().ifPresent(container::setValue);
     }
 }
-

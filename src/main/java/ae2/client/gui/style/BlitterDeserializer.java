@@ -62,4 +62,3 @@ enum BlitterDeserializer implements JsonDeserializer<Blitter> {
     }
 
 }
-

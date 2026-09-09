@@ -205,6 +205,3 @@ public class PatternProviderPart extends AEBasePart implements PatternProviderLo
         return AEParts.PATTERN_PROVIDER.stack();
     }
 }
-
-
-

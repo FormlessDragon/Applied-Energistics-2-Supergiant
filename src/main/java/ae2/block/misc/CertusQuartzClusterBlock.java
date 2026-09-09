@@ -153,4 +153,3 @@ public class CertusQuartzClusterBlock extends AEBaseBlock {
         return supportState.getBlock().isSideSolid(supportState, world, supportPos, facing);
     }
 }
-

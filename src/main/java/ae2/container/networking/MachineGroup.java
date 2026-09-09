@@ -84,4 +84,3 @@ public class MachineGroup {
         this.count = count;
     }
 }
-

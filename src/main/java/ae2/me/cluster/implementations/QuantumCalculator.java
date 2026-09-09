@@ -120,4 +120,3 @@ public class QuantumCalculator extends MBCalculator<TileQuantumBridge, QuantumCl
         return def.block() == level.getBlockState(pos).getBlock();
     }
 }
-

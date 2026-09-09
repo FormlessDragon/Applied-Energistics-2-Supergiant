@@ -110,4 +110,3 @@ public class Position {
         return result.toString();
     }
 }
-

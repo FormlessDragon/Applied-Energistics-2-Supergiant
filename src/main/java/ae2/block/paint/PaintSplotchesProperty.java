@@ -25,4 +25,3 @@ class PaintSplotchesProperty implements IUnlistedProperty<PaintSplotches> {
         return null;
     }
 }
-

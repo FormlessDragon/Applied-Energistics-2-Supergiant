@@ -244,4 +244,3 @@ public abstract class AbstractLevelEmitterPart extends UpgradeablePart {
         return false; // We handle this completely in our enabled flag
     }
 }
-

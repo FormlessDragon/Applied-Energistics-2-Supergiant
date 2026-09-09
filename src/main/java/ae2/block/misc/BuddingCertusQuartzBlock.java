@@ -120,4 +120,3 @@ public class BuddingCertusQuartzBlock extends AEBaseBlock {
         return this;
     }
 }
-

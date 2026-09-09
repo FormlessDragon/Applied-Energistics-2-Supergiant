@@ -30,5 +30,3 @@ public class EnergyGeneratorBlock extends AEBaseTileBlock<TileEnergyGenerator> {
         this.setTileEntity(TileEnergyGenerator.class);
     }
 }
-
-

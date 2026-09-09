@@ -101,4 +101,3 @@ public final class InventoryItemLocator implements ItemGuiHostLocator {
     private record DecodedHitResult(@Nullable RayTraceResult hitResult, boolean valid) {
     }
 }
-

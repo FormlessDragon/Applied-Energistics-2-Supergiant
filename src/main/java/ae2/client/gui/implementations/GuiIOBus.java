@@ -90,4 +90,3 @@ public class GuiIOBus extends GuiUpgradeable<ContainerIOBus> {
         }
     }
 }
-

@@ -116,4 +116,3 @@ public class IncrementalUpdateHelper implements Iterable<AEKey> {
         return this.changes.spliterator();
     }
 }
-

@@ -217,4 +217,3 @@ public class GuiNetworkStatus<T extends AEBaseContainer & INetworkStatusContaine
             + AEConfig.instance().getSelectedEnergyUnit().getSymbolName() + (isRate ? "/t" : "");
     }
 }
-

@@ -1801,4 +1801,3 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         }
     }
 }
-

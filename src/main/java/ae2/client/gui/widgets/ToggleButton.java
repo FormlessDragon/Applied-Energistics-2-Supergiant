@@ -89,4 +89,3 @@ public class ToggleButton extends IconButton {
         void onChange(boolean state);
     }
 }
-

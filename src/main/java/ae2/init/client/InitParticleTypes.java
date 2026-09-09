@@ -47,4 +47,3 @@ public final class InitParticleTypes {
         return AppEng.makeId(name);
     }
 }
-

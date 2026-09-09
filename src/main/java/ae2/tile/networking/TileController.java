@@ -189,5 +189,3 @@ public class TileController extends AENetworkedPoweredTile {
         GuiOpener.openGui(player, GuiIds.GuiKey.CONTROLLER_STATUS, this);
     }
 }
-
-

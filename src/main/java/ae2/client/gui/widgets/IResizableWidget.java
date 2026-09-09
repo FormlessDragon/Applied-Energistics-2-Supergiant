@@ -11,4 +11,3 @@ public interface IResizableWidget {
 
     void resize(int width, int height);
 }
-

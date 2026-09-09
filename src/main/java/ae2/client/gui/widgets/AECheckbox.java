@@ -170,4 +170,3 @@ public class AECheckbox extends GuiButton implements ITooltip {
         return this.selected ? CHECKED.copy() : UNCHECKED.copy();
     }
 }
-

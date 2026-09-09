@@ -83,4 +83,3 @@ public class Text {
         this.maxWidth = maxWidth;
     }
 }
-

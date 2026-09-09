@@ -48,4 +48,3 @@ public interface IClientRepo {
      */
     Collection<GridInventoryEntry> getByIngredient(Ingredient ingredient);
 }
-

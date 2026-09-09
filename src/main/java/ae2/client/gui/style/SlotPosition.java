@@ -51,4 +51,3 @@ public class SlotPosition extends Position {
         return grid != null ? result + "grid=" + grid : result;
     }
 }
-

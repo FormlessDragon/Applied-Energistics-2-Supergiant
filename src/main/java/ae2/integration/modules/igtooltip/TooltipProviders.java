@@ -182,5 +182,3 @@ public final class TooltipProviders implements TooltipProvider {
         registration.addPartHost(TileCableBus.class, CableBusBlock.class);
     }
 }
-
-

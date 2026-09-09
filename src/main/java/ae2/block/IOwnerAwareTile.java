@@ -30,4 +30,3 @@ public interface IOwnerAwareTile {
      */
     void setOwner(EntityPlayer owner);
 }
-

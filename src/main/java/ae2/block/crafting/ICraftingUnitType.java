@@ -29,4 +29,3 @@ public interface ICraftingUnitType extends ICraftingUnitDefinition {
         return getItemFromType();
     }
 }
-

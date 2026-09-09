@@ -5,4 +5,3 @@ import ae2.api.storage.ILinkStatus;
 public interface ILinkStatusAwareContainer {
     void setLinkStatus(ILinkStatus linkStatus);
 }
-

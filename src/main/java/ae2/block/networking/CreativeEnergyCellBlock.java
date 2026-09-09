@@ -31,5 +31,3 @@ public class CreativeEnergyCellBlock extends AEBaseTileBlock<TileCreativeEnergyC
         this.setTileEntity(TileCreativeEnergyCell.class);
     }
 }
-
-

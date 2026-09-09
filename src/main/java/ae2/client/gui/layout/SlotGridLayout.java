@@ -87,4 +87,3 @@ public enum SlotGridLayout {
     public abstract Point getPosition(int x, int y, int semanticIdx);
 
 }
-

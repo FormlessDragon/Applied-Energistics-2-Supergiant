@@ -30,4 +30,3 @@ public class CraftingUnitBlock extends AbstractCraftingUnitBlock<TileCraftingUni
         super(definition, TileCraftingUnit.class);
     }
 }
-

@@ -34,5 +34,3 @@ public interface IOverlayDataSource {
 
     int getOverlayColor();
 }
-
-

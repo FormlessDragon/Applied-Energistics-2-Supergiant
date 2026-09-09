@@ -240,5 +240,3 @@ public class LightP2PTunnelPart extends P2PTunnelPart<LightP2PTunnelPart> implem
     record LightState(boolean output, int lastValue, int opacity) {
     }
 }
-
-

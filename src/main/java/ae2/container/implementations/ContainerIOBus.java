@@ -79,4 +79,3 @@ public class ContainerIOBus extends UpgradeableContainer<IOBusPart> implements I
         }
     }
 }
-

@@ -10,5 +10,3 @@ public class TileMysteriousCube extends AEBaseTile {
         super();
     }
 }
-
-

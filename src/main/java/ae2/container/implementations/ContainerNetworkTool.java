@@ -36,4 +36,3 @@ public class ContainerNetworkTool extends AEBaseContainer {
         this.addPlayerInventorySlots(0, 0);
     }
 }
-

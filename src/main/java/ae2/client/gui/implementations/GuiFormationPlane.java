@@ -75,4 +75,3 @@ public class GuiFormationPlane extends GuiUpgradeable<ContainerFormationPlane> {
         InitNetwork.sendToServer(SwitchGuisPacket.openSubGui(GuiIds.GuiKey.WORK_INTERVAL));
     }
 }
-

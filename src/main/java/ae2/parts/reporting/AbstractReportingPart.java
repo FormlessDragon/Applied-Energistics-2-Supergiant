@@ -149,4 +149,3 @@ public abstract class AbstractReportingPart extends AEBasePart implements IMonit
     public abstract boolean isLightSource();
 
 }
-

@@ -81,4 +81,3 @@ public record CraftingStatusEntry(long serial, @Nullable AEKey what, long stored
     }
 
 }
-

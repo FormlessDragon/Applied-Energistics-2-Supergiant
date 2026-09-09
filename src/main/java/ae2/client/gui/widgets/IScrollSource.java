@@ -22,4 +22,3 @@ public interface IScrollSource {
 
     int getCurrentScroll();
 }
-

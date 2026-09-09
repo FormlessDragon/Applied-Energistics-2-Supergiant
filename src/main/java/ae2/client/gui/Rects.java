@@ -46,4 +46,3 @@ public final class Rects {
             rect.height);
     }
 }
-

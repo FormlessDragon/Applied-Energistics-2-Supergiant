@@ -10,4 +10,3 @@ public class AEDecorativeBlock extends AEBaseBlock {
         this.setResistance(resistance);
     }
 }
-

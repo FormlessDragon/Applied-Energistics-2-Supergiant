@@ -85,4 +85,3 @@ public class RepoSlot extends ClientReadOnlySlot {
         return getEntry() != null;
     }
 }
-

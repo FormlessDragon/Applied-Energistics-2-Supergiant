@@ -388,4 +388,3 @@ public class Scrollbar implements IScrollSource, ICompositeWidget {
         }
     }
 }
-

@@ -56,4 +56,3 @@ public enum Rectangle2dDeserializer implements JsonDeserializer<Rectangle> {
         }
     }
 }
-

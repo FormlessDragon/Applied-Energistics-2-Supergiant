@@ -80,4 +80,3 @@ public class GuiPatternSlot extends AppEngSlot {
         return false;
     }
 }
-

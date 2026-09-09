@@ -132,5 +132,3 @@ public abstract class CapabilityP2PTunnelPart<P extends CapabilityP2PTunnelPart<
         }
     }
 }
-
-

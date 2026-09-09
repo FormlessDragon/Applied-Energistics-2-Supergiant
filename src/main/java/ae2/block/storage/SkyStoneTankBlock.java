@@ -72,5 +72,3 @@ public class SkyStoneTankBlock extends AEBaseTileBlock<TileSkyStoneTank> {
         lines.add(GuiText.TankBucketCapacity.getLocal(TileSkyStoneTank.BUCKET_CAPACITY));
     }
 }
-
-

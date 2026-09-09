@@ -263,5 +263,3 @@ public final class Platform {
         }
     }
 }
-
-

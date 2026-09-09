@@ -47,4 +47,3 @@ public interface ITooltip {
      */
     boolean isTooltipAreaVisible();
 }
-

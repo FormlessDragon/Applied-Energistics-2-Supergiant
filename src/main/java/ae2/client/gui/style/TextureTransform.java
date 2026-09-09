@@ -23,4 +23,3 @@ public enum TextureTransform {
     MIRROR_H,
     MIRROR_V
 }
-

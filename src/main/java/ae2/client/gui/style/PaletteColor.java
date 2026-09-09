@@ -32,4 +32,3 @@ public enum PaletteColor {
     ANALYSER_DENSE_NODES,
     ANALYSER_MISSING_NODES
 }
-

@@ -406,4 +406,3 @@ public interface InternalInventory extends Iterable<ItemStack>, ItemTransfer {
     default void sendChangeNotification(int slot) {
     }
 }
-

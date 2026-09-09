@@ -39,4 +39,3 @@ public class PaintSplotches {
         return this.splotches;
     }
 }
-

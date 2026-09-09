@@ -191,7 +191,3 @@ public class BasicStorageCell extends AEBaseItem implements IBasicCellItem {
             : EnumActionResult.PASS;
     }
 }
-
-
-
-

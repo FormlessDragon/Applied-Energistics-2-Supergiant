@@ -9,4 +9,3 @@ import io.netty.buffer.ByteBuf;
 public interface PacketWritable {
     void writeToPacket(ByteBuf data);
 }
-

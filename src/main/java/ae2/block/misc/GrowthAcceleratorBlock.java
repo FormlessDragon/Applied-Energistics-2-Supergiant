@@ -143,5 +143,3 @@ public class GrowthAcceleratorBlock extends AEBaseTileBlock<TileGrowthAccelerato
         ParticleTypes.LIGHTNING.spawn(world, rx, ry, rz, 0.0D, 0.0D, 0.0D, null);
     }
 }
-
-

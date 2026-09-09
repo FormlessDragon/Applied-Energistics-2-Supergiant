@@ -51,4 +51,3 @@ public class WidgetStyle extends Position {
     }
 
 }
-

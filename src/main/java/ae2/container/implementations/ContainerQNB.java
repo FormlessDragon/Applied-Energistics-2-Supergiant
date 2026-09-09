@@ -39,4 +39,3 @@ public class ContainerQNB extends AEBaseContainer {
         this.addPlayerInventorySlots(8, 84);
     }
 }
-

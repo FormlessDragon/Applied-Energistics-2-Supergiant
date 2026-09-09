@@ -123,6 +123,3 @@ public abstract class QuantumBaseBlock extends AEBaseTileBlock<TileQuantumBridge
         super.breakBlock(world, pos, state);
     }
 }
-
-
-

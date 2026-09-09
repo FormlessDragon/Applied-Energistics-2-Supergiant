@@ -40,4 +40,3 @@ public final class TileLocator implements GuiHostLocator {
         return "Tile{pos=" + pos + '}';
     }
 }
-

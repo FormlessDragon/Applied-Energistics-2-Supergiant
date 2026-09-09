@@ -195,4 +195,3 @@ public class NetworkStatus {
         return groupedMachines;
     }
 }
-

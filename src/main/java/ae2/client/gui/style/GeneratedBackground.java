@@ -38,4 +38,3 @@ public class GeneratedBackground {
         this.height = height;
     }
 }
-

@@ -34,4 +34,3 @@ public record GridInventoryEntry(long serial, @Nullable AEKey what, long storedA
         return storedAmount > 0 || requestableAmount > 0 || craftable;
     }
 }
-

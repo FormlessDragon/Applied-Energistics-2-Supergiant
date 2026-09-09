@@ -52,4 +52,3 @@ public class GuiWirelessAccessPoint extends AEBaseGui<ContainerWirelessAccessPoi
         setTextContent("energy_use", energyUseText);
     }
 }
-

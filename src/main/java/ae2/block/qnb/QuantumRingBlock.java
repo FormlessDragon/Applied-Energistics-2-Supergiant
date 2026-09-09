@@ -69,4 +69,3 @@ public class QuantumRingBlock extends QuantumBaseBlock {
         super.addCollisionBoxToList(state, worldIn, pos, entityBox, collidingBoxes, entityIn, isActualState);
     }
 }
-

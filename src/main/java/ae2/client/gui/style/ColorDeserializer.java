@@ -35,4 +35,3 @@ enum ColorDeserializer implements JsonDeserializer<Color> {
         return Color.parse(json.getAsString());
     }
 }
-

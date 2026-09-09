@@ -30,4 +30,3 @@ public final class SpinMapping {
         return spinDirs[Math.floorMod(spin, spinDirs.length)];
     }
 }
-

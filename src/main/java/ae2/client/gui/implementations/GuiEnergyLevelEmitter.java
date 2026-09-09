@@ -71,4 +71,3 @@ public class GuiEnergyLevelEmitter extends GuiUpgradeable<ContainerEnergyLevelEm
         this.level.getLongValue().ifPresent(container::setReportingValue);
     }
 }
-
