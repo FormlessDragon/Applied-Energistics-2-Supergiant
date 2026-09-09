@@ -1,6 +1,5 @@
 ---
 title: Addon and Mod API
-# Note that this file is automatically included into the Website and is available at https://appliedenergistics.github.io/api.html
 ---
 
 ## Source Layout
@@ -276,9 +275,11 @@ capability or host interface, such as `IInWorldGridNodeHost`.
 Virtual nodes do not automatically form connections with nearby world nodes. They allow addons to build ME network
 topologies that are not represented by normal block adjacency.
 
-Virtual links must be created explicitly with `GridHelper.createConnection(IGridNode, IGridNode)`. Removing the
-connection is handled by destroying the corresponding node, which also handles unload cleanup and prevents old
-connections from lingering.
+Virtual links must be created explicitly with `GridHelper.createConnection(IGridNode, IGridNode)`. A single link can be
+removed by destroying its corresponding node. Integrations that remove several links at once should call
+`GridHelper.destroyConnections(Collection<? extends IGridConnection>)` instead. The batch method validates all entries
+before mutation, deduplicates repeated connection identities, detaches both endpoints before callbacks, and reconciles
+the resulting connected components once per component. It is synchronous and must be called on the server thread.
 
 ### Node Services
 
@@ -305,6 +306,19 @@ well. Services can be retrieved by calling `IGrid#getService` with the service i
 This service allows energy to be extracted from and injected into the grid's energy storage, including energy cells,
 the grid's internal storage, and other grid-connected energy providers.
 
+Energy providers implement `IAEPowerStorage`. `injectAEPower(...)` must return a finite, non-negative remainder no
+greater than the requested amount; simulation must not mutate storage or emit events. Providers should override
+`getExtractableAEPower(double)` and `getReceivableAEPower(double)` when they can calculate these values directly;
+the defaults use simulation. Both queries must be side-effect free and return finite, non-negative values bounded by
+their argument. Changes made outside an energy-service operation must post
+`GridPowerStorageChanged(ChangeType.VALUES_CHANGED)`. Routing or capacity changes use
+`ChangeType.ROUTING_CHANGED`. These callbacks are synchronous on the owning grid's server thread.
+
+The energy service caches primitive contributions per registered provider and refreshes only the provider named by a
+value-change event. Providers that report invalid values are isolated for that refresh and contribute zero until a
+later valid change event; an invalid provider must not disable unrelated energy providers. The removed
+`PowerStorageSnapshotBuilder` API must not be implemented by addons.
+
 #### Ticking
 
 **Service Interface:** `ITickManager`  
@@ -319,6 +333,10 @@ AE2 offers its grid-connected machines an advanced ticking system with the follo
 
 The grid's `ITickManager` service handles the per-grid aspects of this ticking system. It offers an API to manage the
 sleep and wake status of grid nodes.
+
+`ae2.api.networking.ticking.TickSnapshot` exposes the mutable timing totals used by the tick manager. Its
+`cpuMax()` value is maintained lazily after removals or reductions, so reading it may perform a scan of the current
+node timing entries. `reset()` clears all node and category timing data.
 
 To participate in the ticking system, your grid node must provide the `IGridTickable` node service. The
 `ITickManager` reacts to the presence of this service when your grid node joins the grid. `IGridTickable` returns a
@@ -343,6 +361,17 @@ Consumers of `getInventory()` may register their own `MEStorageChangeListener`, 
 synchronous signed deltas they receive. Positive deltas add to the amount of a key and negative deltas remove from it.
 `onListUpdate()` means that an exact delta cannot describe a structural change and requests one new enumeration; it
 must not replace `onStackChange(...)` for an ordinary content change.
+
+Storage watcher nodes may additionally override
+`IStorageWatcherNode.onStackChange(AEKey, long, long)` to receive both the new and previous absolute network amount.
+The two-amount overload has a default implementation that delegates to the original callback, so existing watcher
+implementations remain source-compatible. Both amounts are non-negative and describe the same synchronous update.
+
+For large stable inventories, an implementation may also implement `ae2.api.inventories.VersionedInternalInventory`.
+Its `getContentsVersion()` must be a monotonically increasing, side-effect-free value. The version must change for
+every visible slot-content, count, NBT, or visibility change, including changes made through another facade;
+simulation must not change it. Consumers may skip slot enumeration when the inventory identity, size, and version are
+unchanged. The interface describes lifecycle ordering only and does not make inventory access thread-safe.
 
 Node-backed storage should implement `IStorageProvider` as a node service. When the node joins or leaves a grid, the
 storage service will mount or unmount it automatically by calling `mountInventories(...)`. Global storage providers
@@ -384,6 +413,12 @@ reconnecting.
 This service provides access to craftable patterns, crafting CPUs, job calculation, job simulation, job submission,
 and active-request tracking. Craftable keys are queried through this service rather than being reported as ordinary
 stored network contents.
+
+`ICraftingProvider` registration is lazy: registering or refreshing a provider records its reference without reading
+patterns until a consumer first requests the crafting index or starts a calculation. Provider content and priority
+snapshots are read synchronously on the server thread and must be complete, non-null snapshots. After initialization,
+call `ICraftingProvider.requestUpdate(...)` for pattern, priority, or availability changes. Temporary grid booting must
+not be used to remove an otherwise valid provider.
 
 `getCraftablesVersion()` returns a monotonic revision that changes whenever the craftable resource set may have
 changed. Consumers can retain the last observed revision and avoid calling `getCraftables(...)` again while it remains
@@ -491,6 +526,8 @@ allowing explicit machine-driven forced crafting.
 
 This service provides channel and controller/pathing state for the grid. Nodes can use it to inspect whether the grid
 is booting and whether channel requirements are currently satisfied.
+
+The current channel allocation mode is returned by `IPathingService.channelMode()`.
 
 #### Spatial I/O
 

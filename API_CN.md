@@ -1,6 +1,5 @@
 ---
 title: 附属与模组 API
-# 注：本文件为 API.md 的中文翻译，仅供阅读；英文原版由网站自动收录，见 https://appliedenergistics.github.io/api.html
 ---
 
 ## 源码布局
@@ -212,7 +211,7 @@ class MyTileEntity extends TileEntity {
 
 虚拟节点不会自动与附近的世界节点建立连接。它允许附加模组构建不由常规方块邻接表示的 ME 网络拓扑。
 
-虚拟连接必须通过 `GridHelper.createConnection(IGridNode, IGridNode)` 显式创建。移除连接由销毁对应节点处理，这同时处理卸载清理并防止旧连接残留。
+虚拟连接必须通过 `GridHelper.createConnection(IGridNode, IGridNode)` 显式创建。单条连接可以通过销毁对应节点移除；附加模组一次移除多条连接时，应使用 `GridHelper.destroyConnections(Collection<? extends IGridConnection>)`。批量入口会在修改前校验参数，对重复连接按身份去重，在回调前解绑两端，并对最终连通分量各处理一次。该操作同步执行，必须在服务端线程调用。
 
 ### 节点服务
 
@@ -231,7 +230,11 @@ AE2 通过 `GridServices` 提供默认服务，附加模组也可以在那里注
 **服务接口：** `IEnergyService`  
 **便捷获取：** `IGrid.getEnergyService()`
 
-该服务允许从网络的能量存储中取出能量或向其中注入能量，包括能量元件、网络内部存储以及其他接入网络的能量提供方。
+该服务允许从网络的能量存储中取出能量或向其中注入能量，包括能量元件、网络内部存储以及其他接入网络的能源提供方。
+
+能源提供方实现 `IAEPowerStorage`。`injectAEPower(...)` 必须返回有限、非负且不大于请求量的剩余量；模拟操作不得修改存储或发出事件。若实现可以直接计算容量或传输限制，应覆盖 `getExtractableAEPower(double)` 与 `getReceivableAEPower(double)`；默认实现使用模拟操作。这两个查询必须无副作用，并返回不超过参数的有限非负值。能源服务操作之外的数值变化必须发送 `GridPowerStorageChanged(ChangeType.VALUES_CHANGED)`；路由或容量变化使用 `ChangeType.ROUTING_CHANGED`。这些回调必须在所属网络的服务端线程同步执行。
+
+能源服务按已注册提供方缓存原始数值贡献，数值变化事件只刷新事件指出的来源。某个提供方返回非法值时，仅该来源在本次刷新中被隔离并按零贡献处理，不得使其他能源提供方失效；后续有效变化事件可以使其恢复。已删除的 `PowerStorageSnapshotBuilder` API 不应由附加模组实现。
 
 #### 刻调度
 
@@ -247,6 +250,8 @@ AE2 为接入网络的机器提供了先进的刻调度系统，具备以下特�
 
 网络的 `ITickManager` 服务处理该调度系统的网络侧部分，提供管理网络节点休眠与唤醒状态的 API。
 
+`ae2.api.networking.ticking.TickSnapshot` 暴露刻管理使用的可变计时汇总。节点移除或最大耗时降低后，`cpuMax()` 会延迟重算，因此读取它可能遍历当前节点计时条目；`reset()` 会清除所有节点及分类计时数据。
+
 要参与刻调度系统，你的网络节点必须提供 `IGridTickable` 节点服务。`ITickManager` 在你的节点加入网络时对该服务的存在做出反应。`IGridTickable` 返回 `TickingRequest` 描述期望的响应速度，然后每次 tick 返回 `TickRateModulation` 来加速、减速、休眠或保持当前频率。
 
 #### 存储
@@ -259,6 +264,10 @@ AE2 为接入网络的机器提供了先进的刻调度系统，具备以下特�
 聚合缓存在首次访问时通过枚举全部挂载构建。之后的内容变化通过 `MEStorageChangeListener.onStackChange(...)` 的带符号增量同步更新。只有在挂载结构变化或某个监视器调用 `onListUpdate()` 之后，才会重新进行一次完整枚举。返回的 `KeyCounter` 是共享的，调用方不得修改。
 
 `getInventory()` 的使用方可以注册自己的 `MEStorageChangeListener`，先完整枚举一次，然后应用收到的同步带符号增量。正增量表示某个键的数量增加，负增量表示减少。`onListUpdate()` 表示无法用精确增量描述的结构性变化，会请求一次新的完整枚举；对普通内容变化而言，它不能替代 `onStackChange(...)`。
+
+存储监听节点还可以覆盖 `IStorageWatcherNode.onStackChange(AEKey, long, long)`，同时接收变化后的绝对网络数量与变化前的绝对网络数量。该重载默认调用原有回调，因此既有监听器仍保持源码兼容。两个数量均为非负值，并描述同一次同步更新。
+
+对于稳定且较大的内部物品栏，可以额外实现 `ae2.api.inventories.VersionedInternalInventory`。`getContentsVersion()` 必须是单调递增、无副作用的版本值；可见槽内容、数量、NBT 或槽位可见性每次真实变化（包括通过其他 facade 的变化）都必须递增，模拟操作不得递增。消费者可以在物品栏对象、大小和版本均未变化时跳过槽位枚举。该接口只规定生命周期顺序，不使物品栏访问变为线程安全。
 
 由节点提供的存储应以节点服务的形式实现 `IStorageProvider`。节点加入或离开网络时，存储服务会自动调用 `mountInventories(...)` 挂载或卸载它。当存储由某个网络服务而非单个节点提供时，可以通过 `IStorageService.addGlobalStorageProvider(...)` 添加全局存储提供方。
 
@@ -346,6 +355,8 @@ public interface ICraftingForceStartRequester extends ICraftingRequester {
 **便捷获取：** `IGrid.getPathingService()`
 
 该服务提供网络的频道与控制器/寻路状态。节点可以用它检查网络是否正在引导，以及频道需求当前是否满足。
+
+当前频道分配模式通过 `IPathingService.channelMode()` 获取。
 
 #### 空间 I/O
 
