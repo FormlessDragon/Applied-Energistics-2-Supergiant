@@ -34,8 +34,11 @@ import ae2.core.AppEng;
 import ae2.core.settings.TickRates;
 import ae2.hooks.ticking.TickHandler;
 import ae2.items.parts.PartModels;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ReferenceSet;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
@@ -157,28 +160,39 @@ public class MEP2PTunnelPart extends P2PTunnelPart<MEP2PTunnelPart> implements I
         }
 
         if (operation == ConnectionUpdate.DISCONNECT) {
-            for (IGridConnection connection : this.connections.values()) {
-                connection.destroy();
-            }
+            var removed = new ObjectArrayList<>(this.connections.values());
             this.connections.clear();
+            GridHelper.destroyConnections(removed);
         } else if (operation == ConnectionUpdate.CONNECT) {
             List<MEP2PTunnelPart> outputs = getOutputs();
+            ReferenceSet<MEP2PTunnelPart> outputSet = new ReferenceOpenHashSet<>(outputs.size());
+            outputSet.addAll(outputs);
             Iterator<Map.Entry<MEP2PTunnelPart, IGridConnection>> it = this.connections.entrySet()
                                                                                        .iterator();
+            var removed = new ObjectArrayList<IGridConnection>();
             while (it.hasNext()) {
                 Map.Entry<MEP2PTunnelPart, IGridConnection> entry = it.next();
                 MEP2PTunnelPart output = entry.getKey();
                 IGridConnection connection = entry.getValue();
                 if (output.getMainNode().getGrid() != mainGrid
                     || !output.getMainNode().isOnline()
-                    || !outputs.contains(output)) {
-                    connection.destroy();
+                    || !outputSet.contains(output)) {
+                    removed.add(connection);
                     it.remove();
                 }
             }
 
-            for (MEP2PTunnelPart output : outputs) {
-                if (!output.getMainNode().isOnline() || this.connections.containsKey(output)) {
+            GridHelper.destroyConnections(removed);
+
+            if (!getMainNode().isOnline() || getMainNode().getGrid() != mainGrid || isOutput()) {
+                return;
+            }
+            outputs = getOutputs();
+            for (int i = 0; i < outputs.size(); i++) {
+                MEP2PTunnelPart output = outputs.get(i);
+                if (!output.getMainNode().isOnline() || output.getMainNode().getGrid() != mainGrid
+                    || getExternalFacingNode() == null || output.getExternalFacingNode() == null
+                    || this.connections.containsKey(output)) {
                     continue;
                 }
 

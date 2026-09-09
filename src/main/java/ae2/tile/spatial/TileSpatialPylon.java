@@ -22,10 +22,12 @@ import ae2.api.networking.GridFlags;
 import ae2.api.networking.IGridMultiblock;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridNodeListener;
+import ae2.api.networking.spatial.ISpatialService;
 import ae2.api.orientation.BlockOrientation;
 import ae2.me.cluster.IAEMultiBlock;
 import ae2.me.cluster.implementations.SpatialPylonCalculator;
 import ae2.me.cluster.implementations.SpatialPylonCluster;
+import ae2.me.service.SpatialPylonService;
 import ae2.tile.grid.AENetworkedTile;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -36,6 +38,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.EnumSkyBlock;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
@@ -124,7 +127,15 @@ public class TileSpatialPylon extends AENetworkedTile implements IAEMultiBlock<S
         if (this.removing) {
             return;
         }
-        this.cluster = cluster;
+        if (this.cluster != cluster) {
+            this.cluster = cluster;
+            this.getMainNode().ifPresent((grid, node) -> {
+                if (grid.getService(ISpatialService.class)
+                    instanceof SpatialPylonService pylons) {
+                    pylons.markDirty();
+                }
+            });
+        }
         this.onGridConnectableSidesChanged();
         this.recalculateDisplay();
     }
@@ -248,7 +259,7 @@ public class TileSpatialPylon extends AENetworkedTile implements IAEMultiBlock<S
             boolean hasLight = this.getLightValue() > 0;
             if (hasLight != this.hadLight) {
                 this.hadLight = hasLight;
-                this.world.checkLight(this.pos);
+                this.world.checkLightFor(EnumSkyBlock.BLOCK, this.pos);
             }
         }
     }

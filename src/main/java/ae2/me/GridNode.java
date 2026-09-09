@@ -34,7 +34,6 @@ import ae2.api.stacks.AEItemKey;
 import ae2.api.util.AEColor;
 import ae2.core.AELog;
 import ae2.me.pathfinding.IPathItem;
-import ae2.tile.networking.TileController;
 import ae2.util.IDebugExportable;
 import ae2.util.JsonStreamUtil;
 import com.google.common.base.Preconditions;
@@ -45,6 +44,7 @@ import com.google.gson.stream.JsonWriter;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.Reference2IntMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectLinkedOpenHashMap;
 import net.minecraft.crash.CrashReportCategory;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
@@ -70,7 +70,10 @@ import java.util.UUID;
 public class GridNode implements IGridNode, IPathItem, IDebugExportable {
     private static final Logger LOG = LoggerFactory.getLogger(GridNode.class);
     protected final IGridNodeListener<?> listener;
-    protected final ObjectList<GridConnection> connections = new ObjectArrayList<>();
+    protected final Reference2ObjectLinkedOpenHashMap<GridNode, GridConnection> connections =
+        new Reference2ObjectLinkedOpenHashMap<>(2);
+    private final ObjectList<GridConnection> pathConnections = new ObjectArrayList<>();
+    private boolean pathConnectionsDirty = true;
     private final WorldServer level;
     /**
      * This is the logical host of the node, which could be any object. In many cases this will be a tile entity or
@@ -117,6 +120,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
      */
     @Nullable
     private GridNode highestSimilarAncestor = null;
+    private boolean controllerRouteRoot;
     private int subtreeMaxChannels;
     private boolean subtreeAllowsCompressedChannels;
     private ClassToInstanceMap<IGridNodeService> services;
@@ -155,31 +159,49 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
      * Notifies the grid node's listener about a potential change in the grid node's status.
      */
     public void notifyStatusChange(IGridNodeListener.State reason) {
+        var notifiedGrid = this.myGrid;
+        if (notifiedGrid != null) {
+            notifiedGrid.onNodeStateChanged(this);
+        }
         callListener((nodeListener, nodeOwner, node) -> nodeListener.onStateChanged(nodeOwner, node, reason));
     }
 
     void addConnection(IGridConnection gridConnection) {
-        connections.add((GridConnection) gridConnection);
+        GridConnection.topologyChanged();
+        var other = (GridNode) gridConnection.getOtherSide(this);
+        Preconditions.checkState(!connections.containsKey(other), "Nodes are already connected");
+        connections.put(other, (GridConnection) gridConnection);
+        invalidatePathConnections();
         if (gridConnection.isInWorld()) {
             callListener(IGridNodeListener::onInWorldConnectionChanged);
         }
     }
 
     void removeConnection(IGridConnection gridConnection) {
-        connections.remove((GridConnection) gridConnection);
+        detachConnection(gridConnection);
+        notifyConnectionRemoved(gridConnection);
+    }
+
+    void detachConnection(IGridConnection gridConnection) {
+        var other = (GridNode) gridConnection.getOtherSide(this);
+        Preconditions.checkState(connections.get(other) == gridConnection, "Connection is not attached to this node");
+        connections.remove(other);
+        GridConnection.topologyChanged();
+        invalidatePathConnections();
+    }
+
+    void notifyConnectionRemoved(IGridConnection gridConnection) {
         if (gridConnection.isInWorld()) {
             callListener(IGridNodeListener::onInWorldConnectionChanged);
         }
     }
 
+    boolean isReady() {
+        return this.ready;
+    }
+
     boolean hasConnection(IGridNode otherSide) {
-        for (int i = 0, size = this.connections.size(); i < size; i++) {
-            IGridConnection gc = this.connections.get(i);
-            if (gc.a() == otherSide || gc.b() == otherSide) {
-                return true;
-            }
-        }
-        return false;
+        return this.connections.containsKey(otherSide);
     }
 
     void validateGrid() {
@@ -188,9 +210,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
             return;
         }
 
-        var gsd = new GridSplitDetector(this.getInternalGrid().getPivot());
-        this.beginVisit(gsd);
-        if (!gsd.isPivotFound()) {
+        if (!GridSplitDetector.isConnected(this, (GridNode) this.getInternalGrid().getPivot())) {
             var gp = new GridPropagator(Grid.create(this));
             this.beginVisit(gp);
         }
@@ -212,35 +232,43 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
     @Override
     public void beginVisit(IGridVisitor g) {
         final Object tracker = new Object();
-
+        Deque<GridNode> currentRun = new ArrayDeque<>();
         Deque<GridNode> nextRun = new ArrayDeque<>();
-        nextRun.add(this);
+        currentRun.add(this);
 
         this.visitorIterationNumber = tracker;
 
         if (g instanceof IGridConnectionVisitor gcv) {
             final Deque<IGridConnection> nextConn = new ArrayDeque<>();
 
-            while (!nextRun.isEmpty()) {
+            while (!currentRun.isEmpty()) {
                 while (!nextConn.isEmpty()) {
                     gcv.visitConnection(nextConn.poll());
                 }
 
-                final Iterable<GridNode> thisRun = nextRun;
-                nextRun = new ArrayDeque<>();
-
-                for (GridNode n : thisRun) {
-                    n.visitorConnection(tracker, g, nextRun, nextConn);
+                while (!currentRun.isEmpty()) {
+                    currentRun.poll().visitorConnection(tracker, g, nextRun, nextConn);
                 }
+
+                var swap = currentRun;
+                currentRun = nextRun;
+                nextRun = swap;
+            }
+
+            // A connection that closes a cycle can be discovered from the final node level without adding another
+            // node. It still belongs to the visited graph and must be reported.
+            while (!nextConn.isEmpty()) {
+                gcv.visitConnection(nextConn.poll());
             }
         } else {
-            while (!nextRun.isEmpty()) {
-                var thisRun = nextRun;
-                nextRun = new ArrayDeque<>();
-
-                for (var n : thisRun) {
-                    n.visitorNode(tracker, g, nextRun);
+            while (!currentRun.isEmpty()) {
+                while (!currentRun.isEmpty()) {
+                    currentRun.poll().visitorNode(tracker, g, nextRun);
                 }
+
+                var swap = currentRun;
+                currentRun = nextRun;
+                nextRun = swap;
             }
         }
     }
@@ -264,6 +292,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
         if (this.myGrid == grid) {
             return;
         }
+        GridConnection.topologyChanged();
 
         // Save any data from the old grid to move it over to the new grid
         if (this.myGrid != null) {
@@ -286,50 +315,30 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
         // Allows connection destroy logic to know that this node is
         // no longer available.
         this.ready = false;
-
-        boolean movedPivot = false;
-
-        // First pass: Remove the connection on the other side
-        for (int i = 0, size = this.connections.size(); i < size; i++) {
-            var connection = this.connections.get(i);
-            var otherSide = (GridNode) connection.getOtherSide(this);
-
-            // Moving the pivot closer means we potentially have to search fewer nodes
-            // when searching for a grid split. Especially if the grid hasn't really been split.
-            // In grids with a controller, side A of the connection will be closer to the controller
-            // By moving the pivot to side A, the controller will NOT receive a new grid, which
-            // is potentially beneficial by assuming the controller has a lot more connected
-            // nodes that are not disrupted by this node being destroyed.
-            if (!movedPivot && connection.a() != this && myGrid != null) {
-                myGrid.setPivot(connection.a());
-                movedPivot = true;
+        GridConnection.topologyChanged();
+        if (this.connections.size() == 1) {
+            var connection = this.connections.get(this.connections.firstKey());
+            if (myGrid != null) {
+                myGrid.setPivot((GridNode) connection.getOtherSide(this));
             }
-
-            // Ensure the other side holds no reference to this node anymore
-            otherSide.removeConnection(connection);
-        }
-
-        // Second pass: Re-validate the grids of the previously connected, adjacent nodes
-        for (int i = 0, size = this.connections.size(); i < size; i++) {
-            var connection = this.connections.get(i);
-            var otherSide = (GridNode) connection.getOtherSide(this);
-
-            // If we were unable to move the pivot away from ourselves in the first pass
-            // just move it to the first eligible node, but only if we're the pivot
+            // A leaf cannot split the surviving network. The single-edge search stops at this pivot.
+            connection.destroy();
+        } else if (!this.connections.isEmpty()) {
+            boolean movedPivot = false;
+            var detached = new ObjectArrayList<>(this.connections.values());
+            // Keep the controller side's grid identity when choosing a replacement pivot.
+            for (int i = 0; i < detached.size(); i++) {
+                var connection = detached.get(i);
+                if (!movedPivot && connection.a() != this && myGrid != null) {
+                    myGrid.setPivot(connection.a());
+                    movedPivot = true;
+                }
+            }
             if (!movedPivot && myGrid != null && myGrid.getPivot() == this) {
-                myGrid.setPivot(otherSide);
-                movedPivot = true;
+                myGrid.setPivot((GridNode) detached.getFirst().getOtherSide(this));
             }
-
-            // Re-validating the grid will cause the actual grid split to occur if the previously adjacent nodes
-            // were only connected by this node.
-            otherSide.validateGrid();
-
-            // Cause a repath later. This is not done immediately.
-            otherSide.getInternalGrid().getPathingService().repath();
+            GridConnection.destroyConnections(detached);
         }
-
-        connections.clear();
 
         AELog.grid("Destroyed node %s in grid %s", this, this.myGrid);
         if (this.myGrid != null) {
@@ -347,8 +356,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
     @Override
     public EnumSet<EnumFacing> getConnectedSides() {
         var result = EnumSet.noneOf(EnumFacing.class);
-        for (int i = 0, size = this.connections.size(); i < size; i++) {
-            IGridConnection connection = this.connections.get(i);
+        for (var connection : this.connections.values()) {
             if (connection.isInWorld()) {
                 result.add(connection.getDirection(this));
             }
@@ -359,8 +367,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
     @Override
     public Map<EnumFacing, IGridConnection> getInWorldConnections() {
         var result = new EnumMap<EnumFacing, IGridConnection>(EnumFacing.class);
-        for (int i = 0, size = this.connections.size(); i < size; i++) {
-            IGridConnection connection = this.connections.get(i);
+        for (var connection : this.connections.values()) {
             var direction = connection.getDirection(this);
             if (direction != null) {
                 result.put(direction, connection);
@@ -371,7 +378,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
 
     @Override
     public List<IGridConnection> getConnections() {
-        return ImmutableList.copyOf(this.connections);
+        return ImmutableList.copyOf(this.connections.values());
     }
 
     public boolean hasNoConnections() {
@@ -540,8 +547,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
     private void visitorConnection(Object tracker, IGridVisitor g, Deque<GridNode> nextRun,
                                    Deque<IGridConnection> nextConnections) {
         if (g.visitNode(this)) {
-            for (int i = 0, size = this.connections.size(); i < size; i++) {
-                GridConnection gc = this.connections.get(i);
+            for (var gc : this.connections.values()) {
                 final GridNode gn = (GridNode) gc.getOtherSide(this);
 
                 if (gc.getVisitorIterationNumber() != tracker) {
@@ -562,8 +568,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
 
     private void visitorNode(Object tracker, IGridVisitor g, Deque<GridNode> nextRun) {
         if (g.visitNode(this)) {
-            for (int i = 0, size = this.connections.size(); i < size; i++) {
-                var gc = this.connections.get(i);
+            for (var gc : this.connections.values()) {
                 var gn = (GridNode) gc.getOtherSide(this);
 
                 if (tracker == gn.visitorIterationNumber) {
@@ -589,7 +594,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
                 "Node %s has no connections, cannot have a controller route!".formatted(this));
         }
 
-        return this.connections.getFirst();
+        return this.connections.get(this.connections.firstKey());
     }
 
     @Override
@@ -597,7 +602,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
         this.usedChannels = 0;
 
         var nodeParent = (GridNode) fast.getControllerRoute();
-        if (nodeParent.getOwner() instanceof TileController) {
+        if (nodeParent.controllerRouteRoot) {
             this.highestSimilarAncestor = null;
             this.subtreeMaxChannels = getMaxChannels();
             this.subtreeAllowsCompressedChannels = !hasFlag(GridFlags.CANNOT_CARRY_COMPRESSED);
@@ -619,15 +624,22 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
 
         GridConnection connection = (GridConnection) fast;
 
-        final int idx = this.connections.indexOf(connection);
-        if (idx > 0) {
-            this.connections.remove(connection);
-            this.connections.addFirst(connection);
+        var other = (GridNode) connection.getOtherSide(this);
+        Preconditions.checkState(this.connections.get(other) == connection, "Controller route is not attached");
+        if (this.connections.firstKey() != other) {
+            this.connections.getAndMoveToFirst(other);
+            invalidatePathConnections();
         }
     }
 
     public @Nullable GridNode getHighestSimilarAncestor() {
         return highestSimilarAncestor;
+    }
+
+    public void prepareControllerRouteRoot() {
+        this.usedChannels = 0;
+        this.highestSimilarAncestor = null;
+        this.controllerRouteRoot = true;
     }
 
     public boolean getSubtreeAllowsCompressedChannels() {
@@ -645,7 +657,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
             return 0;
         }
 
-        var channelMode = myGrid.getPathingService().getChannelMode();
+        var channelMode = myGrid.getPathingService().channelMode();
         if (channelMode == ChannelMode.INFINITE) {
             return Integer.MAX_VALUE;
         }
@@ -658,18 +670,29 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
     }
 
     @Override
-    public Iterable<IPathItem> getPossibleOptions() {
-        return ImmutableList.copyOf(this.connections);
+    public int getPossibleOptionCount() {
+        if (this.pathConnectionsDirty) {
+            this.pathConnections.addAll(this.connections.values());
+            this.pathConnectionsDirty = false;
+        }
+        return this.connections.size();
+    }
+
+    @Override
+    public IPathItem getPossibleOption(int index) {
+        getPossibleOptionCount();
+        return this.pathConnections.get(index);
+    }
+
+    private void invalidatePathConnections() {
+        if (!this.pathConnectionsDirty) {
+            this.pathConnections.clear();
+            this.pathConnectionsDirty = true;
+        }
     }
 
     public int propagateChannelsUpwards(boolean consumesChannel) {
-        this.usedChannels = 0;
-        for (int i = 0, size = this.connections.size(); i < size; i++) {
-            var connection = this.connections.get(i);
-            if (connection.getControllerRoute() == this) {
-                this.usedChannels += connection.usedChannels;
-            }
-        }
+        // Child connections have already added their contribution during the reverse BFS pass.
         if (consumesChannel) {
             this.usedChannels++;
         }
@@ -688,21 +711,35 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
     }
 
     @Override
-    public void finalizeChannels() {
+    public boolean finalizeChannels() {
         this.highestSimilarAncestor = null;
+        this.controllerRouteRoot = false;
 
         if (hasFlag(GridFlags.CANNOT_CARRY)) {
-            return;
+            return false;
         }
 
         if (this.lastUsedChannels != this.usedChannels) {
             this.lastUsedChannels = this.usedChannels;
 
-            if (this.getInternalGrid() != null) {
-                this.getInternalGrid().markMachineStateChanged();
-                notifyStatusChange(IGridNodeListener.State.CHANNEL);
+            if (this.myGrid != null) {
+                this.myGrid.markMachineStateChanged();
             }
+            return true;
         }
+        return false;
+    }
+
+    public boolean isAttachedToGrid(IGrid grid) {
+        return this.myGrid == grid;
+    }
+
+    boolean markVisited(Object marker) {
+        if (visitorIterationNumber == marker) {
+            return false;
+        }
+        visitorIterationNumber = marker;
+        return true;
     }
 
     public double getPreviousDraw() {

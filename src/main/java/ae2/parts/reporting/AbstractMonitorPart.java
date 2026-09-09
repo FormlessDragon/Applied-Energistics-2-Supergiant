@@ -60,6 +60,7 @@ public abstract class AbstractMonitorPart extends AbstractDisplayPart implements
     private boolean locked;
     private IStackWatcher storageWatcher;
     private IStackWatcher craftingWatcher;
+    private boolean reportingUpdatePending;
 
     public AbstractMonitorPart(IPartItem<?> partItem, boolean requireChannel) {
         super(partItem, requireChannel);
@@ -100,7 +101,7 @@ public abstract class AbstractMonitorPart extends AbstractDisplayPart implements
 
             @Override
             public void onCraftableChange(AEKey what) {
-                getMainNode().ifPresent(AbstractMonitorPart.this::updateReportingValue);
+                scheduleReportingUpdate();
             }
         });
     }
@@ -259,7 +260,19 @@ public abstract class AbstractMonitorPart extends AbstractDisplayPart implements
                 this.craftingWatcher.add(this.configuredItem);
             }
 
+        }
+        scheduleReportingUpdate();
+    }
+
+    private void scheduleReportingUpdate() {
+        if (this.reportingUpdatePending || isClientSide() || getLevel() == null) {
+            return;
+        }
+        this.reportingUpdatePending = true;
+        try {
             getMainNode().ifPresent(this::updateReportingValue);
+        } finally {
+            this.reportingUpdatePending = false;
         }
     }
 

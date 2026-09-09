@@ -273,6 +273,16 @@ public class TileEnergyCell extends AENetworkedTile implements IAEPowerStorage, 
     }
 
     @Override
+    public double getExtractableAEPower(double maximum) {
+        return maximum < StoredEnergyAmount.MIN_AMOUNT ? 0 : Math.min(maximum, this.stored.getAmount());
+    }
+
+    @Override
+    public double getReceivableAEPower(double maximum) {
+        return maximum < StoredEnergyAmount.MIN_AMOUNT ? 0 : Math.clamp(this.stored.remainingCapacity(), 0, maximum);
+    }
+
+    @Override
     public boolean isAEPublicPowerStorage() {
         return true;
     }

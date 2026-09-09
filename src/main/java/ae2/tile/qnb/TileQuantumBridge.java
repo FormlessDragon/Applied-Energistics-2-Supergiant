@@ -65,6 +65,7 @@ public class TileQuantumBridge extends AENetworkedInvTile
     private QuantumCluster cluster;
     private boolean updateStatus;
     private boolean suppressBlockUpdates;
+    private int lastClientFlags = Integer.MIN_VALUE;
 
     public TileQuantumBridge() {
         this.getMainNode().setFlags(GridFlags.DENSE_CAPACITY);
@@ -115,8 +116,11 @@ public class TileQuantumBridge extends AENetworkedInvTile
                 this.cluster.updateStatus(true);
             }
 
-            this.markForUpdate();
-            this.neighborUpdate(this.pos);
+            int flags = getClientFlags();
+            if (flags != this.lastClientFlags) {
+                this.lastClientFlags = flags;
+                this.markForUpdate();
+            }
         }
     }
 
@@ -124,6 +128,10 @@ public class TileQuantumBridge extends AENetworkedInvTile
     protected void writeToStream(ByteBuf data) {
         super.writeToStream(data);
 
+        data.writeByte(getClientFlags());
+    }
+
+    private int getClientFlags() {
         int out = this.constructed;
 
         if (!this.internalInventory.getStackInSlot(0).isEmpty() && this.constructed != -1) {
@@ -134,7 +142,7 @@ public class TileQuantumBridge extends AENetworkedInvTile
             out |= this.powered;
         }
 
-        data.writeByte((byte) out);
+        return out;
     }
 
     @Override

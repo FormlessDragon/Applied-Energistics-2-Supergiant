@@ -18,32 +18,44 @@
 
 package ae2.me;
 
-import ae2.api.networking.IGridNode;
-import ae2.api.networking.IGridVisitor;
+import java.util.ArrayDeque;
 
-class GridSplitDetector implements IGridVisitor {
+final class GridSplitDetector {
+    // Searches invoke no callbacks. One workspace per thread can serve every grid and start node.
+    private static final ThreadLocal<ArrayDeque<GridNode>> SEARCH_QUEUE = ThreadLocal.withInitial(ArrayDeque::new);
 
-    private final IGridNode pivot;
-    private boolean pivotFound;
-
-    public GridSplitDetector(IGridNode pivot) {
-        this.pivot = pivot;
+    private GridSplitDetector() {
     }
 
-    @Override
-    public boolean visitNode(IGridNode n) {
-        if (n == this.pivot) {
-            this.setPivotFound(true);
+    static boolean isConnected(GridNode start, GridNode pivot) {
+        if (start == pivot) {
+            return true;
         }
 
-        return !this.isPivotFound();
-    }
+        var open = SEARCH_QUEUE.get();
+        if (!open.isEmpty()) {
+            throw new IllegalStateException("Grid split search queue is already in use");
+        }
 
-    public boolean isPivotFound() {
-        return this.pivotFound;
-    }
+        var marker = new Object();
+        open.add(start);
+        start.markVisited(marker);
 
-    private void setPivotFound(boolean pivotFound) {
-        this.pivotFound = pivotFound;
+        try {
+            while (!open.isEmpty()) {
+                GridNode node = open.removeFirst();
+                for (var other : node.connections.keySet()) {
+                    if (other == pivot) {
+                        return true;
+                    }
+                    if (other.markVisited(marker)) {
+                        open.addLast(other);
+                    }
+                }
+            }
+            return false;
+        } finally {
+            open.clear();
+        }
     }
 }

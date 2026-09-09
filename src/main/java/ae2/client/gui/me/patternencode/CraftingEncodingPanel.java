@@ -60,6 +60,7 @@ public class CraftingEncodingPanel extends EncodingModePanel {
         widgets.add("craftingFluidSubstitutions", this.fluidSubstitutionsBtn);
 
         this.recipeSelectionButton = new RecipeSelectionButton(screen, this.container::getRecipeCandidates,
+            this.container::hasRecipeConflict, this.container::getRecipeCandidatesRevision,
             this.container::getSelectedRecipeId, this.container::selectRecipe);
         widgets.add("craftingRecipeConflictSelection", this.recipeSelectionButton.button());
     }
@@ -79,6 +80,7 @@ public class CraftingEncodingPanel extends EncodingModePanel {
         BG.dest(bounds.x + this.position.x() - 1, bounds.y + this.position.y() + 1).blit();
 
         if (this.container.substituteFluids && mouse.isIn(this.fluidSubstitutionsBtn.getTooltipArea())) {
+            this.container.ensureFluidSubstitutionSupport();
             for (int slotIndex : this.container.slotsSupportingFluidSubstitution) {
                 drawSlotGreenBG(bounds, this.container.getCraftingGridSlots()[slotIndex]);
             }

@@ -41,9 +41,15 @@ public interface IPathItem {
     int getMaxChannels();
 
     /**
-     * Find possible choices for other pathing.
+     * Returns the number of adjacent path items. Pathing uses indexed access to avoid allocating snapshots while
+     * traversing the grid.
      */
-    Iterable<IPathItem> getPossibleOptions();
+    int getPossibleOptionCount();
+
+    /**
+     * Returns an adjacent path item by index.
+     */
+    IPathItem getPossibleOption(int index);
 
     /**
      * Tests if this path item has the specific grid flag set.
@@ -55,5 +61,5 @@ public interface IPathItem {
     /**
      * channels are done, wrap it up.
      */
-    void finalizeChannels();
+    boolean finalizeChannels();
 }

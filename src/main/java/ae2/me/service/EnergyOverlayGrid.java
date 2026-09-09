@@ -18,29 +18,30 @@
 
 package ae2.me.service;
 
-import java.util.Comparator;
-import java.util.Objects;
-
-import org.jetbrains.annotations.Nullable;
-
 import ae2.api.config.AccessRestriction;
 import ae2.api.config.Actionable;
 import ae2.api.config.PowerMultiplier;
 import ae2.api.networking.energy.IAEPowerStorage;
 import ae2.api.networking.energy.IPassiveEnergyGenerator;
-import ae2.api.networking.energy.PowerStorageSnapshotBuilder;
 import ae2.core.AELog;
 import ae2.me.energy.StoredEnergyAmount;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.Reference2DoubleOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * Shared lazy caches for all energy services connected through Quartz Fibers.
  * <p>
  * The topology cache records only connected services and owns passive-generator selection. The independently lazy
- * {@link EnergyStorageCache} contains routed storage entries and aggregate values, so storage structure and routing
+ * {@link EnergyStorageCache} contains storage references and aggregate values, so storage structure and routing
  * changes do not require another Quartz Fiber topology walk.
  */
 class EnergyOverlayGrid {
@@ -160,12 +161,26 @@ class EnergyOverlayGrid {
     }
 
     /**
-     * Incrementally refreshes one storage if the storage cache has already been built.
+     * Marks values dirty without constructing an unused cache or invalidating the Quartz Fiber topology.
      */
     void refreshStorageValues(EnergyStorageGroup service, IAEPowerStorage storage) {
         var cache = this.storageCache;
         if (cache != null && this.valid) {
             cache.refreshStorage(service, storage);
+        } else if (this.storageCacheBuildInProgress) {
+            this.storageCacheRevision++;
+        }
+    }
+
+    /**
+     * Refreshes the inherent storage of one grid after its node count changed without rebuilding unrelated providers.
+     */
+    void refreshLocalStorage(EnergyStorageGroup service, IAEPowerStorage storage) {
+        var cache = this.storageCache;
+        if (cache != null && this.valid) {
+            if (!cache.refreshStorageCapacity(service, storage)) {
+                invalidateStorageCache();
+            }
         } else if (this.storageCacheBuildInProgress) {
             this.storageCacheRevision++;
         }
@@ -237,7 +252,9 @@ class EnergyOverlayGrid {
         this.storageCache = null;
 
         if (this.storageCacheBuildInProgress) {
-            throw new IllegalStateException("Power storage snapshot recursively requested the overlay storage cache");
+            AELog.error("Power storage recursively requested the overlay storage cache while it was being built.");
+            this.storageCacheRevision++;
+            return null;
         }
 
         long buildRevision = this.storageCacheRevision;
@@ -257,7 +274,7 @@ class EnergyOverlayGrid {
     }
 
     private boolean isCurrent(EnergyStorageCache cache) {
-        return this.valid && cache.isValid() && this.storageCache == cache;
+        return this.valid && cache != null && cache.isValid() && this.storageCache == cache;
     }
 }
 
@@ -293,64 +310,73 @@ final class EnergyPowerStatistics {
     }
 }
 
-/** One service's production storage registrations, identity lookup and immediate tick statistics. */
+/**
+ * Node registrations in one grid; no amounts or per-storage snapshots are retained here.
+ */
 final class EnergyStorageGroup {
-    private final ObjectArrayList<EnergyStorageRegistration> registeredStorages = new ObjectArrayList<>();
-    private final Reference2ObjectMap<IAEPowerStorage, EnergyStorageRegistration> registeredStorageLookup =
-        new Reference2ObjectOpenHashMap<>();
+    private final ObjectArrayList<IAEPowerStorage> storages = new ObjectArrayList<>();
+    private final Reference2IntOpenHashMap<IAEPowerStorage> counts = new Reference2IntOpenHashMap<>();
+    private final Reference2IntOpenHashMap<IAEPowerStorage> positions = new Reference2IntOpenHashMap<>();
     private final EnergyPowerStatistics powerStatistics;
-    private long nextStorageRegistrationSequence;
+    private int holes;
 
     EnergyStorageGroup(EnergyPowerStatistics powerStatistics) {
         this.powerStatistics = Objects.requireNonNull(powerStatistics, "powerStatistics");
     }
 
     void register(IAEPowerStorage storage) {
-        var existingRegistration = this.registeredStorageLookup.get(storage);
-        if (existingRegistration != null) {
-            if (existingRegistration.referenceCount == Integer.MAX_VALUE) {
-                throw new IllegalStateException("Power storage registration reference count overflow");
-            }
-            existingRegistration.referenceCount++;
-            return;
+        Objects.requireNonNull(storage, "storage");
+        int count = this.counts.getInt(storage);
+        if (count == Integer.MAX_VALUE) {
+            throw new IllegalStateException("Power storage registration count overflow");
         }
-
-        if (this.nextStorageRegistrationSequence == Long.MAX_VALUE) {
-            throw new IllegalStateException("Power storage registration sequence overflow");
+        this.counts.put(storage, count + 1);
+        if (count == 0) {
+            this.positions.put(storage, this.storages.size());
+            this.storages.add(storage);
         }
-        var registration = new EnergyStorageRegistration(storage, this.nextStorageRegistrationSequence++);
-        this.registeredStorageLookup.put(storage, registration);
-        this.registeredStorages.add(registration);
     }
 
     void unregister(IAEPowerStorage storage) {
-        var registration = this.registeredStorageLookup.get(storage);
-        if (registration == null || registration.referenceCount <= 0) {
+        int count = this.counts.getInt(storage);
+        if (count == 0) {
             throw new IllegalStateException("Cannot remove an unregistered power storage");
         }
-
-        registration.referenceCount--;
-        if (registration.referenceCount > 0) {
+        if (count > 1) {
+            this.counts.put(storage, count - 1);
             return;
         }
+        this.counts.removeInt(storage);
+        this.storages.set(this.positions.removeInt(storage), null);
+        if (++this.holes >= (this.storages.size() + 1) / 2) {
+            compact();
+        }
+    }
 
-        this.registeredStorageLookup.remove(storage);
-        int registrationCount = this.registeredStorages.size();
-        for (int i = 0; i < registrationCount; i++) {
-            if (this.registeredStorages.get(i) == registration) {
-                this.registeredStorages.remove(i);
-                return;
+    private void compact() {
+        int write = 0;
+        for (int i = 0; i < this.storages.size(); i++) {
+            var storage = this.storages.get(i);
+            if (storage != null) {
+                this.positions.put(storage, write);
+                this.storages.set(write++, storage);
             }
         }
-        throw new IllegalStateException("Power storage identity lookup and registration order diverged");
+        this.storages.size(write);
+        this.holes = 0;
     }
 
     boolean contains(IAEPowerStorage storage) {
-        return this.registeredStorageLookup.containsKey(storage);
+        return this.counts.containsKey(storage);
     }
 
-    ObjectArrayList<EnergyStorageRegistration> registrations() {
-        return this.registeredStorages;
+    void appendStorages(ObjectArrayList<IAEPowerStorage> destination) {
+        for (int i = 0; i < this.storages.size(); i++) {
+            var storage = this.storages.get(i);
+            if (storage != null) {
+                destination.add(storage);
+            }
+        }
     }
 
     void recordPowerExtraction(double amount) {
@@ -362,76 +388,79 @@ final class EnergyStorageGroup {
     }
 }
 
-/** Identity registration retained across lazy storage-cache generations. */
-final class EnergyStorageRegistration {
-    /** Storage identity registered by a node service. */
-    final IAEPowerStorage storage;
-    /** Monotonic service-local sequence used to stabilize equal-priority ordering. */
-    final long registrationSequence;
-    /** Number of node registrations that expose the same storage identity. */
-    int referenceCount = 1;
-
-    EnergyStorageRegistration(IAEPowerStorage storage, long registrationSequence) {
-        this.storage = Objects.requireNonNull(storage, "storage");
-        if (registrationSequence < 0) {
-            throw new IllegalArgumentException("registrationSequence must be non-negative");
-        }
-        this.registrationSequence = registrationSequence;
-    }
-}
-
 /**
- * Directly constructible package-private core for storage snapshots, aggregate accounting and routed hot traversal.
- * <p>
- * A cache instance is one immutable routing generation. Snapshot values remain mutable and are corrected by absolute
- * reads after every real storage call. Invalidating a generation makes in-flight operations stop before touching
- * another entry.
+ * One overlay's lazy storage list and shared totals. Four primitive contributions per registered
+ * identity allow a value event to refresh only its source, without per-storage snapshot objects.
  */
 final class EnergyStorageCache {
-    private static final Comparator<ServiceStorageCache> SERVICE_CAPACITY_ORDER = (left, right) -> {
-        int capacityComparison = Double.compare(right.maximumPower.value(), left.maximumPower.value());
-        return capacityComparison != 0
-            ? capacityComparison
-            : Integer.compare(left.topologyIndex, right.topologyIndex);
-    };
-
-    private static final Comparator<StorageEntry> EXTRACTION_ORDER = (left, right) -> {
-        int priorityComparison = Integer.compare(right.priority, left.priority);
-        return priorityComparison != 0
-            ? priorityComparison
-            : Long.compare(left.registrationSequence, right.registrationSequence);
-    };
-
-    private static final Comparator<StorageEntry> INSERTION_ORDER = Comparator.comparingInt((StorageEntry left) -> left.priority).thenComparingLong(left -> left.registrationSequence);
-
-    private final ObjectArrayList<ServiceStorageCache> serviceGroups = new ObjectArrayList<>();
-    private final Reference2ObjectMap<IAEPowerStorage, StorageEntry> entriesByStorage =
-        new Reference2ObjectOpenHashMap<>();
-    private final PowerStorageSnapshotBuilder snapshotBuilder = new PowerStorageSnapshotBuilder();
-
-    @Nullable
-    private StorageEntry activeEntry;
+    private final ObjectArrayList<IAEPowerStorage> storages = new ObjectArrayList<>();
+    private final Reference2ObjectMap<IAEPowerStorage, EnergyStorageGroup> owners = new Reference2ObjectOpenHashMap<>();
+    private final Reference2IntOpenHashMap<IAEPowerStorage> indices = new Reference2IntOpenHashMap<>();
+    private final Reference2IntOpenHashMap<EnergyStorageGroup> groupOrder = new Reference2IntOpenHashMap<>();
+    private final Reference2DoubleOpenHashMap<EnergyStorageGroup> capacities = new Reference2DoubleOpenHashMap<>();
+    private final IntArrayList extractionOrder = new IntArrayList();
+    private final IntArrayList insertionOrder = new IntArrayList();
+    private final IntArrayList pendingReads = new IntArrayList();
+    private final double[] storedContributions;
+    private final double[] maximumContributions;
+    private final double[] extractableContributions;
+    private final double[] receivableContributions;
+    private final int[] priorities;
+    private final int[] extractionPositions;
+    private final int[] insertionPositions;
+    private final boolean[] dirty;
+    private final boolean[] quarantined;
+    private final int[] capacitySources;
+    private int storedSources;
+    private int maximumSources;
+    private int extractableSources;
+    private int receivableSources;
+    private int totalsRebuildCount;
+    private double storedPower;
+    private double maximumPower;
+    private double extractablePower;
+    private double receivablePower;
     private boolean valid = true;
-    private boolean snapshotReadInProgress;
-    private final CompensatedPowerSum storedPower = new CompensatedPowerSum();
-    private final CompensatedPowerSum maximumPower = new CompensatedPowerSum();
-    private final CompensatedPowerSum extractablePower = new CompensatedPowerSum();
-    private final CompensatedPowerSum energyDemand = new CompensatedPowerSum();
+    private boolean totalsDirty;
+    private boolean orderDirty = true;
+    private boolean reading;
+    private boolean operating;
+    @Nullable
+    private IAEPowerStorage activeStorage;
+    private int firstExtractable;
+    private int firstReceivable;
 
-    /**
-     * Builds a routing generation from service groups in topology-discovery order.
-     *
-     * @param groups real storage groups; the constructor reads registrations immediately and does not retain this list
-     */
     EnergyStorageCache(ObjectArrayList<EnergyStorageGroup> groups) {
-        int serviceCount = groups.size();
-        for (int i = 0; i < serviceCount; i++) {
-            var group = new ServiceStorageCache(this, groups.get(i), i);
-            this.serviceGroups.add(group);
-            buildServiceGroup(group);
+        this.capacitySources = new int[groups.size()];
+        this.indices.defaultReturnValue(-1);
+        for (int i = 0; i < groups.size(); i++) {
+            var group = groups.get(i);
+            this.groupOrder.put(group, i);
+            int start = this.storages.size();
+            group.appendStorages(this.storages);
+            for (int j = start; j < this.storages.size(); j++) {
+                var storage = this.storages.get(j);
+                if (this.owners.put(storage, group) != null) {
+                    AELog.error("Power storage %s is registered in multiple grids of one overlay.", describeStorage(storage));
+                    invalidate();
+                }
+                this.indices.put(storage, j);
+                this.extractionOrder.add(j);
+                this.pendingReads.add(j);
+            }
         }
-
-        this.serviceGroups.sort(SERVICE_CAPACITY_ORDER);
+        int size = this.storages.size();
+        this.storedContributions = new double[size];
+        this.maximumContributions = new double[size];
+        this.extractableContributions = new double[size];
+        this.receivableContributions = new double[size];
+        this.priorities = new int[size];
+        this.extractionPositions = new int[size];
+        this.insertionPositions = new int[size];
+        this.dirty = new boolean[size];
+        this.quarantined = new boolean[size];
+        Arrays.fill(this.dirty, true);
+        ensureValues();
     }
 
     boolean isValid() {
@@ -442,502 +471,379 @@ final class EnergyStorageCache {
         this.valid = false;
     }
 
-    double getStoredPower() {
-        return this.valid ? this.storedPower.value() : 0;
-    }
-
-    double getMaximumPower() {
-        return this.valid ? this.maximumPower.value() : 0;
-    }
-
-    double getEnergyDemand(double maximumDemand) {
-        requirePowerAmount(maximumDemand, "maximumDemand");
-        return this.valid ? Math.min(maximumDemand, this.energyDemand.value()) : 0;
-    }
-
-    double extractPower(double amount, Actionable mode) {
-        requirePowerAmount(amount, "amount");
-        Objects.requireNonNull(mode, "mode");
-        if (!this.valid || amount < StoredEnergyAmount.MIN_AMOUNT) {
-            return 0;
-        }
-
-        double extractionTarget = Math.min(amount, this.extractablePower.value());
-        if (mode == Actionable.SIMULATE || extractionTarget <= 0) {
-            return extractionTarget;
-        }
-
-        double extractedPower = 0;
-        int groupCount = this.serviceGroups.size();
-        for (int groupIndex = 0; groupIndex < groupCount && extractedPower < extractionTarget; groupIndex++) {
-            if (!this.valid) {
-                break;
-            }
-
-            double remainingPower = extractionTarget - extractedPower;
-            if (remainingPower < StoredEnergyAmount.MIN_AMOUNT) {
-                break;
-            }
-
-            var group = this.serviceGroups.get(groupIndex);
-            double groupTarget = Math.min(remainingPower, group.extractablePower.value());
-            double groupExtracted = 0;
-            int entryCount = group.extractionOrder.size();
-            for (int entryIndex = 0; entryIndex < entryCount && groupExtracted < groupTarget; entryIndex++) {
-                if (!this.valid) {
-                    return extractedPower;
-                }
-
-                double groupRemainingPower = groupTarget - groupExtracted;
-                if (groupRemainingPower < StoredEnergyAmount.MIN_AMOUNT) {
-                    break;
-                }
-
-                var entry = group.extractionOrder.get(entryIndex);
-                double entryTarget = Math.min(groupRemainingPower, entry.extractablePower);
-                if (entryTarget < StoredEnergyAmount.MIN_AMOUNT) {
-                    continue;
-                }
-
-                double extracted = callExtract(entry, entryTarget);
-                groupExtracted += extracted;
-                extractedPower += extracted;
-            }
-        }
-
-        return Math.min(extractedPower, extractionTarget);
-    }
-
-    double injectPower(double amount, Actionable mode) {
-        requirePowerAmount(amount, "amount");
-        Objects.requireNonNull(mode, "mode");
-        if (!this.valid || amount < StoredEnergyAmount.MIN_AMOUNT) {
-            return amount;
-        }
-
-        double insertionTarget = Math.min(amount, this.energyDemand.value());
-        if (mode == Actionable.SIMULATE || insertionTarget <= 0) {
-            return amount - insertionTarget;
-        }
-
-        double injectedPower = 0;
-        int groupCount = this.serviceGroups.size();
-        for (int groupIndex = 0; groupIndex < groupCount && injectedPower < insertionTarget; groupIndex++) {
-            if (!this.valid) {
-                break;
-            }
-
-            double remainingPower = insertionTarget - injectedPower;
-            if (remainingPower < StoredEnergyAmount.MIN_AMOUNT) {
-                break;
-            }
-
-            var group = this.serviceGroups.get(groupIndex);
-            double groupTarget = Math.min(remainingPower, group.energyDemand.value());
-            double groupInjected = 0;
-            int entryCount = group.insertionOrder.size();
-            for (int entryIndex = 0; entryIndex < entryCount && groupInjected < groupTarget; entryIndex++) {
-                if (!this.valid) {
-                    return amount - injectedPower;
-                }
-
-                double groupRemainingPower = groupTarget - groupInjected;
-                if (groupRemainingPower < StoredEnergyAmount.MIN_AMOUNT) {
-                    break;
-                }
-
-                var entry = group.insertionOrder.get(entryIndex);
-                double entryTarget = Math.min(groupRemainingPower, entry.energyDemand);
-                if (entryTarget < StoredEnergyAmount.MIN_AMOUNT) {
-                    continue;
-                }
-
-                double injected = callInject(entry, entryTarget);
-                groupInjected += injected;
-                injectedPower += injected;
-            }
-        }
-
-        return amount - Math.min(injectedPower, insertionTarget);
-    }
-
-    void refreshStorage(EnergyStorageGroup service, IAEPowerStorage storage) {
-        if (!this.valid) {
-            return;
-        }
-
-        var entry = this.entriesByStorage.get(storage);
-        if (entry == null) {
-            if (service.contains(storage)) {
-                invalidate();
-            } else {
-                AELog.warn("Ignoring a power-storage value event for unregistered storage %s.",
-                    describeStorage(storage));
-            }
-            return;
-        }
-
-        if (entry.group.service != service) {
-            AELog.error("Power-storage value event for %s was posted to a different energy service.",
-                describeStorage(storage));
-            return;
-        }
-
-        if (entry == this.activeEntry) {
-            return;
-        }
-
-        readStorageSnapshot(entry);
-    }
-
-    private static void requirePowerAmount(double amount, String name) {
-        if (!Double.isFinite(amount) || amount < 0) {
-            throw new IllegalArgumentException(name + " must be finite and non-negative");
-        }
-    }
-
-    private void buildServiceGroup(ServiceStorageCache group) {
-        var registrations = group.service.registrations();
-        int registrationCount = registrations.size();
-        for (int i = 0; i < registrationCount; i++) {
-            addStorage(group, registrations.get(i));
-        }
-
-        group.extractionOrder.sort(EXTRACTION_ORDER);
-        group.insertionOrder.sort(INSERTION_ORDER);
-    }
-
-    private void addStorage(ServiceStorageCache group, EnergyStorageRegistration registration) {
-        var storage = registration.storage;
-        var existingEntry = this.entriesByStorage.get(storage);
-        if (existingEntry != null) {
-            AELog.error("Power storage %s is registered with multiple services in one energy overlay; "
-                + "the later registration is ignored.", describeStorage(storage));
-            return;
-        }
-
-        if (!collectStorageSnapshot(storage)) {
-            return;
-        }
-
-        var powerFlow = this.snapshotBuilder.getPowerFlow();
-        var entry = new StorageEntry(group, storage, registration.registrationSequence,
-            this.snapshotBuilder.getMaximumPower(), this.snapshotBuilder.getPriority(), powerFlow,
-            this.snapshotBuilder.isPublicStorage());
-        this.entriesByStorage.put(storage, entry);
-        if (entry.publicStorage && entry.allowExtraction) {
-            group.extractionOrder.add(entry);
-        }
-        if (entry.publicStorage && entry.allowInsertion) {
-            group.insertionOrder.add(entry);
-        }
-        applyCollectedSnapshot(entry);
-    }
-
-    private void readStorageSnapshot(StorageEntry entry) {
-        if (this.snapshotReadInProgress) {
-            AELog.error("Power storage %s emitted a reentrant event while its snapshot was being read; "
-                + "the reentrant refresh was ignored.", describeStorage(entry.storage));
-            return;
-        }
-
-        if (!collectStorageSnapshot(entry.storage)) {
-            entry.replaceSnapshot(0, 0, 0, 0);
-            return;
-        }
-
-        if (Double.compare(this.snapshotBuilder.getMaximumPower(), entry.routingMaximumPower) != 0
-            || this.snapshotBuilder.isPublicStorage() != entry.publicStorage
-            || this.snapshotBuilder.getPowerFlow() != entry.powerFlow
-            || this.snapshotBuilder.getPriority() != entry.priority) {
-            AELog.error("Power storage %s changed maximum capacity, public visibility, access restrictions or "
-                + "priority without a ROUTING_CHANGED event; the storage cache is invalidated.",
-                describeStorage(entry.storage));
-            invalidate();
-            return;
-        }
-
-        applyCollectedSnapshot(entry);
-    }
-
-    private boolean collectStorageSnapshot(IAEPowerStorage storage) {
-        this.snapshotReadInProgress = true;
-        this.snapshotBuilder.reset();
-        try {
-            storage.getPowerSnapshot(this.snapshotBuilder);
-            if (!this.snapshotBuilder.isComplete()) {
-                throw new IllegalStateException("Power storage did not supply a complete snapshot");
-            }
-            return true;
-        } catch (RuntimeException exception) {
-            AELog.error(exception, "Invalid power snapshot from storage " + describeStorage(storage)
-                + "; its cached contribution is isolated until a valid refresh.");
-            return false;
-        } finally {
-            this.snapshotReadInProgress = false;
-        }
-    }
-
-    private void applyCollectedSnapshot(StorageEntry entry) {
-        if (!entry.publicStorage) {
-            entry.replaceSnapshot(0, 0, 0, 0);
-            return;
-        }
-
-        entry.replaceSnapshot(
-            entry.allowExtraction ? this.snapshotBuilder.getCurrentPower() : 0,
-            entry.allowExtraction ? this.snapshotBuilder.getMaximumPower() : 0,
-            entry.allowExtraction ? usableOperationPower(this.snapshotBuilder.getExtractablePower()) : 0,
-            entry.allowInsertion ? usableOperationPower(this.snapshotBuilder.getReceivablePower()) : 0);
-    }
-
-    private double callExtract(StorageEntry entry, double amount) {
-        beginActiveOperation(entry);
-        double extracted = 0;
-        try {
-            double result = entry.storage.extractAEPower(amount, Actionable.MODULATE, PowerMultiplier.ONE);
-            extracted = validateExtractResult(entry.storage, result, amount);
-        } catch (RuntimeException exception) {
-            AELog.error(exception, "Power extraction failed for storage " + describeStorage(entry.storage));
-        } finally {
-            finishActiveOperation(entry);
-        }
-
-        if (extracted > 0) {
-            entry.group.service.recordPowerExtraction(extracted);
-        }
-        return extracted;
-    }
-
-    private double callInject(StorageEntry entry, double amount) {
-        beginActiveOperation(entry);
-        double injected = 0;
-        try {
-            double overflow = entry.storage.injectAEPower(amount, Actionable.MODULATE);
-            injected = amount - validateOverflowResult(entry.storage, overflow, amount);
-        } catch (RuntimeException exception) {
-            AELog.error(exception, "Power injection failed for storage " + describeStorage(entry.storage));
-        } finally {
-            finishActiveOperation(entry);
-        }
-
-        if (injected > 0) {
-            entry.group.service.recordPowerInjection(injected);
-        }
-        return injected;
-    }
-
-    private void beginActiveOperation(StorageEntry entry) {
-        if (this.activeEntry != null) {
-            throw new IllegalStateException("Power storage operation reentered the overlay energy cache");
-        }
-        this.activeEntry = entry;
-    }
-
-    private void finishActiveOperation(StorageEntry entry) {
-        if (this.activeEntry != entry) {
-            throw new IllegalStateException("Power storage operation active-entry state diverged");
-        }
-
-        this.activeEntry = null;
-        if (this.valid) {
-            readStorageSnapshot(entry);
-        }
-    }
-
-    private static double usableOperationPower(double amount) {
+    private static double usablePower(double amount) {
         return amount < StoredEnergyAmount.MIN_AMOUNT ? 0 : amount;
     }
 
-    private static double validateExtractResult(IAEPowerStorage storage, double result, double requested) {
-        if (Double.isNaN(result) || result < 0) {
-            AELog.error("Power storage %s returned invalid extracted power %s.", describeStorage(storage), result);
-            return 0;
-        }
-        if (!Double.isFinite(result) || result > requested) {
-            AELog.error("Power storage %s returned extracted power %s above the requested %s.",
-                describeStorage(storage), result, requested);
-            return requested;
-        }
-        return result;
+    private static int sourceCountChange(double previous, double current) {
+        return (current > 0 ? 1 : 0) - (previous > 0 ? 1 : 0);
     }
 
-    private static double validateOverflowResult(IAEPowerStorage storage, double result, double requested) {
-        if (Double.isNaN(result) || !Double.isFinite(result) || result > requested) {
-            AELog.error("Power storage %s returned invalid injection overflow %s for requested power %s.",
-                describeStorage(storage), result, requested);
-            return requested;
-        }
-        if (result < 0) {
-            AELog.error("Power storage %s returned negative injection overflow %s.", describeStorage(storage), result);
-            return 0;
-        }
-        return result;
+    private static double addAmount(double current, double amount) {
+        double result = current + amount;
+        return Double.isFinite(result) ? result : Double.MAX_VALUE;
     }
 
-    private void replaceSnapshotContribution(StorageEntry entry, double storedPower, double maximumPower,
-                                             double extractablePower, double energyDemand) {
-        var group = entry.group;
-        group.storedPower.replace(entry.storedPower, storedPower);
-        group.maximumPower.replace(entry.maximumPower, maximumPower);
-        group.extractablePower.replace(entry.extractablePower, extractablePower);
-        group.energyDemand.replace(entry.energyDemand, energyDemand);
-
-        this.storedPower.replace(entry.storedPower, storedPower);
-        this.maximumPower.replace(entry.maximumPower, maximumPower);
-        this.extractablePower.replace(entry.extractablePower, extractablePower);
-        this.energyDemand.replace(entry.energyDemand, energyDemand);
-    }
-
-    private static String describeStorage(IAEPowerStorage storage) {
-        return storage.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(storage));
-    }
-
-    /** Storage entries belonging to one service, kept contiguous in overlay operation order. */
-    private static final class ServiceStorageCache {
-        private final EnergyStorageCache owner;
-        private final EnergyStorageGroup service;
-        private final int topologyIndex;
-        private final ObjectArrayList<StorageEntry> extractionOrder = new ObjectArrayList<>();
-        private final ObjectArrayList<StorageEntry> insertionOrder = new ObjectArrayList<>();
-
-        private final CompensatedPowerSum storedPower = new CompensatedPowerSum();
-        private final CompensatedPowerSum maximumPower = new CompensatedPowerSum();
-        private final CompensatedPowerSum extractablePower = new CompensatedPowerSum();
-        private final CompensatedPowerSum energyDemand = new CompensatedPowerSum();
-
-        private ServiceStorageCache(EnergyStorageCache owner, EnergyStorageGroup service, int topologyIndex) {
-            this.owner = owner;
-            this.service = service;
-            this.topologyIndex = topologyIndex;
+    private static double requirePowerAmount(double amount, String name) {
+        if (!Double.isFinite(amount) || amount < 0) {
+            throw new IllegalArgumentException(name + " must be finite and non-negative");
         }
+        return amount;
     }
 
-    /** One identity-addressed storage contribution in a storage-cache generation. */
-    private static final class StorageEntry {
-        private final ServiceStorageCache group;
-        private final IAEPowerStorage storage;
-        private final long registrationSequence;
-        private final double routingMaximumPower;
-        private final int priority;
-        private final AccessRestriction powerFlow;
-        private final boolean publicStorage;
-        private final boolean allowExtraction;
-        private final boolean allowInsertion;
+    private static String describeStorage(@Nullable IAEPowerStorage storage) {
+        return storage == null ? "<none>" : storage.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(storage));
+    }
 
-        private double storedPower;
-        private double maximumPower;
-        private double extractablePower;
-        private double energyDemand;
+    double getStoredPower() {
+        ensureValues();
+        return this.valid ? this.storedPower : 0;
+    }
 
-        private StorageEntry(ServiceStorageCache group, IAEPowerStorage storage, long registrationSequence,
-                             double routingMaximumPower, int priority, AccessRestriction powerFlow,
-                             boolean publicStorage) {
-            this.group = group;
-            this.storage = storage;
-            this.registrationSequence = registrationSequence;
-            this.routingMaximumPower = routingMaximumPower;
-            this.priority = priority;
-            this.powerFlow = powerFlow;
-            this.publicStorage = publicStorage;
-            this.allowExtraction = powerFlow.isAllowExtraction();
-            this.allowInsertion = powerFlow.isAllowInsertion();
+    double getMaximumPower() {
+        ensureValues();
+        return this.valid ? this.maximumPower : 0;
+    }
+
+    /**
+     * Diagnostic count of precision-recovery scans over the cached contributions.
+     */
+    int getTotalsRebuildCount() {
+        return this.totalsRebuildCount;
+    }
+
+    double getEnergyDemand(double maximumDemand) {
+        return transfer(maximumDemand, Actionable.SIMULATE, true);
+    }
+
+    double extractPower(double amount, Actionable mode) {
+        return transfer(amount, mode, false);
+    }
+
+    double injectPower(double amount, Actionable mode) {
+        return amount - transfer(amount, mode, true);
+    }
+
+    void refreshStorage(EnergyStorageGroup group, IAEPowerStorage storage) {
+        if (!this.valid) {
+            return;
         }
-
-        private void replaceSnapshot(double storedPower, double maximumPower, double extractablePower,
-                                     double energyDemand) {
-            this.group.owner.replaceSnapshotContribution(this, storedPower, maximumPower, extractablePower,
-                energyDemand);
-            this.storedPower = storedPower;
-            this.maximumPower = maximumPower;
-            this.extractablePower = extractablePower;
-            this.energyDemand = energyDemand;
+        if (this.owners.get(storage) != group) {
+            AELog.error("Power-storage value event for %s was posted to the wrong grid.", describeStorage(storage));
+            return;
+        }
+        if (storage == this.activeStorage && !this.reading) {
+            return;
+        }
+        if (this.reading || this.operating) {
+            AELog.error("Power storage changed while the overlay was reading or routing energy; invalidating the route.");
+            invalidate();
+            return;
+        }
+        int index = this.indices.getInt(storage);
+        if (!this.dirty[index]) {
+            this.dirty[index] = true;
+            this.pendingReads.add(index);
         }
     }
 
     /**
-     * Allocation-free scaled double-double accumulator. Scaling keeps overflow recoverable while the low component
-     * preserves contributions that would be rounded away by the high component.
+     * Refreshes the inherent buffer immediately, without querying any other registered storage.
      */
-    private static final class CompensatedPowerSum {
-        private boolean initialized;
-        private int scaleExponent;
-        private double high;
-        private double low;
-
-        private void replace(double previous, double current) {
-            add(-previous);
-            add(current);
+    boolean refreshStorageCapacity(EnergyStorageGroup group, IAEPowerStorage storage) {
+        if (!this.valid) {
+            return false;
         }
-
-        private void add(double value) {
-            if (value == 0) {
-                return;
-            }
-
-            int valueExponent = Math.getExponent(Math.abs(value));
-            if (!this.initialized) {
-                this.initialized = true;
-                this.scaleExponent = valueExponent;
-                this.high = Math.scalb(value, -valueExponent);
-                this.low = 0;
-                return;
-            }
-
-            if (valueExponent > this.scaleExponent) {
-                int shift = this.scaleExponent - valueExponent;
-                this.high = Math.scalb(this.high, shift);
-                this.low = Math.scalb(this.low, shift);
-                this.scaleExponent = valueExponent;
-            }
-
-            addScaled(Math.scalb(value, -this.scaleExponent));
-            normalizeScale();
+        if (this.reading || this.operating) {
+            AELog.error("Grid capacity changed while the overlay was reading or routing energy; invalidating the route.");
+            invalidate();
+            return false;
         }
-
-        private void addScaled(double value) {
-            double sum = this.high + value;
-            double virtualValue = sum - this.high;
-            double error = (this.high - (sum - virtualValue)) + (value - virtualValue);
-            double correctedLow = this.low + error;
-            double correctedHigh = sum + correctedLow;
-            this.low = correctedLow - (correctedHigh - sum);
-            this.high = correctedHigh;
+        if (this.owners.get(storage) != group) {
+            AELog.error("Cannot refresh inherent power storage %s in a different grid.", describeStorage(storage));
+            invalidate();
+            return false;
         }
+        int index = this.indices.getInt(storage);
+        this.dirty[index] = false;
+        readContribution(index);
+        return this.valid;
+    }
 
-        private void normalizeScale() {
-            double magnitude = Math.max(Math.abs(this.high), Math.abs(this.low));
-            if (magnitude == 0) {
-                this.initialized = false;
-                this.scaleExponent = 0;
-                this.high = 0;
-                this.low = 0;
-                return;
-            }
-
-            int shift = Math.getExponent(magnitude);
-            if (shift != 0) {
-                this.high = Math.scalb(this.high, -shift);
-                this.low = Math.scalb(this.low, -shift);
-                this.scaleExponent += shift;
+    private void ensureValues() {
+        if (this.reading || this.operating) {
+            AELog.error("Reentrant request for overlay energy values.");
+            invalidate();
+            return;
+        }
+        if (!this.valid) {
+            return;
+        }
+        for (int i = 0; i < this.pendingReads.size() && this.valid; i++) {
+            int index = this.pendingReads.getInt(i);
+            if (this.dirty[index]) {
+                this.dirty[index] = false;
+                readContribution(index);
             }
         }
-
-        private double value() {
-            if (!this.initialized) {
-                return 0;
-            }
-
-            double significand = this.high + this.low;
-            if (significand <= 0) {
-                return 0;
-            }
-            if (this.scaleExponent > Double.MAX_EXPONENT) {
-                return Double.MAX_VALUE;
-            }
-
-            double result = Math.scalb(significand, this.scaleExponent);
-            return Double.isFinite(result) ? result : Double.MAX_VALUE;
+        this.pendingReads.clear();
+        if (this.totalsDirty && this.valid) {
+            rebuildTotals();
         }
+    }
+
+    private void readContribution(int index) {
+        var storage = this.storages.get(index);
+        this.reading = true;
+        try {
+            double current = requirePowerAmount(storage.getAECurrentPower(), "current power");
+            double maximum = requirePowerAmount(storage.getAEMaxPower(), "maximum power");
+            int priority = storage.getPriority();
+            double stored = 0;
+            double capacity = 0;
+            double extractable = 0;
+            double receivable = 0;
+            if (storage.isAEPublicPowerStorage()) {
+                var flow = Objects.requireNonNull(storage.getPowerFlow(), "power flow");
+                extractable = availablePower(storage, current, maximum, flow, false);
+                receivable = availablePower(storage, current, maximum, flow, true);
+                if (flow.isAllowExtraction()) {
+                    stored = current;
+                    capacity = maximum;
+                }
+            }
+            if (this.valid) {
+                this.orderDirty |= this.priorities[index] != priority;
+                this.priorities[index] = priority;
+                this.quarantined[index] = false;
+                replaceContribution(index, stored, capacity, extractable, receivable);
+            }
+        } catch (RuntimeException exception) {
+            quarantine(index, exception);
+        } finally {
+            this.reading = false;
+        }
+    }
+
+    private void replaceContribution(int index, double stored, double maximum, double extractable, double receivable) {
+        this.storedPower = replaceAmount(this.storedPower, this.storedContributions[index], stored, this.storedSources);
+        this.maximumPower = replaceAmount(this.maximumPower, this.maximumContributions[index], maximum, this.maximumSources);
+        this.extractablePower = replaceAmount(this.extractablePower, this.extractableContributions[index], extractable,
+            this.extractableSources);
+        this.receivablePower = replaceAmount(this.receivablePower, this.receivableContributions[index], receivable,
+            this.receivableSources);
+        this.storedSources += sourceCountChange(this.storedContributions[index], stored);
+        this.maximumSources += sourceCountChange(this.maximumContributions[index], maximum);
+        this.extractableSources += sourceCountChange(this.extractableContributions[index], extractable);
+        this.receivableSources += sourceCountChange(this.receivableContributions[index], receivable);
+        if (this.maximumContributions[index] != maximum) {
+            var group = this.owners.get(this.storages.get(index));
+            int groupIndex = this.groupOrder.getInt(group);
+            this.capacities.put(group, replaceAmount(this.capacities.getDouble(group),
+                this.maximumContributions[index], maximum, this.capacitySources[groupIndex]));
+            this.capacitySources[groupIndex] += sourceCountChange(this.maximumContributions[index], maximum);
+            this.orderDirty = true;
+        }
+        if (extractable > this.extractableContributions[index]) {
+            this.firstExtractable = Math.min(this.firstExtractable, this.extractionPositions[index]);
+        }
+        if (receivable > this.receivableContributions[index]) {
+            this.firstReceivable = Math.min(this.firstReceivable, this.insertionPositions[index]);
+        }
+        this.storedContributions[index] = stored;
+        this.maximumContributions[index] = maximum;
+        this.extractableContributions[index] = extractable;
+        this.receivableContributions[index] = receivable;
+    }
+
+    private void quarantine(int index, RuntimeException exception) {
+        if (!this.quarantined[index]) {
+            AELog.error(exception, "Ignoring invalid power storage " + describeStorage(this.storages.get(index))
+                + " until its next value or routing event.");
+        }
+        this.quarantined[index] = true;
+        replaceContribution(index, 0, 0, 0, 0);
+    }
+
+    private void rebuildTotals() {
+        // Saturation/cancellation can lose a small contribution. Sum cached primitives, never re-read providers.
+        this.totalsRebuildCount++;
+        this.storedPower = 0;
+        this.maximumPower = 0;
+        this.extractablePower = 0;
+        this.receivablePower = 0;
+        this.capacities.clear();
+        for (int i = 0; i < this.storages.size(); i++) {
+            this.storedPower = addAmount(this.storedPower, this.storedContributions[i]);
+            this.maximumPower = addAmount(this.maximumPower, this.maximumContributions[i]);
+            this.extractablePower = addAmount(this.extractablePower, this.extractableContributions[i]);
+            this.receivablePower = addAmount(this.receivablePower, this.receivableContributions[i]);
+            var group = this.owners.get(this.storages.get(i));
+            this.capacities.put(group, addAmount(this.capacities.getDouble(group), this.maximumContributions[i]));
+        }
+        this.totalsDirty = false;
+    }
+
+    private void ensureOrder() {
+        if (!this.orderDirty || !this.valid) {
+            return;
+        }
+        // Contributions use permanent registration indices. Only these routing indices are sorted.
+        this.extractionOrder.sort((left, right) -> {
+            var leftGroup = this.owners.get(this.storages.get(left));
+            var rightGroup = this.owners.get(this.storages.get(right));
+            if (leftGroup != rightGroup) {
+                int capacity = Double.compare(this.capacities.getDouble(rightGroup), this.capacities.getDouble(leftGroup));
+                return capacity != 0 ? capacity : Integer.compare(this.groupOrder.getInt(leftGroup), this.groupOrder.getInt(rightGroup));
+            }
+            int priority = Integer.compare(this.priorities[right], this.priorities[left]);
+            return priority != 0 ? priority : Integer.compare(left, right);
+        });
+        this.insertionOrder.clear();
+        int start = 0;
+        while (start < this.extractionOrder.size()) {
+            var group = this.owners.get(this.storages.get(this.extractionOrder.getInt(start)));
+            int end = start + 1;
+            while (end < this.extractionOrder.size()
+                && this.owners.get(this.storages.get(this.extractionOrder.getInt(end))) == group) {
+                end++;
+            }
+            int bandEnd = end;
+            while (bandEnd > start) {
+                int bandStart = bandEnd - 1;
+                int priority = this.priorities[this.extractionOrder.getInt(bandStart)];
+                while (bandStart > start && this.priorities[this.extractionOrder.getInt(bandStart - 1)] == priority) {
+                    bandStart--;
+                }
+                for (int i = bandStart; i < bandEnd; i++) {
+                    int index = this.extractionOrder.getInt(i);
+                    this.extractionPositions[index] = i;
+                    this.insertionPositions[index] = this.insertionOrder.size();
+                    this.insertionOrder.add(index);
+                }
+                bandEnd = bandStart;
+            }
+            start = end;
+        }
+        this.firstExtractable = 0;
+        this.firstReceivable = 0;
+        this.orderDirty = false;
+    }
+
+    private double transfer(double amount, Actionable mode, boolean injection) {
+        requirePowerAmount(amount, "amount");
+        Objects.requireNonNull(mode, "mode");
+        if (this.reading || this.operating) {
+            AELog.error("Reentrant overlay energy operation.");
+            invalidate();
+            return 0;
+        }
+        if (!this.valid || amount < StoredEnergyAmount.MIN_AMOUNT) {
+            return 0;
+        }
+        ensureValues();
+        if (!this.valid) {
+            return 0;
+        }
+        double target = Math.min(amount, injection ? this.receivablePower : this.extractablePower);
+        if (mode == Actionable.SIMULATE || target < StoredEnergyAmount.MIN_AMOUNT) {
+            return target;
+        }
+        ensureOrder();
+        this.operating = true;
+        double transferred = 0;
+        int first = injection ? this.firstReceivable : this.firstExtractable;
+        try {
+            for (int position = first; position < this.storages.size() && this.valid; position++) {
+                double remaining = target - transferred;
+                if (remaining < StoredEnergyAmount.MIN_AMOUNT) {
+                    break;
+                }
+                int index = (injection ? this.insertionOrder : this.extractionOrder).getInt(position);
+                double available = injection ? this.receivableContributions[index] : this.extractableContributions[index];
+                if (available < StoredEnergyAmount.MIN_AMOUNT) {
+                    advanceEmptyPrefix(position, injection);
+                    continue;
+                }
+                var storage = this.storages.get(index);
+                this.activeStorage = storage;
+                try {
+                    double request = Math.min(remaining, available);
+                    double result = injection ? storage.injectAEPower(request, mode)
+                        : storage.extractAEPower(request, mode, PowerMultiplier.ONE);
+                    if (!Double.isFinite(result) || result < 0 || result > request) {
+                        throw new IllegalArgumentException("Invalid " + (injection ? "injection overflow" : "extraction")
+                            + " " + result + " for requested " + request);
+                    }
+                    double moved = injection ? request - result : result;
+                    transferred += moved;
+                    var owner = this.owners.get(storage);
+                    if (injection) {
+                        owner.recordPowerInjection(moved);
+                    } else {
+                        owner.recordPowerExtraction(moved);
+                    }
+                    if (!this.valid) {
+                        break;
+                    }
+                    readContribution(index);
+                } catch (RuntimeException exception) {
+                    quarantine(index, exception);
+                } finally {
+                    this.activeStorage = null;
+                }
+                if ((injection ? this.receivableContributions[index] : this.extractableContributions[index])
+                    < StoredEnergyAmount.MIN_AMOUNT) {
+                    advanceEmptyPrefix(position, injection);
+                }
+            }
+        } finally {
+            this.activeStorage = null;
+            this.operating = false;
+        }
+        return transferred;
+    }
+
+    private void advanceEmptyPrefix(int position, boolean injection) {
+        if (injection && position == this.firstReceivable) {
+            this.firstReceivable++;
+        } else if (!injection && position == this.firstExtractable) {
+            this.firstExtractable++;
+        }
+    }
+
+    private double availablePower(IAEPowerStorage storage, double current, double maximum,
+                                  AccessRestriction flow, boolean injection) {
+        if (!this.valid || !(injection ? flow.isAllowInsertion() : flow.isAllowExtraction())) {
+            return 0;
+        }
+        double requested = usablePower(injection ? Math.max(0, maximum - current) : current);
+        if (requested == 0) {
+            return 0;
+        }
+        double result = injection ? storage.getReceivableAEPower(requested) : storage.getExtractableAEPower(requested);
+        if (!Double.isFinite(result) || result < 0 || result > requested) {
+            throw new IllegalArgumentException("Invalid available " + (injection ? "insertion" : "extraction")
+                + " " + result + " for requested " + requested);
+        }
+        return usablePower(result);
+    }
+
+    private double replaceAmount(double total, double previous, double current, int sources) {
+        if (previous == current) {
+            return total;
+        }
+        // With no other nonzero source, the exact total is known, including normal drain/refill to zero.
+        // Otherwise, cancellation may hide a smaller source and must still trigger precision recovery.
+        if (sources == (previous > 0 ? 1 : 0)) {
+            return current;
+        }
+        double delta = current - previous;
+        double result = total + delta;
+        if (!Double.isFinite(result) || result < 0 || total == Double.MAX_VALUE
+            || result == total || previous > current && result < Math.ulp(total)) {
+            this.totalsDirty = true;
+        }
+        return Math.max(0, Double.isFinite(result) ? result : Double.MAX_VALUE);
     }
 }

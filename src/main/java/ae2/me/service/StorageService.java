@@ -29,6 +29,7 @@ import ae2.api.storage.IStorageProvider;
 import ae2.api.storage.MEStorageChangeListener;
 import ae2.api.storage.MEStorageMonitor;
 import ae2.core.AELog;
+import ae2.hooks.ticking.TickHandler;
 import ae2.me.helpers.InterestManager;
 import ae2.me.helpers.StackWatcher;
 import ae2.me.storage.NetworkStorage;
@@ -37,7 +38,6 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 import com.google.gson.stream.JsonWriter;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
@@ -45,11 +45,12 @@ import it.unimi.dsi.fastutil.objects.ReferenceSet;
 import net.minecraft.nbt.NBTTagCompound;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class StorageService implements IStorageService, IGridServiceProvider {
 
     private final Reference2ObjectMap<IGridNode, ProviderState> nodeProviders = new Reference2ObjectOpenHashMap<>();
-    private final ObjectList<ProviderState> globalProviders = new ObjectArrayList<>();
+    private final Reference2ObjectMap<IStorageProvider, ProviderState> globalProviders = new Reference2ObjectOpenHashMap<>();
     private final SetMultimap<AEKey, StackWatcher<IStorageWatcherNode>> interests = HashMultimap.create();
     private final InterestManager<StackWatcher<IStorageWatcherNode>> interestManager = new InterestManager<>(this.interests);
     private final NetworkStorage storage = new NetworkStorage(this::getCachedInventory, this::invalidateCache);
@@ -60,7 +61,9 @@ public class StorageService implements IStorageService, IGridServiceProvider {
 
     private boolean cachedStacksNeedUpdate = true;
     private boolean cacheInitialized;
+    private final ObjectArrayList<StackWatcher<IStorageWatcherNode>> watcherDispatch = new ObjectArrayList<>();
     private boolean processingMonitorCallback;
+    private boolean rebuildingCache;
 
     @Override
     public void onServerEndTick() {
@@ -75,22 +78,46 @@ public class StorageService implements IStorageService, IGridServiceProvider {
     }
 
     private void updateCachedStacks() {
+        if (this.rebuildingCache) {
+            return;
+        }
+        this.rebuildingCache = true;
+        this.cachedStacksNeedUpdate = false;
+        try {
+            rebuildCachedStacks();
+        } catch (RuntimeException exception) {
+            this.cachedStacksNeedUpdate = true;
+            AELog.error(exception, "Network storage cache rebuild or notification failed; scheduling another refresh.");
+        } finally {
+            try {
+                if (this.cachedStacksNeedUpdate) {
+                    this.storage.postListUpdate();
+                }
+            } finally {
+                this.rebuildingCache = false;
+            }
+        }
+    }
+
+    private void rebuildCachedStacks() {
         var previous = this.cachedAvailableStacks;
         var replacement = this.cachedAvailableScratch;
 
         replacement.reset();
-        this.storage.getAvailableStacksRaw(replacement);
+        if (!this.storage.getAvailableStacksRaw(replacement) || this.cachedStacksNeedUpdate) {
+            this.cachedStacksNeedUpdate = true;
+            return;
+        }
         replacement.removeZeros();
         this.cachedAvailableStacks = replacement;
         this.cachedAvailableScratch = previous;
-        this.cachedStacksNeedUpdate = false;
 
         if (!this.cacheInitialized) {
             this.cacheInitialized = true;
             for (var entry : replacement) {
                 var amount = sanitizeAmount(entry.getLongValue());
                 if (amount > 0) {
-                    postWatcherUpdate(entry.getKey(), amount);
+                    postWatcherUpdate(entry.getKey(), amount, 0);
                 }
             }
             return;
@@ -101,7 +128,7 @@ public class StorageService implements IStorageService, IGridServiceProvider {
             var newAmount = sanitizeAmount(entry.getLongValue());
             var oldAmount = sanitizeAmount(previous.get(what));
             if (newAmount != oldAmount) {
-                postWatcherUpdate(what, newAmount);
+                postWatcherUpdate(what, newAmount, oldAmount);
                 this.storage.postChange(what, newAmount - oldAmount);
             }
         }
@@ -110,7 +137,7 @@ public class StorageService implements IStorageService, IGridServiceProvider {
             var what = entry.getKey();
             var oldAmount = sanitizeAmount(entry.getLongValue());
             if (oldAmount > 0 && replacement.get(what) == 0) {
-                postWatcherUpdate(what, 0);
+                postWatcherUpdate(what, 0, oldAmount);
                 this.storage.postChange(what, -oldAmount);
             }
         }
@@ -123,6 +150,14 @@ public class StorageService implements IStorageService, IGridServiceProvider {
             return;
         }
         if (delta == 0) {
+            return;
+        }
+        if (this.rebuildingCache) {
+            // A child rebuild publishes its difference before copying its authoritative cache into our scan.
+            if (source instanceof NetworkStorage network && this.storage.isEnumerating(network)) {
+                return;
+            }
+            invalidateCache();
             return;
         }
         if (this.cachedStacksNeedUpdate || !this.cacheInitialized) {
@@ -153,16 +188,32 @@ public class StorageService implements IStorageService, IGridServiceProvider {
         } else {
             this.cachedAvailableStacks.set(what, updated);
         }
-        postWatcherUpdate(what, updated);
+        postWatcherUpdate(what, updated, current);
         this.storage.postChange(what, updated - current);
     }
 
-    private void postWatcherUpdate(AEKey what, long newAmount) {
-        for (var watcher : this.interestManager.get(what)) {
-            watcher.getHost().onStackChange(what, newAmount);
-        }
+    private void postWatcherUpdate(AEKey what, long newAmount, long previousAmount) {
+        int start = this.watcherDispatch.size();
+        this.watcherDispatch.addAll(this.interestManager.get(what));
         for (var watcher : this.interestManager.getAllStacksWatchers()) {
-            watcher.getHost().onStackChange(what, newAmount);
+            if (!this.interestManager.get(what).contains(watcher)) {
+                this.watcherDispatch.add(watcher);
+            }
+        }
+        int end = this.watcherDispatch.size();
+        try {
+            for (int i = start; i < end; i++) {
+                var watcher = this.watcherDispatch.get(i);
+                if (watcher.isWatching(what)) {
+                    try {
+                        watcher.getHost().onStackChange(what, newAmount, previousAmount);
+                    } catch (RuntimeException exception) {
+                        AELog.error(exception, "Storage watcher failed for " + what);
+                    }
+                }
+            }
+        } finally {
+            this.watcherDispatch.size(start);
         }
     }
 
@@ -172,7 +223,12 @@ public class StorageService implements IStorageService, IGridServiceProvider {
         if (storageProvider != null) {
             var state = new ProviderState(storageProvider);
             this.nodeProviders.put(node, state);
-            state.mount();
+            try {
+                state.mount();
+            } catch (RuntimeException exception) {
+                this.nodeProviders.remove(node, state);
+                throw exception;
+            }
         }
 
         var watcherNode = node.getService(IStorageWatcherNode.class);
@@ -211,27 +267,25 @@ public class StorageService implements IStorageService, IGridServiceProvider {
 
     @Override
     public void addGlobalStorageProvider(IStorageProvider provider) {
-        for (int i = 0; i < this.globalProviders.size(); i++) {
-            var state = this.globalProviders.get(i);
-            if (state.provider == provider) {
-                throw new IllegalArgumentException("Duplicate storage provider registration for " + provider);
-            }
+        if (this.globalProviders.containsKey(provider)) {
+            throw new IllegalArgumentException("Duplicate storage provider registration for " + provider);
         }
 
         var state = new ProviderState(provider);
-        this.globalProviders.add(state);
-        state.mount();
+        this.globalProviders.put(provider, state);
+        try {
+            state.mount();
+        } catch (RuntimeException exception) {
+            this.globalProviders.remove(provider, state);
+            throw exception;
+        }
     }
 
     @Override
     public void removeGlobalStorageProvider(IStorageProvider provider) {
-        for (int i = this.globalProviders.size() - 1; i >= 0; i--) {
-            var state = this.globalProviders.get(i);
-            if (state.provider == provider) {
-                this.globalProviders.remove(i);
-                state.unmount();
-                return;
-            }
+        var state = this.globalProviders.remove(provider);
+        if (state != null) {
+            state.unmount();
         }
     }
 
@@ -246,12 +300,10 @@ public class StorageService implements IStorageService, IGridServiceProvider {
 
     @Override
     public void refreshGlobalStorageProvider(IStorageProvider provider) {
-        for (int i = 0; i < this.globalProviders.size(); i++) {
-            var state = this.globalProviders.get(i);
-            if (state.provider == provider) {
-                state.update();
-                return;
-            }
+        var state = this.globalProviders.get(provider);
+        if (state != null) {
+            state.update();
+            return;
         }
 
         throw new IllegalArgumentException("Storage provider " + provider + " is not part of this grid.");
@@ -261,7 +313,9 @@ public class StorageService implements IStorageService, IGridServiceProvider {
     public void invalidateCache() {
         if (!this.cachedStacksNeedUpdate) {
             this.cachedStacksNeedUpdate = true;
-            this.storage.postListUpdate();
+            if (!this.rebuildingCache) {
+                this.storage.postListUpdate();
+            }
         }
     }
 
@@ -295,8 +349,21 @@ public class StorageService implements IStorageService, IGridServiceProvider {
             Preconditions.checkState(!this.mounted, "Can't mount a provider's inventories when it's already mounted");
 
             this.mounted = true;
-            this.provider.mountInventories(this);
-            invalidateCache();
+            try {
+                this.provider.mountInventories(this);
+                invalidateCache();
+            } catch (RuntimeException exception) {
+                AELog.error(exception, String.format("Storage provider mount failed; rolling back provider %s.",
+                    this.provider));
+                try {
+                    this.unmount();
+                } catch (RuntimeException cleanupException) {
+                    AELog.error(cleanupException, String.format(
+                        "Storage provider rollback encountered a cleanup failure for %s.", this.provider));
+                    exception.addSuppressed(cleanupException);
+                }
+                throw exception;
+            }
         }
 
         @Override
@@ -307,11 +374,33 @@ public class StorageService implements IStorageService, IGridServiceProvider {
                 throw new IllegalStateException("Cannot mount the same inventory twice.");
             }
 
-            storage.mount(priority, inventory);
-            var listener = new SourceListener(this, inventory, Thread.currentThread());
-            this.monitorListeners.put(inventory, listener);
-            inventory.addListener(listener, inventory);
-            invalidateCache();
+            SourceListener listener = null;
+            boolean networkMounted = false;
+            try {
+                storage.mount(priority, inventory);
+                networkMounted = true;
+                listener = new SourceListener(this, inventory, Thread.currentThread());
+                this.monitorListeners.put(inventory, listener);
+                inventory.addListener(listener, inventory);
+                invalidateCache();
+            } catch (RuntimeException exception) {
+                AELog.error(exception, String.format("Storage inventory mount failed; rolling back inventory %s.",
+                    inventory));
+                if (listener != null) {
+                    this.monitorListeners.remove(inventory);
+                    try {
+                        inventory.removeListener(listener);
+                    } catch (RuntimeException cleanupException) {
+                        AELog.error(cleanupException, String.format(
+                            "Failed to remove listener from rolled-back inventory %s.", inventory));
+                    }
+                }
+                if (networkMounted) {
+                    storage.unmount(inventory);
+                }
+                this.inventories.remove(inventory);
+                throw exception;
+            }
         }
 
         void update() {
@@ -325,14 +414,33 @@ public class StorageService implements IStorageService, IGridServiceProvider {
             }
 
             this.mounted = false;
+            RuntimeException failure = null;
             for (var inventory : this.inventories) {
                 var listener = this.monitorListeners.remove(inventory);
-                Preconditions.checkState(listener != null, "Mounted storage has no monitor listener");
-                listener.monitor.removeListener(listener);
-                storage.unmount(inventory);
+                if (listener == null) {
+                    AELog.error("Mounted storage %s has no monitor listener during unmount.", inventory);
+                } else {
+                    try {
+                        listener.monitor.removeListener(listener);
+                    } catch (RuntimeException exception) {
+                        AELog.error(exception, String.format("Failed to remove storage monitor listener from %s.",
+                            inventory));
+                        failure = failure == null ? exception : failure;
+                    }
+                }
+                try {
+                    storage.unmount(inventory);
+                } catch (RuntimeException exception) {
+                    AELog.error(exception, String.format("Failed to unmount storage %s from the network.", inventory));
+                    failure = failure == null ? exception : failure;
+                }
             }
             this.inventories.clear();
+            this.monitorListeners.clear();
             invalidateCache();
+            if (failure != null) {
+                throw failure;
+            }
         }
     }
 
@@ -340,6 +448,7 @@ public class StorageService implements IStorageService, IGridServiceProvider {
         private final ProviderState provider;
         private final MEStorageMonitor monitor;
         private final Thread ownerThread;
+        private final AtomicBoolean invalidationQueued = new AtomicBoolean();
 
         private SourceListener(ProviderState provider, MEStorageMonitor monitor, Thread ownerThread) {
             this.provider = provider;
@@ -357,9 +466,14 @@ public class StorageService implements IStorageService, IGridServiceProvider {
         @Override
         public void onStackChange(AEKey what, long delta) {
             if (Thread.currentThread() != this.ownerThread) {
-                AELog.error("Storage monitor %s invoked a callback from the wrong thread; scheduling a full storage scan.",
-                    this.monitor);
-                cachedStacksNeedUpdate = true;
+                queueThreadInvalidation();
+                return;
+            }
+            if (!isValid(this.monitor)) {
+                AELog.error("Detached storage monitor %s invoked a content callback.", this.monitor);
+                return;
+            }
+            if (this.invalidationQueued.get()) {
                 return;
             }
             if (processingMonitorCallback || storage.isDispatchingListeners()) {
@@ -378,8 +492,11 @@ public class StorageService implements IStorageService, IGridServiceProvider {
         @Override
         public void onListUpdate() {
             if (Thread.currentThread() != this.ownerThread) {
-                AELog.error("Storage monitor %s invalidated its list from the wrong thread.", this.monitor);
-                cachedStacksNeedUpdate = true;
+                queueThreadInvalidation();
+                return;
+            }
+            if (!isValid(this.monitor)) {
+                AELog.error("Detached storage monitor %s invalidated its list.", this.monitor);
                 return;
             }
             if (processingMonitorCallback || storage.isDispatchingListeners()) {
@@ -392,6 +509,19 @@ public class StorageService implements IStorageService, IGridServiceProvider {
                 invalidateCache();
             } finally {
                 processingMonitorCallback = false;
+            }
+        }
+
+        private void queueThreadInvalidation() {
+            if (this.invalidationQueued.compareAndSet(false, true)) {
+                AELog.error("Storage monitor %s invoked a callback from the wrong thread; queuing a server-thread invalidation.",
+                    this.monitor);
+                TickHandler.instance().addCallable(null, () -> {
+                    this.invalidationQueued.set(false);
+                    if (isValid(this.monitor)) {
+                        invalidateCache();
+                    }
+                });
             }
         }
     }

@@ -85,7 +85,9 @@ public class TileDenseBeamFormer extends AENetworkedTile implements BeamFormerEn
 
     @Override
     public void onMainNodeStateChanged(IGridNodeListener.State reason) {
-        this.markForUpdate();
+        if (getCurrentClientFlags() != this.clientFlags) {
+            this.markForUpdate();
+        }
     }
 
     @Override

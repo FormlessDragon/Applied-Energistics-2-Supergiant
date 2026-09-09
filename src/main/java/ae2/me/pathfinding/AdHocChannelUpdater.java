@@ -27,15 +27,24 @@ import ae2.me.GridNode;
 public class AdHocChannelUpdater implements IGridConnectionVisitor {
 
     private final int usedChannels;
+    private final ChannelFinalizer finalizer;
 
     public AdHocChannelUpdater(int used) {
+        this(used, null);
+    }
+
+    public AdHocChannelUpdater(int used, ChannelFinalizer finalizer) {
         this.usedChannels = used;
+        this.finalizer = finalizer;
     }
 
     @Override
     public boolean visitNode(IGridNode n) {
         final GridNode gn = (GridNode) n;
         gn.setAdHocChannels(this.usedChannels);
+        if (this.finalizer != null) {
+            this.finalizer.finalizeItem(gn);
+        }
         return true;
     }
 
@@ -43,5 +52,8 @@ public class AdHocChannelUpdater implements IGridConnectionVisitor {
     public void visitConnection(IGridConnection gcc) {
         final GridConnection gc = (GridConnection) gcc;
         gc.setAdHocChannels(this.usedChannels);
+        if (this.finalizer != null) {
+            this.finalizer.finalizeItem(gc);
+        }
     }
 }

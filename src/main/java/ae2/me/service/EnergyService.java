@@ -27,7 +27,6 @@ import ae2.api.networking.IGridNodeListener;
 import ae2.api.networking.IGridServiceProvider;
 import ae2.api.networking.energy.IAEPowerStorage;
 import ae2.api.networking.energy.IEnergyService;
-import ae2.api.networking.energy.IEnergyWatcher;
 import ae2.api.networking.energy.IEnergyWatcherNode;
 import ae2.api.networking.energy.IPassiveEnergyGenerator;
 import ae2.api.networking.events.GridPowerIdleChange;
@@ -47,6 +46,7 @@ import ae2.tile.networking.TileCreativeEnergyCell;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
@@ -78,7 +78,7 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
     private final EnergyPowerStatistics energyPowerStatistics = new EnergyPowerStatistics();
     private final EnergyStorageGroup energyStorageGroup = new EnergyStorageGroup(this.energyPowerStatistics);
     private final Multiset<IEnergyOverlayGridConnection> overlayGridConnections = HashMultiset.create();
-    private final Reference2ObjectMap<IGridNode, IEnergyWatcher> watchers = new Reference2ObjectOpenHashMap<>();
+    private final Reference2ObjectMap<IGridNode, EnergyWatcher> watchers = new Reference2ObjectOpenHashMap<>();
     private final GridEnergyStorage localStorage;
     private final PathingService pgc;
     /**
@@ -104,6 +104,8 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
     private long ticksSinceHasPowerChange = 900;
     private double lastStoredPower = -1;
     private int creativeEnergyCellCount;
+    private final ObjectArrayList<EnergyThreshold> thresholdDispatch =
+        new ObjectArrayList<>();
 
     public EnergyService(IGrid g, IPathingService pgc) {
         this.grid = (Grid) g;
@@ -168,92 +170,7 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
             }
         }
     }
-
-    @Override
-    public void onServerEndTick() {
-        if (isCreativePowerModeActive()) {
-            var overlay = getOverlayGrid();
-            overlay.setCurrentPassiveGenerator(null);
-            for (var passiveGenerator : passiveGenerators) {
-                passiveGenerator.setSuppressed(true);
-            }
-
-            if (!this.interests.isEmpty()) {
-                final double oldPower = this.lastStoredPower;
-                this.lastStoredPower = this.getStoredPower();
-
-                final EnergyThreshold low = new EnergyThreshold(Math.min(oldPower, this.lastStoredPower),
-                    Integer.MIN_VALUE);
-                final EnergyThreshold high = new EnergyThreshold(Math.max(oldPower, this.lastStoredPower),
-                    Integer.MAX_VALUE);
-
-                for (EnergyThreshold th : this.interests.subSet(low, true, high, true)) {
-                    ((EnergyWatcher) th.getEnergyWatcher()).post(this);
-                }
-            }
-
-            this.energyPowerStatistics.reset();
-            double averageLength = 40.0;
-            this.avgDrainPerTick *= (averageLength - 1) / averageLength;
-            this.avgInjectionPerTick *= (averageLength - 1) / averageLength;
-            this.hasPower = true;
-            this.ticksSinceHasPowerChange = 900;
-            this.publicPowerState(true, this.grid);
-            return;
-        }
-
-        var currentPassiveGenerator = getOverlayGrid().getCurrentPassiveGenerator();
-// If the node came with buffered energy, add it to our internal storage
-        if (currentPassiveGenerator != null && passiveGenerators.contains(currentPassiveGenerator)) {
-            injectPower(currentPassiveGenerator.getRate(), Actionable.MODULATE);
-        }
-
-        if (!this.interests.isEmpty()) {
-            final double oldPower = this.lastStoredPower;
-            this.lastStoredPower = this.getStoredPower();
-
-            final EnergyThreshold low = new EnergyThreshold(Math.min(oldPower, this.lastStoredPower),
-                Integer.MIN_VALUE);
-            final EnergyThreshold high = new EnergyThreshold(Math.max(oldPower, this.lastStoredPower),
-                Integer.MAX_VALUE);
-
-            for (EnergyThreshold th : this.interests.subSet(low, true, high, true)) {
-                ((EnergyWatcher) th.getEnergyWatcher()).post(this);
-            }
-        }
-
-        double averageLength = 40.0;
-        this.avgDrainPerTick *= (averageLength - 1) / averageLength;
-        this.avgInjectionPerTick *= (averageLength - 1) / averageLength;
-
-        this.avgDrainPerTick += this.energyPowerStatistics.getPowerExtraction() / averageLength;
-        this.avgInjectionPerTick += this.energyPowerStatistics.getPowerInjection() / averageLength;
-        this.energyPowerStatistics.reset();
-
-        final boolean currentlyHasPower;
-        if (this.drainPerTick > 0.0001) {
-            final double drained = this.extractAEPower(this.getIdlePowerUsage(), Actionable.MODULATE,
-                PowerMultiplier.CONFIG);
-            currentlyHasPower = drained >= this.drainPerTick - 0.001;
-        } else {
-            currentlyHasPower = this.extractAEPower(0.1, Actionable.SIMULATE, PowerMultiplier.CONFIG) > 0;
-        }
-
-        if (currentlyHasPower == this.hasPower) {
-            this.ticksSinceHasPowerChange++;
-        } else {
-            this.ticksSinceHasPowerChange = 0;
-        }
-
-        this.hasPower = currentlyHasPower;
-
-        if (this.hasPower && this.ticksSinceHasPowerChange > 30) {
-            this.publicPowerState(true, this.grid);
-        } else if (!this.hasPower) {
-            this.publicPowerState(false, this.grid);
-        }
-
-    }
+    private boolean localStorageStructureUpdateInProgress;
 
     @Override
     public double getIdlePowerUsage() {
@@ -345,6 +262,111 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
         return this.interests.add(threshold);
     }
 
+    @Override
+    public void onServerEndTick() {
+        if (isCreativePowerModeActive()) {
+            var overlay = getOverlayGrid();
+            overlay.setCurrentPassiveGenerator(null);
+            for (var passiveGenerator : passiveGenerators) {
+                passiveGenerator.setSuppressed(true);
+            }
+
+            if (!this.interests.isEmpty()) {
+                final double oldPower = this.lastStoredPower;
+                this.lastStoredPower = this.getStoredPower();
+
+                if (oldPower != this.lastStoredPower) {
+                    final EnergyThreshold low = new EnergyThreshold(Math.min(oldPower, this.lastStoredPower),
+                        Integer.MIN_VALUE);
+                    final EnergyThreshold high = new EnergyThreshold(Math.max(oldPower, this.lastStoredPower),
+                        Integer.MAX_VALUE);
+                    notifyThresholds(low, high);
+                }
+            }
+
+            this.energyPowerStatistics.reset();
+            double averageLength = 40.0;
+            this.avgDrainPerTick *= (averageLength - 1) / averageLength;
+            this.avgInjectionPerTick *= (averageLength - 1) / averageLength;
+            this.hasPower = true;
+            this.ticksSinceHasPowerChange = 900;
+            this.publicPowerState(true, this.grid);
+            return;
+        }
+
+        var currentPassiveGenerator = getOverlayGrid().getCurrentPassiveGenerator();
+// If the node came with buffered energy, add it to our internal storage
+        if (currentPassiveGenerator != null && passiveGenerators.contains(currentPassiveGenerator)) {
+            injectPower(currentPassiveGenerator.getRate(), Actionable.MODULATE);
+        }
+
+        if (!this.interests.isEmpty()) {
+            final double oldPower = this.lastStoredPower;
+            this.lastStoredPower = this.getStoredPower();
+
+            if (oldPower != this.lastStoredPower) {
+                final EnergyThreshold low = new EnergyThreshold(Math.min(oldPower, this.lastStoredPower),
+                    Integer.MIN_VALUE);
+                final EnergyThreshold high = new EnergyThreshold(Math.max(oldPower, this.lastStoredPower),
+                    Integer.MAX_VALUE);
+                notifyThresholds(low, high);
+            }
+        }
+
+        double averageLength = 40.0;
+        this.avgDrainPerTick *= (averageLength - 1) / averageLength;
+        this.avgInjectionPerTick *= (averageLength - 1) / averageLength;
+
+        this.avgDrainPerTick += this.energyPowerStatistics.getPowerExtraction() / averageLength;
+        this.avgInjectionPerTick += this.energyPowerStatistics.getPowerInjection() / averageLength;
+        this.energyPowerStatistics.reset();
+
+        final boolean currentlyHasPower;
+        if (this.drainPerTick > 0.0001) {
+            final double drained = this.extractAEPower(this.getIdlePowerUsage(), Actionable.MODULATE,
+                PowerMultiplier.CONFIG);
+            currentlyHasPower = drained >= this.drainPerTick - 0.001;
+        } else {
+            currentlyHasPower = this.extractAEPower(0.1, Actionable.SIMULATE, PowerMultiplier.CONFIG) > 0;
+        }
+
+        if (currentlyHasPower == this.hasPower) {
+            this.ticksSinceHasPowerChange++;
+        } else {
+            this.ticksSinceHasPowerChange = 0;
+        }
+
+        this.hasPower = currentlyHasPower;
+
+        if (this.hasPower && this.ticksSinceHasPowerChange > 30) {
+            this.publicPowerState(true, this.grid);
+        } else if (!this.hasPower) {
+            this.publicPowerState(false, this.grid);
+        }
+
+    }
+
+    void notifyThresholds(EnergyThreshold low, EnergyThreshold high) {
+        int start = this.thresholdDispatch.size();
+        this.thresholdDispatch.addAll(this.interests.subSet(low, true, high, true));
+        int end = this.thresholdDispatch.size();
+        try {
+            for (int i = start; i < end; i++) {
+                var threshold = this.thresholdDispatch.get(i);
+                var watcher = (EnergyWatcher) threshold.getEnergyWatcher();
+                if (watcher.isWatching(threshold)) {
+                    try {
+                        watcher.post(this);
+                    } catch (RuntimeException exception) {
+                        AELog.error(exception, "Energy threshold listener failed for " + this.grid);
+                    }
+                }
+            }
+        } finally {
+            this.thresholdDispatch.size(start);
+        }
+    }
+
     public boolean unregisterEnergyInterest(EnergyThreshold threshold) {
         return this.interests.remove(threshold);
     }
@@ -423,8 +445,22 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
     @Override
     public void removeNode(IGridNode node) {
         var currentOverlay = this.overlayGrid;
-        invalidateOverlayStorageCache();
-        localStorage.removeNode();
+        var ps = node.getService(IAEPowerStorage.class);
+        var gridProvider = node.getService(IEnergyOverlayGridConnection.class);
+        boolean refreshLocalStorage = ps == null && gridProvider == null;
+        if (!refreshLocalStorage) {
+            invalidateOverlayStorageCache();
+        }
+
+        this.localStorageStructureUpdateInProgress = refreshLocalStorage;
+        try {
+            localStorage.removeNode();
+        } finally {
+            this.localStorageStructureUpdateInProgress = false;
+        }
+        if (refreshLocalStorage && currentOverlay != null) {
+            currentOverlay.refreshLocalStorage(this.energyStorageGroup, this.localStorage);
+        }
 
         var passiveGenerator = node.getService(IPassiveEnergyGenerator.class);
         if (passiveGenerator != null) {
@@ -434,7 +470,6 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
             }
         }
 
-        var ps = node.getService(IAEPowerStorage.class);
         if (ps != null) {
             this.energyStorageGroup.unregister(ps);
         }
@@ -448,7 +483,6 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
             }
         }
 
-        var gridProvider = node.getService(IEnergyOverlayGridConnection.class);
         if (gridProvider != null) {
             this.overlayGridConnections.remove(gridProvider);
             invalidateOverlayEnergyGrid();
@@ -459,21 +493,40 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
 
         var watcher = this.watchers.remove(node);
         if (watcher != null) {
-            watcher.reset();
+            watcher.destroy();
         }
     }
 
     @Override
     public void addNode(IGridNode node, @Nullable NBTTagCompound storedData) {
-        invalidateOverlayStorageCache();
-        localStorage.addNode();
-
+        var currentOverlay = this.overlayGrid;
         var ps = node.getService(IAEPowerStorage.class);
+        var gridProvider = node.getService(IEnergyOverlayGridConnection.class);
+        boolean refreshLocalStorage = ps == null && gridProvider == null;
+        if (!refreshLocalStorage) {
+            invalidateOverlayStorageCache();
+        }
+
+        this.localStorageStructureUpdateInProgress = refreshLocalStorage;
+        try {
+            localStorage.addNode();
+            if (storedData != null && storedData.hasKey(TAG_STORED_ENERGY, NBT_DOUBLE)) {
+                double buffer = storedData.getDouble(TAG_STORED_ENERGY);
+                if (buffer > 0) {
+                    localStorage.injectAEPower(buffer, Actionable.MODULATE);
+                }
+            }
+        } finally {
+            this.localStorageStructureUpdateInProgress = false;
+        }
+        if (refreshLocalStorage && currentOverlay != null) {
+            currentOverlay.refreshLocalStorage(this.energyStorageGroup, this.localStorage);
+        }
+
         if (ps != null) {
             this.energyStorageGroup.register(ps);
         }
 
-        var gridProvider = node.getService(IEnergyOverlayGridConnection.class);
         if (gridProvider != null) {
             this.overlayGridConnections.add(gridProvider);
             invalidateOverlayEnergyGrid();
@@ -505,15 +558,12 @@ public class EnergyService implements IEnergyService, IGridServiceProvider {
             ews.updateWatcher(iw);
         }
 
-        if (storedData != null && storedData.hasKey(TAG_STORED_ENERGY, NBT_DOUBLE)) {
-            double buffer = storedData.getDouble(TAG_STORED_ENERGY);
-            if (buffer > 0) {
-                localStorage.injectAEPower(buffer, Actionable.MODULATE);
-            }
-        }
     }
 
     private void refreshRegisteredStorage(IAEPowerStorage storage) {
+        if (storage == this.localStorage && this.localStorageStructureUpdateInProgress) {
+            return;
+        }
         if (!this.energyStorageGroup.contains(storage)) {
             AELog.warn("Ignoring a power-storage value event for an unregistered storage.");
             return;

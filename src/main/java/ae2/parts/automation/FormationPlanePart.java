@@ -286,6 +286,9 @@ public class FormationPlanePart extends UpgradeablePart
 
     @Override
     public void setPriority(int newValue) {
+        if (this.priority == newValue) {
+            return;
+        }
         this.priority = newValue;
         this.getHost().markForSave();
         this.remountStorage();

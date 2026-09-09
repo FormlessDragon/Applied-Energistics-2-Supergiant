@@ -32,10 +32,15 @@ import ae2.parts.p2p.MEP2PTunnelPart;
 import ae2.parts.p2p.P2PTunnelPart;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.shorts.Short2ByteLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.shorts.ShortArrayList;
 import net.minecraft.nbt.NBTTagCompound;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.stream.Stream;
 
@@ -54,6 +59,12 @@ public class P2PService implements IGridService, IGridServiceProvider {
     private final IGrid myGrid;
     private final Multimap<Short, P2PTunnelPart<?>> inputs = LinkedHashMultimap.create();
     private final Multimap<Short, P2PTunnelPart<?>> outputs = LinkedHashMultimap.create();
+    private final Map<Short, Map<Class<?>, Boolean>> inputMatchCache = new HashMap<>();
+    // Membership is immediately visible; peer callbacks run once per frequency after lifecycle changes settle.
+    private final Short2ByteLinkedOpenHashMap pendingUpdates = new Short2ByteLinkedOpenHashMap();
+    private final ShortArrayList frequencyDispatch = new ShortArrayList();
+    private final ObjectArrayList<P2PTunnelPart<?>> tunnelDispatch = new ObjectArrayList<>();
+    private boolean dispatching;
     private final Random frequencyGenerator;
 
     public P2PService(IGrid g) {
@@ -81,13 +92,16 @@ public class P2PService implements IGridService, IGridServiceProvider {
                 return;
             }
 
-            if (tunnel.isOutput()) {
-                this.outputs.remove(tunnel.getFrequency(), tunnel);
-            } else {
-                this.inputs.remove(tunnel.getFrequency(), tunnel);
+            short frequency = tunnel.getFrequency();
+            boolean removedInput = this.inputs.remove(frequency, tunnel);
+            boolean removedOutput = this.outputs.remove(frequency, tunnel);
+            if (removedInput) {
+                this.inputMatchCache.remove(frequency);
+                updateTunnel(frequency, true);
             }
-
-            this.updateTunnel(tunnel.getFrequency(), !tunnel.isOutput(), false);
+            if (removedOutput) {
+                updateTunnel(frequency, false);
+            }
         }
     }
 
@@ -98,15 +112,14 @@ public class P2PService implements IGridService, IGridServiceProvider {
                 return;
             }
 
-            // AELog.info( "add-" + (t.output ? "output: " : "input: ") + t.freq );
-
             if (tunnel.isOutput()) {
-                this.outputs.put(tunnel.getFrequency(), tunnel);
+                if (!this.outputs.put(tunnel.getFrequency(), tunnel)) {
+                    return;
+                }
             } else {
                 this.addInput(tunnel);
             }
-
-            this.updateTunnel(tunnel.getFrequency(), !tunnel.isOutput(), false);
+            this.updateTunnel(tunnel.getFrequency(), !tunnel.isOutput());
         }
     }
 
@@ -115,37 +128,70 @@ public class P2PService implements IGridService, IGridServiceProvider {
             this.inputs.removeAll(tunnel.getFrequency());
         }
         this.inputs.put(tunnel.getFrequency(), tunnel);
+        this.inputMatchCache.remove(tunnel.getFrequency());
     }
 
-    private void updateTunnel(short freq, boolean updateOutputs, boolean configChange) {
-        if (updateOutputs) {
-            for (P2PTunnelPart<?> p : this.outputs.get(freq)) {
-                if (configChange) {
-                    p.onTunnelConfigChange();
-                }
-                p.onTunnelNetworkChange();
-            }
+    private void updateTunnel(short freq, boolean updateOutputs) {
+        byte flag = (byte) (updateOutputs ? 2 : 1);
+        this.pendingUpdates.put(freq, (byte) (this.pendingUpdates.get(freq) | flag));
+    }
+
+    private void updateAllTunnels(short freq) {
+        this.pendingUpdates.put(freq, (byte) 3);
+    }
+
+    @Override
+    public void onServerEndTick() {
+        if (this.dispatching || this.pendingUpdates.isEmpty()) {
+            return;
         }
-        if (!updateOutputs) {
-            for (P2PTunnelPart<?> in : this.inputs.get(freq)) {
-                if (configChange) {
-                    in.onTunnelConfigChange();
+        this.dispatching = true;
+        this.frequencyDispatch.addAll(this.pendingUpdates.keySet());
+        try {
+            for (int i = 0; i < this.frequencyDispatch.size(); i++) {
+                short frequency = this.frequencyDispatch.getShort(i);
+                byte flags = this.pendingUpdates.remove(frequency);
+                if ((flags & 2) != 0) {
+                    dispatchTunnels(frequency, this.outputs.get(frequency));
                 }
-                in.onTunnelNetworkChange();
+                if ((flags & 1) != 0) {
+                    dispatchTunnels(frequency, this.inputs.get(frequency));
+                }
             }
+        } finally {
+            this.frequencyDispatch.clear();
+            this.dispatching = false;
+        }
+    }
+
+    private void dispatchTunnels(short frequency, Collection<P2PTunnelPart<?>> members) {
+        this.tunnelDispatch.addAll(members);
+        try {
+            for (int i = 0; i < this.tunnelDispatch.size(); i++) {
+                var tunnel = this.tunnelDispatch.get(i);
+                if (tunnel.getFrequency() == frequency && members.contains(tunnel)) {
+                    try {
+                        tunnel.onTunnelNetworkChange();
+                    } catch (RuntimeException exception) {
+                        AELog.error(exception, "P2P network-change callback failed for " + tunnel);
+                    }
+                }
+            }
+        } finally {
+            this.tunnelDispatch.clear();
         }
     }
 
     public void updateFreq(P2PTunnelPart<?> t, short newFrequency) {
-        if (this.outputs.containsValue(t)) {
-            this.outputs.remove(t.getFrequency(), t);
-        }
-
-        if (this.inputs.containsValue(t)) {
-            this.inputs.remove(t.getFrequency(), t);
-        }
-
         final short oldFrequency = t.getFrequency();
+        if (oldFrequency == newFrequency && (t.isOutput() ? this.outputs : this.inputs).containsEntry(oldFrequency, t)) {
+            return;
+        }
+        boolean removedOutput = this.outputs.remove(oldFrequency, t);
+        boolean removedInput = this.inputs.remove(oldFrequency, t);
+        if (removedInput) {
+            this.inputMatchCache.remove(oldFrequency);
+        }
         t.setFrequency(newFrequency);
 
         if (t.isOutput()) {
@@ -153,13 +199,14 @@ public class P2PService implements IGridService, IGridServiceProvider {
         } else {
             this.addInput(t);
         }
-
-        if (oldFrequency != newFrequency) {
-            this.updateTunnel(oldFrequency, true, true);
-            this.updateTunnel(oldFrequency, false, true);
+        if (removedInput) {
+            this.updateTunnel(oldFrequency, true);
         }
-        this.updateTunnel(newFrequency, true, true);
-        this.updateTunnel(newFrequency, false, true);
+        if (removedOutput) {
+            this.updateTunnel(oldFrequency, false);
+        }
+        this.updateAllTunnels(newFrequency);
+        t.onTunnelConfigChange();
     }
 
     public short newFrequency() {
@@ -179,14 +226,19 @@ public class P2PService implements IGridService, IGridServiceProvider {
     }
 
     public <T extends P2PTunnelPart<T>> Stream<T> getOutputs(short freq, Class<T> c) {
-        // Check that a matching input exists for the requested type
-        boolean hasMatchingInput = false;
-        for (P2PTunnelPart<?> input : this.inputs.get(freq)) {
-            if (c.isInstance(input)) {
-                hasMatchingInput = true;
-                break;
-            }
+        if (!this.inputs.containsKey(freq)) {
+            return Stream.empty();
         }
+        // Check that a matching input exists for the requested type
+        Map<Class<?>, Boolean> matches = this.inputMatchCache.computeIfAbsent(freq, ignored -> new HashMap<>());
+        boolean hasMatchingInput = matches.computeIfAbsent(c, type -> {
+            for (P2PTunnelPart<?> input : this.inputs.get(freq)) {
+                if (type.isInstance(input)) {
+                    return true;
+                }
+            }
+            return false;
+        });
         if (!hasMatchingInput) {
             return Stream.empty();
         }

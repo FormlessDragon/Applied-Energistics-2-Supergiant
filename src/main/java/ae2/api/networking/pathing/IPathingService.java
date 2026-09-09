@@ -57,7 +57,7 @@ public interface IPathingService extends IGridService {
     /**
      * @return The current mode used for channel calculations.
      */
-    ChannelMode getChannelMode();
+    ChannelMode channelMode();
 
     /**
      * @return The total number of channels currently used by this network.

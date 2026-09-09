@@ -35,6 +35,22 @@ public class TickTracker implements Comparable<TickTracker> {
 
     private long lastTick;
     private int currentRate;
+    // A tracker belongs to at most one scheduling heap; -1 also covers a currently executing tracker.
+    private int heapIndex = -1;
+
+    /**
+     * Returns the scheduling heap's slot, or -1 when this tracker is not queued.
+     */
+    public final int getHeapIndex() {
+        return this.heapIndex;
+    }
+
+    /**
+     * Used only by the scheduling heap when moving, inserting or removing this tracker.
+     */
+    public final void setHeapIndex(int heapIndex) {
+        this.heapIndex = heapIndex;
+    }
 
     public TickTracker(TickingRequest req, IGridNode node, IGridTickable gt, long currentTick) {
         this.request = req;

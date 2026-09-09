@@ -6,12 +6,18 @@ import ae2.container.crafting.RecipeSelection;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.Tooltips;
 import ae2.util.Platform;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 public final class RecipeSelectionButton {
@@ -19,23 +25,36 @@ public final class RecipeSelectionButton {
 
     private final AEBaseGui<?> screen;
     private final Supplier<List<RecipeSelection.Candidate>> candidates;
+    @Nullable
+    private final BooleanSupplier hasConflict;
+    @Nullable
+    private final LongSupplier candidatesRevision;
     private final Supplier<ResourceLocation> selectedRecipe;
     private final Consumer<ResourceLocation> selectionHandler;
     private final TabButton button;
     private List<ResourceLocation> visibleCandidateIds = List.of();
+    private long lastCandidatesRevision = Long.MIN_VALUE;
 
     public RecipeSelectionButton(AEBaseGui<?> screen,
                                  Supplier<List<RecipeSelection.Candidate>> candidates,
                                  Supplier<ResourceLocation> selectedRecipe,
                                  Consumer<ResourceLocation> selectionHandler) {
+        this(screen, candidates, null, null, selectedRecipe, selectionHandler);
+    }
+
+    public RecipeSelectionButton(AEBaseGui<?> screen,
+                                 Supplier<List<RecipeSelection.Candidate>> candidates,
+                                 @Nullable BooleanSupplier hasConflict,
+                                 @Nullable LongSupplier candidatesRevision,
+                                 Supplier<ResourceLocation> selectedRecipe,
+                                 Consumer<ResourceLocation> selectionHandler) {
         this.screen = screen;
         this.candidates = candidates;
+        this.hasConflict = hasConflict;
+        this.candidatesRevision = candidatesRevision;
         this.selectedRecipe = selectedRecipe;
         this.selectionHandler = selectionHandler;
-        this.button = new TabButton(Icon.RECIPE_CONFLICT_SELECTION,
-            ButtonToolTips.RecipeConflictSelection.text(), this::open);
-        this.button.width = 12;
-        this.button.height = 12;
+        this.button = new CompactTabButton(this::open);
         this.button.visible = false;
         this.button.enabled = false;
     }
@@ -45,15 +64,36 @@ public final class RecipeSelectionButton {
     }
 
     public void update(boolean parentVisible) {
-        List<ResourceLocation> candidateIds = this.candidates.get().stream()
-                                                             .map(RecipeSelection.Candidate::id)
-                                                             .toList();
-        boolean candidatesChanged = !candidateIds.equals(this.visibleCandidateIds);
-        boolean visible = parentVisible && candidateIds.size() > 1;
-        if (candidatesChanged || !visible && this.button.visible) {
-            this.screen.closeSelectionPopup();
+        if (!parentVisible) {
+            if (this.button.visible) {
+                this.screen.closeSelectionPopup();
+            }
+            this.button.visible = false;
+            this.button.enabled = false;
+            return;
         }
-        this.visibleCandidateIds = candidateIds;
+
+        if (this.hasConflict == null) {
+            List<ResourceLocation> candidateIds = this.candidates.get().stream()
+                                                                 .map(RecipeSelection.Candidate::id)
+                                                                 .toList();
+            boolean candidatesChanged = !candidateIds.equals(this.visibleCandidateIds);
+            boolean visible = candidateIds.size() > 1;
+            if (candidatesChanged || !visible && this.button.visible) {
+                this.screen.closeSelectionPopup();
+            }
+            this.visibleCandidateIds = candidateIds;
+            this.button.visible = visible;
+            this.button.enabled = visible;
+            return;
+        }
+
+        boolean visible = this.hasConflict.getAsBoolean();
+        long revision = Objects.requireNonNull(this.candidatesRevision).getAsLong();
+        if (revision != this.lastCandidatesRevision) {
+            this.screen.closeSelectionPopup();
+            this.lastCandidatesRevision = revision;
+        }
         this.button.visible = visible;
         this.button.enabled = visible;
     }
@@ -115,6 +155,33 @@ public final class RecipeSelectionButton {
             Tooltips.muted(ButtonToolTips.RecipeId.text(candidate.id().toString())),
             new TextComponentString(modName).setStyle(Tooltips.muted(new TextComponentString("")).getStyle())
         );
+    }
+
+    private static final class CompactTabButton extends TabButton {
+        private CompactTabButton(Runnable onPress) {
+            super(Icon.RECIPE_CONFLICT_SELECTION, ButtonToolTips.RecipeConflictSelection.text(), onPress);
+            this.width = 16;
+            this.height = 16;
+        }
+
+        @Override
+        public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
+            if (!this.visible) {
+                return;
+            }
+
+            this.hovered = mouseX >= this.x && mouseY >= this.y
+                && mouseX < this.x + this.width && mouseY < this.y + this.height;
+            Icon background = this.isFocused() ? Icon.TAB_BUTTON_BACKGROUND_FOCUS : Icon.TAB_BUTTON_BACKGROUND;
+            background.getBlitter().dest(this.x, this.y, this.width, this.height).blit();
+
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(this.x + this.width / 2.0F,
+                this.y + this.height / 2.0F, 100.0F);
+            GlStateManager.scale(0.75F, 0.75F, 1.0F);
+            Icon.RECIPE_CONFLICT_SELECTION.getBlitter().dest(-8, -8).blit();
+            GlStateManager.popMatrix();
+        }
     }
 
     private sealed interface Choice permits RecipeChoice, PageChoice {

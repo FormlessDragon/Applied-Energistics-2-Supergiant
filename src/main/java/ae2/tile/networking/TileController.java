@@ -33,6 +33,7 @@ import ae2.block.networking.ControllerBlock;
 import ae2.container.GuiIds;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.gui.GuiOpener;
+import ae2.me.energy.StoredEnergyAmount;
 import ae2.tile.grid.AENetworkedPoweredTile;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.block.state.IBlockState;
@@ -64,6 +65,11 @@ public class TileController extends AENetworkedPoweredTile {
     @Override
     public AECableType getCableConnectionType(EnumFacing dir) {
         return AECableType.DENSE_SMART;
+    }
+
+    @Override
+    public double getExtractableAEPower(double maximum) {
+        return maximum < StoredEnergyAmount.MIN_AMOUNT ? 0 : Math.min(maximum, getInternalCurrentPower());
     }
 
     @Override

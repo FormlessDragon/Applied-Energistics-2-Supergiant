@@ -22,6 +22,13 @@ public interface IPatternProviderDisplay {
     void clear();
 
     /**
+     * Removes a departed provider and its location metadata without clearing unrelated inventories.
+     *
+     * @param inventoryId server identity of the removed provider
+     */
+    void removeProvider(long inventoryId);
+
+    /**
      * Applies world-location metadata for a provider inventory.
      *
      * @param inventoryId provider inventory id used by later provider updates

@@ -135,7 +135,7 @@ public class ContainerMEStorage extends AEBaseContainer
         @Override
         public void onListUpdate() {
             assertGridStorageCallbackThread("invalidating a terminal storage list");
-            gridStorageFullUpdatePending = true;
+            // The owning service is already dirty; reading its shared cache publishes the exact differences.
         }
     };
     /**
@@ -171,7 +171,6 @@ public class ContainerMEStorage extends AEBaseContainer
     private Object gridStorageVerificationToken;
     @Nullable
     private Thread gridStorageThread;
-    private boolean gridStorageFullUpdatePending;
     private boolean containerClosed;
     @Nullable
     private ICraftingService previousCraftingService;
@@ -310,10 +309,6 @@ public class ContainerMEStorage extends AEBaseContainer
 
             KeyCounter availableStacks;
             if (this.gridStorageService != null) {
-                if (this.gridStorageFullUpdatePending) {
-                    this.gridStorageFullUpdatePending = false;
-                    this.updateHelper.reset();
-                }
                 availableStacks = this.gridStorageService.getCachedInventory();
             } else {
                 availableStacks = storage.getAvailableStacks();
@@ -440,7 +435,6 @@ public class ContainerMEStorage extends AEBaseContainer
         this.gridStorageVerificationToken = null;
         this.gridStorageThread = null;
         this.gridStorageService = null;
-        this.gridStorageFullUpdatePending = false;
     }
 
     private void assertGridStorageCallbackThread(String operation) {

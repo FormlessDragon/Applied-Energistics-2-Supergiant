@@ -5,7 +5,6 @@ import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.stacks.GenericStack;
 import ae2.core.AELog;
-import ae2.util.inv.AppEngInternalInventory;
 import com.google.common.collect.HashMultimap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -91,6 +90,18 @@ final class PatternAccessDisplaySupport {
     }
 
     /**
+     * Releases one provider's display state after it leaves the observed directory.
+     */
+    public void removeProvider(long inventoryId) {
+        var removed = this.byId.remove(inventoryId);
+        if (removed != null) {
+            removed.clearMatchedSlots();
+            forgetSearchText(removed);
+        }
+        this.providerInfo.remove(inventoryId);
+    }
+
+    /**
      * Stores provider location metadata delivered independently of provider inventory packets.
      */
     public void postProviderInfo(long inventoryId, int dimensionId, BlockPos pos, @Nullable EnumFacing face) {
@@ -113,9 +124,11 @@ final class PatternAccessDisplaySupport {
 
         PatternContainerEntry entry = new PatternContainerEntry(inventoryId, inventorySize, sortBy,
             canEditTerminalName, canModifyTerminalVisibility, group);
-        this.byId.put(inventoryId, entry);
-        applySlotUpdates(entry.getInventory(), slots);
-        this.patternSearchText.clear();
+        var previous = this.byId.put(inventoryId, entry);
+        if (previous != null) {
+            forgetSearchText(previous);
+        }
+        applySlotUpdates(entry, slots);
         return true;
     }
 
@@ -131,8 +144,7 @@ final class PatternAccessDisplaySupport {
             return false;
         }
 
-        applySlotUpdates(entry.getInventory(), slots);
-        this.patternSearchText.clear();
+        applySlotUpdates(entry, slots);
         return true;
     }
 
@@ -167,12 +179,14 @@ final class PatternAccessDisplaySupport {
 
         this.rows.clear();
         this.rows.ensureCapacity(rowCapacity);
-        for (PatternContainerGroup group : this.groups) {
+        for (int groupIndex = 0; groupIndex < this.groups.size(); groupIndex++) {
+            var group = this.groups.get(groupIndex);
             this.rows.add(new GroupHeaderRow(group));
 
             ObjectList<PatternContainerEntry> containers = new ObjectArrayList<>(this.byGroup.get(group));
             containers.sort(null);
-            for (PatternContainerEntry container : containers) {
+            for (int containerIndex = 0; containerIndex < containers.size(); containerIndex++) {
+                var container = containers.get(containerIndex);
                 int size = container.getInventory().size();
                 for (int offset = 0; offset < size; offset += this.columns) {
                     int slots = Math.min(size - offset, this.columns);
@@ -199,28 +213,25 @@ final class PatternAccessDisplaySupport {
         return entry.isSlotMatched(slot);
     }
 
-    private void applySlotUpdates(AppEngInternalInventory inventory, Int2ObjectMap<ItemStack> slots) {
+    private void forgetSearchText(PatternContainerEntry entry) {
+        var inventory = entry.getInventory();
+        for (int i = 0; i < inventory.size(); i++) {
+            this.patternSearchText.remove(inventory.getStackInSlot(i));
+        }
+    }
+
+    private void applySlotUpdates(PatternContainerEntry entry, Int2ObjectMap<ItemStack> slots) {
+        var inventory = entry.getInventory();
         for (Int2ObjectMap.Entry<ItemStack> slotUpdate : slots.int2ObjectEntrySet()) {
             int slot = slotUpdate.getIntKey();
             if (slot >= 0 && slot < inventory.size()) {
+                var previous = inventory.getStackInSlot(slot);
+                this.patternSearchText.remove(previous);
+                entry.invalidatePatternDisplay(previous);
                 inventory.setItemDirect(slot, slotUpdate.getValue());
+                entry.invalidatePatternDisplay(slotUpdate.getValue());
             } else {
                 AELog.warn("Ignoring %s provider slot update outside inventory bounds: %d", this.logName, slot);
-            }
-        }
-        // Invalidate caches for the affected entry. The entry caches decoded display data per stack reference; the
-        // global search-text cache is invalidated wholesale here because a single stack reference can appear in
-        // multiple entries and incremental refcounting is not worth the complexity for provider packet updates.
-        for (PatternContainerEntry entry : this.byId.values()) {
-            if (entry.getInventory() == inventory) {
-                for (Int2ObjectMap.Entry<ItemStack> slotUpdate : slots.int2ObjectEntrySet()) {
-                    int slot = slotUpdate.getIntKey();
-                    if (slot >= 0 && slot < inventory.size()) {
-                        entry.invalidatePatternDisplay(slotUpdate.getValue());
-                    }
-                }
-                this.patternSearchText.clear();
-                return;
             }
         }
     }

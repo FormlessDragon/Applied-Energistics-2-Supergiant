@@ -31,12 +31,19 @@ import java.util.Set;
 public abstract class ExternalStorageFacade implements MEStorage {
     @Nullable
     private final ExternalStorageMonitor externalMonitor;
+    private final Object handlerIdentity;
     protected boolean extractableOnly;
     @Nullable
     private Runnable changeListener;
 
-    private ExternalStorageFacade(@Nullable ExternalStorageMonitor externalMonitor) {
-        this.externalMonitor = externalMonitor;
+    private ExternalStorageFacade(Object handler) {
+        this.handlerIdentity = handler;
+        this.externalMonitor = handler instanceof ExternalStorageMonitor monitor ? monitor : null;
+    }
+
+    final boolean hasSameView(ExternalStorageFacade other) {
+        return getClass() == other.getClass() && this.handlerIdentity == other.handlerIdentity
+            && this.extractableOnly == other.extractableOnly;
     }
 
     public static ExternalStorageFacade of(IFluidHandler handler) {
@@ -110,7 +117,7 @@ public abstract class ExternalStorageFacade implements MEStorage {
         private final IItemHandler handler;
 
         public ItemHandlerFacade(IItemHandler handler) {
-            super(handler instanceof ExternalStorageMonitor monitor ? monitor : null);
+            super(handler);
             this.handler = handler;
         }
 
@@ -350,7 +357,7 @@ public abstract class ExternalStorageFacade implements MEStorage {
         private final IFluidHandler handler;
 
         public FluidHandlerFacade(IFluidHandler handler) {
-            super(handler instanceof ExternalStorageMonitor monitor ? monitor : null);
+            super(handler);
             this.handler = handler;
         }
 

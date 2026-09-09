@@ -131,11 +131,6 @@ public class TabButton extends GuiButton implements ITooltip {
             case BOX -> this.isFocused() ? Icon.TAB_BUTTON_BACKGROUND_FOCUS : Icon.TAB_BUTTON_BACKGROUND;
         };
 
-        if (this.width != 22 || this.height != 22) {
-            drawCompactButton(backdrop);
-            return;
-        }
-
         if (!this.disableBackground) {
             backdrop.getBlitter().dest(this.x, this.y).blit();
         }
@@ -170,24 +165,6 @@ public class TabButton extends GuiButton implements ITooltip {
                 null);
             RenderHelper.disableStandardItemLighting();
             GlStateManager.disableDepth();
-            GlStateManager.popMatrix();
-        }
-    }
-
-    private void drawCompactButton(Icon backdrop) {
-        if (!this.disableBackground) {
-            backdrop.getBlitter().dest(this.x, this.y, this.width, this.height).blit();
-        }
-
-        if (this.icon != null) {
-            float scale = Math.min((float) this.width / this.icon.width, (float) this.height / this.icon.height);
-            float iconWidth = this.icon.width * scale;
-            float iconHeight = this.icon.height * scale;
-            GlStateManager.pushMatrix();
-            GlStateManager.translate(this.x + (this.width - iconWidth) / 2.0F,
-                this.y + (this.height - iconHeight) / 2.0F, 100);
-            GlStateManager.scale(scale, scale, 1.0F);
-            this.icon.getBlitter().dest(0, 0).blit();
             GlStateManager.popMatrix();
         }
     }

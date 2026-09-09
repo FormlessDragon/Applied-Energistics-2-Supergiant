@@ -37,6 +37,7 @@ import ae2.api.implementations.blockentities.IPatternProviderBatchTarget;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.BaseInternalInventory;
 import ae2.api.inventories.InternalInventory;
+import ae2.api.inventories.VersionedInternalInventory;
 import ae2.api.networking.GridFlags;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridConnection;
@@ -114,7 +115,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -140,6 +140,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     private final IConfigManager configManager;
     private final AppEngInternalInventory patternInventory;
     private final InternalInventory terminalPatternInventory = new ActivePatternInventory();
+    private long terminalContentsVersion;
     private final IUpgradeInventory upgrades;
     private final List<GridLogicExtension> extensions;
     private final ObjectList<IPatternDetails> patterns = new ObjectArrayList<>();
@@ -233,6 +234,9 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     }
 
     public void setPriority(int priority) {
+        if (this.priority == priority) {
+            return;
+        }
         this.priority = priority;
         this.host.saveChanges();
         ICraftingProvider.requestUpdate(this.mainNode);
@@ -250,14 +254,14 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         this.host.saveChanges();
         this.updatePatterns();
         ICraftingProvider.requestUpdate(this.mainNode);
-        for (var extension : this.extensions) {
-            extension.onUpgradesChanged();
+        for (int i = 0; i < this.extensions.size(); i++) {
+            this.extensions.get(i).onUpgradesChanged();
         }
     }
 
     public void onNeighborChanged(EnumFacing side) {
-        for (var extension : this.extensions) {
-            extension.onNeighborChanged(side);
+        for (int i = 0; i < this.extensions.size(); i++) {
+            this.extensions.get(i).onNeighborChanged(side);
         }
     }
 
@@ -338,7 +342,9 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             EnumFacing direction = tag.hasKey(NBT_SEND_DIRECTION, Constants.NBT.TAG_BYTE)
                 ? readDirection(tag.getByte(NBT_SEND_DIRECTION))
                 : null;
-            for (GenericStack stack : GenericStack.readList(sendListTag)) {
+            var stacks = GenericStack.readList(sendListTag);
+            for (int i = 0; i < stacks.size(); i++) {
+                var stack = stacks.get(i);
                 if (stack != null && direction != null) {
                     this.pendingSendList.add(new PendingSend(stack, direction));
                 }
@@ -371,6 +377,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     }
 
     public void updatePatterns() {
+        this.terminalContentsVersion++;
         this.patterns.clear();
         this.patternKeys.clear();
         this.patternInputs.clear();
@@ -400,7 +407,7 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
     @Override
     public List<IPatternDetails> getAvailablePatterns() {
-        if (!this.mainNode.isActive()) {
+        if (!this.mainNode.isOnline()) {
             return Collections.emptyList();
         }
         if (!this.upgrades.isInstalled(AEItems.PSEUDO_CRAFTING_CARD.item())) {
@@ -945,8 +952,8 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
         boolean didSomething = false;
         boolean changed = false;
-        for (ListIterator<PendingSend> it = this.pendingSendList.listIterator(); it.hasNext(); ) {
-            PendingSend pendingSend = it.next();
+        for (int i = 0; i < this.pendingSendList.size(); i++) {
+            PendingSend pendingSend = this.pendingSendList.get(i);
             GenericStack stack = pendingSend.stack();
             PatternProviderTarget adapter = findAdapter(pendingSend.direction());
             if (adapter == null) {
@@ -955,11 +962,11 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
 
             long inserted = adapter.insert(stack.what(), stack.amount(), Actionable.MODULATE, getInsertionMode());
             if (inserted >= stack.amount()) {
-                it.remove();
+                this.pendingSendList.remove(i--);
                 didSomething = true;
                 changed = true;
             } else if (inserted > 0) {
-                it.set(new PendingSend(new GenericStack(stack.what(), stack.amount() - inserted),
+                this.pendingSendList.set(i, new PendingSend(new GenericStack(stack.what(), stack.amount() - inserted),
                     pendingSend.direction()));
                 didSomething = true;
                 changed = true;
@@ -1023,13 +1030,13 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
     }
 
     public void onMainNodeStateChanged() {
-        boolean providerActive = this.mainNode.isActive();
+        boolean providerActive = this.mainNode.isOnline();
         if (this.wasProviderActive != providerActive) {
             this.wasProviderActive = providerActive;
             ICraftingProvider.requestUpdate(this.mainNode);
         }
 
-        if (providerActive) {
+        if (providerActive && this.mainNode.hasGridBooted() && hasWorkToDo()) {
             this.mainNode.ifPresent((grid, node) -> grid.getTickManager().alertDevice(node));
         }
     }
@@ -1072,7 +1079,9 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
             return 0;
         }
 
-        for (PatternProviderP2PTunnelPart outputTunnel : inputTunnel.getOutputsInAttemptOrder()) {
+        var outputs = inputTunnel.getOutputsInAttemptOrder();
+        for (int i = 0; i < outputs.size(); i++) {
+            var outputTunnel = outputs.get(i);
             PatternProviderP2PTunnelPart.RemoteMachineTarget machineTarget = outputTunnel.findRemoteMachineTarget();
             if (machineTarget != null) {
                 int multiplier;
@@ -1113,7 +1122,9 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
                                          int multiplier) {
         var basePatternDetails = PseudoPatternDetails.unwrap(patternDetails);
         PatternProviderP2PTunnelPart plannedOutput = inputTunnel.consumePlannedOutput(basePatternDetails);
-        for (PatternProviderP2PTunnelPart outputTunnel : inputTunnel.getOutputsInAttemptOrder(plannedOutput)) {
+        var outputs = inputTunnel.getOutputsInAttemptOrder(plannedOutput);
+        for (int i = 0; i < outputs.size(); i++) {
+            var outputTunnel = outputs.get(i);
             PatternProviderP2PTunnelPart.RemoteMachineTarget machineTarget = outputTunnel.findRemoteMachineTarget();
             if (machineTarget != null) {
                 if (machineTarget.batchTarget() != null) {
@@ -1309,8 +1320,9 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
                                                            .setStyle(new Style().setBold(true).setColor(TextFormatting.WHITE)));
             for (PatternContainerGroup group : groups) {
                 tooltip.add(group.name().createCopy());
-                for (ITextComponent line : group.tooltip()) {
-                    tooltip.add(new TextComponentString("  ").appendSibling(line.createCopy()));
+                var lines = group.tooltip();
+                for (int i = 0; i < lines.size(); i++) {
+                    tooltip.add(new TextComponentString("  ").appendSibling(lines.get(i).createCopy()));
                 }
             }
         }
@@ -1664,7 +1676,12 @@ public class PatternProviderLogic implements InternalInventoryHost, ICraftingPro
         }
     }
 
-    private class ActivePatternInventory extends BaseInternalInventory {
+    private class ActivePatternInventory extends BaseInternalInventory implements VersionedInternalInventory {
+        @Override
+        public long getContentsVersion() {
+            return terminalContentsVersion;
+        }
+
         @Override
         public int size() {
             return getActivePatternSlots();

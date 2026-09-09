@@ -23,7 +23,6 @@ import ae2.api.networking.energy.IEnergyWatcherNode;
 import ae2.me.service.EnergyService;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
 
 import java.util.Iterator;
 
@@ -34,7 +33,24 @@ public class EnergyWatcher implements IEnergyWatcher {
 
     private final EnergyService service;
     private final IEnergyWatcherNode watcherHost;
-    private final ObjectSet<EnergyThreshold> myInterests = new ObjectOpenHashSet<>();
+    private final ObjectOpenHashSet<EnergyThreshold> myInterests = new ObjectOpenHashSet<>();
+    private boolean destroyed;
+
+    /**
+     * True only while this exact threshold registration belongs to the live watcher.
+     */
+    public boolean isWatching(EnergyThreshold threshold) {
+        return !this.destroyed && this.myInterests.get(threshold) == threshold;
+    }
+
+    /**
+     * Permanently detaches a watcher when its node leaves this energy service.
+     */
+    public void destroy() {
+        reset();
+        EnergyThreshold.releaseWatcher(this);
+        this.destroyed = true;
+    }
 
     public EnergyWatcher(EnergyService service, IEnergyWatcherNode host) {
         this.service = service;
@@ -51,6 +67,9 @@ public class EnergyWatcher implements IEnergyWatcher {
 
     @Override
     public void add(double amount) {
+        if (this.destroyed) {
+            return;
+        }
         Preconditions.checkArgument(amount >= 0, "amount must be >= 0");
 
         final EnergyThreshold eh = new EnergyThreshold(amount, this);

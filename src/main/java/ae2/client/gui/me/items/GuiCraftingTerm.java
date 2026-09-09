@@ -29,6 +29,8 @@ import ae2.container.me.items.ContainerCraftingTerm;
 import ae2.core.AEConfig;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.Tooltips;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
@@ -60,16 +62,14 @@ public class GuiCraftingTerm extends GuiMEStorage<ContainerCraftingTerm> {
             container::getSelectedRecipeId, container::selectRecipe);
         widgets.add("recipeConflictSelection", this.recipeSelectionButton.button());
 
-        var rotateGridButton = new SimpleIconButton(Icon.CRAFTING_GRID_ROTATE,
+        var rotateGridButton = new CompactCraftingIconButton(Icon.CRAFTING_GRID_ROTATE,
             ButtonToolTips.RotateCraftingGrid.text(), rotateGridTooltip(),
             () -> this.container.rotateGrid(isShiftDown()));
-        rotateGridButton.setIconScale(0.75F);
         widgets.add("rotateCraftingGrid", rotateGridButton);
 
-        var balanceGridButton = new SimpleIconButton(Icon.CRAFTING_GRID_BALANCE,
+        var balanceGridButton = new CompactCraftingIconButton(Icon.CRAFTING_GRID_BALANCE,
             ButtonToolTips.BalanceCraftingGrid.text(), balanceGridTooltip(),
             () -> this.container.balanceGrid(isShiftDown()));
-        balanceGridButton.setIconScale(0.75F);
         widgets.add("balanceCraftingGrid", balanceGridButton);
     }
 
@@ -121,6 +121,39 @@ public class GuiCraftingTerm extends GuiMEStorage<ContainerCraftingTerm> {
             ButtonToolTips.BalanceCraftingGrid.text(),
             Tooltips.muted(ButtonToolTips.BalanceCraftingGridDesc.text(Tooltips.getMouseButtonText(0))),
             Tooltips.muted(ButtonToolTips.BalanceCraftingGridShiftDesc.text(Tooltips.getMouseButtonText(0))));
+    }
+
+    private static final class CompactCraftingIconButton extends SimpleIconButton {
+        private CompactCraftingIconButton(Icon icon, ITextComponent message, List<ITextComponent> tooltip,
+                                          Runnable onPress) {
+            super(icon, message, tooltip, onPress);
+            this.width = 12;
+            this.height = 12;
+        }
+
+        @Override
+        public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
+            if (!this.visible) {
+                return;
+            }
+
+            this.hovered = mouseX >= this.x && mouseY >= this.y
+                && mouseX < this.x + this.width && mouseY < this.y + this.height;
+            int yOffset = this.hovered ? 1 : 0;
+            Icon background = this.hovered ? Icon.TOOLBAR_BUTTON_BACKGROUND_HOVER
+                : this.isFocused() ? Icon.TOOLBAR_BUTTON_BACKGROUND_FOCUS : Icon.TOOLBAR_BUTTON_BACKGROUND;
+            background.getBlitter()
+                      .dest(this.x - 1, this.y + yOffset, this.width + 2, this.height + 4)
+                      .zOffset(2)
+                      .blit();
+
+            Icon icon = getIcon();
+            GlStateManager.pushMatrix();
+            GlStateManager.translate(this.x, this.y + yOffset, 20.0F);
+            GlStateManager.scale(0.75F, 0.75F, 1.0F);
+            icon.getBlitter().dest(0, 0).blit();
+            GlStateManager.popMatrix();
+        }
     }
 
     @Override

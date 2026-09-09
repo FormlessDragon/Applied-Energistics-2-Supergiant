@@ -31,6 +31,7 @@ import ae2.api.storage.MEStorageChangeListener;
 import ae2.api.storage.MEStorageMonitor;
 import ae2.core.AELog;
 import ae2.core.localization.GuiText;
+import ae2.hooks.ticking.TickHandler;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
@@ -41,6 +42,7 @@ import net.minecraft.util.text.TextComponentString;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Combines several external storages that each handle a given key-space. External monitors are only subscribed while
@@ -62,11 +64,11 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
     private KeyCounter legacyCache = KeyCounter.saturating();
     private KeyCounter legacyScratch = KeyCounter.saturating();
     private boolean cacheInitialized;
-    private boolean standaloneDirty = true;
     private boolean eventDirty = true;
     private boolean legacyDirty = true;
     private boolean hasLegacyStorage;
     private boolean sourcesBound;
+    private boolean unbindingSources;
     private boolean processingSourceCallback;
     private boolean dispatchingListeners;
     private boolean dispatchingListUpdate;
@@ -81,16 +83,47 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
         this(new Object2ObjectOpenHashMap<>());
     }
 
+    private static void discardContents(KeyCounter counter) {
+        counter.clear();
+        counter.removeEmptySubmaps();
+    }
+
     public void setStorages(Map<AEKeyType, MEStorage> storages) {
+        checkNotUnbinding();
+        Objects.requireNonNull(storages);
+        if (hasSameStorages(storages)) {
+            return;
+        }
         if (this.sourcesBound) {
             unbindSources();
         }
+        discardContents(this.cache);
+        discardContents(this.cacheScratch);
+        discardContents(this.eventCache);
+        discardContents(this.eventScratch);
+        discardContents(this.legacyCache);
+        discardContents(this.legacyScratch);
         this.storages = Objects.requireNonNull(storages);
         if (!this.listeners.isEmpty()) {
             bindSources();
         }
         invalidateLocalCaches();
         requestListUpdate();
+    }
+
+    private boolean hasSameStorages(Map<AEKeyType, MEStorage> replacement) {
+        if (this.storages.size() != replacement.size()) {
+            return false;
+        }
+        for (var entry : this.storages.entrySet()) {
+            var previous = entry.getValue();
+            var next = replacement.get(entry.getKey());
+            if (previous != next && !(previous instanceof ExternalStorageFacade facade
+                && next instanceof ExternalStorageFacade nextFacade && facade.hasSameView(nextFacade))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -163,9 +196,7 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
     @Override
     public void getAvailableStacks(KeyCounter out) {
         if (this.listeners.isEmpty()) {
-            if (!this.cacheInitialized || this.standaloneDirty) {
-                refreshStandalone();
-            }
+            refreshStandalone();
         } else {
             ensureMonitoredCache();
         }
@@ -174,6 +205,7 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
 
     @Override
     public void addListener(MEStorageChangeListener listener, Object verificationToken) {
+        checkNotUnbinding();
         for (int i = 0; i < this.listeners.size(); i++) {
             if (this.listeners.get(i).listener == listener) {
                 throw new IllegalStateException("The storage listener is already registered.");
@@ -216,7 +248,7 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
                 if (externalMonitor != null) {
                     var group = this.sourceGroups.get(externalMonitor);
                     if (group == null) {
-                        group = new SourceGroup(externalMonitor, facade.getStorageFilter(), Thread.currentThread());
+                        group = new SourceGroup(this, externalMonitor, facade.getStorageFilter(), Thread.currentThread());
                         this.sourceGroups.put(externalMonitor, group);
                     }
                     group.addFacade(facade);
@@ -233,13 +265,35 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
     }
 
     private void unbindSources() {
-        for (var group : this.sourceGroups.values()) {
-            group.monitor.removeListener(group);
-        }
-        this.sourceGroups.clear();
-        this.sourceGroupsByStorage.clear();
         this.sourcesBound = false;
-        this.hasLegacyStorage = false;
+        this.unbindingSources = true;
+        try {
+            // Revoke all callbacks before invoking external code, including monitors that refuse removal.
+            for (var group : this.sourceGroups.values()) {
+                group.owner = null;
+                group.facades.clear();
+            }
+            for (var group : this.sourceGroups.values()) {
+                try {
+                    group.monitor.removeListener(group);
+                } catch (RuntimeException exception) {
+                    AELog.error(exception, "External storage monitor " + group.monitor.getClass().getName()
+                        + " failed to remove its detached composite listener.");
+                }
+            }
+        } finally {
+            this.sourceGroups.clear();
+            this.sourceGroupsByStorage.clear();
+            this.hasLegacyStorage = false;
+            this.unbindingSources = false;
+        }
+    }
+
+    private void checkNotUnbinding() {
+        if (this.unbindingSources) {
+            AELog.error("External storage attempted to rebind a composite during listener removal.");
+            throw new IllegalStateException("Cannot rebind composite storage during listener removal");
+        }
     }
 
     private boolean isEventDriven(MEStorage storage) {
@@ -248,7 +302,6 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
 
     private void invalidateLocalCaches() {
         this.cacheInitialized = false;
-        this.standaloneDirty = true;
         this.eventDirty = true;
         this.legacyDirty = true;
     }
@@ -291,7 +344,6 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
         this.cache = this.cacheScratch;
         this.cacheScratch = previous;
         this.cacheInitialized = true;
-        this.standaloneDirty = false;
         return changed;
     }
 
@@ -364,7 +416,15 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
         boolean exact = true;
         for (var entry : replacement) {
             long oldAmount = previous.get(entry.getKey());
-            long delta = entry.getLongValue() - oldAmount;
+            long delta;
+            try {
+                delta = Math.subtractExact(entry.getLongValue(), oldAmount);
+            } catch (ArithmeticException exception) {
+                AELog.error(exception, String.format(
+                    "Legacy external storage amount changed outside signed delta range for %s.", entry.getKey()));
+                exact = false;
+                continue;
+            }
             if (delta != 0 && !applyKnownDelta(this.cache, entry.getKey(), delta)) {
                 exact = false;
             }
@@ -417,12 +477,17 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
             AELog.error("%s reported delta %d for %s with cached amount %d.", source, delta, what, current);
             return false;
         }
+        if (delta > 0 && current > Long.MAX_VALUE - delta) {
+            AELog.error("%s reported delta %d for %s with cached amount %d, which overflows the cache.",
+                source, delta, what, current);
+            return false;
+        }
         return true;
     }
 
     private void applyDelta(KeyCounter target, AEKey what, long delta) {
         long current = Math.max(0, target.get(what));
-        long updated = delta > 0 && current > Long.MAX_VALUE - delta ? Long.MAX_VALUE : current + delta;
+        long updated = current + delta;
         if (updated == 0) {
             target.remove(what);
         } else {
@@ -431,9 +496,7 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
     }
 
     private void markLegacyDirty() {
-        if (this.listeners.isEmpty()) {
-            this.standaloneDirty = true;
-        } else if (!this.legacyDirty) {
+        if (!this.listeners.isEmpty() && !this.legacyDirty) {
             this.legacyDirty = true;
             requestListUpdate();
         }
@@ -517,13 +580,17 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
         }
     }
 
-    private final class SourceGroup implements MEStorageChangeListener {
+    private static final class SourceGroup implements MEStorageChangeListener {
+        private final AtomicBoolean invalidationQueued = new AtomicBoolean();
         private final ExternalStorageMonitor monitor;
         private final StorageFilter storageFilter;
         private final Thread ownerThread;
+        private volatile CompositeStorage owner;
         private final ObjectList<ExternalStorageFacade> facades = new ObjectArrayList<>();
 
-        private SourceGroup(ExternalStorageMonitor monitor, StorageFilter storageFilter, Thread ownerThread) {
+        private SourceGroup(CompositeStorage owner, ExternalStorageMonitor monitor,
+                            StorageFilter storageFilter, Thread ownerThread) {
+            this.owner = owner;
             this.monitor = monitor;
             this.storageFilter = storageFilter;
             this.ownerThread = ownerThread;
@@ -547,45 +614,80 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
 
         @Override
         public boolean isValid(Object verificationToken) {
-            return verificationToken == this && sourcesBound && sourceGroups.get(this.monitor) == this;
+            var composite = this.owner;
+            return verificationToken == this && composite != null && composite.sourcesBound
+                && composite.sourceGroups.get(this.monitor) == this;
         }
 
         @Override
         public void onStackChange(AEKey what, long delta) {
-            if (Thread.currentThread() != this.ownerThread) {
-                AELog.error("External storage %s invoked a callback from the wrong thread.", this.monitor);
-                eventDirty = true;
-                requestListUpdate();
+            var composite = this.owner;
+            if (composite == null) {
                 return;
             }
-            if (processingSourceCallback || dispatchingListeners) {
+            if (Thread.currentThread() != this.ownerThread) {
+                queueThreadInvalidation();
+                return;
+            }
+            if (!isValid(this)) {
+                AELog.error("Detached external storage %s invoked a content callback.", this.monitor);
+                return;
+            }
+            if (this.invalidationQueued.get()) {
+                return;
+            }
+            if (composite.processingSourceCallback || composite.dispatchingListeners) {
                 AELog.error("Reentrant external storage callback from %s; scheduling a list update.", this.monitor);
-                eventDirty = true;
-                requestListUpdate();
+                composite.eventDirty = true;
+                composite.requestListUpdate();
                 return;
             }
             if (!accepts(what)) {
                 AELog.error("External storage %s reported an incompatible resource %s.", this.monitor, what);
-                eventDirty = true;
-                requestListUpdate();
+                composite.eventDirty = true;
+                composite.requestListUpdate();
                 return;
             }
-            processingSourceCallback = true;
+            composite.processingSourceCallback = true;
             try {
-                applyEventDelta(what, delta, this.monitor);
+                composite.applyEventDelta(what, delta, this.monitor);
             } finally {
-                processingSourceCallback = false;
-                flushPendingListUpdate();
+                composite.processingSourceCallback = false;
+                composite.flushPendingListUpdate();
             }
         }
 
         @Override
         public void onListUpdate() {
-            if (Thread.currentThread() != this.ownerThread) {
-                AELog.error("External storage %s invalidated its list from the wrong thread.", this.monitor);
+            var composite = this.owner;
+            if (composite == null) {
+                return;
             }
-            eventDirty = true;
-            requestListUpdate();
+            if (Thread.currentThread() != this.ownerThread) {
+                queueThreadInvalidation();
+                return;
+            }
+            if (!isValid(this)) {
+                AELog.error("Detached external storage %s invalidated its list.", this.monitor);
+                return;
+            }
+            composite.eventDirty = true;
+            composite.requestListUpdate();
+        }
+
+        private void queueThreadInvalidation() {
+            if (this.invalidationQueued.compareAndSet(false, true)) {
+                AELog.error("External storage %s invoked a callback from the wrong thread; queuing a server-thread invalidation.",
+                    this.monitor);
+                TickHandler.instance().addCallable(null, () -> {
+                    this.invalidationQueued.set(false);
+                    var composite = this.owner;
+                    if (composite != null && isValid(this)) {
+                        composite.eventDirty = true;
+                        composite.requestListUpdate();
+                    }
+                });
+            }
         }
     }
 

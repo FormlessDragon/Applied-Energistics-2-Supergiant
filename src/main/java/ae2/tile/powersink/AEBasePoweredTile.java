@@ -109,6 +109,11 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
         return amt - stored.insert(amt, mode == Actionable.MODULATE);
     }
 
+    @Override
+    public double getReceivableAEPower(double maximum) {
+        return maximum < StoredEnergyAmount.MIN_AMOUNT ? 0 : Math.clamp(this.stored.remainingCapacity(), 0, maximum);
+    }
+
     protected void emitPowerStateEvent(PowerEventType x) {
     }
 

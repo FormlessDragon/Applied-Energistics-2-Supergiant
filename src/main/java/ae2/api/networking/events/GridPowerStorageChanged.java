@@ -32,7 +32,7 @@ import java.util.Objects;
 /**
  * Informs an {@link IGrid} that a registered {@link IAEPowerStorage} changed after it was added to the grid.
  * <p>
- * Value changes are refreshed incrementally through the storage's allocation-free snapshot. Routing changes discard
+ * Value changes mark only the changed source for a lazy read and update of the shared totals. Routing changes discard
  * the storage-routing cache so maximum capacity, public visibility, access restrictions and priority are evaluated
  * lazily on the next energy operation. Adding or removing a grid node already supplies the corresponding structural
  * notification and does not require this event.
@@ -47,7 +47,7 @@ public final class GridPowerStorageChanged extends GridEvent {
      * Creates a storage change event.
      *
      * @param storage storage that is already registered with the grid receiving the event
-     * @param type    whether only snapshot values or storage routing changed
+     * @param type    whether only energy amounts or storage routing changed
      */
     public GridPowerStorageChanged(IAEPowerStorage storage, ChangeType type) {
         this.storage = Objects.requireNonNull(storage, "storage");
@@ -60,8 +60,11 @@ public final class GridPowerStorageChanged extends GridEvent {
     public enum ChangeType {
         /**
          * Current power, extractable power or receivable power changed without changing maximum capacity, public
-         * visibility, access restrictions or priority. The energy service refreshes only this storage's aggregate
-         * contribution.
+         * visibility, access restrictions or priority. The energy service lazily reads only this source and replaces
+         * its primitive contributions to the shared totals. Repeated events before a read are coalesced. An event
+         * also permits retrying a source previously isolated for invalid values. Events emitted by the storage
+         * currently being operated on are accounted for by that operation instead. Callbacks must run synchronously
+         * on the server thread.
          */
         VALUES_CHANGED,
 

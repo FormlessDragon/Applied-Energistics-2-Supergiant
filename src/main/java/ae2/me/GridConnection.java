@@ -21,17 +21,161 @@ package ae2.me;
 import ae2.api.networking.GridFlags;
 import ae2.api.networking.IGridConnection;
 import ae2.api.networking.IGridNode;
-import ae2.api.networking.IGridNodeListener;
 import ae2.api.networking.pathing.ChannelMode;
+import ae2.core.AELog;
 import ae2.me.pathfinding.IPathItem;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.util.EnumFacing;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
+import java.util.RandomAccess;
 
 public class GridConnection implements IGridConnection, IPathItem {
+    private static long topologyRevision;
+
+    static void topologyChanged() {
+        topologyRevision++;
+    }
+
+    /**
+     * Implements GridHelper's synchronous batch disconnect without repeated pivot searches.
+     */
+    public static void destroyConnections(Collection<? extends IGridConnection> connections) {
+        Objects.requireNonNull(connections, "connections");
+        if (connections.isEmpty()) {
+            return;
+        }
+        var unique = new ReferenceOpenHashSet<GridConnection>();
+        var detached = new ObjectArrayList<GridConnection>();
+        if (connections instanceof List<? extends IGridConnection> list && list instanceof RandomAccess) {
+            for (int i = 0; i < list.size(); i++) {
+                collectAttached(list.get(i), unique, detached);
+            }
+        } else {
+            for (var connection : connections) {
+                collectAttached(connection, unique, detached);
+            }
+        }
+        if (detached.isEmpty()) {
+            return;
+        }
+        var seeds = new ObjectArrayList<GridNode>();
+        var grids = new ReferenceOpenHashSet<Grid>();
+        for (int i = 0; i < detached.size(); i++) {
+            var connection = detached.get(i);
+            seeds.add(connection.sideA);
+            seeds.add(connection.sideB);
+            grids.add(connection.sideA.getInternalGrid());
+            grids.add(connection.sideB.getInternalGrid());
+        }
+        for (int i = 0; i < detached.size(); i++) {
+            var connection = detached.get(i);
+            connection.sideA.detachConnection(connection);
+            connection.sideB.detachConnection(connection);
+        }
+        for (var grid : grids) {
+            grid.getPathingService().repath();
+        }
+        long detachedRevision = topologyRevision;
+        for (int i = 0; i < detached.size(); i++) {
+            var connection = detached.get(i);
+            connection.notifyDetached();
+        }
+        // Pure removal leaves each component in its old grid. It is enough to prove connectivity to that grid's
+        // pivot or an already resolved region. Interrupted migrations need a complete classification instead.
+        boolean canStopAtRetainedGrid = topologyRevision == detachedRevision;
+        var resolved = new ReferenceOpenHashSet<GridNode>();
+        var visited = new ReferenceOpenHashSet<GridNode>();
+        var component = new ObjectArrayList<GridNode>();
+        for (int seedIndex = 0; seedIndex < seeds.size(); seedIndex++) {
+            var seed = seeds.get(seedIndex);
+            if (!seed.isReady() || seed.getMyGrid() == null || resolved.contains(seed)) {
+                continue;
+            }
+            var originalGrid = seed.getMyGrid();
+            visited.clear();
+            visited.add(seed);
+            component.clear();
+            component.add(seed);
+            Grid retained = null;
+            search:
+            for (int i = 0; i < component.size(); i++) {
+                var node = component.get(i);
+                var nodeGrid = node.getMyGrid();
+                if (canStopAtRetainedGrid && nodeGrid == originalGrid
+                    && (node == originalGrid.getPivot() || resolved.contains(node))) {
+                    retained = originalGrid;
+                    break;
+                }
+                if (nodeGrid != null && nodeGrid.getPivot() == node
+                    && (retained == null || isGridABetterThanGridB(nodeGrid, retained))) {
+                    retained = nodeGrid;
+                }
+                for (var neighbor : node.connections.keySet()) {
+                    if (!neighbor.isReady()) {
+                        continue;
+                    }
+                    if (canStopAtRetainedGrid && neighbor.getMyGrid() == originalGrid
+                        && (neighbor == originalGrid.getPivot() || resolved.contains(neighbor))) {
+                        retained = originalGrid;
+                        break search;
+                    }
+                    if (visited.add(neighbor)) {
+                        component.add(neighbor);
+                    }
+                }
+            }
+            long revision = topologyRevision;
+            if (retained == null) {
+                revision++;
+                retained = Grid.create(seed);
+            }
+            for (int i = 0; i < component.size() && topologyRevision == revision; i++) {
+                var node = component.get(i);
+                if (node.isReady() && node.getMyGrid() != retained) {
+                    revision++;
+                    node.setGrid(retained);
+                }
+            }
+            if (topologyRevision != revision) {
+                // A lifecycle callback changed connections. Previously classified components are no longer valid.
+                var knownSeeds = new ReferenceOpenHashSet<>(seeds);
+                for (int i = 0; i < component.size(); i++) {
+                    var node = component.get(i);
+                    if (knownSeeds.add(node)) {
+                        seeds.add(node);
+                    }
+                }
+                resolved.clear();
+                canStopAtRetainedGrid = false;
+                seedIndex = -1;
+            } else {
+                resolved.addAll(component);
+            }
+        }
+    }
+
+    private static void collectAttached(IGridConnection candidate, ReferenceOpenHashSet<GridConnection> unique,
+                                        ObjectArrayList<GridConnection> detached) {
+        if (!(candidate instanceof GridConnection connection)) {
+            AELog.error("Batch disconnect received a foreign or null connection: %s", candidate);
+            throw new IllegalArgumentException("Batch disconnect requires AE grid connections");
+        }
+        boolean attachedA = connection.sideA.connections.get(connection.sideB) == connection;
+        boolean attachedB = connection.sideB.connections.get(connection.sideA) == connection;
+        if (attachedA != attachedB) {
+            AELog.error("Grid connection is attached to only one endpoint: %s", connection);
+            throw new IllegalStateException("Grid connection is attached to only one endpoint");
+        }
+        if (attachedA && unique.add(connection)) {
+            detached.add(connection);
+        }
+    }
 
     /**
      * Will be modified during pathing and should not be exposed outside of that purpose.
@@ -166,15 +310,32 @@ public class GridConnection implements IGridConnection, IPathItem {
 
     @Override
     public void destroy() {
-        // a connection was destroyed RE-PATH!! (this is not done immediately)
-        var p = this.sideA.getInternalGrid().getPathingService();
-        p.repath();
-
-        this.sideA.removeConnection(this);
-        this.sideB.removeConnection(this);
-
+        boolean attachedA = this.sideA.connections.get(this.sideB) == this;
+        boolean attachedB = this.sideB.connections.get(this.sideA) == this;
+        Preconditions.checkState(attachedA == attachedB, "Grid connection is attached to only one endpoint");
+        if (!attachedA) {
+            return;
+        }
+        this.sideA.getInternalGrid().getPathingService().repath();
+        this.sideA.detachConnection(this);
+        this.sideB.detachConnection(this);
+        notifyDetached();
+        // Single-edge removal retains the existing early-exit pivot search.
         this.sideA.validateGrid();
         this.sideB.validateGrid();
+    }
+
+    private void notifyDetached() {
+        notifyDetached(this.sideA);
+        notifyDetached(this.sideB);
+    }
+
+    private void notifyDetached(GridNode node) {
+        try {
+            node.notifyConnectionRemoved(this);
+        } catch (RuntimeException exception) {
+            AELog.error(exception, "Grid connection removal callback failed for " + node);
+        }
     }
 
     @Override
@@ -225,7 +386,7 @@ public class GridConnection implements IGridConnection, IPathItem {
 
     @Override
     public int getMaxChannels() {
-        var mode = sideB.grid().getPathingService().getChannelMode();
+        var mode = sideB.grid().getPathingService().channelMode();
         if (mode == ChannelMode.INFINITE) {
             return Integer.MAX_VALUE;
         }
@@ -233,8 +394,17 @@ public class GridConnection implements IGridConnection, IPathItem {
     }
 
     @Override
-    public Iterable<IPathItem> getPossibleOptions() {
-        return ImmutableList.of(this.a(), this.b());
+    public int getPossibleOptionCount() {
+        return 2;
+    }
+
+    @Override
+    public IPathItem getPossibleOption(int index) {
+        return switch (index) {
+            case 0 -> this.sideA;
+            case 1 -> this.sideB;
+            default -> throw new IndexOutOfBoundsException(index);
+        };
     }
 
     @Override
@@ -248,22 +418,17 @@ public class GridConnection implements IGridConnection, IPathItem {
         } else {
             this.usedChannels = 0;
         }
+        this.sideA.incrementChannelCount(this.usedChannels);
         return this.usedChannels;
     }
 
     @Override
-    public void finalizeChannels() {
+    public boolean finalizeChannels() {
         if (this.lastUsedChannels != this.usedChannels) {
             this.lastUsedChannels = this.usedChannels;
-
-            if (this.sideA.getInternalGrid() != null) {
-                this.sideA.notifyStatusChange(IGridNodeListener.State.CHANNEL);
-            }
-
-            if (this.sideB.getInternalGrid() != null) {
-                this.sideB.notifyStatusChange(IGridNodeListener.State.CHANNEL);
-            }
+            return true;
         }
+        return false;
     }
 
     Object getVisitorIterationNumber() {

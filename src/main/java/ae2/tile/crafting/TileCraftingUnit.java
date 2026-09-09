@@ -142,7 +142,12 @@ public class TileCraftingUnit extends AENetworkedTile
         super.onReady();
         this.getMainNode().setVisualRepresentation(this.getItemFromTile());
         if (this.world != null && !this.world.isRemote) {
-            this.calc.calculateMultiblock(this.world, this.pos);
+            // Another member's initialization may already have built and validated this entire cluster.
+            if (this.cluster == null || this.cluster.isDestroyed()) {
+                this.calc.calculateMultiblock(this.world, this.pos);
+            } else {
+                this.updateSubType(true);
+            }
             this.recalculateDisplay();
         }
     }

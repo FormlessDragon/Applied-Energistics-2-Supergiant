@@ -16,6 +16,7 @@ public class StackWatcher<T> implements IStackWatcher {
     private final T myHost;
     private final ObjectSet<AEKey> myInterests = new ObjectOpenHashSet<>();
     private boolean destroyed = false;
+    private boolean watchingAll;
 
     public StackWatcher(InterestManager<StackWatcher<T>> interestManager, T host) {
         this.interestManager = interestManager;
@@ -26,9 +27,17 @@ public class StackWatcher<T> implements IStackWatcher {
         return this.myHost;
     }
 
+    /**
+     * Checks whether the live registration still accepts this key before synchronous delivery.
+     */
+    public boolean isWatching(AEKey what) {
+        return !this.destroyed && (this.watchingAll || this.myInterests.contains(what));
+    }
+
     @Override
     public void setWatchAll(boolean watchAll) {
         if (!destroyed) {
+            this.watchingAll = watchAll;
             interestManager.setWatchAll(watchAll, this);
         }
     }

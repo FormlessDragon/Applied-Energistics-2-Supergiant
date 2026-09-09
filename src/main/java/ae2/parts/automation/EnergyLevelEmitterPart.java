@@ -104,11 +104,12 @@ public class EnergyLevelEmitterPart extends AbstractLevelEmitterPart {
             this.energyWatcher.add(getReportingValue());
         }
 
-        getMainNode().ifPresent(grid -> {
-            // update to power...
-            this.lastReportedValue = (long) grid.getEnergyService().getStoredPower();
-            this.updateState();
-        });
+        if (!isClientSide() && getLevel() != null) {
+            getMainNode().ifPresent(grid -> {
+                this.lastReportedValue = (long) grid.getEnergyService().getStoredPower();
+                this.updateState();
+            });
+        }
     }
 
     @Override

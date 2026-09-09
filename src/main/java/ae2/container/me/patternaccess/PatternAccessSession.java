@@ -6,6 +6,7 @@ import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.InternalInventory;
+import ae2.api.inventories.VersionedInternalInventory;
 import ae2.api.networking.IGrid;
 import ae2.api.stacks.AEItemKey;
 import ae2.container.AEBaseContainer;
@@ -46,6 +47,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -107,39 +109,18 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
             : grid.getService(ActivePatternProviderDirectory.class).getActiveProviders());
     }
 
-    public void updateProviderVisibility(@Nullable List<PatternContainer> discovery) {
-        IGrid grid = this.gridSupplier.get();
-        ShowPatternProviders shownProviders = getShownProviders();
-        if (grid == null || discovery == null) {
-            updateDisconnectedDirectory(shownProviders);
-            return;
-        }
+    static boolean isVisibleInPatternAccess(PatternContainer container, ShowPatternProviders shownProviders,
+                                            boolean pinned, ActivePatternProviderDirectory directory) {
+        Objects.requireNonNull(container, "container");
+        Objects.requireNonNull(shownProviders, "shownProviders");
 
-        boolean rebuildTrackers = !this.providerDirectoryInitialized
-            || grid != this.observedGrid
-            || shownProviders != this.observedShownProviders
-            || hasTrackerInventorySizeChanged();
-        boolean scheduledScan = --this.ticksUntilProviderDirectoryScan <= 0;
-        if (!rebuildTrackers && !scheduledScan) {
-            if (sendIncrementalUpdate()) {
-                return;
-            }
-            rebuildTrackers = true;
-        }
-
-        List<ProviderDirectoryEntry> providers = collectPatternAccessProviders(discovery, shownProviders);
-        List<ProviderStamp> signature = createProviderSignature(providers);
-        boolean directoryChanged = rebuildTrackers
-            || !this.providerDirectorySignature.equals(signature);
-        rememberProviderDirectory(grid, shownProviders, signature);
-        if (directoryChanged) {
-            sendFullUpdate(grid, providers);
-            return;
-        }
-
-        if (!sendIncrementalUpdate()) {
-            sendFullUpdate(grid, providers);
-        }
+        boolean visible = container.isVisibleInTerminal();
+        return switch (shownProviders) {
+            case VISIBLE -> visible;
+            case HIDDEN -> !visible;
+            case NOT_FULL -> visible && (pinned || directory.getEmptySlots(container) > 0);
+            case ALL -> true;
+        };
     }
 
     private void updateDisconnectedDirectory(ShowPatternProviders shownProviders) {
@@ -340,6 +321,64 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         return true;
     }
 
+    private static List<ProviderStamp> createProviderSignature(List<ProviderDirectoryEntry> providers) {
+        List<ProviderStamp> signature = new ObjectArrayList<>(providers.size());
+        for (int i = 0; i < providers.size(); i++) {
+            signature.add(new ProviderStamp(providers.get(i)));
+        }
+        return List.copyOf(signature);
+    }
+
+    private boolean sendIncrementalUpdate() {
+        for (ContainerTracker inv : this.diList.values()) {
+            PatternAccessTerminalPacket packet = inv.createUpdatePacket();
+            if (packet != null && !sendPatternAccessPacket(packet)) {
+                return false;
+            }
+            if (packet != null) {
+                inv.synchronizeClientSnapshot();
+            }
+        }
+        return true;
+    }
+
+    public void updateProviderVisibility(@Nullable List<PatternContainer> discovery) {
+        IGrid grid = this.gridSupplier.get();
+        ShowPatternProviders shownProviders = getShownProviders();
+        if (grid == null || discovery == null) {
+            updateDisconnectedDirectory(shownProviders);
+            return;
+        }
+
+        boolean rebuildTrackers = !this.providerDirectoryInitialized
+            || grid != this.observedGrid
+            || shownProviders != this.observedShownProviders
+            || hasTrackerInventorySizeChanged();
+        boolean scheduledScan = --this.ticksUntilProviderDirectoryScan <= 0;
+        if (!rebuildTrackers && !scheduledScan) {
+            if (sendIncrementalUpdate()) {
+                return;
+            }
+            rebuildTrackers = true;
+        }
+
+        List<ProviderDirectoryEntry> providers = collectPatternAccessProviders(discovery, shownProviders,
+            grid.getService(ActivePatternProviderDirectory.class));
+        List<ProviderStamp> signature = createProviderSignature(providers);
+        boolean directoryChanged = rebuildTrackers
+            || !this.providerDirectorySignature.equals(signature);
+        boolean resetClient = !this.providerDirectoryInitialized || grid != this.observedGrid;
+        rememberProviderDirectory(grid, shownProviders, signature);
+        if (directoryChanged) {
+            synchronizeDirectory(grid, providers, resetClient);
+            return;
+        }
+
+        if (!sendIncrementalUpdate()) {
+            sendFullUpdate(grid, providers);
+        }
+    }
+
     public void quickMovePattern(@Nullable EntityPlayerMP player, Slot sourceSlot, LongList allowedPatternContainerIds,
                                  LongList allowedPatternSlots) {
         if (!this.sourceSlotAllowed.test(sourceSlot)) {
@@ -383,25 +422,13 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         }
 
         ReferenceSet<ContainerTracker> usedContainers = new ReferenceOpenHashSet<>();
-        for (QuickMoveTarget target : targets) {
+        for (int i = 0; i < targets.size(); i++) {
+            QuickMoveTarget target = targets.get(i);
             if (movePatternToTarget(player, sourceSlot, sourcePattern, usedContainers, target.container(),
                 target.slot())) {
                 return;
             }
         }
-    }
-
-    private boolean sendIncrementalUpdate() {
-        for (ContainerTracker inv : this.diList.values()) {
-            PatternAccessTerminalPacket packet = inv.createUpdatePacket();
-            if (packet != null && !sendPatternAccessPacket(packet)) {
-                return false;
-            }
-            if (packet != null) {
-                inv.synchronizeClientSnapshot();
-            }
-        }
-        return true;
     }
 
     void sendFullUpdate(@Nullable IGrid grid) {
@@ -418,20 +445,38 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
             return;
         }
 
+        var directory = grid.getService(ActivePatternProviderDirectory.class);
         List<ProviderDirectoryEntry> providers = collectPatternAccessProviders(
-            grid.getService(ActivePatternProviderDirectory.class).getActiveProviders(), shownProviders);
+            directory.getActiveProviders(), shownProviders, directory);
         List<ProviderStamp> signature = createProviderSignature(providers);
         rememberProviderDirectory(grid, shownProviders, signature);
         sendFullUpdate(grid, providers);
     }
 
-    private void sendFullUpdate(@Nullable IGrid grid, List<ProviderDirectoryEntry> providers) {
-        Objects.requireNonNull(providers, "providers");
-        Reference2LongOpenHashMap<PatternContainer> previousIds = new Reference2LongOpenHashMap<>();
+    private boolean hasTrackerInventorySizeChanged() {
         for (ContainerTracker tracker : this.diList.values()) {
-            previousIds.put(tracker.container, tracker.serverId);
+            if (tracker.hasInventorySizeChanged()) {
+                return true;
+            }
         }
+        return false;
+    }
 
+    private void sendFullUpdate(@Nullable IGrid grid, List<ProviderDirectoryEntry> providers) {
+        synchronizeDirectory(grid, providers, true);
+    }
+
+    private void scheduleProviderDirectoryRebuild() {
+        this.providerDirectoryInitialized = false;
+        this.ticksUntilProviderDirectoryScan = 0;
+    }
+
+    private static boolean isAcceptedByContainer(PatternContainer container, @Nullable IPatternDetails details) {
+        return details != null && (details instanceof IAssemblerPattern) == container.isAssemblerPatternContainer();
+    }
+
+    private void synchronizeDirectory(@Nullable IGrid grid, List<ProviderDirectoryEntry> providers, boolean reset) {
+        Objects.requireNonNull(providers, "providers");
         if (grid == null) {
             this.byId.clear();
             this.diList.clear();
@@ -444,20 +489,25 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         Long2ObjectOpenHashMap<ContainerTracker> nextTrackersById = new Long2ObjectOpenHashMap<>();
         List<ContainerTracker> trackers = new ObjectArrayList<>(providers.size());
         List<ClientboundPacket> packets = new ObjectArrayList<>();
-        for (ProviderDirectoryEntry provider : providers) {
-            long serverId = previousIds.containsKey(provider.container())
-                ? previousIds.getLong(provider.container())
-                : inventorySerial++;
-            ContainerTracker tracker = new ContainerTracker(provider, this.worldSupplier.get(), this.patternDecoder, serverId);
+        for (int i = 0; i < providers.size(); i++) {
+            var provider = providers.get(i);
+            var previous = this.diList.get(provider.container());
+            long serverId = previous != null ? previous.serverId : inventorySerial++;
+            var tracker = reset ? null : this.diList.get(provider.container());
+            if (tracker == null || !tracker.matches(provider)) {
+                tracker = new ContainerTracker(provider, this.worldSupplier.get(), this.patternDecoder, serverId);
+                trackers.add(tracker);
+            }
             nextTrackers.put(provider.container(), tracker);
             nextTrackersById.put(serverId, tracker);
-            trackers.add(tracker);
         }
 
-        for (ContainerTracker tracker : trackers) {
+        for (int i = 0; i < trackers.size(); i++) {
+            var tracker = trackers.get(i);
             List<ClientboundPacket> updatePackets = PatternAccessTerminalPacket.createPackets(
                 tracker.createFullPacket(), this.ownerContainer.windowId);
             if (updatePackets == null) {
+                this.packetSender.accept(new ClearPatternAccessTerminalPacket());
                 scheduleProviderDirectoryRebuild();
                 return;
             }
@@ -468,95 +518,41 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
             }
         }
 
+        if (reset) {
+            this.packetSender.accept(new ClearPatternAccessTerminalPacket());
+        } else {
+            for (var previous : this.diList.values()) {
+                if (!nextTrackers.containsKey(previous.container)) {
+                    this.packetSender.accept(new ClearPatternAccessTerminalPacket(previous.serverId));
+                }
+            }
+        }
         this.byId.clear();
         this.byId.putAll(nextTrackersById);
         this.diList.clear();
         this.diList.putAll(nextTrackers);
-        this.packetSender.accept(new ClearPatternAccessTerminalPacket());
-        for (ClientboundPacket packet : packets) {
-            this.packetSender.accept(packet);
+        for (int i = 0; i < packets.size(); i++) {
+            this.packetSender.accept(packets.get(i));
         }
-        for (ContainerTracker tracker : trackers) {
-            tracker.synchronizeClientSnapshot();
+        for (int i = 0; i < trackers.size(); i++) {
+            trackers.get(i).synchronizeClientSnapshot();
         }
-    }
-
-    private boolean hasTrackerInventorySizeChanged() {
-        for (ContainerTracker tracker : this.diList.values()) {
-            if (tracker.hasInventorySizeChanged()) {
-                return true;
-            }
+        if (!reset && !sendIncrementalUpdate()) {
+            scheduleProviderDirectoryRebuild();
         }
-        return false;
     }
 
     private boolean sendPatternAccessPacket(PatternAccessTerminalPacket packet) {
         List<ClientboundPacket> packets = PatternAccessTerminalPacket.createPackets(packet, this.ownerContainer.windowId);
         if (packets == null) {
+            this.packetSender.accept(new ClearPatternAccessTerminalPacket());
             scheduleProviderDirectoryRebuild();
             return false;
         }
-        for (ClientboundPacket wirePacket : packets) {
-            this.packetSender.accept(wirePacket);
+        for (int i = 0; i < packets.size(); i++) {
+            this.packetSender.accept(packets.get(i));
         }
         return true;
-    }
-
-    private void scheduleProviderDirectoryRebuild() {
-        this.providerDirectoryInitialized = false;
-        this.ticksUntilProviderDirectoryScan = 0;
-    }
-
-    private static boolean isAcceptedByContainer(PatternContainer container, @Nullable IPatternDetails details) {
-        return details != null && (details instanceof IAssemblerPattern) == container.isAssemblerPatternContainer();
-    }
-
-    private List<ProviderDirectoryEntry> collectPatternAccessProviders(List<PatternContainer> discoveredProviders,
-                                                                       ShowPatternProviders shownProviders) {
-        Objects.requireNonNull(discoveredProviders, "discoveredProviders");
-        Objects.requireNonNull(shownProviders, "shownProviders");
-
-        if (shownProviders != ShowPatternProviders.NOT_FULL) {
-            this.pinnedHosts.clear();
-        }
-
-        List<ProviderDirectoryEntry> providers = new ObjectArrayList<>();
-        ReferenceSet<PatternContainer> activeProviders = new ReferenceOpenHashSet<>();
-        for (PatternContainer container : discoveredProviders) {
-            activeProviders.add(container);
-            long identityOrdinal = getOrCreateProviderIdentityOrdinal(container);
-            ProviderDirectoryEntry provider = ProviderDirectoryEntry.of(container, identityOrdinal);
-            if (!isVisibleInPatternAccess(provider, shownProviders, this.pinnedHosts)) {
-                continue;
-            }
-
-            providers.add(provider);
-            if (shownProviders == ShowPatternProviders.NOT_FULL) {
-                this.pinnedHosts.add(container);
-            }
-        }
-
-        this.pinnedHosts.removeIf(container -> !activeProviders.contains(container));
-        this.providerIdentityOrdinals.keySet().removeIf(container -> !activeProviders.contains(container));
-        providers.sort(PatternAccessSession::compareProviderEntries);
-        return List.copyOf(providers);
-    }
-
-    private static boolean isVisibleInPatternAccess(ProviderDirectoryEntry provider,
-                                                    ShowPatternProviders shownProviders,
-                                                    ReferenceSet<PatternContainer> pinnedProviders) {
-        Objects.requireNonNull(provider, "provider");
-        Objects.requireNonNull(shownProviders, "shownProviders");
-        Objects.requireNonNull(pinnedProviders, "pinnedProviders");
-
-        boolean visible = provider.visibleInTerminal();
-        return switch (shownProviders) {
-            case VISIBLE -> visible;
-            case HIDDEN -> !visible;
-            case NOT_FULL -> visible
-                && (pinnedProviders.contains(provider.container()) || provider.emptySlots() > 0);
-            case ALL -> true;
-        };
     }
 
     private long getOrCreateProviderIdentityOrdinal(PatternContainer container) {
@@ -600,23 +596,36 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         return comparison != 0 ? comparison : Integer.compare(left.side(), right.side());
     }
 
-    private static List<ProviderStamp> createProviderSignature(List<ProviderDirectoryEntry> providers) {
-        List<ProviderStamp> signature = new ObjectArrayList<>(providers.size());
-        for (ProviderDirectoryEntry provider : providers) {
-            signature.add(new ProviderStamp(provider));
-        }
-        return List.copyOf(signature);
-    }
+    private List<ProviderDirectoryEntry> collectPatternAccessProviders(List<PatternContainer> discoveredProviders,
+                                                                       ShowPatternProviders shownProviders,
+                                                                       ActivePatternProviderDirectory directory) {
+        Objects.requireNonNull(discoveredProviders, "discoveredProviders");
+        Objects.requireNonNull(shownProviders, "shownProviders");
 
-    private static int countEmptySlots(InternalInventory inventory) {
-        Objects.requireNonNull(inventory, "inventory");
-        int emptySlots = 0;
-        for (int slot = 0; slot < inventory.size(); slot++) {
-            if (inventory.getStackInSlot(slot).isEmpty()) {
-                emptySlots++;
+        if (shownProviders != ShowPatternProviders.NOT_FULL) {
+            this.pinnedHosts.clear();
+        }
+
+        List<ProviderDirectoryEntry> providers = new ObjectArrayList<>();
+        ReferenceSet<PatternContainer> activeProviders = new ReferenceOpenHashSet<>();
+        for (int i = 0; i < discoveredProviders.size(); i++) {
+            PatternContainer container = discoveredProviders.get(i);
+            activeProviders.add(container);
+            long identityOrdinal = getOrCreateProviderIdentityOrdinal(container);
+            if (!isVisibleInPatternAccess(container, shownProviders, this.pinnedHosts.contains(container), directory)) {
+                continue;
+            }
+
+            providers.add(ProviderDirectoryEntry.of(container, identityOrdinal));
+            if (shownProviders == ShowPatternProviders.NOT_FULL) {
+                this.pinnedHosts.add(container);
             }
         }
-        return emptySlots;
+
+        this.pinnedHosts.removeIf(container -> !activeProviders.contains(container));
+        this.providerIdentityOrdinals.keySet().removeIf(container -> !activeProviders.contains(container));
+        providers.sort(PatternAccessSession::compareProviderEntries);
+        return List.copyOf(providers);
     }
 
     @Nullable
@@ -687,23 +696,12 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         ContainerTracker tracker = this.byId.get(inventoryId);
         if (tracker == null
             || !actionContext.activeProviders().contains(tracker.container)
-            || !isVisibleInCurrentPatternAccess(tracker.container, actionContext.shownProviders())) {
+            || !isVisibleInPatternAccess(tracker.container, actionContext.shownProviders(),
+            this.pinnedHosts.contains(tracker.container),
+            actionContext.grid().getService(ActivePatternProviderDirectory.class))) {
             return null;
         }
         return tracker;
-    }
-
-    private boolean isVisibleInCurrentPatternAccess(PatternContainer container,
-                                                    ShowPatternProviders shownProviders) {
-        Objects.requireNonNull(container, "container");
-        boolean visible = container.isVisibleInTerminal();
-        return switch (shownProviders) {
-            case VISIBLE -> visible;
-            case HIDDEN -> !visible;
-            case NOT_FULL -> visible && (this.pinnedHosts.contains(container)
-                || countEmptySlots(container.getTerminalPatternInventory()) > 0);
-            case ALL -> true;
-        };
     }
 
     private void quickMoveAssemblerPattern(ProviderActionContext actionContext,
@@ -787,20 +785,17 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
     private record ProviderLocation(int dimensionId, long pos, int side) {
     }
 
-    private record ProviderDirectoryEntry(PatternContainer container, long identityOrdinal, long sortBy,
-                                          PatternContainerGroup group, int inventorySize, int emptySlots,
-                                          boolean visibleInTerminal,
-                                          boolean canEditTerminalName, boolean canModifyTerminalVisibility,
-                                          @Nullable ProviderReference reference, boolean hasLocation,
-                                          int locationDimension, long locationPos, int locationSide) {
-        private ProviderDirectoryEntry {
+    record ProviderDirectoryEntry(PatternContainer container, long identityOrdinal, long sortBy,
+                                  PatternContainerGroup group, int inventorySize,
+                                  boolean visibleInTerminal,
+                                  boolean canEditTerminalName, boolean canModifyTerminalVisibility,
+                                  @Nullable ProviderReference reference, boolean hasLocation,
+                                  int locationDimension, long locationPos, int locationSide) {
+        ProviderDirectoryEntry {
             Objects.requireNonNull(container, "container");
             Objects.requireNonNull(group, "group");
             if (inventorySize < 0) {
                 throw new IllegalArgumentException("inventorySize must not be negative");
-            }
-            if (emptySlots < 0 || emptySlots > inventorySize) {
-                throw new IllegalArgumentException("emptySlots must be between zero and inventorySize");
             }
         }
 
@@ -813,7 +808,7 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
                 : new ProviderReference(location.dimensionId(), location.pos(), location.side());
             InternalInventory inventory = container.getTerminalPatternInventory();
             return new ProviderDirectoryEntry(container, identityOrdinal, container.getTerminalSortOrder(),
-                container.getTerminalGroup(), inventory.size(), countEmptySlots(inventory),
+                container.getTerminalGroup(), inventory.size(),
                 container.isVisibleInTerminal(), container.canEditTerminalName(),
                 container.canModifyTerminalVisibility(), reference,
                 location != null, location == null ? 0 : location.dimensionId(),
@@ -821,9 +816,7 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         }
     }
 
-    private static final class ProviderStamp {
-        private final ProviderDirectoryEntry provider;
-
+    private record ProviderStamp(ProviderDirectoryEntry provider) {
         private ProviderStamp(ProviderDirectoryEntry provider) {
             this.provider = Objects.requireNonNull(provider, "provider");
         }
@@ -833,11 +826,10 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
             if (this == other) {
                 return true;
             }
-            if (!(other instanceof ProviderStamp that)) {
+            if (!(other instanceof ProviderStamp(PatternAccessSession.ProviderDirectoryEntry right))) {
                 return false;
             }
             ProviderDirectoryEntry left = this.provider;
-            ProviderDirectoryEntry right = that.provider;
             return left.container() == right.container()
                 && left.identityOrdinal() == right.identityOrdinal()
                 && left.sortBy() == right.sortBy()
@@ -853,18 +845,17 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
                 && Objects.equals(left.reference(), right.reference());
         }
 
-        @Override
-        public int hashCode() {
-            ProviderDirectoryEntry value = this.provider;
-            return Objects.hash(System.identityHashCode(value.container()), value.identityOrdinal(), value.sortBy(),
-                value.group(), value.inventorySize(), value.visibleInTerminal(),
-                value.canEditTerminalName(), value.canModifyTerminalVisibility(),
-                value.reference(), value.hasLocation(), value.locationDimension(), value.locationPos(),
-                value.locationSide());
-        }
     }
 
-    private static final class ContainerTracker {
+    static final class ContainerTracker {
+        private final ProviderStamp stamp;
+        private final ItemStack[] decodedStacks;
+        private final boolean[] acceptedSlots;
+        private boolean contentsVersionKnown;
+        private long contentsVersion;
+        private long preparedVersion;
+        private boolean snapshotPrepared;
+        private boolean assemblerContainer;
         private final PatternContainer container;
         private final long sortBy;
         private final long serverId;
@@ -881,13 +872,17 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         private final World level;
         private final PatternDecoder patternDecoder;
 
-        private ContainerTracker(ProviderDirectoryEntry provider,
-                                 @Nullable World level, PatternDecoder patternDecoder,
-                                 long serverId) {
+        ContainerTracker(ProviderDirectoryEntry provider,
+                         @Nullable World level, PatternDecoder patternDecoder,
+                         long serverId) {
             this.container = provider.container();
+            this.stamp = new ProviderStamp(provider);
             this.serverId = serverId;
             this.server = provider.container().getTerminalPatternInventory();
             this.client = new AppEngInternalInventory(this.server.size());
+            this.decodedStacks = new ItemStack[this.server.size()];
+            this.acceptedSlots = new boolean[this.server.size()];
+            this.assemblerContainer = this.container.isAssemblerPatternContainer();
             this.group = provider.group();
             this.sortBy = provider.sortBy();
             this.canEditTerminalName = provider.canEditTerminalName();
@@ -909,10 +904,16 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
                 return true;
             }
 
-            return !ItemStack.areItemsEqual(a, b) || !ItemStack.areItemStackTagsEqual(a, b);
+            return a.getCount() != b.getCount() || !ItemStack.areItemsEqual(a, b) || !ItemStack.areItemStackTagsEqual(a, b);
+        }
+
+        private boolean matches(ProviderDirectoryEntry provider) {
+            return this.stamp.equals(new ProviderStamp(provider))
+                && this.server == provider.container().getTerminalPatternInventory();
         }
 
         private PatternAccessTerminalPacket createFullPacket() {
+            this.preparedVersion = currentContentsVersion();
             Int2ObjectArrayMap<ItemStack> slots = new Int2ObjectArrayMap<>(this.server.size());
             for (int i = 0; i < this.server.size(); i++) {
                 ItemStack stack = this.getVisibleStack(i);
@@ -921,21 +922,34 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
                 }
             }
 
+            this.snapshotPrepared = true;
             return PatternAccessTerminalPacket.fullUpdate(this.serverId, this.server.size(), this.sortBy,
                 this.canEditTerminalName, this.canModifyTerminalVisibility, this.group, slots);
         }
 
         @Nullable
-        private PatternAccessTerminalPacket createUpdatePacket() {
-            IntList changedSlots = detectChangedSlots();
-            if (changedSlots == null) {
+        PatternAccessTerminalPacket createUpdatePacket() {
+            var versioned = this.server instanceof VersionedInternalInventory inventory
+                ? inventory : null;
+            long version = versioned == null ? 0 : versioned.getContentsVersion();
+            if (versioned != null && this.contentsVersionKnown && version == this.contentsVersion
+                && !hasInventorySizeChanged()
+                && this.assemblerContainer == this.container.isAssemblerPatternContainer()) {
                 return null;
             }
+            IntList changedSlots = detectChangedSlots();
+            if (changedSlots == null) {
+                this.contentsVersion = version;
+                this.contentsVersionKnown = versioned != null;
+                return null;
+            }
+            this.preparedVersion = version;
+            this.snapshotPrepared = true;
 
             Int2ObjectArrayMap<ItemStack> slots = new Int2ObjectArrayMap<>(changedSlots.size());
             for (int i = 0; i < changedSlots.size(); i++) {
                 int slot = changedSlots.getInt(i);
-                ItemStack stack = this.getVisibleStack(slot);
+                ItemStack stack = this.acceptedSlots[slot] ? this.decodedStacks[slot] : ItemStack.EMPTY;
                 slots.put(slot, stack);
             }
 
@@ -943,14 +957,26 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         }
 
         private boolean hasInventorySizeChanged() {
-            return this.client.size() != this.server.size();
+            return this.client.size() != this.server.size()
+                || this.server != this.container.getTerminalPatternInventory();
         }
 
-        private void synchronizeClientSnapshot() {
+        void synchronizeClientSnapshot() {
+            long version = this.snapshotPrepared ? this.preparedVersion : currentContentsVersion();
             for (int i = 0; i < this.client.size(); i++) {
-                ItemStack stack = this.getVisibleStack(i);
-                this.client.setItemDirect(i, stack.isEmpty() ? ItemStack.EMPTY : stack.copy());
+                ItemStack stack = this.snapshotPrepared
+                    ? this.acceptedSlots[i] ? this.decodedStacks[i] : ItemStack.EMPTY
+                    : this.getVisibleStack(i);
+                this.client.setItemDirect(i, stack);
             }
+            this.contentsVersion = version;
+            this.contentsVersionKnown = this.server instanceof VersionedInternalInventory;
+            this.snapshotPrepared = false;
+        }
+
+        private long currentContentsVersion() {
+            return this.server instanceof VersionedInternalInventory inventory
+                ? inventory.getContentsVersion() : 0;
         }
 
         @Nullable
@@ -978,10 +1004,19 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         }
 
         private ItemStack getVisibleStack(int slot) {
+            boolean assembler = this.container.isAssemblerPatternContainer();
+            if (assembler != this.assemblerContainer) {
+                Arrays.fill(this.decodedStacks, null);
+                this.assemblerContainer = assembler;
+            }
             ItemStack stack = this.server.getStackInSlot(slot);
-            return isAcceptedByContainer(this.container, this.patternDecoder.decode(stack, this.level))
-                ? stack
-                : ItemStack.EMPTY;
+            var previous = this.decodedStacks[slot];
+            if (previous == null || isDifferent(stack, previous)) {
+                this.decodedStacks[slot] = stack.isEmpty() ? ItemStack.EMPTY : stack.copy();
+                this.acceptedSlots[slot] = !stack.isEmpty()
+                    && isAcceptedByContainer(this.container, this.patternDecoder.decode(stack, this.level));
+            }
+            return this.acceptedSlots[slot] ? this.decodedStacks[slot] : ItemStack.EMPTY;
         }
     }
 

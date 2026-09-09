@@ -67,7 +67,9 @@ public class TileWirelessAccessPoint extends AENetworkedInvTile
 
     @Override
     public void onMainNodeStateChanged(IGridNodeListener.State reason) {
-        this.markForUpdate();
+        if (getCurrentClientFlags() != this.getClientFlags()) {
+            this.markForUpdate();
+        }
     }
 
     @Override

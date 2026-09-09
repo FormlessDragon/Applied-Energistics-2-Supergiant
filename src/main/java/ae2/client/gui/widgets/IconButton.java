@@ -132,7 +132,7 @@ public abstract class IconButton extends GuiButton implements ITooltip {
                     : this.isFocused() ? Icon.TOOLBAR_BUTTON_BACKGROUND_FOCUS : Icon.TOOLBAR_BUTTON_BACKGROUND;
 
                 bgIcon.getBlitter()
-                      .dest(this.x - 1, this.y + yOffset, this.width + 2, this.height + 4)
+                      .dest(this.x - 1, this.y + yOffset, 18, 20)
                       .zOffset(2)
                       .blit();
             }

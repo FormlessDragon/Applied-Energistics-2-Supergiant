@@ -37,11 +37,12 @@ import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigurableObject;
 import ae2.client.render.overlay.IOverlayDataSource;
 import ae2.client.render.overlay.OverlayManager;
+import ae2.core.AELog;
 import ae2.core.definitions.AEBlocks;
 import ae2.me.service.StatisticsService;
 import ae2.server.services.ChunkLoadingService;
 import ae2.tile.grid.AENetworkedTile;
-import com.google.common.collect.HashMultiset;
+import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.Multiset;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
@@ -62,8 +63,6 @@ public class TileSpatialAnchor extends AENetworkedTile
     implements IGridTickable, IConfigurableObject, IOverlayDataSource {
 
     private static final int SPATIAL_TRANSFER_TEMPORARY_CHUNK_RANGE = 4;
-    private static final int MAX_SYNCED_CHUNKS = (SPATIAL_TRANSFER_TEMPORARY_CHUNK_RANGE * 2 + 1)
-        * (SPATIAL_TRANSFER_TEMPORARY_CHUNK_RANGE * 2 + 1);
 
     static {
         GridHelper.addNodeOwnerEventHandler(GridChunkAdded.class, TileSpatialAnchor.class,
@@ -74,10 +73,16 @@ public class TileSpatialAnchor extends AENetworkedTile
 
     private final IConfigManager manager;
     private final Set<ChunkPos> chunks = new ObjectOpenHashSet<>();
+    private final Set<ChunkPos> receivedChunks = new ObjectOpenHashSet<>();
+    private IGrid observedGrid;
+    private boolean observedOnline;
     private int powerlessTicks;
+    private long lastPowerCheckTick = -1;
     private boolean initialized;
+    private boolean chunksDirty = true;
     private boolean displayOverlay;
     private boolean active;
+    private int clientChunkCount;
 
     public TileSpatialAnchor() {
         this.getMainNode().setFlags(GridFlags.REQUIRE_CHANNEL).addService(IGridTickable.class, this);
@@ -109,9 +114,11 @@ public class TileSpatialAnchor extends AENetworkedTile
         data.writeBoolean(this.isActive());
         data.writeBoolean(this.displayOverlay);
         data.writeInt(this.chunks.size());
-        for (ChunkPos chunk : this.chunks) {
-            data.writeInt(chunk.x);
-            data.writeInt(chunk.z);
+        if (this.displayOverlay) {
+            for (ChunkPos chunk : this.chunks) {
+                data.writeInt(chunk.x);
+                data.writeInt(chunk.z);
+            }
         }
     }
 
@@ -124,24 +131,32 @@ public class TileSpatialAnchor extends AENetworkedTile
 
         boolean nextDisplay = data.readBoolean();
         changed = changed || nextDisplay != this.displayOverlay;
-        this.displayOverlay = nextDisplay;
-
-        this.chunks.clear();
-        if (this.world != null && this.world.isRemote) {
-            OverlayManager.getInstance().removeHandlers(this);
-        }
-
         int chunkCount = data.readInt();
-        if (chunkCount < 0 || chunkCount > MAX_SYNCED_CHUNKS || data.readableBytes() < chunkCount * Integer.BYTES * 2) {
+        // The temporary transfer radius does not limit the number of chunks in the actual network.
+        if (chunkCount < 0 || nextDisplay && chunkCount > data.readableBytes() / (Integer.BYTES * 2)) {
+            AELog.warn("Invalid spatial anchor chunk display count: %s", chunkCount);
             return changed;
         }
-        for (int i = 0; i < chunkCount; i++) {
-            this.chunks.add(new ChunkPos(data.readInt(), data.readInt()));
+        this.clientChunkCount = chunkCount;
+        this.receivedChunks.clear();
+        if (nextDisplay) {
+            for (int i = 0; i < chunkCount; i++) {
+                this.receivedChunks.add(new ChunkPos(data.readInt(), data.readInt()));
+            }
         }
-
-        if (this.displayOverlay && this.world != null && this.world.isRemote) {
-            OverlayManager.getInstance().showArea(this);
+        boolean overlayChanged = nextDisplay != this.displayOverlay || !this.chunks.equals(this.receivedChunks);
+        this.displayOverlay = nextDisplay;
+        if (overlayChanged) {
+            this.chunks.clear();
+            this.chunks.addAll(this.receivedChunks);
+            if (this.world != null && this.world.isRemote) {
+                OverlayManager.getInstance().removeHandlers(this);
+                if (this.displayOverlay) {
+                    OverlayManager.getInstance().showArea(this);
+                }
+            }
         }
+        this.receivedChunks.clear();
 
         return changed;
     }
@@ -153,19 +168,31 @@ public class TileSpatialAnchor extends AENetworkedTile
 
     public void chunkAdded(GridChunkAdded changed) {
         if (changed.getLevel() == this.getServerLevel()) {
-            this.force(changed.getChunkPos());
+            this.wakeUp();
         }
     }
 
     public void chunkRemoved(GridChunkRemoved changed) {
         if (changed.getLevel() == this.getServerLevel()) {
-            this.release(changed.getChunkPos(), true);
             this.wakeUp();
         }
     }
 
     @Override
     public void onMainNodeStateChanged(IGridNodeListener.State reason) {
+        IGrid grid = this.getMainNode().getGrid();
+        boolean online = this.getMainNode().isOnline();
+        if (this.observedGrid == grid && this.observedOnline == online) {
+            return;
+        }
+        this.observedGrid = grid;
+        this.observedOnline = online;
+        if (this.getMainNode().isOnline()) {
+            this.powerlessTicks = 0;
+            this.lastPowerCheckTick = -1;
+        } else if (this.lastPowerCheckTick < 0 && this.world != null) {
+            this.lastPowerCheckTick = this.world.getTotalWorldTime();
+        }
         if (reason != IGridNodeListener.State.GRID_BOOT) {
             this.markForUpdate();
         }
@@ -180,6 +207,16 @@ public class TileSpatialAnchor extends AENetworkedTile
         } else {
             this.releaseAll();
         }
+    }
+
+    @Override
+    public void onChunkUnloaded() {
+        if (this.world != null && this.world.isRemote) {
+            OverlayManager.getInstance().removeHandlers(this);
+        } else {
+            this.releaseAll();
+        }
+        super.onChunkUnloaded();
     }
 
     @Override
@@ -201,22 +238,24 @@ public class TileSpatialAnchor extends AENetworkedTile
             this.initialized = true;
         }
 
-        this.cleanUp();
-
-        if (this.powerlessTicks > 200) {
-            if (!this.getMainNode().isOnline()) {
-                this.releaseAll();
-            }
-            this.powerlessTicks = 0;
-            return TickRateModulation.SLEEP;
-        }
-
         if (!this.getMainNode().isOnline()) {
-            this.powerlessTicks += ticksSinceLastCall;
+            long now = this.world.getTotalWorldTime();
+            if (this.lastPowerCheckTick < 0) {
+                this.lastPowerCheckTick = now;
+            }
+            this.powerlessTicks = Math.clamp(now - this.lastPowerCheckTick, 0, 201);
+            if (this.powerlessTicks > 200) {
+                this.releaseAll();
+                return TickRateModulation.SLEEP;
+            }
             return TickRateModulation.SAME;
         }
 
-        return TickRateModulation.SLEEP;
+        this.powerlessTicks = 0;
+        this.lastPowerCheckTick = -1;
+        this.chunksDirty = false;
+        this.cleanUp();
+        return this.chunksDirty ? TickRateModulation.SAME : TickRateModulation.SLEEP;
     }
 
     @SuppressWarnings("unused")
@@ -225,7 +264,7 @@ public class TileSpatialAnchor extends AENetworkedTile
     }
 
     public int countLoadedChunks() {
-        return this.chunks.size();
+        return this.world != null && this.world.isRemote ? this.clientChunkCount : this.chunks.size();
     }
 
     public boolean isActive() {
@@ -261,12 +300,14 @@ public class TileSpatialAnchor extends AENetworkedTile
     }
 
     private void wakeUp() {
+        this.chunksDirty = true;
         this.getMainNode().ifPresent((grid, node) -> grid.getTickManager().wakeDevice(node));
     }
 
     private void onSettingChanged() {
-        if (Settings.OVERLAY_MODE == Settings.OVERLAY_MODE) {
-            this.displayOverlay = this.manager.getSetting(Settings.OVERLAY_MODE) == YesNo.YES;
+        boolean nextDisplay = this.manager.getSetting(Settings.OVERLAY_MODE) == YesNo.YES;
+        if (this.displayOverlay != nextDisplay) {
+            this.displayOverlay = nextDisplay;
             this.markForUpdate();
         }
         this.saveChanges();
@@ -276,7 +317,7 @@ public class TileSpatialAnchor extends AENetworkedTile
         if (this.isInvalid()) {
             return;
         }
-        int energy = 80 + this.chunks.size() * (this.chunks.size() + 1) / 2;
+        double energy = 80 + (double) this.chunks.size() * (this.chunks.size() + 1L) / 2;
         this.getMainNode().setIdlePowerUsage(energy);
     }
 
@@ -288,27 +329,38 @@ public class TileSpatialAnchor extends AENetworkedTile
 
         Multiset<ChunkPos> requiredChunks = grid.getService(StatisticsService.class).getChunks().get(this.getServerLevel());
         if (requiredChunks == null) {
-            requiredChunks = HashMultiset.create();
+            requiredChunks = ImmutableMultiset.of();
         }
+        this.receivedChunks.clear();
+        this.receivedChunks.addAll(requiredChunks.elementSet());
 
+        boolean removed = false;
         for (Iterator<ChunkPos> iterator = this.chunks.iterator(); iterator.hasNext(); ) {
             ChunkPos chunkPos = iterator.next();
-            if (!requiredChunks.contains(chunkPos)) {
-                this.release(chunkPos, false);
+            if (!this.receivedChunks.contains(chunkPos)) {
                 iterator.remove();
+                ChunkLoadingService.getInstance().releaseChunk(this.getServerLevel(), this.pos, chunkPos,
+                    this.chunks.isEmpty());
+                removed = true;
             }
         }
 
-        for (ChunkPos chunkPos : requiredChunks.elementSet()) {
+        if (removed) {
+            this.updatePowerConsumption();
+            this.markForClientUpdate();
+        }
+
+        for (ChunkPos chunkPos : this.receivedChunks) {
             if (!this.chunks.contains(chunkPos)) {
                 this.force(chunkPos);
             }
         }
+        this.receivedChunks.clear();
     }
 
     private void force(ChunkPos chunkPos) {
         WorldServer level = this.getServerLevel();
-        if (level == null || this.isInvalid()) {
+        if (level == null || this.isInvalid() || this.chunks.contains(chunkPos)) {
             return;
         }
 
@@ -319,25 +371,16 @@ public class TileSpatialAnchor extends AENetworkedTile
         }
     }
 
-    private void release(ChunkPos chunkPos, boolean remove) {
-        WorldServer level = this.getServerLevel();
-        if (level == null) {
-            return;
+    public void releaseAll() {
+        if (this.getServerLevel() != null) {
+            ChunkLoadingService.getInstance().releaseOwner(this.getServerLevel(), this.pos);
         }
-
-        boolean released = ChunkLoadingService.getInstance().releaseChunk(level, this.pos, chunkPos);
-        if (released && remove && this.chunks.remove(chunkPos)) {
+        boolean changed = !this.chunks.isEmpty();
+        this.chunks.clear();
+        if (changed) {
             this.updatePowerConsumption();
             this.markForClientUpdate();
         }
-    }
-
-    public void releaseAll() {
-        for (ChunkPos chunkPos : new ObjectOpenHashSet<>(this.chunks)) {
-            this.release(chunkPos, true);
-        }
-        this.chunks.clear();
-        this.updatePowerConsumption();
     }
 
     @Override

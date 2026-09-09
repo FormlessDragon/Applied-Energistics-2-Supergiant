@@ -78,7 +78,7 @@ public class InterfacePart extends AEBasePart implements InterfaceLogicHost {
     protected void onMainNodeStateChanged(IGridNodeListener.State reason) {
         super.onMainNodeStateChanged(reason);
         if (this.getMainNode().hasGridBooted()) {
-            this.logic.notifyNeighbors();
+            this.logic.onNodeStateChanged();
         }
     }
 

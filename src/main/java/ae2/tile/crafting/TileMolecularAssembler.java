@@ -10,6 +10,7 @@ import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.BaseInternalInventory;
 import ae2.api.inventories.InternalInventory;
+import ae2.api.inventories.VersionedInternalInventory;
 import ae2.api.networking.GridFlags;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
@@ -63,6 +64,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 
 import org.jetbrains.annotations.Nullable;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -100,6 +102,7 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         1,
         new PatternFilter());
     private final InternalInventory terminalPatternInventory = new ActivePatternInventory();
+    private long terminalContentsVersion;
     private final IUpgradeInventory upgrades = new MolecularAssemblerUpgradeInventory(this);
     private final ObjectList<GenericStack> cachedOutputs = new ObjectArrayList<>();
     private final ObjectList<IAssemblerPattern> patterns = new ObjectArrayList<>();
@@ -114,11 +117,13 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     private GenericStack currentMainOutput;
     private int pendingCrafts;
     private boolean powered;
+    private boolean patternsActive;
     private double progress;
     private boolean awake;
     private boolean reboot = true;
     @Nullable
     private AssemblerAnimationStatus animationStatus;
+
     public TileMolecularAssembler() {
         this.getMainNode()
             .setIdlePowerUsage(0.0)
@@ -200,7 +205,11 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     @Override
     public void onMainNodeStateChanged(IGridNodeListener.State reason) {
         this.updatePoweredState();
-        ICraftingProvider.requestUpdate(this.getMainNode());
+        boolean active = this.getMainNode().isOnline();
+        if (active != this.patternsActive) {
+            this.patternsActive = active;
+            ICraftingProvider.requestUpdate(this.getMainNode());
+        }
         this.updateSleepiness();
     }
 
@@ -263,7 +272,7 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
 
     @Override
     public List<IAssemblerPattern> getAvailablePatterns() {
-        if (!this.getMainNode().isActive()) {
+        if (!this.getMainNode().isOnline()) {
             return Collections.emptyList();
         }
         return this.patterns;
@@ -523,6 +532,7 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     }
 
     private void updatePatterns() {
+        this.terminalContentsVersion++;
         this.patterns.clear();
         this.patternKeys.clear();
         World level = this.world;
@@ -572,7 +582,8 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         }
 
         this.pendingCrafts = 0;
-        for (GenericStack result : this.cachedOutputs) {
+        for (int i = 0; i < this.cachedOutputs.size(); i++) {
+            var result = this.cachedOutputs.get(i);
             this.outputBuffer.insert(result.what(), result.amount(), Actionable.MODULATE, this.actionSource);
         }
         this.cachedOutputs.clear();
@@ -590,7 +601,8 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         for (int i = 0; i < this.outputBuffer.size(); i++) {
             simulated.setStack(i, this.outputBuffer.getStack(i));
         }
-        for (GenericStack result : results) {
+        for (int i = 0; i < results.size(); i++) {
+            var result = results.get(i);
             if (simulated.insert(result.what(), result.amount(), Actionable.MODULATE, this.actionSource) < result.amount()) {
                 return false;
             }
@@ -757,10 +769,12 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
 
     private void mergeCachedOutputs(List<GenericStack> outputs) {
         KeyCounter merged = new KeyCounter();
-        for (GenericStack cachedOutput : this.cachedOutputs) {
+        for (int i = 0; i < this.cachedOutputs.size(); i++) {
+            var cachedOutput = this.cachedOutputs.get(i);
             merged.add(cachedOutput.what(), cachedOutput.amount());
         }
-        for (GenericStack output : outputs) {
+        for (int i = 0; i < outputs.size(); i++) {
+            var output = outputs.get(i);
             merged.add(output.what(), output.amount());
         }
         this.cachedOutputs.clear();
@@ -793,7 +807,9 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
             return;
         }
 
-        for (GenericStack stack : GenericStack.readList(data.getTagList(NBT_CACHED_OUTPUTS, Constants.NBT.TAG_COMPOUND))) {
+        var stacks = GenericStack.readList(data.getTagList(NBT_CACHED_OUTPUTS, Constants.NBT.TAG_COMPOUND));
+        for (int i = 0; i < stacks.size(); i++) {
+            var stack = stacks.get(i);
             if (stack != null) {
                 this.cachedOutputs.add(stack);
             }
@@ -868,7 +884,12 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         }
     }
 
-    private class ActivePatternInventory extends BaseInternalInventory {
+    private class ActivePatternInventory extends BaseInternalInventory implements VersionedInternalInventory {
+        @Override
+        public long getContentsVersion() {
+            return terminalContentsVersion;
+        }
+
         @Override
         public int size() {
             return getActivePatternSlots();

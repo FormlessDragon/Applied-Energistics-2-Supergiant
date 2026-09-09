@@ -33,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
-import java.util.List;
 import java.util.Queue;
 
 /**
@@ -44,11 +43,10 @@ import java.util.Queue;
  * controller. As nodes that require channels are visited, they are assigned a channel if possible. This is done by
  * checking the channel count of a few key nodes (max 3) along the path.
  * <p>
- * Second, a DFS is performed to propagate the channel count upwards.
+ * Second, the BFS visitation order is traversed backwards to propagate the channel count upwards.
  */
 public class PathingCalculation {
     private static final Logger LOG = LoggerFactory.getLogger(PathingCalculation.class);
-    private static final Object SUBTREE_END = new Object();
     private final IGrid grid;
     /**
      * Path items that are part of a multiblock that was already granted a channel.
@@ -63,6 +61,18 @@ public class PathingCalculation {
      * Path items that are either in a queue, or have been processed already.
      */
     private final ReferenceSet<IPathItem> visited = new ReferenceOpenHashSet<>();
+    /**
+     * Controllers in the order exposed by the grid. This order affects which equally short route wins.
+     */
+    private final ObjectArrayList<GridNode> controllerNodes = new ObjectArrayList<>();
+    /**
+     * Parent-before-child order produced by the BFS. Reversing it is a post-order traversal of the selected path tree.
+     */
+    private final ObjectArrayList<IPathItem> visitationOrder = new ObjectArrayList<>();
+    /**
+     * Every path item whose computed channel state must be committed after the grid finishes booting.
+     */
+    private final ObjectArrayList<IPathItem> finalizationOrder = new ObjectArrayList<>();
     /**
      * Tracks the number of channels assigned to each path item during the BFS pass. Only a few key nodes along any path
      * are checked and updated.
@@ -80,21 +90,69 @@ public class PathingCalculation {
      * Tracks the total number of channels for each path item is using.
      */
     private int channelsByBlocks = 0;
+    private boolean awaitingFinalization;
 
     /**
      * Create a new pathing calculation from the passed grid.
      */
     public PathingCalculation(IGrid grid) {
         this.grid = grid;
+    }
 
+    public void compute() {
+        compute(grid.getMachineNodes(TileController.class));
+    }
+
+    void compute(Iterable<? extends IGridNode> controllers) {
+        if (awaitingFinalization) {
+            throw new IllegalStateException("Previous pathing calculation has not been finalized");
+        }
+
+        channelsInUse = 0;
+        channelsByBlocks = 0;
+
+        try {
+            initializeControllers(controllers);
+
+            // BFS pass
+            for (int i = 0; i < queues.length; ++i) {
+                processQueue(queues[i], i);
+            }
+
+            // Reverse BFS pass
+            propagateAssignments();
+            awaitingFinalization = true;
+        } catch (RuntimeException | Error e) {
+            clearWorkspace();
+            throw e;
+        }
+    }
+
+    private void initializeControllers(Iterable<? extends IGridNode> controllers) {
         // Add every outgoing connection of the controllers (that doesn't point to another controller) to the list.
-        for (var node : grid.getMachineNodes(TileController.class)) {
-            visited.add((IPathItem) node);
-            for (var gcc : node.getConnections()) {
-                var gc = (GridConnection) gcc;
-                if (!(gc.getOtherSide(node).getOwner() instanceof TileController)) {
-                    enqueue(gc, 0);
-                    gc.setControllerRoute((GridNode) node);
+        for (var node : controllers) {
+            var controller = (GridNode) node;
+            controller.prepareControllerRouteRoot();
+            if (visited.add(controller)) {
+                controllerNodes.add(controller);
+                finalizationOrder.add(controller);
+            }
+        }
+
+        for (int controllerIndex = 0, controllerCount = controllerNodes.size();
+             controllerIndex < controllerCount;
+             controllerIndex++) {
+            var controller = controllerNodes.get(controllerIndex);
+            for (int i = 0, size = controller.getPossibleOptionCount(); i < size; i++) {
+                var gc = (GridConnection) controller.getPossibleOption(i);
+                if (visited.add(gc)) {
+                    finalizationOrder.add(gc);
+                    if (!visited.contains(gc.getOtherSide(controller))) {
+                        enqueue(gc, 0);
+                        gc.setControllerRoute(controller);
+                    } else {
+                        gc.setAdHocChannels(0);
+                    }
                 }
             }
         }
@@ -110,8 +168,6 @@ public class PathingCalculation {
     }
 
     private void enqueue(IPathItem pathItem, int queueIndex) {
-        visited.add(pathItem);
-
         int possibleIndex;
 
         if (pathItem instanceof GridConnection) {
@@ -131,21 +187,13 @@ public class PathingCalculation {
         queues[index].add(pathItem);
     }
 
-    public void compute() {
-        // BFS pass
-        for (int i = 0; i < 3; ++i) {
-            processQueue(queues[i], i);
-        }
-
-        // DFS pass
-        propagateAssignments();
-    }
-
     private void processQueue(Queue<IPathItem> oldOpen, int queueIndex) {
         while (!oldOpen.isEmpty()) {
             IPathItem i = oldOpen.poll();
-            for (IPathItem pi : i.getPossibleOptions()) {
-                if (!this.visited.contains(pi)) {
+            visitationOrder.add(i);
+            for (int optionIndex = 0, size = i.getPossibleOptionCount(); optionIndex < size; optionIndex++) {
+                IPathItem pi = i.getPossibleOption(optionIndex);
+                if (this.visited.add(pi)) {
                     // Set BFS parent.
                     pi.setControllerRoute(i);
 
@@ -177,6 +225,7 @@ public class PathingCalculation {
                         }
                     }
 
+                    finalizationOrder.add(pi);
                     enqueue(pi, queueIndex);
                 }
             }
@@ -216,47 +265,19 @@ public class PathingCalculation {
     }
 
     /**
-     * Propagates assignment to all nodes by performing a DFS. The implementation is iterative to avoid stack overflow.
+     * Propagates assignments in reverse BFS order, which is post-order for the selected controller-route tree.
      */
     private void propagateAssignments() {
-        List<Object> stack = new ObjectArrayList<>();
-        ReferenceSet<IPathItem> controllerNodes = new ReferenceOpenHashSet<>();
-
-        for (var node : grid.getMachineNodes(TileController.class)) {
-            controllerNodes.add((IPathItem) node);
-            for (var gcc : node.getConnections()) {
-                var gc = (GridConnection) gcc;
-                if (!(gc.getOtherSide(node).getOwner() instanceof TileController)) {
-                    stack.add(gc);
-                }
-            }
-        }
-
-        while (!stack.isEmpty()) {
-            Object current = stack.getLast();
-            if (current == SUBTREE_END) {
-                stack.removeLast();
-                IPathItem item = (IPathItem) stack.removeLast();
-                // We have visited the entire subtree and can now propagate channels upwards.
-                if (item instanceof GridNode node) {
-                    boolean hasChannel = channelNodes.contains(item);
-                    channelsByBlocks += node.propagateChannelsUpwards(hasChannel);
-                    if (hasChannel) {
-                        channelsInUse++;
-                    }
-                } else {
-                    channelsByBlocks += ((GridConnection) item).propagateChannelsUpwards();
+        for (int i = visitationOrder.size() - 1; i >= 0; i--) {
+            IPathItem item = visitationOrder.get(i);
+            if (item instanceof GridNode node) {
+                boolean hasChannel = channelNodes.contains(item);
+                channelsByBlocks += node.propagateChannelsUpwards(hasChannel);
+                if (hasChannel) {
+                    channelsInUse++;
                 }
             } else {
-                stack.add(SUBTREE_END);
-                for (var pi : ((IPathItem) current).getPossibleOptions()) {
-                    // The neighbor could either be: a child, the parent, or in a different tree if it is closer to
-                    // another controller. It is a child if we are its parent.
-                    // We need to exclude controller nodes because their getControllerRoute() is nonsense.
-                    if (!controllerNodes.contains(pi) && pi.getControllerRoute() == current) {
-                        stack.add(pi);
-                    }
-                }
+                channelsByBlocks += ((GridConnection) item).propagateChannelsUpwards();
             }
         }
 
@@ -264,6 +285,37 @@ public class PathingCalculation {
         for (var multiblockNode : multiblocksWithChannel) {
             multiblockNode.incrementChannelCount(1);
         }
+    }
+
+    /**
+     * Commits all path-item state without traversing the graph again.
+     */
+    public void finalizeChannels(ChannelFinalizer finalizer) {
+        if (!awaitingFinalization) {
+            throw new IllegalStateException("Pathing calculation has not completed");
+        }
+
+        try {
+            for (int i = 0, size = finalizationOrder.size(); i < size; i++) {
+                finalizer.finalizeItem(finalizationOrder.get(i));
+            }
+        } finally {
+            clearWorkspace();
+        }
+    }
+
+    private void clearWorkspace() {
+        for (Queue<IPathItem> queue : queues) {
+            queue.clear();
+        }
+        multiblocksWithChannel.clear();
+        visited.clear();
+        controllerNodes.clear();
+        visitationOrder.clear();
+        finalizationOrder.clear();
+        channelBottlenecks.clear();
+        channelNodes.clear();
+        awaitingFinalization = false;
     }
 
     public int getChannelsInUse() {

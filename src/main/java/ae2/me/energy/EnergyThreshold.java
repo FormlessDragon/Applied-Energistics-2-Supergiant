@@ -20,11 +20,17 @@ package ae2.me.energy;
 
 import ae2.api.networking.energy.IEnergyWatcher;
 
+import java.util.IdentityHashMap;
+import java.util.Map;
+
 public class EnergyThreshold implements Comparable<EnergyThreshold> {
 
     private final double threshold;
     private final IEnergyWatcher watcher;
     private final int watcherHash;
+    private static final Map<IEnergyWatcher, Long> WATCHER_ORDERS = new IdentityHashMap<>();
+    private static long nextWatcherOrder = 1;
+    private final long watcherOrder;
 
     /**
      * Special constructor to allow querying a for a subset of thresholds.
@@ -36,6 +42,7 @@ public class EnergyThreshold implements Comparable<EnergyThreshold> {
         this.threshold = lim;
         this.watcher = watcher;
         this.watcherHash = watcher.hashCode();
+        this.watcherOrder = watcherOrder(watcher);
     }
 
     /**
@@ -45,10 +52,31 @@ public class EnergyThreshold implements Comparable<EnergyThreshold> {
         this.threshold = lim;
         this.watcher = null;
         this.watcherHash = bound;
+        this.watcherOrder = bound < 0 ? Long.MIN_VALUE : Long.MAX_VALUE;
     }
 
     public IEnergyWatcher getEnergyWatcher() {
         return this.watcher;
+    }
+
+    /**
+     * Releases the stable ordering slot when a watcher is permanently destroyed.
+     */
+    static synchronized void releaseWatcher(IEnergyWatcher watcher) {
+        WATCHER_ORDERS.remove(watcher);
+    }
+
+    private static synchronized long watcherOrder(IEnergyWatcher watcher) {
+        Long existing = WATCHER_ORDERS.get(watcher);
+        if (existing != null) {
+            return existing;
+        }
+        if (nextWatcherOrder == Long.MAX_VALUE) {
+            throw new IllegalStateException("Energy watcher ordering exhausted");
+        }
+        long assigned = nextWatcherOrder++;
+        WATCHER_ORDERS.put(watcher, assigned);
+        return assigned;
     }
 
     @Override
@@ -56,7 +84,7 @@ public class EnergyThreshold implements Comparable<EnergyThreshold> {
         int a = Double.compare(this.threshold, o.threshold);
 
         if (a == 0) {
-            return Integer.compare(this.watcherHash, o.watcherHash);
+            return Long.compare(this.watcherOrder, o.watcherOrder);
         }
 
         return a;

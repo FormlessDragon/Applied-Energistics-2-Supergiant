@@ -35,6 +35,16 @@ import java.util.Set;
 
 /**
  * Allows a node to provide crafting patterns and emitable items to the network.
+ *
+ * <p>Registration records the provider without reading its contents until a consumer first requests the network's
+ * pattern index. Content and priority getters are called synchronously on the server thread, both at initialization
+ * and when this provider changes. They must return complete, non-null snapshots and must not reenter index loading
+ * or mutate provider registration. Pattern objects may subsequently be read by calculation workers and must remain
+ * stable for those readers. Runtime execution methods continue to run on the server thread.</p>
+ *
+ * <p>After initialization, call {@link #requestUpdate} for pattern edits, priority changes and actual availability
+ * changes. Temporary grid booting must not remove otherwise powered, channel-qualified patterns. Moving between
+ * grids unregisters only this provider; it does not invalidate unrelated providers.</p>
  */
 public interface ICraftingProvider extends IGridNodeService {
     /**

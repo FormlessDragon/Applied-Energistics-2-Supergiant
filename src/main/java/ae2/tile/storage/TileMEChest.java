@@ -127,7 +127,7 @@ public class TileMEChest extends AENetworkedPoweredTile
     public TileMEChest() {
         setInternalMaxPower(PowerMultiplier.CONFIG.multiply(500));
         getMainNode().setFlags(GridFlags.REQUIRE_CHANNEL);
-        setInternalPublicPowerStorage(true);
+        // Direct power feeds this private buffer; normal operation draws from the grid instead.
         setInternalPowerFlow(AccessRestriction.WRITE);
     }
 

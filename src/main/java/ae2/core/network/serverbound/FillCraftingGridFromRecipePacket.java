@@ -16,13 +16,15 @@ import ae2.api.storage.MEStorage;
 import ae2.api.storage.StorageHelper;
 import ae2.container.AEBaseContainer;
 import ae2.container.interfaces.ICraftingGridContainer;
+import ae2.container.me.items.ContainerCraftingTerm;
+import ae2.core.AELog;
 import ae2.core.network.ServerboundPacket;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.items.storage.ViewCellItem;
 import ae2.me.storage.NullInventory;
-import ae2.util.Platform;
 import ae2.util.CraftingRecipeUtil;
 import ae2.util.EmptyArrays;
+import ae2.util.Platform;
 import ae2.util.prioritylist.IPartitionList;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
@@ -657,6 +659,11 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
 
         if (player.openContainer == baseContainer) {
             baseContainer.onCraftMatrixChanged(craftMatrix.toContainer());
+            if (this.recipeId != null && container instanceof ContainerCraftingTerm craftingTerm
+                && !craftingTerm.applyHeiCraftingRecipe(this.recipeId)) {
+                AELog.warn("HEI recipe %s did not match the transferred crafting matrix; using deferred recipe lookup",
+                    this.recipeId);
+            }
         }
 
         if (useTemporaryPseudoCraft) {

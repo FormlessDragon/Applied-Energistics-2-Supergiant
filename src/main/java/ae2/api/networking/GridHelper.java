@@ -36,6 +36,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collection;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -44,6 +45,22 @@ import java.util.function.Consumer;
  */
 public final class GridHelper {
     private GridHelper() {
+    }
+
+    /**
+     * Synchronously disconnects a group of AE grid connections on the server thread. All arguments are validated
+     * before mutation, already detached connections are ignored, and repeated identities are disconnected once.
+     * Both endpoints of every connection
+     * are detached before connection callbacks run; final connected components are then reconciled once each.
+     * The original pivot component keeps its grid. Other components use the normal node-data migration lifecycle.
+     * Reentrant topology changes from callbacks are rechecked before this method returns.
+     *
+     * @param connections connections to destroy; neither the collection nor its entries may be null
+     * @throws IllegalArgumentException if an entry is not an AE connection
+     * @throws IllegalStateException    if a connection is attached to only one endpoint
+     */
+    public static void destroyConnections(Collection<? extends IGridConnection> connections) {
+        GridConnection.destroyConnections(connections);
     }
 
     /**

@@ -46,6 +46,7 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.AEKeyFilter;
 import ae2.core.AEConfig;
+import ae2.core.AELog;
 import ae2.crafting.CraftingCalculation;
 import ae2.crafting.CraftingLink;
 import ae2.crafting.CraftingLinkNexus;
@@ -65,16 +66,17 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -115,24 +117,29 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
             (service, ignoredEvent) -> ((CraftingService) service).updateList = true);
     }
 
-    private final ObjectOpenHashSet<CraftingCPUCluster> craftingCPUClusters = new ObjectOpenHashSet<>();
+    private final ReferenceOpenHashSet<CraftingCPUCluster> craftingCPUClusters = new ReferenceOpenHashSet<>();
+    private final ReferenceOpenHashSet<IGridNode> craftingCpuNodes = new ReferenceOpenHashSet<>();
+    private final ObjectArrayList<CraftingCPUCluster> executionOrder = new ObjectArrayList<>();
     private final Reference2ObjectMap<IGridNode, StackWatcher<ICraftingWatcherNode>> craftingWatchers =
         new Reference2ObjectOpenHashMap<>();
     private final IGrid grid;
-    private final NetworkCraftingProviders craftingProviders = new NetworkCraftingProviders();
+    private final NetworkCraftingProviders craftingProviders;
     private final Object2ObjectMap<UUID, CraftingLinkNexus> craftingLinks = new Object2ObjectOpenHashMap<>();
     private final Multimap<AEKey, StackWatcher<ICraftingWatcherNode>> interests = HashMultimap.create();
     private final InterestManager<StackWatcher<ICraftingWatcherNode>> interestManager = new InterestManager<>(
         this.interests);
     private final IEnergyService energyGrid;
     private final ObjectSet<AEKey> currentlyCrafting = new ObjectOpenHashSet<>();
+    private final ObjectArrayList<StackWatcher<ICraftingWatcherNode>> watcherDispatch = new ObjectArrayList<>();
+    private boolean currentlyCraftingDirty = true;
     private final ObjectOpenHashSet<AEKey> currentlyCraftable = new ObjectOpenHashSet<>();
     private long lastProcessedCraftingLogicChangeTick;
     private long lastProcessedCraftablesVersion;
     private long recursiveIngredientReserveAmount = DEFAULT_RECURSIVE_INGREDIENT_RESERVE_AMOUNT;
     private boolean recursiveIngredientReserveAmountRestored;
     private boolean updateList = false;
-    private final Cache<Object, Object> craftingMemoCache;
+    @Nullable
+    private Cache<Object, Object> craftingMemoCache;
     private long memoRevision;
     /**
      * Reusable graph structures keyed by output. A graph is taken (removed) for the duration of one calculation so
@@ -143,20 +150,10 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
     public CraftingService(IGrid grid, IStorageService storageGrid, IEnergyService energyGrid) {
         this.grid = grid;
+        this.craftingProviders = new NetworkCraftingProviders(grid);
         this.energyGrid = energyGrid;
         this.lastProcessedCraftingLogicChangeTick = TickHandler.instance().getCurrentTick();
-        this.lastProcessedCraftablesVersion = this.craftingProviders.getRevision();
-
-        int cacheSize = AEConfig.instance().getMemoizationCacheSize();
-        if (cacheSize > 0) {
-            this.craftingMemoCache = CacheBuilder.newBuilder()
-                .maximumSize(cacheSize)
-                .build();
-        } else {
-            this.craftingMemoCache = CacheBuilder.newBuilder()
-                .maximumSize(0)
-                .build();
-        }
+        this.lastProcessedCraftablesVersion = this.craftingProviders.getCraftablesRevision();
 
         storageGrid.addGlobalStorageProvider(new CraftingServiceStorage(this));
     }
@@ -225,9 +222,10 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
         var requester = gridNode.getService(ICraftingRequester.class);
         if (requester != null) {
-            for (CraftingLinkNexus link : this.craftingLinks.values()) {
-                if (link.isRequester(requester)) {
-                    link.removeNode();
+            for (var requested : requester.getRequestedJobs()) {
+                var nexus = this.craftingLinks.get(requested.getCraftingID());
+                if (nexus != null && nexus.isRequester(requester)) {
+                    nexus.removeNode();
                 }
             }
         }
@@ -235,6 +233,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         this.craftingProviders.removeProvider(gridNode);
 
         if (gridNode.getOwner() instanceof ICraftingCPUTileEntity) {
+            this.craftingCpuNodes.remove(gridNode);
             this.updateList = true;
         }
     }
@@ -265,6 +264,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         }
 
         if (gridNode.getOwner() instanceof ICraftingCPUTileEntity) {
+            this.craftingCpuNodes.add(gridNode);
             this.updateList = true;
         }
     }
@@ -285,21 +285,22 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
     @Override
     public long getCraftablesVersion() {
-        return this.craftingProviders.getRevision();
+        this.craftingProviders.ensureInitialized();
+        return this.craftingProviders.getCraftablesRevision();
     }
 
     private void updateCPUClusters() {
         this.craftingCPUClusters.clear();
-        this.craftingCPUClusters.ensureCapacity(this.grid.size());
+        this.executionOrder.clear();
 
-        for (var node : this.grid.getNodes()) {
+        for (var node : this.craftingCpuNodes) {
             if (!(node.getOwner() instanceof ICraftingCPUTileEntity tile)) {
                 continue;
             }
 
             final CraftingCPUCluster cluster = tile.getCluster();
-            if (cluster != null) {
-                this.craftingCPUClusters.add(cluster);
+            if (cluster != null && !cluster.isDestroyed() && this.craftingCPUClusters.add(cluster)) {
+                this.executionOrder.add(cluster);
 
                 ICraftingLink maybeLink = cluster.craftingLogic.getLastLink();
                 if (maybeLink instanceof CraftingLink craftingLink) {
@@ -322,6 +323,9 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
     public long insertIntoCpus(AEKey what, long amount, Actionable type) {
         long inserted = 0;
         for (var cpu : this.craftingCPUClusters) {
+            if (inserted >= amount) {
+                break;
+            }
             inserted += cpu.craftingLogic.insert(what, amount - inserted, type);
         }
 
@@ -340,8 +344,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
     @Override
     public void refreshNodeCraftingProvider(IGridNode node) {
-        this.craftingProviders.removeProvider(node);
-        this.craftingProviders.addProvider(node);
+        this.craftingProviders.refreshProvider(node);
     }
 
     @Override
@@ -356,8 +359,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
     @Override
     public void refreshGlobalCraftingProvider(ICraftingProvider provider) {
-        this.craftingProviders.removeProvider(provider);
-        this.craftingProviders.addProvider(provider);
+        this.craftingProviders.refreshProvider(provider);
     }
 
     @Nullable
@@ -373,7 +375,13 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
             throw new IllegalArgumentException("Invalid Crafting Job Request");
         }
 
+        this.craftingProviders.ensureInitialized();
         long currentRevision = this.craftingProviders.getRevision();
+        if (this.craftingMemoCache == null) {
+            this.craftingMemoCache = CacheBuilder.newBuilder()
+                                                 .maximumSize(Math.max(0, AEConfig.instance().getMemoizationCacheSize()))
+                                                 .build();
+        }
         if (this.memoRevision != currentRevision) {
             this.craftingMemoCache.invalidateAll();
             this.memoRevision = currentRevision;
@@ -440,7 +448,8 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
     @Override
     public ICraftingSubmitResult submitJob(ICraftingPlan job, @Nullable ICraftingRequester requestingMachine,
                                            @Nullable ICraftingCPU target, boolean prioritizePower, IActionSource src,
-                                           boolean forceStart) {        return submitJob(job, requestingMachine, target, prioritizePower, src, forceStart, false);
+                                           boolean forceStart) {
+        return submitJob(job, requestingMachine, target, prioritizePower, src, forceStart, false);
     }
 
     @Override
@@ -501,6 +510,13 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
     @Override
     public void onServerEndTick() {
+        if (!this.interestManager.isEmpty()) {
+            this.craftingProviders.ensureInitialized();
+        }
+        if (this.interestManager.isEmpty()) {
+            this.currentlyCraftable.clear();
+            this.lastProcessedCraftablesVersion = -1;
+        }
         if (this.updateList) {
             this.updateList = false;
             this.updateCPUClusters();
@@ -509,52 +525,44 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
         this.craftingLinks.values().removeIf(nexus -> nexus.isDead(this.grid, this));
 
-        var sortedCpus = new ArrayList<>(this.craftingCPUClusters);
-        sortedCpus.sort(CraftingService::compareExecutionOrder);
+        var sortedCpus = this.executionOrder;
+        // Priority changes (including job completion) do not require another CPU discovery or list allocation.
+        for (int i = 1; i < sortedCpus.size(); i++) {
+            if (compareExecutionOrder(sortedCpus.get(i - 1), sortedCpus.get(i)) > 0) {
+                sortedCpus.sort(CraftingService::compareExecutionOrder);
+                break;
+            }
+        }
 
         long latestChange = 0;
-        for (var cpu : sortedCpus) {
+        for (int i = 0; i < sortedCpus.size(); i++) {
+            var cpu = sortedCpus.get(i);
             cpu.craftingLogic.tickCraftingLogic(this.energyGrid, this);
             latestChange = Math.max(latestChange, cpu.craftingLogic.getLastModifiedOnTick());
         }
 
         if (latestChange != this.lastProcessedCraftingLogicChangeTick) {
             this.lastProcessedCraftingLogicChangeTick = latestChange;
-
-            boolean hasInterests = !this.interests.isEmpty();
-            Set<AEKey> previouslyCrafting = hasInterests
-                ? copySet(this.currentlyCrafting)
-                : Set.of();
-            this.currentlyCrafting.clear();
-
-            for (var cpu : sortedCpus) {
-                cpu.craftingLogic.getAllWaitingFor(this.currentlyCrafting);
-            }
-
-            if (hasInterests && !(previouslyCrafting.isEmpty() && this.currentlyCrafting.isEmpty())) {
-                var changed = new ObjectOpenHashSet<AEKey>();
-                addSetDifference(changed, previouslyCrafting, this.currentlyCrafting);
-                addSetDifference(changed, this.currentlyCrafting, previouslyCrafting);
-                for (var what : changed) {
-                    for (var watcher : this.interestManager.get(what)) {
-                        watcher.getHost().onRequestChange(what);
-                    }
-                    for (var watcher : this.interestManager.getAllStacksWatchers()) {
-                        watcher.getHost().onRequestChange(what);
-                    }
-                }
+            this.currentlyCraftingDirty = true;
+            if (this.interestManager.isEmpty()) {
+                this.currentlyCrafting.clear();
             }
         }
 
-        if (this.lastProcessedCraftablesVersion != this.craftingProviders.getRevision()) {
-            this.lastProcessedCraftablesVersion = this.craftingProviders.getRevision();
+        if (!this.interestManager.isEmpty()) {
+            refreshCurrentlyCrafting();
+        }
+
+        if (!this.interestManager.isEmpty()
+            && this.lastProcessedCraftablesVersion != this.craftingProviders.getCraftablesRevision()) {
+            this.lastProcessedCraftablesVersion = this.craftingProviders.getCraftablesRevision();
 
             var craftableKeys = this.craftingProviders.getCraftableKeys();
             var emittableKeys = this.craftingProviders.getEmittableKeys();
 
             if (!this.currentlyCraftable.isEmpty() || !craftableKeys.isEmpty()
                 || !emittableKeys.isEmpty()) {
-                boolean hasInterests = !this.interests.isEmpty();
+                boolean hasInterests = !this.interestManager.isEmpty();
                 Set<AEKey> previouslyCraftable = hasInterests
                     ? copySet(this.currentlyCraftable)
                     : Set.of();
@@ -568,12 +576,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
                     addSetDifference(changedCraftable, previouslyCraftable, this.currentlyCraftable);
                     addSetDifference(changedCraftable, this.currentlyCraftable, previouslyCraftable);
                     for (var what : changedCraftable) {
-                        for (var watcher : this.interestManager.get(what)) {
-                            watcher.getHost().onCraftableChange(what);
-                        }
-                        for (var watcher : this.interestManager.getAllStacksWatchers()) {
-                            watcher.getHost().onCraftableChange(what);
-                        }
+                        notifyCraftingWatchers(what, true);
                     }
                 }
             }
@@ -594,7 +597,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
     @Override
     public ImmutableSet<ICraftingCPU> getCpus() {
         var cpus = ImmutableSet.<ICraftingCPU>builder();
-        for (CraftingCPUCluster cpu : this.craftingCPUClusters) {
+        for (var cpu : this.craftingCPUClusters) {
             if (cpu.isActive() && !cpu.isDestroyed()) {
                 cpus.add(cpu);
             }
@@ -609,14 +612,65 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
     @Override
     public boolean isRequesting(AEKey what) {
+        refreshCurrentlyCrafting();
         return this.currentlyCrafting.contains(what);
+    }
+
+    private void refreshCurrentlyCrafting() {
+        if (!this.currentlyCraftingDirty) {
+            return;
+        }
+        boolean hasInterests = !this.interestManager.isEmpty();
+        Set<AEKey> previous = hasInterests ? copySet(this.currentlyCrafting) : Set.of();
+        this.currentlyCrafting.clear();
+        for (int i = 0; i < this.executionOrder.size(); i++) {
+            this.executionOrder.get(i).craftingLogic.getAllWaitingFor(this.currentlyCrafting);
+        }
+        this.currentlyCraftingDirty = false;
+        if (hasInterests) {
+            var changed = new ObjectOpenHashSet<AEKey>();
+            addSetDifference(changed, previous, this.currentlyCrafting);
+            addSetDifference(changed, this.currentlyCrafting, previous);
+            for (var what : changed) {
+                notifyCraftingWatchers(what, false);
+            }
+        }
+    }
+
+    void notifyCraftingWatchers(AEKey what, boolean craftable) {
+        int start = this.watcherDispatch.size();
+        this.watcherDispatch.addAll(this.interestManager.get(what));
+        for (var watcher : this.interestManager.getAllStacksWatchers()) {
+            if (!this.interestManager.get(what).contains(watcher)) {
+                this.watcherDispatch.add(watcher);
+            }
+        }
+        int end = this.watcherDispatch.size();
+        try {
+            for (int i = start; i < end; i++) {
+                var watcher = this.watcherDispatch.get(i);
+                if (watcher.isWatching(what)) {
+                    try {
+                        if (craftable) {
+                            watcher.getHost().onCraftableChange(what);
+                        } else {
+                            watcher.getHost().onRequestChange(what);
+                        }
+                    } catch (RuntimeException exception) {
+                        AELog.error(exception, "Crafting watcher failed for " + this.grid);
+                    }
+                }
+            }
+        } finally {
+            this.watcherDispatch.size(start);
+        }
     }
 
     @Override
     public long getRequestedAmount(AEKey what) {
         long requested = 0;
 
-        for (CraftingCPUCluster cluster : this.craftingCPUClusters) {
+        for (var cluster : this.craftingCPUClusters) {
             requested += cluster.craftingLogic.getWaitingFor(what);
         }
 
@@ -625,6 +679,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
     @Override
     public boolean isRequestingAny() {
+        refreshCurrentlyCrafting();
         return !this.currentlyCrafting.isEmpty();
     }
 
@@ -724,11 +779,6 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
     }
 
     public boolean hasCpu(ICraftingCPU cpu) {
-        for (CraftingCPUCluster cluster : this.craftingCPUClusters) {
-            if (cluster == cpu) {
-                return true;
-            }
-        }
-        return false;
+        return this.craftingCPUClusters.contains(cpu);
     }
 }

@@ -37,7 +37,6 @@ import ae2.core.AppEng;
 import ae2.core.definitions.AEItems;
 import ae2.core.gui.GuiOpener;
 import ae2.helpers.IConfigInvHost;
-import ae2.hooks.ticking.TickHandler;
 import ae2.items.parts.PartModels;
 import ae2.parts.PartModel;
 import ae2.util.ConfigInventory;
@@ -49,6 +48,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Set;
 
@@ -80,13 +80,15 @@ public class StorageLevelEmitterPart extends AbstractLevelEmitterPart
     public static final PartModel MODEL_ON_HAS_CHANNEL = new PartModel(MODEL_BASE_ON, MODEL_STATUS_HAS_CHANNEL);
     private IStackWatcher storageWatcher;
     private IStackWatcher craftingWatcher;
-    private long lastUpdateTick = -1;
+    private final ConfigInventory config = ConfigInventory.configTypes(1).changeListener(this::configureWatchers)
+                                                          .build();
+    private boolean reportingUpdatePending;
+    private BigInteger aggregateOverflow;
+
     public StorageLevelEmitterPart(IPartItem<?> partItem) {
         super(partItem);
 
-        // either fuzzy upgrade or null filter
-        // When using a fuzzy upgrade or no filter at all, the level emitter will actively scan the grid
-        // We need to ensure we only do this once per tick in case any stack has changed.
+        // Aggregate modes initialize once, then track the difference between the old and new network amounts.
         IStorageWatcherNode stackWatcherNode = new IStorageWatcherNode() {
             @Override
             public void updateWatcher(IStackWatcher newWatcher) {
@@ -99,17 +101,23 @@ public class StorageLevelEmitterPart extends AbstractLevelEmitterPart
                 if (what.equals(getConfiguredKey()) && !isUpgradedWith(AEItems.FUZZY_CARD)) {
                     lastReportedValue = amount;
                     updateState();
-                } else { // either fuzzy upgrade or null filter
-                    // When using a fuzzy upgrade or no filter at all, the level emitter will actively scan the grid
-                    // We need to ensure we only do this once per tick in case any stack has changed.
-                    long currentTick = TickHandler.instance().getCurrentTick();
-                    if (currentTick != lastUpdateTick) {
-                        lastUpdateTick = currentTick;
-                        var gridNode = getGridNode();
-                        if (gridNode != null) {
-                            updateReportingValue(gridNode.grid());
-                        }
-                    }
+                } else {
+                    scheduleReportingUpdate();
+                }
+            }
+
+            @Override
+            public void onStackChange(AEKey what, long amount, long previousAmount) {
+                if (reportingUpdatePending) {
+                    return;
+                }
+                var configured = getConfiguredKey();
+                if (configured != null && !isUpgradedWith(AEItems.FUZZY_CARD)) {
+                    onStackChange(what, amount);
+                } else if (configured == null || configured.fuzzyEquals(what,
+                    getConfigManager().getSetting(Settings.FUZZY_MODE))) {
+                    addReportedAmount(amount - previousAmount);
+                    updateState();
                 }
             }
         };
@@ -132,9 +140,7 @@ public class StorageLevelEmitterPart extends AbstractLevelEmitterPart
         };
         getMainNode().addService(ICraftingWatcherNode.class, craftingWatcherNode);
         getMainNode().addService(ICraftingProvider.class, this);
-    }    private final ConfigInventory config = ConfigInventory.configTypes(1).changeListener(this::configureWatchers)
-                                                          .build();
-
+    }
 
 
     @Override
@@ -206,9 +212,7 @@ public class StorageLevelEmitterPart extends AbstractLevelEmitterPart
 
     @Override
     protected void onReportingValueChanged() {
-        // Since we stop iteration below once lastReportedValue > reportingValue, we must recompute lastReportedValue if
-        // reportingValue is updated.
-        getMainNode().ifPresent(this::updateReportingValue);
+        updateState();
     }
 
     @Override
@@ -242,7 +246,7 @@ public class StorageLevelEmitterPart extends AbstractLevelEmitterPart
                 }
             }
 
-            getMainNode().ifPresent(this::updateReportingValue);
+            scheduleReportingUpdate();
         }
 
         updateState();
@@ -253,30 +257,53 @@ public class StorageLevelEmitterPart extends AbstractLevelEmitterPart
         var myStack = getConfiguredKey();
 
         if (myStack == null) {
+            this.aggregateOverflow = null;
             this.lastReportedValue = 0;
             for (var st : stacks) {
-                this.lastReportedValue += st.getLongValue();
-                if (this.lastReportedValue > this.getReportingValue()) {
-                    // Stop here, we have enough info! This prevents blank emitter spam from causing lots of lag.
-                    break;
-                }
+                addReportedAmount(st.getLongValue());
             }
         } else if (isUpgradedWith(AEItems.FUZZY_CARD)) {
+            this.aggregateOverflow = null;
             this.lastReportedValue = 0;
             var fzMode = this.getConfigManager().getSetting(Settings.FUZZY_MODE);
             var fuzzyList = stacks.findFuzzy(myStack, fzMode);
             for (var st : fuzzyList) {
-                this.lastReportedValue += st.getLongValue();
-                if (this.lastReportedValue > this.getReportingValue()) {
-                    // Stop here, we have enough info!
-                    break;
-                }
+                addReportedAmount(st.getLongValue());
             }
         } else {
             this.lastReportedValue = stacks.get(myStack);
         }
 
         this.updateState();
+    }
+
+    private void scheduleReportingUpdate() {
+        if (this.reportingUpdatePending || isClientSide() || getLevel() == null) {
+            return;
+        }
+        this.reportingUpdatePending = true;
+        try {
+            getMainNode().ifPresent(this::updateReportingValue);
+        } finally {
+            this.reportingUpdatePending = false;
+        }
+    }
+
+    private void addReportedAmount(long delta) {
+        if (this.aggregateOverflow == null && (delta <= 0 || this.lastReportedValue <= Long.MAX_VALUE - delta)) {
+            this.lastReportedValue += delta;
+            return;
+        }
+        if (this.aggregateOverflow == null) {
+            this.aggregateOverflow = BigInteger.valueOf(this.lastReportedValue);
+        }
+        this.aggregateOverflow = this.aggregateOverflow.add(BigInteger.valueOf(delta));
+        if (this.aggregateOverflow.bitLength() < 64) {
+            this.lastReportedValue = this.aggregateOverflow.longValue();
+            this.aggregateOverflow = null;
+        } else {
+            this.lastReportedValue = Long.MAX_VALUE;
+        }
     }
 
     @Override
@@ -321,8 +348,6 @@ public class StorageLevelEmitterPart extends AbstractLevelEmitterPart
             return this.isLevelEmitterOn() ? MODEL_ON_OFF : MODEL_OFF_OFF;
         }
     }
-
-
 
 
 }

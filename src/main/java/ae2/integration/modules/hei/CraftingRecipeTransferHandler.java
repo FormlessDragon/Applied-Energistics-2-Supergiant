@@ -8,6 +8,7 @@ import ae2.container.me.items.ContainerCraftingTerm;
 import ae2.core.localization.ItemModText;
 import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.integration.modules.itemlists.CraftingHelper;
+import ae2.mixins.hei.AccessorRecipeLayout;
 import ae2.util.EmptyArrays;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -16,14 +17,17 @@ import mezz.jei.api.gui.IGuiIngredient;
 import mezz.jei.api.gui.IRecipeLayout;
 import mezz.jei.api.ingredients.VanillaTypes;
 import mezz.jei.api.recipe.IRecipeCategory;
+import mezz.jei.api.recipe.IRecipeWrapper;
 import mezz.jei.api.recipe.VanillaRecipeCategoryUid;
 import mezz.jei.api.recipe.transfer.IRecipeTransferError;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandler;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandlerHelper;
+import mezz.jei.api.recipe.wrapper.ICraftingRecipeWrapper;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.Ingredient;
+import net.minecraft.util.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -178,6 +182,17 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
         return category != null && VanillaRecipeCategoryUid.CRAFTING.equals(category.getUid());
     }
 
+    private static @Nullable ResourceLocation getCraftingRecipeId(IRecipeLayout recipeLayout) {
+        if (!(recipeLayout instanceof AccessorRecipeLayout accessor)) {
+            return null;
+        }
+
+        IRecipeWrapper wrapper = accessor.ae2$getRecipeWrapper();
+        return wrapper instanceof ICraftingRecipeWrapper craftingWrapper
+            ? craftingWrapper.getRegistryName()
+            : null;
+    }
+
     private static boolean isValidStack(@Nullable GenericStack stack) {
         return stack != null && stack.what() != null && stack.amount() > 0;
     }
@@ -232,7 +247,8 @@ public class CraftingRecipeTransferHandler<T extends ContainerCraftingTerm> impl
         if (pseudoRecipe != null) {
             CraftingHelper.performTransfer(container, null, templates, true, pseudoRecipe.inputs, pseudoRecipe.outputs);
         } else {
-            CraftingHelper.performTransfer(container, null, templates, GuiScreen.isCtrlKeyDown());
+            ResourceLocation recipeId = isCraftingLayout(recipeLayout) ? getCraftingRecipeId(recipeLayout) : null;
+            CraftingHelper.performTransfer(container, recipeId, templates, GuiScreen.isCtrlKeyDown());
         }
 
         return null;

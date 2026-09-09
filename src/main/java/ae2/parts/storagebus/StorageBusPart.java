@@ -2,8 +2,8 @@ package ae2.parts.storagebus;
 
 import ae2.api.AECapabilities;
 import ae2.api.behaviors.ExternalStorageStrategy;
-import ae2.api.config.Actionable;
 import ae2.api.config.AccessRestriction;
+import ae2.api.config.Actionable;
 import ae2.api.config.FuzzyMode;
 import ae2.api.config.IncludeExclude;
 import ae2.api.config.Setting;
@@ -21,8 +21,8 @@ import ae2.api.parts.IPartCollisionHelper;
 import ae2.api.parts.IPartHost;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
-import ae2.api.stacks.AEKeyType;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.AEKeyType;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.IStorageMounts;
 import ae2.api.storage.IStorageProvider;
@@ -34,14 +34,15 @@ import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigManagerBuilder;
 import ae2.container.GuiIds;
 import ae2.container.ISubGui;
-import ae2.core.AppEng;
 import ae2.core.AELog;
+import ae2.core.AppEng;
 import ae2.core.definitions.AEItems;
 import ae2.core.gui.GuiOpener;
 import ae2.core.settings.TickRates;
 import ae2.helpers.IConfigInvHost;
 import ae2.helpers.IPriorityHost;
 import ae2.helpers.InterfaceLogicHost;
+import ae2.hooks.ticking.TickHandler;
 import ae2.items.parts.PartModels;
 import ae2.me.helpers.MachineSource;
 import ae2.me.storage.CompositeStorage;
@@ -58,10 +59,10 @@ import ae2.util.prioritylist.DefaultPriorityList;
 import ae2.util.prioritylist.FuzzyPriorityList;
 import ae2.util.prioritylist.IPartitionList;
 import ae2.util.prioritylist.PrecisePriorityList;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
@@ -84,6 +85,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class StorageBusPart extends UpgradeablePart
     implements IGridTickable, IStorageProvider, IPriorityHost, IConfigInvHost {
@@ -114,14 +116,17 @@ public class StorageBusPart extends UpgradeablePart
     @Nullable
     private Map<AEKeyType, ExternalStorageStrategy> externalStorageStrategies;
     private boolean wasOnline;
+    private boolean targetValidated;
     private final ConfigInventory config = ConfigInventory.configTypes(63)
                                                           .changeListener(this::onConfigurationChanged)
                                                           .build();
     private int priority;
     private PendingUpdateStatus updateStatus = PendingUpdateStatus.FAST_UPDATE;
     private boolean externalStorageExtractableOnly;
+    private boolean configurationDirty = true;
     @Nullable
     private ITickingMonitor monitor;
+
     public StorageBusPart(IPartItem<?> partItem) {
         super(partItem);
         this.adjacentStorageAccessor = new PartAdjacentApi<>(this, AECapabilities.ME_STORAGE,
@@ -174,6 +179,11 @@ public class StorageBusPart extends UpgradeablePart
         if (this.wasOnline != currentOnline) {
             this.wasOnline = currentOnline;
             this.getHost().markForUpdate();
+            if (currentOnline) {
+                scheduleUpdate();
+            } else {
+                this.targetValidated = false;
+            }
             remountStorage();
         }
     }
@@ -200,7 +210,11 @@ public class StorageBusPart extends UpgradeablePart
         }
 
         this.updateStatus = PendingUpdateStatus.FAST_UPDATE;
-        getMainNode().ifPresent((grid, node) -> grid.getTickManager().alertDevice(node));
+        getMainNode().ifPresent((grid, node) -> {
+            if (node.isOnline()) {
+                grid.getTickManager().alertDevice(node);
+            }
+        });
     }
 
     @Override
@@ -285,8 +299,15 @@ public class StorageBusPart extends UpgradeablePart
 
     @Override
     public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
+        if (!node.isOnline()) {
+            return TickRateModulation.SLEEP;
+        }
         if (this.updateStatus != PendingUpdateStatus.NO_UPDATE) {
             this.updateTarget(false);
+        }
+
+        if (!node.isOnline()) {
+            return TickRateModulation.SLEEP;
         }
 
         if (this.monitor != null) {
@@ -306,7 +327,8 @@ public class StorageBusPart extends UpgradeablePart
     }
 
     private boolean hasRegisteredCellToNetwork() {
-        return getMainNode().isOnline() && !(this.handler.getDelegate() instanceof NullInventory);
+        return this.targetValidated && getMainNode().isOnline()
+            && !(this.handler.getDelegate() instanceof NullInventory);
     }
 
     @Nullable
@@ -315,8 +337,11 @@ public class StorageBusPart extends UpgradeablePart
     }
 
     protected void onConfigurationChanged() {
-        if (getMainNode().isReady()) {
+        this.configurationDirty = true;
+        if (getMainNode().isOnline()) {
             updateTarget(true);
+        } else {
+            scheduleUpdate();
         }
     }
 
@@ -331,6 +356,12 @@ public class StorageBusPart extends UpgradeablePart
         if (isClientSide()) {
             return;
         }
+        if (!getMainNode().isOnline()) {
+            scheduleUpdate();
+            return;
+        }
+        forceFullUpdate |= this.configurationDirty;
+        boolean wasRegistered = this.hasRegisteredCellToNetwork();
 
         MEStorage foundMonitor = null;
         Reference2ObjectMap<AEKeyType, MEStorage> foundExternalApi = new Reference2ObjectOpenHashMap<>(0);
@@ -350,22 +381,30 @@ public class StorageBusPart extends UpgradeablePart
         }
 
         boolean extractableOnly = isExtractableOnly();
+        this.targetValidated = true;
         if (this.handler.getDelegate() instanceof CompositeStorage compositeStorage
             && !foundExternalApi.isEmpty()
             && (!forceFullUpdate || this.externalStorageExtractableOnly == extractableOnly)) {
-            if (!forceFullUpdate) {
-                compositeStorage.setStorages(foundExternalApi);
-            }
+            compositeStorage.setStorages(foundExternalApi);
             this.handlerDescription = compositeStorage.getDescription();
-            configureHandler();
+            if (forceFullUpdate) {
+                configureHandler();
+            }
+            if (wasRegistered != this.hasRegisteredCellToNetwork()) {
+                remountStorage();
+            }
             return;
         } else if (foundMonitor == this.handler.getDelegate()) {
-            configureHandler();
+            if (forceFullUpdate) {
+                configureHandler();
+            }
+            if (wasRegistered != this.hasRegisteredCellToNetwork()) {
+                remountStorage();
+            }
             return;
         }
 
         boolean wasSleeping = this.monitor == null;
-        boolean wasRegistered = this.hasRegisteredCellToNetwork();
 
         MEStorage newInventory;
         if (foundMonitor != null) {
@@ -407,6 +446,7 @@ public class StorageBusPart extends UpgradeablePart
     }
 
     private void configureHandler() {
+        this.configurationDirty = false;
         this.handler.setAccessRestriction(this.getConfigManager().getSetting(Settings.ACCESS));
         this.handler.setWhitelist(isUpgradedWith(AEItems.INVERTER_CARD) ? IncludeExclude.BLACKLIST
             : IncludeExclude.WHITELIST);
@@ -460,7 +500,7 @@ public class StorageBusPart extends UpgradeablePart
 
     private void invalidateOnExternalStorageChange() {
         this.clearCachedExternalStorageStrategies();
-        getMainNode().ifPresent((grid, node) -> grid.getTickManager().alertDevice(node));
+        this.scheduleUpdate();
     }
 
     protected void clearCachedExternalStorageStrategies() {
@@ -512,6 +552,9 @@ public class StorageBusPart extends UpgradeablePart
 
     @Override
     public void setPriority(int newValue) {
+        if (this.priority == newValue) {
+            return;
+        }
         this.priority = newValue;
         this.getHost().markForSave();
         this.remountStorage();
@@ -557,13 +600,12 @@ public class StorageBusPart extends UpgradeablePart
     protected static class StorageBusInventory extends MEInventoryHandler implements MEStorageMonitor, ITickingMonitor {
         private final ObjectList<ListenerRegistration> listeners = new ObjectArrayList<>();
         private final ObjectList<ListenerRegistration> listenerDispatchBuffer = new ObjectArrayList<>();
-        private final DelegateListener delegateListener = new DelegateListener();
+        @Nullable
+        private DelegateListener delegateListener;
         private KeyCounter targetCache = KeyCounter.saturating();
         private KeyCounter targetScratch = KeyCounter.saturating();
         @Nullable
         private MEStorageMonitor monitoredDelegate;
-        @Nullable
-        private Thread delegateThread;
         private boolean cacheDirty = true;
         private boolean cacheInitialized;
         private boolean processingDelegateCallback;
@@ -584,11 +626,14 @@ public class StorageBusPart extends UpgradeablePart
         protected void setDelegate(MEStorage delegate) {
             unbindDelegateMonitor();
             super.setDelegate(delegate);
+            this.targetCache.clear();
+            this.targetCache.removeEmptySubmaps();
+            this.targetScratch.clear();
+            this.targetScratch.removeEmptySubmaps();
             this.cacheInitialized = false;
             this.cacheDirty = true;
             if (!this.listeners.isEmpty()) {
                 bindDelegateMonitor();
-                refreshTarget(false);
             }
             notifyListUpdate();
         }
@@ -659,7 +704,7 @@ public class StorageBusPart extends UpgradeablePart
             this.listeners.add(new ListenerRegistration(listener, verificationToken));
             if (firstListener) {
                 bindDelegateMonitor();
-                refreshTarget(false);
+                this.cacheDirty = true;
             }
         }
 
@@ -683,6 +728,11 @@ public class StorageBusPart extends UpgradeablePart
             }
             this.listeners.clear();
             unbindDelegateMonitor();
+            this.targetCache.clear();
+            this.targetCache.removeEmptySubmaps();
+            this.targetScratch.clear();
+            this.targetScratch.removeEmptySubmaps();
+            this.cacheInitialized = false;
         }
 
         private void bindDelegateMonitor() {
@@ -691,16 +741,19 @@ public class StorageBusPart extends UpgradeablePart
             }
             if (getDelegate() instanceof MEStorageMonitor monitor) {
                 this.monitoredDelegate = monitor;
-                this.delegateThread = Thread.currentThread();
+                this.delegateListener = new DelegateListener();
                 monitor.addListener(this.delegateListener, getDelegate());
             }
         }
 
         private void unbindDelegateMonitor() {
             if (this.monitoredDelegate != null) {
-                this.monitoredDelegate.removeListener(this.delegateListener);
+                var previous = this.monitoredDelegate;
+                var previousListener = this.delegateListener;
                 this.monitoredDelegate = null;
-                this.delegateThread = null;
+                this.delegateListener = null;
+                this.cacheDirty = true;
+                previous.removeListener(previousListener);
             }
         }
 
@@ -715,14 +768,14 @@ public class StorageBusPart extends UpgradeablePart
             getDelegate().getAvailableStacks(this.targetScratch);
             this.targetScratch.removeZeros();
             boolean changed = hasDifference(this.targetCache, this.targetScratch);
-            if (publishChanges) {
-                publishReplacement(this.targetCache, this.targetScratch);
-            }
             var previous = this.targetCache;
             this.targetCache = this.targetScratch;
             this.targetScratch = previous;
             this.cacheInitialized = true;
             this.cacheDirty = false;
+            if (publishChanges) {
+                publishReplacement(previous, this.targetCache);
+            }
             return changed;
         }
 
@@ -768,7 +821,6 @@ public class StorageBusPart extends UpgradeablePart
                 return;
             }
             if (this.cacheDirty) {
-                requestListUpdate();
                 return;
             }
 
@@ -779,7 +831,13 @@ public class StorageBusPart extends UpgradeablePart
                 markCacheDirty();
                 return;
             }
-            long updated = delta > 0 && current > Long.MAX_VALUE - delta ? Long.MAX_VALUE : current + delta;
+            if (delta > 0 && current > Long.MAX_VALUE - delta) {
+                AELog.error("Storage bus target reported delta %d for %s with cached amount %d, which overflows the cache.",
+                    delta, what, current);
+                markCacheDirty();
+                return;
+            }
+            long updated = current + delta;
             if (updated == 0) {
                 this.targetCache.remove(what);
             } else {
@@ -880,18 +938,27 @@ public class StorageBusPart extends UpgradeablePart
         }
 
         private final class DelegateListener implements MEStorageChangeListener {
+            private final Thread ownerThread = Thread.currentThread();
+            private final AtomicBoolean invalidationQueued = new AtomicBoolean();
+
             @Override
             public boolean isValid(Object verificationToken) {
-                return verificationToken == getDelegate()
+                return delegateListener == this && verificationToken == getDelegate()
                     && monitoredDelegate == getDelegate()
                     && !listeners.isEmpty();
             }
 
             @Override
             public void onStackChange(AEKey what, long delta) {
-                if (Thread.currentThread() != delegateThread) {
-                    AELog.error("Storage bus target invoked a callback from the wrong thread.");
-                    cacheDirty = true;
+                if (Thread.currentThread() != this.ownerThread) {
+                    queueThreadInvalidation();
+                    return;
+                }
+                if (delegateListener != this) {
+                    AELog.error("Detached storage bus target invoked a content callback.");
+                    return;
+                }
+                if (this.invalidationQueued.get()) {
                     return;
                 }
                 if (processingDelegateCallback || dispatchingListeners) {
@@ -911,9 +978,12 @@ public class StorageBusPart extends UpgradeablePart
 
             @Override
             public void onListUpdate() {
-                if (Thread.currentThread() != delegateThread) {
-                    AELog.error("Storage bus target invalidated its list from the wrong thread.");
-                    cacheDirty = true;
+                if (Thread.currentThread() != this.ownerThread) {
+                    queueThreadInvalidation();
+                    return;
+                }
+                if (delegateListener != this) {
+                    AELog.error("Detached storage bus target invalidated its list.");
                     return;
                 }
                 if (processingDelegateCallback || dispatchingListeners) {
@@ -928,6 +998,18 @@ public class StorageBusPart extends UpgradeablePart
                 } finally {
                     processingDelegateCallback = false;
                     flushPendingListUpdate();
+                }
+            }
+
+            private void queueThreadInvalidation() {
+                if (this.invalidationQueued.compareAndSet(false, true)) {
+                    AELog.error("Storage bus target invoked a callback from the wrong thread; queuing a server-thread invalidation.");
+                    TickHandler.instance().addCallable(null, () -> {
+                        this.invalidationQueued.set(false);
+                        if (delegateListener == this) {
+                            markCacheDirty();
+                        }
+                    });
                 }
             }
         }

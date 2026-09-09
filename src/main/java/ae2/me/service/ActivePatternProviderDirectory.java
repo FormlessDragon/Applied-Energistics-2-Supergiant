@@ -2,6 +2,7 @@ package ae2.me.service;
 
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.inventories.InternalInventory;
+import ae2.api.inventories.VersionedInternalInventory;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridService;
@@ -14,6 +15,7 @@ import ae2.core.worlddata.PatternProviderMappingData.ProviderReference;
 import ae2.helpers.patternprovider.PatternContainer;
 import ae2.helpers.patternprovider.PatternProviderLogicHost;
 import ae2.parts.AEBasePart;
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
@@ -55,17 +57,21 @@ public final class ActivePatternProviderDirectory implements IGridService, IGrid
         .thenComparing(ProviderDescriptor::providerClassName)
         .thenComparingLong(descriptor -> descriptor.providerKey().serial);
 
-    private final IGrid grid;
+    private final Reference2ObjectOpenHashMap<IGridNode, Candidate> candidates = new Reference2ObjectOpenHashMap<>();
+    private final Reference2IntOpenHashMap<PatternContainer> candidateNodeCounts = new Reference2IntOpenHashMap<>();
     private final Reference2ObjectOpenHashMap<PatternContainer, ProviderKey> providerKeysByContainer =
         new Reference2ObjectOpenHashMap<>();
     private final Reference2ObjectOpenHashMap<ProviderKey, PatternContainer> providersByKey =
         new Reference2ObjectOpenHashMap<>();
-    private long observedActiveMachineSetRevision = Long.MIN_VALUE;
+    private final Reference2ObjectOpenHashMap<PatternContainer, EmptySlotCount> emptySlotCounts =
+        new Reference2ObjectOpenHashMap<>();
+    private long providerSetRevision;
+    private long observedProviderSetRevision = Long.MIN_VALUE;
     private long nextProviderKey;
     private List<PatternContainer> activeProviders = List.of();
 
     public ActivePatternProviderDirectory(IGrid grid) {
-        this.grid = Objects.requireNonNull(grid, "grid");
+        Objects.requireNonNull(grid, "grid");
     }
 
     /** Returns the current server-only cache of active provider machines. */
@@ -74,23 +80,14 @@ public final class ActivePatternProviderDirectory implements IGridService, IGrid
         return this.activeProviders;
     }
 
-    /**
-     * Creates freshly evaluated Provider Selection descriptors from the active-provider cache.
-     *
-     * <p>Selection metadata such as available slots and display names may change without changing Grid membership, so
-     * these immutable descriptors are rebuilt on each query while discovery itself remains revision-cached.</p>
-     */
-    public List<ProviderDescriptor> getSelectableProviderDescriptors() {
-        refreshActiveProvidersIfNeeded();
-
-        List<ProviderDescriptor> descriptors = new ArrayList<>();
-        for (PatternContainer container : this.activeProviders) {
-            if (isSelectableProvider(container)) {
-                descriptors.add(createDescriptor(container, this.providerKeysByContainer.get(container)));
+    private static int countEmptySlots(InternalInventory inventory, int size) {
+        int emptySlots = 0;
+        for (int slot = 0; slot < size; slot++) {
+            if (inventory.getStackInSlot(slot).isEmpty()) {
+                emptySlots++;
             }
         }
-        descriptors.sort(PROVIDER_DESCRIPTOR_ORDER);
-        return List.copyOf(descriptors);
+        return emptySlots;
     }
 
     /** Resolves a server-only key while its provider remains active and selectable. */
@@ -109,32 +106,46 @@ public final class ActivePatternProviderDirectory implements IGridService, IGrid
         return this.providerKeysByContainer.containsKey(container) && isSelectableProvider(container);
     }
 
+    /**
+     * Creates freshly evaluated Provider Selection descriptors from the active-provider cache.
+     *
+     * <p>Selection metadata such as available slots and display names may change without changing Grid membership, so
+     * these immutable descriptors are rebuilt on each query while discovery itself remains revision-cached.</p>
+     */
+    public List<ProviderDescriptor> getSelectableProviderDescriptors() {
+        refreshActiveProvidersIfNeeded();
+
+        List<ProviderDescriptor> descriptors = new ArrayList<>();
+        for (int i = 0, size = this.activeProviders.size(); i < size; i++) {
+            var container = this.activeProviders.get(i);
+            if (isSelectableProvider(container)) {
+                descriptors.add(createDescriptor(container, this.providerKeysByContainer.get(container)));
+            }
+        }
+        descriptors.sort(PROVIDER_DESCRIPTOR_ORDER);
+        return List.copyOf(descriptors);
+    }
+
     private void refreshActiveProvidersIfNeeded() {
-        long revision = this.grid.getActiveMachineSetRevision();
-        if (revision < 0 || revision != this.observedActiveMachineSetRevision) {
+        if (this.providerSetRevision != this.observedProviderSetRevision) {
             refreshActiveProviders();
-            this.observedActiveMachineSetRevision = revision;
+            this.observedProviderSetRevision = this.providerSetRevision;
         }
     }
 
     private void refreshActiveProviders() {
         List<PatternContainer> providers = new ArrayList<>();
         Set<PatternContainer> seen = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (Class<?> machineClass : this.grid.getMachineClasses()) {
-            if (!PatternContainer.class.isAssignableFrom(machineClass)) {
-                continue;
-            }
-            Class<? extends PatternContainer> containerClass = machineClass.asSubclass(PatternContainer.class);
-            for (PatternContainer container : this.grid.getActiveMachines(containerClass)) {
-                if (seen.add(container)) {
-                    providers.add(container);
-                }
+        for (var candidate : this.candidates.values()) {
+            if (candidate.active && seen.add(candidate.container)) {
+                providers.add(candidate.container);
             }
         }
 
         this.providerKeysByContainer.keySet().removeIf(container -> !seen.contains(container));
         this.providersByKey.clear();
-        for (PatternContainer provider : providers) {
+        for (int i = 0; i < providers.size(); i++) {
+            PatternContainer provider = providers.get(i);
             ProviderKey key = this.providerKeysByContainer.get(provider);
             if (key == null) {
                 key = new ProviderKey(this.nextProviderKey++);
@@ -145,31 +156,116 @@ public final class ActivePatternProviderDirectory implements IGridService, IGrid
         this.activeProviders = List.copyOf(providers);
     }
 
+    @Override
+    public void addNode(IGridNode gridNode, @Nullable NBTTagCompound savedData) {
+        if (!(gridNode.getOwner() instanceof PatternContainer container)) {
+            return;
+        }
+        if (this.candidates.putIfAbsent(gridNode, new Candidate(container, gridNode.isOnline())) != null) {
+            throw new IllegalStateException("Pattern container node was added to the directory twice: " + gridNode);
+        }
+        this.candidateNodeCounts.addTo(container, 1);
+        markProviderSetChanged();
+    }
+
+    @Override
+    public void removeNode(IGridNode gridNode) {
+        Candidate removed = this.candidates.remove(gridNode);
+        if (removed != null) {
+            if (this.candidateNodeCounts.addTo(removed.container, -1) == 1) {
+                this.candidateNodeCounts.removeInt(removed.container);
+                this.emptySlotCounts.remove(removed.container);
+                ProviderKey key = this.providerKeysByContainer.remove(removed.container);
+                if (key != null) {
+                    this.providersByKey.remove(key);
+                }
+            }
+            markProviderSetChanged();
+        }
+    }
+
+    /**
+     * Refreshes one candidate after its owning node receives a state notification.
+     *
+     * <p>Unknown nodes are ignored, which keeps notifications for unrelated grid machines from querying their
+     * active state.</p>
+     */
+    // GridNode is in ae2.me, so this entry point must remain public to cross the package boundary.
+    public void onNodeStateChanged(IGridNode gridNode) {
+        Objects.requireNonNull(gridNode, "gridNode");
+        Candidate candidate = this.candidates.get(gridNode);
+        if (candidate == null) {
+            return;
+        }
+
+        boolean active = gridNode.isOnline();
+        if (candidate.active != active) {
+            candidate.active = active;
+            markProviderSetChanged();
+        }
+    }
+
+    long getProviderSetRevision() {
+        return this.providerSetRevision;
+    }
+
+    private void markProviderSetChanged() {
+        this.providerSetRevision = Math.incrementExact(this.providerSetRevision);
+        this.activeProviders = List.of();
+    }
+
     private static boolean isSelectableProvider(PatternContainer container) {
         return container.isVisibleInTerminal() && !container.isAssemblerPatternContainer();
     }
 
-    private static ProviderDescriptor createDescriptor(PatternContainer container, ProviderKey providerKey) {
+    private ProviderDescriptor createDescriptor(PatternContainer container, ProviderKey providerKey) {
         if (providerKey == null) {
             throw new IllegalStateException("Active pattern provider has no directory key");
         }
         ProviderLocation location = getProviderLocation(container);
         return new ProviderDescriptor(providerKey, container.getTerminalSortOrder(), container.getTerminalGroup(),
-            countEmptySlots(container), !container.isAssemblerPatternContainer(),
+            getEmptySlots(container), !container.isAssemblerPatternContainer(),
             location == null ? null : new ProviderReference(location.dimensionId(), location.pos(), location.side()),
             location != null, location == null ? 0 : location.dimensionId(), location == null ? 0L : location.pos(),
             location == null ? -1 : location.side(), getProviderName(container), container.getClass().getName());
     }
 
-    private static int countEmptySlots(PatternContainer container) {
-        InternalInventory inventory = container.getTerminalPatternInventory();
-        int emptySlots = 0;
-        for (int slot = 0; slot < inventory.size(); slot++) {
-            if (inventory.getStackInSlot(slot).isEmpty()) {
-                emptySlots++;
-            }
+    /**
+     * Counts empty slots only on demand. Versioned inventories share the result across terminal sessions until
+     * identity, size or contents version changes. Unversioned inventories are read on every request.
+     * Must be called on the server thread for a provider still registered in this directory.
+     */
+    public int getEmptySlots(PatternContainer container) {
+        if (!this.candidateNodeCounts.containsKey(container)) {
+            throw new IllegalArgumentException("Cannot query slots of an unregistered pattern provider");
         }
-        return emptySlots;
+        InternalInventory inventory = container.getTerminalPatternInventory();
+        int size = inventory.size();
+        if (inventory instanceof VersionedInternalInventory versioned) {
+            long version = versioned.getContentsVersion();
+            var cached = this.emptySlotCounts.get(container);
+            if (cached != null && cached.inventory == inventory && cached.size == size && cached.version == version) {
+                return cached.emptySlots;
+            }
+            int emptySlots = countEmptySlots(inventory, size);
+            this.emptySlotCounts.put(container, new EmptySlotCount(inventory, size, version, emptySlots));
+            return emptySlots;
+        }
+        this.emptySlotCounts.remove(container);
+        return countEmptySlots(inventory, size);
+    }
+
+    private static final class Candidate {
+        private final PatternContainer container;
+        private boolean active;
+
+        private Candidate(PatternContainer container, boolean active) {
+            this.container = container;
+            this.active = active;
+        }
+    }
+
+    private record EmptySlotCount(InternalInventory inventory, int size, long version, int emptySlots) {
     }
 
     private static String getProviderName(PatternContainer container) {
@@ -291,16 +387,6 @@ public final class ActivePatternProviderDirectory implements IGridService, IGrid
         }
         return new ProviderLocation(tile.getWorld().provider.getDimension(), tile.getPos().toLong(),
             side == null ? -1 : side.ordinal());
-    }
-
-    @Override
-    public void addNode(IGridNode gridNode, @Nullable NBTTagCompound savedData) {
-        this.observedActiveMachineSetRevision = Long.MIN_VALUE;
-    }
-
-    @Override
-    public void removeNode(IGridNode gridNode) {
-        this.observedActiveMachineSetRevision = Long.MIN_VALUE;
     }
 
     /** Opaque server-only identity for a currently active provider. */

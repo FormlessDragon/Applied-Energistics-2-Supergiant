@@ -11,6 +11,7 @@ public final class TickSnapshot {
     private final IdentityHashMap<IGridNode, NodeTimes> nodeTimes = new IdentityHashMap<>();
     private long cpuAverage;
     private long cpuMax;
+    private boolean cpuMaxDirty;
     private long storage;
     private long crafting;
     private long tick;
@@ -19,6 +20,7 @@ public final class TickSnapshot {
     public void reset() {
         this.cpuAverage = 0;
         this.cpuMax = 0;
+        this.cpuMaxDirty = false;
         this.storage = 0;
         this.crafting = 0;
         this.tick = 0;
@@ -38,6 +40,9 @@ public final class TickSnapshot {
             addCategoryAverage(category, deltaAverage);
         }
 
+        if (times.maximumTime == this.cpuMax && maximumTime < times.maximumTime) {
+            this.cpuMaxDirty = true;
+        }
         times.category = category;
         times.averageTime = averageTime;
         times.maximumTime = maximumTime;
@@ -56,7 +61,7 @@ public final class TickSnapshot {
         }
 
         if (times.maximumTime >= this.cpuMax) {
-            updateCpuMax();
+            this.cpuMaxDirty = true;
         }
     }
 
@@ -75,6 +80,7 @@ public final class TickSnapshot {
             maximumTime = Math.max(maximumTime, times.maximumTime);
         }
         this.cpuMax = maximumTime;
+        this.cpuMaxDirty = false;
     }
 
     public long cpuAverage() {
@@ -82,6 +88,9 @@ public final class TickSnapshot {
     }
 
     public long cpuMax() {
+        if (this.cpuMaxDirty) {
+            updateCpuMax();
+        }
         return this.cpuMax;
     }
 

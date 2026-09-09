@@ -28,9 +28,10 @@ import ae2.api.storage.ITerminalHost;
 import ae2.api.storage.StorageHelper;
 import ae2.container.GuiIds;
 import ae2.container.SlotSemantics;
-import ae2.container.crafting.RecipeSelection;
 import ae2.container.crafting.CraftingGridTweaks;
+import ae2.container.crafting.DeferredRecipeLookup;
 import ae2.container.crafting.LastCraftingRecipeTracker;
+import ae2.container.crafting.RecipeSelection;
 import ae2.container.guisync.GuiSync;
 import ae2.container.implementations.ContainerCraftConfirm;
 import ae2.container.interfaces.ICraftingGridContainer;
@@ -39,6 +40,7 @@ import ae2.container.me.common.GridInventoryEntry;
 import ae2.container.me.common.IClientRepo;
 import ae2.container.slot.CraftingMatrixSlot;
 import ae2.container.slot.CraftingTermSlot;
+import ae2.core.AELog;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.crafting.TemporaryPseudoCraftingProvider;
@@ -60,14 +62,15 @@ import net.minecraft.inventory.Container;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.crafting.CraftingManager;
 import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.item.crafting.Ingredient;
 import net.minecraft.util.NonNullList;
 import net.minecraft.util.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Can only be used with a host that implements {@link ISegmentedInventory} and exposes an inventory named "crafting" to
@@ -105,6 +108,11 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
     @GuiSync(90)
     @Nullable
     private ResourceLocation selectedRecipeId;
+    private final DeferredRecipeLookup deferredRecipeLookup = new DeferredRecipeLookup();
+    @GuiSync(91)
+    private boolean authoritativeRecipeSelection;
+    @GuiSync(92)
+    private long recipeSelectionRevision;
     private boolean clearGridOnClose;
 
     public ContainerCraftingTerm(InventoryPlayer ip, ITerminalHost host) {
@@ -149,7 +157,19 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
     @Override
     public void onCraftMatrixChanged(IInventory inventory) {
         super.onCraftMatrixChanged(inventory);
-        updateCurrentRecipeAndOutput(false);
+        if (isServerSide()) {
+            markCraftingRecipeDirty();
+        } else if (!this.authoritativeRecipeSelection) {
+            updateCurrentRecipeAndOutput(false);
+        }
+    }
+
+    @Override
+    public void broadcastChanges() {
+        if (isServerSide()) {
+            resolveDeferredCraftingRecipe();
+        }
+        super.broadcastChanges();
     }
 
     private void updateCurrentRecipeAndOutput(boolean forceUpdate) {
@@ -171,6 +191,7 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
         RecipeSelection.Candidate selected = RecipeSelection.select(this.recipeCandidates, this.selectedRecipeId);
         this.currentRecipe = selected == null ? null : selected.recipe();
         this.selectedRecipeId = selected == null ? null : selected.id();
+        this.authoritativeRecipeSelection = false;
         this.lastTestedInput = testInput;
         this.outputSlot.setRecipeUsed(this.currentRecipe);
 
@@ -236,9 +257,52 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
     @Override
     public void onServerDataSync(ShortSet updatedFields) {
         super.onServerDataSync(updatedFields);
-        if (this.selectedRecipeId != null) {
+        if (this.authoritativeRecipeSelection) {
+            applyAuthoritativeRecipeSelectionOnClient();
+        } else if (updatedFields.contains((short) 91)) {
+            // Slot synchronization may already have refreshed the local matrix. Reuse that
+            // result and only enumerate recipes if the final matrix actually differs.
+            updateCurrentRecipeAndOutput(false);
+        } else if (this.selectedRecipeId != null) {
             applyRecipeSelection(this.selectedRecipeId);
         }
+    }
+
+    private void applyAuthoritativeRecipeSelectionOnClient() {
+        ResourceLocation recipeId = this.selectedRecipeId;
+        if (recipeId == null) {
+            AELog.error("Server marked crafting recipe selection authoritative without a recipe id");
+            this.recipeCandidates = List.of();
+            this.currentRecipe = null;
+            this.outputSlot.setRecipeUsed(null);
+            this.outputSlot.setDisplayedCraftingOutput(ItemStack.EMPTY);
+            return;
+        }
+
+        IRecipe recipe = CraftingManager.REGISTRY.getObject(recipeId);
+        if (recipe == null || !recipeId.equals(recipe.getRegistryName())) {
+            AELog.error("Server synchronized unknown authoritative crafting recipe %s", recipeId);
+            this.recipeCandidates = List.of();
+            this.currentRecipe = null;
+            this.outputSlot.setRecipeUsed(null);
+            this.outputSlot.setDisplayedCraftingOutput(ItemStack.EMPTY);
+            return;
+        }
+
+        NonNullList<ItemStack> testInput = NonNullList.withSize(this.craftingSlots.length, ItemStack.EMPTY);
+        InventoryCrafting craftingInventory = new InventoryCrafting(RECIPE_FINDING_CONTAINER, GRID_WIDTH, GRID_HEIGHT);
+        for (int i = 0; i < testInput.size(); i++) {
+            ItemStack stack = this.craftingSlots[i].getStack().copy();
+            testInput.set(i, stack);
+            craftingInventory.setInventorySlotContents(i, stack);
+        }
+
+        this.lastTestedInput = testInput;
+        this.recipeCandidates = List.of(new RecipeSelection.Candidate(
+            recipeId, recipe, recipe.getCraftingResult(craftingInventory).copy()));
+        this.currentRecipe = recipe;
+        this.outputSlot.setRecipeUsed(recipe);
+        this.outputSlot.setDisplayedCraftingOutput(this.recipeCandidates.getFirst().output().copy());
     }
 
     public List<RecipeSelection.Candidate> getRecipeCandidates() {
@@ -259,10 +323,82 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
     }
 
     private void selectRecipeFromClient(String recipeId) {
+        if (this.deferredRecipeLookup.isDirty()) {
+            AELog.debug("Ignoring crafting recipe selection while the crafting matrix is pending lookup");
+            return;
+        }
         try {
-            updateCurrentRecipeAndOutput(true);
             applyRecipeSelection(new ResourceLocation(recipeId));
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            AELog.warn(e, "Ignoring invalid crafting recipe selection '%s'", recipeId);
+        }
+    }
+
+    /**
+     * Applies a recipe supplied by HEI after its transfer has populated the matrix.
+     *
+     * @return {@code true} when the registered recipe matches the current matrix
+     */
+    public boolean applyHeiCraftingRecipe(ResourceLocation recipeId) {
+        if (!isServerSide() || recipeId == null) {
+            return false;
+        }
+
+        NonNullList<ItemStack> testInput = NonNullList.withSize(this.craftingSlots.length, ItemStack.EMPTY);
+        InventoryCrafting craftingInventory = new InventoryCrafting(RECIPE_FINDING_CONTAINER, GRID_WIDTH, GRID_HEIGHT);
+        for (int i = 0; i < testInput.size(); i++) {
+            ItemStack stack = this.craftingSlots[i].getStack().copy();
+            testInput.set(i, stack);
+            craftingInventory.setInventorySlotContents(i, stack);
+        }
+
+        RecipeSelection.Candidate selected = RecipeSelection.findCandidateById(
+            craftingInventory, this.getPlayer().world, recipeId);
+        if (selected == null) {
+            markCraftingRecipeDirty();
+            return false;
+        }
+
+        this.lastTestedInput = testInput;
+        this.recipeCandidates = List.of(selected);
+        this.selectedRecipeId = selected.id();
+        this.currentRecipe = selected.recipe();
+        this.authoritativeRecipeSelection = true;
+        this.recipeSelectionRevision++;
+        this.outputSlot.setRecipeUsed(this.currentRecipe);
+        this.outputSlot.setDisplayedCraftingOutput(selected.output().copy());
+        this.deferredRecipeLookup.clear();
+        return true;
+    }
+
+    private void markCraftingRecipeDirty() {
+        if (!isServerSide()) {
+            return;
+        }
+
+        if (this.authoritativeRecipeSelection && !isCurrentMatrixUnchanged()) {
+            this.authoritativeRecipeSelection = false;
+        }
+        this.deferredRecipeLookup.markDirty(this.getPlayer().world.getTotalWorldTime());
+    }
+
+    private boolean isCurrentMatrixUnchanged() {
+        if (this.lastTestedInput == null || this.lastTestedInput.size() != this.craftingSlots.length) {
+            return false;
+        }
+
+        for (int i = 0; i < this.craftingSlots.length; i++) {
+            if (!ItemStack.areItemStacksEqual(this.lastTestedInput.get(i), this.craftingSlots[i].getStack())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void resolveDeferredCraftingRecipe() {
+        if (this.deferredRecipeLookup.isDue(this.getPlayer().world.getTotalWorldTime())) {
+            this.deferredRecipeLookup.clear();
+            updateCurrentRecipeAndOutput(false);
         }
     }
 
@@ -273,6 +409,7 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
         }
         this.selectedRecipeId = selected.id();
         this.currentRecipe = selected.recipe();
+        this.authoritativeRecipeSelection = false;
         this.outputSlot.setRecipeUsed(this.currentRecipe);
         this.outputSlot.setDisplayedCraftingOutput(selected.output().copy());
     }

@@ -48,4 +48,16 @@ public interface IStorageWatcherNode extends IGridNodeService {
      * @param amount New amount in the network
      */
     void onStackChange(AEKey what, long amount);
+
+    /**
+     * Reports both absolute amounts so aggregate observers can update a scalar total without enumerating storage.
+     * The default preserves the existing single-key callback for observers that only need the new amount.
+     *
+     * @param what           changed resource
+     * @param amount         new nonnegative network amount
+     * @param previousAmount previous nonnegative network amount
+     */
+    default void onStackChange(AEKey what, long amount, long previousAmount) {
+        onStackChange(what, amount);
+    }
 }

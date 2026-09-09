@@ -68,7 +68,8 @@ public class ChunkLoadingService implements ForgeChunkManager.LoadingCallback {
             return;
         }
 
-        for (Ticket ticket : tickets) {
+        for (int i = 0; i < tickets.size(); i++) {
+            Ticket ticket = tickets.get(i);
             NBTTagCompound modData = ticket.getModData();
             if (modData == null) {
                 ForgeChunkManager.releaseTicket(ticket);
@@ -114,7 +115,7 @@ public class ChunkLoadingService implements ForgeChunkManager.LoadingCallback {
         return true;
     }
 
-    public boolean releaseChunk(WorldServer level, BlockPos owner, ChunkPos position) {
+    public boolean releaseChunk(WorldServer level, BlockPos owner, ChunkPos position, boolean lastChunk) {
         Object2ObjectMap<BlockPos, Ticket> tickets = this.ticketsByDimension.get(level.provider.getDimension());
         if (tickets == null) {
             return false;
@@ -126,14 +127,27 @@ public class ChunkLoadingService implements ForgeChunkManager.LoadingCallback {
         }
 
         ForgeChunkManager.unforceChunk(ticket, position);
-        if (ticket.getChunkList().isEmpty()) {
-            ForgeChunkManager.releaseTicket(ticket);
-            tickets.remove(owner);
-            if (tickets.isEmpty()) {
-                this.ticketsByDimension.remove(level.provider.getDimension());
-            }
+        if (lastChunk) {
+            releaseOwner(level, owner);
         }
         return true;
+    }
+
+    /**
+     * Releases one owner's ticket; Forge performs the remaining per-chunk bookkeeping.
+     */
+    public void releaseOwner(WorldServer level, BlockPos owner) {
+        var tickets = this.ticketsByDimension.get(level.provider.getDimension());
+        if (tickets == null) {
+            return;
+        }
+        var ticket = tickets.remove(owner);
+        if (tickets.isEmpty()) {
+            this.ticketsByDimension.remove(level.provider.getDimension());
+        }
+        if (ticket != null) {
+            ForgeChunkManager.releaseTicket(ticket);
+        }
     }
 
     private @Nullable Ticket getOrCreateTicket(WorldServer level, BlockPos owner) {

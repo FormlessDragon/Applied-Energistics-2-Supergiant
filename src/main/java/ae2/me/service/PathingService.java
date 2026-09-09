@@ -63,6 +63,9 @@ public class PathingService implements IPathingService, IGridServiceProvider {
     private final ReferenceSet<IGridNode> nodesNeedingChannels = new ReferenceOpenHashSet<>();
     private final ReferenceSet<IGridNode> cannotCarryCompressedNodes = new ReferenceOpenHashSet<>();
     private final Grid grid;
+    private final ChannelFinalizer channelFinalizer;
+    @Nullable
+    private PathingCalculation pathingCalculation;
     private int channelsInUse = 0;
     private int channelsByBlocks = 0;
     private double channelPowerUsage = 0.0;
@@ -83,6 +86,7 @@ public class PathingService implements IPathingService, IGridServiceProvider {
 
     public PathingService(IGrid g) {
         this.grid = (Grid) g;
+        this.channelFinalizer = new ChannelFinalizer(g);
     }
 
     @Override
@@ -107,6 +111,10 @@ public class PathingService implements IPathingService, IGridServiceProvider {
                 return;
             }
 
+            channelFinalizer.clear();
+            if (this.controllerState != ControllerState.CONTROLLER_ONLINE) {
+                this.pathingCalculation = null;
+            }
             if (this.controllerState == ControllerState.NO_CONTROLLER) {
                 // Returns 0 if there's an error
                 this.channelsInUse = this.calculateAdHocChannels();
@@ -115,16 +123,19 @@ public class PathingService implements IPathingService, IGridServiceProvider {
                 this.channelsByBlocks = nodes * this.channelsInUse;
                 this.setChannelPowerUsage(this.channelsByBlocks / 128.0);
 
-                this.grid.getPivot().beginVisit(new AdHocChannelUpdater(this.channelsInUse));
+                this.grid.getPivot().beginVisit(new AdHocChannelUpdater(this.channelsInUse, channelFinalizer));
             } else if (this.controllerState == ControllerState.CONTROLLER_CONFLICT) {
-                this.grid.getPivot().beginVisit(new AdHocChannelUpdater(0));
+                this.grid.getPivot().beginVisit(new AdHocChannelUpdater(0, channelFinalizer));
                 this.channelsInUse = 0;
                 this.channelsByBlocks = 0;
             } else {
-                var calculation = new PathingCalculation(grid);
-                calculation.compute();
-                this.channelsInUse = calculation.getChannelsInUse();
-                this.channelsByBlocks = calculation.getChannelsByBlocks();
+                if (this.pathingCalculation == null) {
+                    this.pathingCalculation = new PathingCalculation(this.grid);
+                }
+                this.pathingCalculation.compute();
+                this.channelsInUse = pathingCalculation.getChannelsInUse();
+                this.channelsByBlocks = pathingCalculation.getChannelsByBlocks();
+                pathingCalculation.finalizeChannels(channelFinalizer);
             }
 
             this.achievementPost();
@@ -133,7 +144,7 @@ public class PathingService implements IPathingService, IGridServiceProvider {
             this.setChannelPowerUsage(this.channelsByBlocks / 128.0);
             // Notify of channel changes AFTER we set booting to false, this ensures that any activeness check will
             // properly return true.
-            this.grid.getPivot().beginVisit(new ChannelFinalizer());
+            channelFinalizer.notifyChangedNodes();
             this.postBootingStatusChange();
         }
     }
@@ -334,7 +345,7 @@ public class PathingService implements IPathingService, IGridServiceProvider {
     }
 
     @Override
-    public ChannelMode getChannelMode() {
+    public ChannelMode channelMode() {
         return channelMode;
     }
 

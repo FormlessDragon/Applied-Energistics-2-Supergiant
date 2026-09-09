@@ -200,9 +200,23 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
         }
     }
 
+    private boolean neighborsActive;
+
+    /**
+     * Notifies neighbors only when the externally visible availability changes.
+     */
+    public void onNodeStateChanged() {
+        boolean active = this.mainNode.isActive();
+        if (active != this.neighborsActive) {
+            this.neighborsActive = active;
+            notifyNeighbors();
+        }
+    }
+
     public void gridChanged() {
         IGrid grid = mainNode.getGrid();
         this.networkStorage = grid != null ? grid.getStorageService().getInventory() : NullInventory.of();
+        this.neighborsActive = this.mainNode.isActive();
         this.notifyNeighbors();
     }
 

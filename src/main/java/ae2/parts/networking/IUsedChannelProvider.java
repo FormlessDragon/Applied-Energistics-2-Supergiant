@@ -39,7 +39,7 @@ public interface IUsedChannelProvider extends IPart {
     default int getMaxChannelsInfo() {
         var node = this.getGridNode();
         if (node instanceof GridNode gridNode) {
-            if (gridNode.grid().getPathingService().getChannelMode() == ChannelMode.INFINITE) {
+            if (gridNode.grid().getPathingService().channelMode() == ChannelMode.INFINITE) {
                 return -1;
             }
             return gridNode.getMaxChannels();

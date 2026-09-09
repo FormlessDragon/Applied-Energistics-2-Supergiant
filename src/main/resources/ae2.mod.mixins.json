@@ -7,6 +7,7 @@
   "target": "@env(MOD)",
   "refmap": "ae2.refmap.json",
   "client": [
+    "hei.AccessorRecipeLayout",
     "hei.MixinGuiContainerWrapper",
     "hei.MixinGuiScreenHelper",
     "hei.MixinInputHandler",

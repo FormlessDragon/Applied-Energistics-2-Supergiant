@@ -13,6 +13,7 @@ import ae2.container.slot.FakeSlot;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.helpers.InventoryAction;
+import ae2.mixins.hei.AccessorRecipeLayout;
 import ae2.parts.encoding.EncodingMode;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -25,12 +26,15 @@ import mezz.jei.api.gui.IGuiIngredient;
 import mezz.jei.api.gui.IRecipeLayout;
 import mezz.jei.api.ingredients.VanillaTypes;
 import mezz.jei.api.recipe.IRecipeCategory;
+import mezz.jei.api.recipe.IRecipeWrapper;
 import mezz.jei.api.recipe.VanillaRecipeCategoryUid;
 import mezz.jei.api.recipe.transfer.IRecipeTransferError;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandler;
+import mezz.jei.api.recipe.wrapper.ICraftingRecipeWrapper;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.Ingredient;
+import net.minecraft.util.ResourceLocation;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -48,31 +52,15 @@ public class PatternEncodingRecipeTransferHandler<C extends ContainerPatternEnco
         this.containerClass = containerClass;
     }
 
-    private void encodeCraftingRecipe(C container, IRecipeLayout recipeLayout) {
-        container.setMode(EncodingMode.CRAFTING);
-        PatternImportPriorityContext context = PatternImportPriorityContextImpl.create(container,
-            HeiBookmarkHelper.getBookmarkedStacks());
-        List<List<GenericStack>> inputs = getCraftingInputs(recipeLayout);
-
-        FakeSlot[] slots = container.getCraftingGridSlots();
-        for (int i = 0; i < slots.length; i++) {
-            ItemStack stack = ItemStack.EMPTY;
-            if (i < inputs.size() && !inputs.get(i).isEmpty()) {
-                GenericStack genericStack = PatternImportPrioritySelector.selectIngredient(inputs.get(i), context, true);
-                if (isValidStack(genericStack)) {
-                    if (genericStack.what() instanceof AEItemKey itemKey) {
-                        stack = itemKey.toStack();
-                    } else {
-                        stack = GenericStack.wrapInItemStack(genericStack.what(), 1);
-                    }
-                }
-            }
-            setFilter(container, slots[i], stack);
+    private static ResourceLocation getCraftingRecipeId(IRecipeLayout recipeLayout) {
+        if (!(recipeLayout instanceof AccessorRecipeLayout accessor)) {
+            return null;
         }
 
-        for (FakeSlot slot : container.getProcessingOutputSlots()) {
-            setFilter(container, slot, ItemStack.EMPTY);
-        }
+        IRecipeWrapper wrapper = accessor.ae2$getRecipeWrapper();
+        return wrapper instanceof ICraftingRecipeWrapper craftingWrapper
+            ? craftingWrapper.getRegistryName()
+            : null;
     }
 
     private void encodeProcessingRecipe(C container, IRecipeLayout recipeLayout) {
@@ -350,6 +338,34 @@ public class PatternEncodingRecipeTransferHandler<C extends ContainerPatternEnco
     private static String getRecipeCategoryUid(IRecipeLayout recipeLayout) {
         IRecipeCategory<?> category = recipeLayout.getRecipeCategory();
         return category == null ? "" : category.getUid();
+    }
+
+    private void encodeCraftingRecipe(C container, IRecipeLayout recipeLayout) {
+        container.setMode(EncodingMode.CRAFTING);
+        PatternImportPriorityContext context = PatternImportPriorityContextImpl.create(container,
+            HeiBookmarkHelper.getBookmarkedStacks());
+        List<List<GenericStack>> inputs = getCraftingInputs(recipeLayout);
+
+        FakeSlot[] slots = container.getCraftingGridSlots();
+        for (int i = 0; i < slots.length; i++) {
+            ItemStack stack = ItemStack.EMPTY;
+            if (i < inputs.size() && !inputs.get(i).isEmpty()) {
+                GenericStack genericStack = PatternImportPrioritySelector.selectIngredient(inputs.get(i), context, true);
+                if (isValidStack(genericStack)) {
+                    if (genericStack.what() instanceof AEItemKey itemKey) {
+                        stack = itemKey.toStack();
+                    } else {
+                        stack = GenericStack.wrapInItemStack(genericStack.what(), 1);
+                    }
+                }
+            }
+            setFilter(container, slots[i], stack);
+        }
+
+        for (FakeSlot slot : container.getProcessingOutputSlots()) {
+            setFilter(container, slot, ItemStack.EMPTY);
+        }
+        container.setHeiCraftingRecipe(getCraftingRecipeId(recipeLayout));
     }
 
     private record RecipeTransferSlots(IntList missingGuiSlots, IntList craftableGuiSlots) {

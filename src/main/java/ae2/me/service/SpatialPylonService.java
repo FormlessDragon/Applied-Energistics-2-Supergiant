@@ -20,13 +20,16 @@ package ae2.me.service;
 
 import ae2.api.networking.GridHelper;
 import ae2.api.networking.IGrid;
+import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridServiceProvider;
 import ae2.api.networking.events.GridBootingStatusChange;
 import ae2.api.networking.spatial.ISpatialService;
 import ae2.core.AEConfig;
 import ae2.me.cluster.implementations.SpatialPylonCluster;
 import ae2.tile.spatial.TileSpatialPylon;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.BlockPos.MutableBlockPos;
 import net.minecraft.world.World;
@@ -44,13 +47,61 @@ public class SpatialPylonService implements ISpatialService, IGridServiceProvide
     private BlockPos captureMin;
     private BlockPos captureMax;
     private boolean isValid;
+    private final Reference2BooleanOpenHashMap<IGridNode> channelEligibility = new Reference2BooleanOpenHashMap<>();
+    private long structureRevision;
+    private long observedStructureRevision;
 
     public SpatialPylonService(IGrid grid) {
         this.myGrid = grid;
     }
 
-    public void bootingRender(GridBootingStatusChange ignored) {
-        this.reset(this.myGrid);
+    public void bootingRender(GridBootingStatusChange event) {
+        if (!event.isBooting()) {
+            refreshIfNeeded();
+        }
+    }
+
+    @Override
+    public void addNode(IGridNode gridNode, NBTTagCompound savedData) {
+        if (gridNode.getOwner() instanceof TileSpatialPylon) {
+            this.channelEligibility.put(gridNode, gridNode.meetsChannelRequirements());
+            markDirty();
+        }
+    }
+
+    @Override
+    public void removeNode(IGridNode gridNode) {
+        if (gridNode.getOwner() instanceof TileSpatialPylon) {
+            this.channelEligibility.removeBoolean(gridNode);
+            markDirty();
+        }
+    }
+
+    /**
+     * Invalidates the region after a pylon's cluster boundaries change.
+     */
+    public void markDirty() {
+        this.structureRevision = Math.incrementExact(this.structureRevision);
+    }
+
+    /**
+     * Final channel eligibility affects the region; power and temporary boot status do not.
+     */
+    public void onNodeStateChanged(IGridNode node) {
+        if (this.channelEligibility.containsKey(node)) {
+            boolean eligible = node.meetsChannelRequirements();
+            if (this.channelEligibility.put(node, eligible) != eligible) {
+                markDirty();
+            }
+        }
+    }
+
+    private void refreshIfNeeded() {
+        long revision = this.structureRevision;
+        if (revision != this.observedStructureRevision) {
+            this.reset(this.myGrid);
+            this.observedStructureRevision = revision;
+        }
     }
 
     private void reset(IGrid grid) {
@@ -67,6 +118,7 @@ public class SpatialPylonService implements ISpatialService, IGridServiceProvide
 
         this.captureLevel = null;
         this.isValid = true;
+        this.efficiency = 0;
 
         MutableBlockPos minPoint = null;
         MutableBlockPos maxPoint = null;
@@ -104,7 +156,7 @@ public class SpatialPylonService implements ISpatialService, IGridServiceProvide
         this.captureMax = maxPoint == null ? null : maxPoint.toImmutable();
 
         double minPower = 0;
-        if (this.hasRegion()) {
+        if (this.hasCachedRegion()) {
             this.isValid = this.captureMax.getX() - this.captureMin.getX() > 1
                 && this.captureMax.getY() - this.captureMin.getY() > 1
                 && this.captureMax.getZ() - this.captureMin.getZ() > 1;
@@ -158,7 +210,7 @@ public class SpatialPylonService implements ISpatialService, IGridServiceProvide
             minPower = (double) reqX * reqY * reqZ * AEConfig.instance().getSpatialPowerMultiplier();
         }
 
-        this.powerRequired = (long) Math.pow(minPower,
+        this.powerRequired = !this.hasCachedRegion() ? 0 : (long) Math.pow(minPower,
             1 + (AEConfig.instance().getSpatialPowerExponent() - 1) * (1 - this.efficiency));
 
         for (SpatialPylonCluster cl : clusters.values()) {
@@ -172,36 +224,47 @@ public class SpatialPylonService implements ISpatialService, IGridServiceProvide
 
     @Override
     public boolean hasRegion() {
-        return this.captureLevel != null && this.captureMin != null && this.captureMax != null;
+        refreshIfNeeded();
+        return hasCachedRegion();
     }
 
     @Override
     public boolean isValidRegion() {
-        return this.hasRegion() && this.isValid;
+        refreshIfNeeded();
+        return this.hasCachedRegion() && this.isValid;
     }
 
     @Override
     public World getLevel() {
+        refreshIfNeeded();
         return this.captureLevel;
     }
 
     @Override
     public BlockPos getMin() {
+        refreshIfNeeded();
         return this.captureMin;
     }
 
     @Override
     public BlockPos getMax() {
+        refreshIfNeeded();
         return this.captureMax;
     }
 
     @Override
     public long requiredPower() {
+        refreshIfNeeded();
         return this.powerRequired;
     }
 
     @Override
     public float currentEfficiency() {
+        refreshIfNeeded();
         return (float) this.efficiency * 100;
+    }
+
+    private boolean hasCachedRegion() {
+        return this.captureLevel != null && this.captureMin != null && this.captureMax != null;
     }
 }

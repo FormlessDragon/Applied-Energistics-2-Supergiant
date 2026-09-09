@@ -33,8 +33,11 @@ import ae2.api.networking.ticking.ITickManager;
 import ae2.core.AELog;
 import ae2.hooks.ticking.TickHandler;
 import ae2.me.helpers.GridServiceContainer;
+import ae2.me.service.ActivePatternProviderDirectory;
 import ae2.me.service.P2PService;
+import ae2.me.service.SpatialPylonService;
 import ae2.parts.AEBasePart;
+import ae2.tile.spatial.TileSpatialPylon;
 import ae2.util.IDebugExportable;
 import ae2.util.JsonStreamUtil;
 import com.google.common.collect.ImmutableSet;
@@ -295,8 +298,11 @@ public class Grid implements IGrid {
             ITERATION_BUFFER.ensureCapacity(this.machines.size());
             ITERATION_BUFFER.addAll(getNodes());
 
-            for (IGridNode node : ITERATION_BUFFER) {
-                ((GridNode) node).notifyStatusChange(state);
+            for (int i = 0; i < ITERATION_BUFFER.size(); i++) {
+                var node = (GridNode) ITERATION_BUFFER.get(i);
+                if (node.isAttachedToGrid(this)) {
+                    node.notifyStatusChange(state);
+                }
             }
         } finally {
             ITERATION_BUFFER.clear();
@@ -305,6 +311,20 @@ public class Grid implements IGrid {
 
     void markMachineStateChanged() {
         this.activeMachineSetRevision++;
+    }
+
+    void onNodeStateChanged(GridNode node) {
+        if (node.getMyGrid() != this) {
+            return;
+        }
+        if (node.getOwner() instanceof TileSpatialPylon
+            && this.services.services().get(ISpatialService.class) instanceof SpatialPylonService pylons) {
+            pylons.onNodeStateChanged(node);
+        }
+        var service = this.services.services().get(ActivePatternProviderDirectory.class);
+        if (service instanceof ActivePatternProviderDirectory directory) {
+            directory.onNodeStateChanged(node);
+        }
     }
 
     public void fillCrashReportCategory(CrashReportCategory category) {

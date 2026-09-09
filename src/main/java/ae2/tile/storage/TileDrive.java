@@ -258,6 +258,9 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
 
     @Override
     public void setPriority(int newValue) {
+        if (this.priority == newValue) {
+            return;
+        }
         this.priority = newValue;
         this.isCached = false;
         updateState();

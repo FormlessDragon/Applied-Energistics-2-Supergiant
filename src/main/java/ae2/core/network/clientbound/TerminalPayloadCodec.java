@@ -105,14 +105,18 @@ final class TerminalPayloadCodec {
         try {
             deflater.setInput(rawPayload);
             deflater.finish();
-            ByteArrayOutputStream output = new ByteArrayOutputStream(rawPayload.length);
-            byte[] buffer = new byte[Math.max(256, rawPayload.length / 4)];
+            ByteArrayOutputStream output = new ByteArrayOutputStream(Math.min(8192, rawPayload.length));
+            byte[] buffer = new byte[8192];
             while (!deflater.finished()) {
                 int written = deflater.deflate(buffer);
                 if (written <= 0) {
                     throw new IllegalStateException("Terminal payload compressor made no progress");
                 }
                 output.write(buffer, 0, written);
+                if ((long) output.size() * 8 > (long) rawPayload.length * 7
+                    || output.size() > rawPayload.length - MINIMUM_SAVINGS) {
+                    return rawPayload;
+                }
             }
             return output.toByteArray();
         } finally {

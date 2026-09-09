@@ -15,16 +15,18 @@ import ae2.api.storage.ILinkStatus;
 import ae2.api.storage.StorageHelper;
 import ae2.container.GuiIds;
 import ae2.container.SlotSemantics;
+import ae2.container.crafting.DeferredRecipeLookup;
 import ae2.container.crafting.RecipeSelection;
 import ae2.container.guisync.GuiSync;
 import ae2.container.implementations.PatternModifierPanel;
+import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.me.patternencode.PatternProviderUploadService.ProcessingPatternUploadPreparation;
 import ae2.container.me.patternencode.PatternProviderUploadService.ProcessingPatternUploadResult;
-import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.slot.FakeSlot;
 import ae2.container.slot.PatternTermSlot;
 import ae2.container.slot.RestrictedInputSlot;
 import ae2.container.slot.SlotBackgroundIcon;
+import ae2.core.AELog;
 import ae2.core.definitions.AEItems;
 import ae2.core.localization.PlayerMessages;
 import ae2.core.network.NetworkPacketHelper;
@@ -53,6 +55,7 @@ import net.minecraft.inventory.Container;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.crafting.CraftingManager;
 import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.nbt.JsonToNBT;
 import net.minecraft.nbt.NBTException;
@@ -71,6 +74,10 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     private static final int CRAFTING_GRID_WIDTH = 3;
     private static final int CRAFTING_GRID_HEIGHT = 3;
     private static final int CRAFTING_GRID_SLOTS = CRAFTING_GRID_WIDTH * CRAFTING_GRID_HEIGHT;
+    private static final short SYNC_CRAFTING_OUTPUT = 78;
+    private static final short SYNC_RECIPE_REVISION = 79;
+    private static final short SYNC_RECIPE_CONFLICT = 80;
+    private static final short SYNC_SELECTED_RECIPE = 81;
 
     private static final String ACTION_SET_MODE = "setMode";
     private static final String ACTION_ENCODE = "encode";
@@ -89,6 +96,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     private static final String ACTION_PROCESSING_DIVIDE_5 = "processingDivide5";
     private static final String ACTION_RENAME_PROCESSING_PATTERN_ITEM = "renameProcessingPatternItem";
     private static final String ACTION_SET_HEI_PROCESSING_RECIPE = "setHeiProcessingRecipe";
+    private static final String ACTION_SET_HEI_CRAFTING_RECIPE = "setHeiCraftingRecipe";
     private static final String ACTION_SELECT_RECIPE = "selectRecipe";
     private static final String ACTION_UPLOAD_PATTERN = "uploadPattern";
     private static final String ACTION_SET_PATTERN_MODIFIER_PANEL_VISIBLE = "setPatternModifierPanelVisible";
@@ -159,13 +167,30 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     @Nullable
     private IRecipe currentRecipe;
     private List<RecipeSelection.Candidate> recipeCandidates = List.of();
-    @GuiSync(81)
+    private final DeferredRecipeLookup deferredRecipeLookup = new DeferredRecipeLookup();
+    private boolean recipeCandidatesInitialized;
+    @Nullable
+    private ItemStack[] lastCraftingIngredients;
+    private boolean craftingCandidatesValid;
+    private boolean fluidSubstitutionSupportKnown;
+    @Nullable
+    private InventoryCrafting craftingInventory;
+    @Nullable
+    private ResourceLocation lastResolvedRecipeId;
+    @GuiSync(SYNC_RECIPE_CONFLICT)
+    private boolean recipeConflict;
+    @GuiSync(SYNC_RECIPE_REVISION)
+    private long recipeCandidatesRevision;
+    @GuiSync(SYNC_SELECTED_RECIPE)
     @Nullable
     private ResourceLocation selectedRecipeId;
     @Nullable
     private HeiProcessingRecipeSnapshot heiProcessingRecipeSnapshot;
     private boolean changingEncodedPatternSlotInternally;
     private boolean clearOnClose;
+    @GuiSync(SYNC_CRAFTING_OUTPUT)
+    @Nullable
+    private GenericStack syncedCraftingOutput;
 
     public ContainerPatternEncodingTerm(InventoryPlayer ip, IPatternTerminalGuiHost host) {
         this(GuiIds.GuiKey.PATTERN_ENCODING_TERMINAL, ip, host, true);
@@ -325,6 +350,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         registerClientAction(ACTION_SET_HEI_PROCESSING_RECIPE, HeiProcessingRecipeRequest.class,
             MAX_SET_HEI_PROCESSING_RECIPE_PAYLOAD_LENGTH,
             this::setHeiProcessingRecipe);
+        registerClientAction(ACTION_SET_HEI_CRAFTING_RECIPE, String.class, 256,
+            this::setHeiCraftingRecipeFromClient);
         registerClientAction(ACTION_SELECT_RECIPE, String.class, 256, this::selectRecipeFromClient);
         registerClientAction(ACTION_UPLOAD_PATTERN, Boolean.class, this::uploadPattern);
         registerClientAction(ACTION_SET_PATTERN_MODIFIER_PANEL_VISIBLE, Boolean.class,
@@ -337,7 +364,9 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
 
         updateSlotVisibility();
         restoreSelectedRecipeFromEncodedPattern();
-        getAndUpdateOutput();
+        if (isServerSide() && this.mode == EncodingMode.CRAFTING) {
+            markCraftingRecipeDirty();
+        }
 
         tryAutoFillBlankPatterns();
     }
@@ -425,9 +454,18 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         }
     }
 
+    private static ItemStack[] copyCraftingIngredients(ItemStack[] ingredients) {
+        ItemStack[] copy = new ItemStack[ingredients.length];
+        for (int i = 0; i < ingredients.length; i++) {
+            copy[i] = ingredients[i].copy();
+        }
+        return copy;
+    }
+
     @Override
     public void broadcastChanges() {
         if (isServerSide()) {
+            resolveDeferredCraftingRecipe();
             this.providerSelectionSession.onBroadcastChanges();
         }
         super.broadcastChanges();
@@ -446,21 +484,79 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     public void onServerDataSync(ShortSet updatedFields) {
         super.onServerDataSync(updatedFields);
         updateSlotVisibility();
-        getAndUpdateOutput();
+        if (updatedFields.contains(SYNC_CRAFTING_OUTPUT) || updatedFields.contains(SYNC_RECIPE_REVISION)
+            || updatedFields.contains(SYNC_RECIPE_CONFLICT) || updatedFields.contains(SYNC_SELECTED_RECIPE)
+            || updatedFields.contains((short) 97)) {
+            updateClientCraftingRecipe();
+        }
+    }
+
+    private void updateClientCraftingRecipe() {
+        if (this.mode != EncodingMode.CRAFTING) {
+            clearClientCraftingRecipeState();
+            return;
+        }
+
+        ResourceLocation recipeId = this.selectedRecipeId;
+        if (recipeId == null) {
+            clearClientCraftingRecipeState();
+            return;
+        }
+
+        IRecipe recipe = CraftingManager.REGISTRY.getObject(recipeId);
+        if (recipe == null || !recipeId.equals(recipe.getRegistryName())) {
+            AELog.error("Server synchronized unknown crafting recipe %s", recipeId);
+            clearClientCraftingRecipeState();
+            return;
+        }
+
+        this.currentRecipe = recipe;
+        this.lastResolvedRecipeId = recipeId;
+        this.craftingCandidatesValid = false;
+        this.craftingInventory = null;
+        this.lastCraftingIngredients = null;
+        this.recipeCandidates = List.of();
+        this.recipeCandidatesInitialized = false;
+        this.craftOutputSlot.setResultItem(toCraftingOutput(this.syncedCraftingOutput));
+    }
+
+    private void clearClientCraftingRecipeState() {
+        this.currentRecipe = null;
+        this.craftingCandidatesValid = false;
+        this.craftingInventory = null;
+        this.recipeCandidates = List.of();
+        this.recipeCandidatesInitialized = false;
+        this.lastCraftingIngredients = null;
+        this.lastResolvedRecipeId = null;
+        this.craftOutputSlot.setResultItem(ItemStack.EMPTY);
+        this.slotsSupportingFluidSubstitution.clear();
+        this.fluidSubstitutionSupportKnown = true;
+    }
+
+    private ItemStack toCraftingOutput(@Nullable GenericStack output) {
+        if (output == null) {
+            return ItemStack.EMPTY;
+        }
+        if (!(output.what() instanceof AEItemKey itemKey)
+            || output.amount() <= 0 || output.amount() > Integer.MAX_VALUE) {
+            AELog.error("Server synchronized invalid crafting output %s", output);
+            return ItemStack.EMPTY;
+        }
+        return itemKey.toStack((int) output.amount());
     }
 
     @Override
     public void onSlotChange(Slot slot) {
         if (slot == this.encodedPatternSlot) {
-            restoreSelectedRecipeFromEncodedPattern();
-            if (isServerSide()) {
-                this.broadcastChanges();
+            if (this.changingEncodedPatternSlotInternally) {
+                return;
             }
-        } else if (slot == this.blankPatternSlot || isEncodingSlot(slot)) {
-            this.selectedRecipeId = null;
-        }
-        if (slot == this.blankPatternSlot || slot == this.encodedPatternSlot || isEncodingSlot(slot)) {
-            getAndUpdateOutput();
+            restoreSelectedRecipeFromEncodedPattern();
+            markCraftingRecipeDirty();
+        } else if (isCraftingGridSlot(slot)) {
+            // Keep the last successful recipe as the common preference for the deferred lookup.
+            // It is discarded only when it no longer matches the final matrix.
+            markCraftingRecipeDirty();
         }
     }
 
@@ -478,29 +574,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
                 : null;
         } catch (RuntimeException e) {
             this.selectedRecipeId = null;
+            AELog.warn(e, "Failed to restore the selected crafting recipe from an encoded pattern");
         }
-    }
-
-    private boolean isEncodingSlot(@Nullable Slot slot) {
-        if (slot == null) {
-            return false;
-        }
-        for (FakeSlot craftingGridSlot : this.craftingGridSlots) {
-            if (craftingGridSlot == slot) {
-                return true;
-            }
-        }
-        for (FakeSlot processingInputSlot : this.processingInputSlots) {
-            if (processingInputSlot == slot) {
-                return true;
-            }
-        }
-        for (FakeSlot processingOutputSlot : this.processingOutputSlots) {
-            if (processingOutputSlot == slot) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void updateSlotVisibility() {
@@ -519,58 +594,134 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         this.patternModifierPanel.updateSlotState(this.patternModifierPanelVisible && this.patternModifierPanelAvailable);
     }
 
-    private ItemStack getAndUpdateOutput() {
+    private boolean isCraftingGridSlot(@Nullable Slot slot) {
+        if (slot == null) {
+            return false;
+        }
+        for (FakeSlot craftingGridSlot : this.craftingGridSlots) {
+            if (craftingGridSlot == slot) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private ItemStack resolveCraftingRecipe() {
+        this.deferredRecipeLookup.clear();
         if (this.mode != EncodingMode.CRAFTING) {
-            this.currentRecipe = null;
-            this.recipeCandidates = List.of();
-            this.selectedRecipeId = null;
-            this.craftOutputSlot.setResultItem(ItemStack.EMPTY);
-            this.slotsSupportingFluidSubstitution.clear();
+            clearCraftingRecipeState();
             return ItemStack.EMPTY;
         }
 
         ItemStack[] ingredients = new ItemStack[CRAFTING_GRID_SLOTS];
         boolean invalidIngredient = false;
+        boolean hasIngredient = false;
         for (int i = 0; i < ingredients.length; i++) {
             ingredients[i] = getEncodedCraftingIngredient(i);
             if (ingredients[i] == null) {
                 invalidIngredient = true;
                 break;
             }
+            hasIngredient |= !ingredients[i].isEmpty();
         }
 
-        if (invalidIngredient) {
-            this.currentRecipe = null;
-            this.recipeCandidates = List.of();
-            this.selectedRecipeId = null;
-            this.craftOutputSlot.setResultItem(ItemStack.EMPTY);
-            this.slotsSupportingFluidSubstitution.clear();
+        if (invalidIngredient || !hasIngredient) {
+            clearCraftingRecipeState();
             return ItemStack.EMPTY;
         }
 
-        InventoryCrafting craftingInventory = new InventoryCrafting(DUMMY_CONTAINER, CRAFTING_GRID_WIDTH,
-            CRAFTING_GRID_HEIGHT);
-        for (int i = 0; i < ingredients.length; i++) {
-            craftingInventory.setInventorySlotContents(i, ingredients[i]);
-        }
-
-        this.recipeCandidates = RecipeSelection.findCandidates(craftingInventory, this.getPlayer().world);
-        RecipeSelection.Candidate selected = RecipeSelection.select(this.recipeCandidates, this.selectedRecipeId);
-        IRecipe previousRecipe = this.currentRecipe;
-        this.currentRecipe = selected == null ? null : selected.recipe();
-        this.selectedRecipeId = selected == null ? null : selected.id();
-        if (this.currentRecipe != previousRecipe) {
-            checkFluidSubstitutionSupport();
+        boolean ingredientsChanged = !areCraftingIngredientsEqual(ingredients);
+        boolean selectedRecipeChanged = !Objects.equals(this.lastResolvedRecipeId, this.selectedRecipeId);
+        if (!this.craftingCandidatesValid || ingredientsChanged || selectedRecipeChanged) {
+            this.craftingInventory = new InventoryCrafting(DUMMY_CONTAINER, CRAFTING_GRID_WIDTH,
+                CRAFTING_GRID_HEIGHT);
+            for (int i = 0; i < ingredients.length; i++) {
+                this.craftingInventory.setInventorySlotContents(i, ingredients[i]);
+            }
+            this.recipeCandidates = List.of();
+            this.recipeCandidatesInitialized = false;
+            this.lastCraftingIngredients = copyCraftingIngredients(ingredients);
+            this.craftingCandidatesValid = true;
+            this.recipeConflict = false;
+            this.recipeCandidatesRevision++;
+            RecipeSelection.Selection selection = RecipeSelection.findFirstCandidateAndConflict(this.craftingInventory,
+                this.getPlayer().world, this.selectedRecipeId);
+            RecipeSelection.Candidate selected = selection.candidate();
+            IRecipe previousRecipe = this.currentRecipe;
+            this.currentRecipe = selected == null ? null : selected.recipe();
+            this.selectedRecipeId = selected == null ? null : selected.id();
+            this.lastResolvedRecipeId = this.selectedRecipeId;
+            this.recipeConflict = selection.conflict();
+            setCraftingOutput(selected == null ? ItemStack.EMPTY : selected.output());
+            if (ingredientsChanged || this.currentRecipe != previousRecipe) {
+                this.slotsSupportingFluidSubstitution.clear();
+                this.fluidSubstitutionSupportKnown = false;
+            }
         }
 
         if (this.currentRecipe == null) {
-            this.craftOutputSlot.setResultItem(ItemStack.EMPTY);
+            setCraftingOutput(ItemStack.EMPTY);
             return ItemStack.EMPTY;
         }
 
-        ItemStack result = this.currentRecipe.getCraftingResult(craftingInventory);
-        this.craftOutputSlot.setResultItem(result);
-        return result;
+        return this.craftOutputSlot.getStack();
+    }
+
+    private void markCraftingRecipeDirty() {
+        if (!isServerSide()) {
+            return;
+        }
+
+        if (this.deferredRecipeLookup.markDirty(this.getPlayer().world.getTotalWorldTime())) {
+            invalidateCraftingCandidates();
+        }
+    }
+
+    private void resolveDeferredCraftingRecipe() {
+        if (this.deferredRecipeLookup.isDue(this.getPlayer().world.getTotalWorldTime())) {
+            resolveCraftingRecipe();
+        }
+    }
+
+    private void clearCraftingRecipeState() {
+        this.currentRecipe = null;
+        this.recipeCandidates = List.of();
+        this.recipeCandidatesInitialized = false;
+        this.lastCraftingIngredients = null;
+        invalidateCraftingCandidates();
+        this.craftingInventory = null;
+        this.lastResolvedRecipeId = null;
+        this.selectedRecipeId = null;
+        this.deferredRecipeLookup.clear();
+        setCraftingOutput(ItemStack.EMPTY);
+        this.slotsSupportingFluidSubstitution.clear();
+        this.fluidSubstitutionSupportKnown = true;
+    }
+
+    private void invalidateCraftingCandidates() {
+        this.craftingCandidatesValid = false;
+        this.recipeConflict = false;
+        this.recipeCandidatesRevision++;
+    }
+
+    private void setCraftingOutput(ItemStack output) {
+        ItemStack copy = output.copy();
+        this.craftOutputSlot.setResultItem(copy);
+        if (isServerSide()) {
+            this.syncedCraftingOutput = GenericStack.fromItemStack(copy);
+        }
+    }
+
+    private boolean areCraftingIngredientsEqual(ItemStack[] ingredients) {
+        if (this.lastCraftingIngredients == null || this.lastCraftingIngredients.length != ingredients.length) {
+            return false;
+        }
+        for (int i = 0; i < ingredients.length; i++) {
+            if (!ItemStack.areItemStacksEqual(this.lastCraftingIngredients[i], ingredients[i])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void checkFluidSubstitutionSupport() {
@@ -594,6 +745,53 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         }
     }
 
+    public void ensureFluidSubstitutionSupport() {
+        if (!this.fluidSubstitutionSupportKnown) {
+            this.fluidSubstitutionSupportKnown = true;
+            checkFluidSubstitutionSupport();
+        }
+    }
+
+    private void ensureRecipeCandidates() {
+        if (this.recipeCandidatesInitialized || this.mode != EncodingMode.CRAFTING) {
+            return;
+        }
+
+        ItemStack[] ingredients = new ItemStack[CRAFTING_GRID_SLOTS];
+        boolean hasIngredient = false;
+        for (int i = 0; i < ingredients.length; i++) {
+            ingredients[i] = getEncodedCraftingIngredient(i);
+            if (ingredients[i] == null) {
+                this.recipeCandidatesInitialized = true;
+                return;
+            }
+            hasIngredient |= !ingredients[i].isEmpty();
+        }
+        if (!hasIngredient) {
+            this.recipeCandidatesInitialized = true;
+            return;
+        }
+
+        InventoryCrafting craftingInventory = this.craftingInventory;
+        if (craftingInventory == null || !areCraftingIngredientsEqual(ingredients)) {
+            craftingInventory = new InventoryCrafting(DUMMY_CONTAINER, CRAFTING_GRID_WIDTH, CRAFTING_GRID_HEIGHT);
+            this.craftingInventory = craftingInventory;
+        }
+        for (int i = 0; i < ingredients.length; i++) {
+            craftingInventory.setInventorySlotContents(i, ingredients[i]);
+        }
+        this.recipeCandidates = RecipeSelection.findCandidates(craftingInventory, this.getPlayer().world);
+        this.recipeCandidatesInitialized = true;
+    }
+
+    public boolean hasRecipeConflict() {
+        return this.mode == EncodingMode.CRAFTING && this.recipeConflict;
+    }
+
+    public long getRecipeCandidatesRevision() {
+        return this.recipeCandidatesRevision;
+    }
+
     public void encode() {
         encode(false);
     }
@@ -607,6 +805,9 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         tryAutoFillBlankPatterns();
         ItemStack encodedPattern = encodePattern();
         if (encodedPattern == null) {
+            if (this.mode == EncodingMode.CRAFTING && this.deferredRecipeLookup.isDirty()) {
+                return;
+            }
             clearPattern();
             return;
         }
@@ -1188,7 +1389,10 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
             return null;
         }
 
-        ItemStack result = getAndUpdateOutput();
+        if (this.deferredRecipeLookup.isDirty()) {
+            return null;
+        }
+        ItemStack result = this.craftOutputSlot.getStack();
         if (this.currentRecipe == null || result.isEmpty()) {
             return null;
         }
@@ -1307,8 +1511,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
 
         this.encodedInputsInv.clear();
         this.encodedOutputsInv.clear();
-        this.currentRecipe = null;
-        this.craftOutputSlot.setResultItem(ItemStack.EMPTY);
+        clearCraftingRecipeState();
         this.broadcastChanges();
     }
 
@@ -1326,6 +1529,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     }
 
     public List<RecipeSelection.Candidate> getRecipeCandidates() {
+        ensureRecipeCandidates();
         return this.recipeCandidates;
     }
 
@@ -1344,13 +1548,17 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
 
     private void selectRecipeFromClient(String recipeId) {
         try {
-            getAndUpdateOutput();
+            if (this.deferredRecipeLookup.isDirty()) {
+                return;
+            }
             applyRecipeSelection(new ResourceLocation(recipeId));
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            AELog.warn(e, "Ignoring invalid crafting recipe selection '%s'", recipeId);
         }
     }
 
     private void applyRecipeSelection(ResourceLocation recipeId) {
+        ensureRecipeCandidates();
         RecipeSelection.Candidate selected = RecipeSelection.select(this.recipeCandidates, recipeId);
         if (selected == null || !selected.id().equals(recipeId)) {
             return;
@@ -1358,9 +1566,11 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         IRecipe previousRecipe = this.currentRecipe;
         this.selectedRecipeId = selected.id();
         this.currentRecipe = selected.recipe();
-        this.craftOutputSlot.setResultItem(selected.output().copy());
+        this.lastResolvedRecipeId = selected.id();
+        setCraftingOutput(selected.output());
         if (this.currentRecipe != previousRecipe) {
-            checkFluidSubstitutionSupport();
+            this.slotsSupportingFluidSubstitution.clear();
+            this.fluidSubstitutionSupportKnown = false;
         }
     }
 
@@ -1377,10 +1587,18 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     private void changeMode(EncodingMode mode) {
         this.mode = mode;
         this.currentRecipe = null;
+        this.fluidSubstitutionSupportKnown = false;
+        if (isServerSide()) {
+            markCraftingRecipeDirty();
+        }
         updateSlotVisibility();
-        getAndUpdateOutput();
         if (isServerSide()) {
             this.encodingLogic.setMode(mode);
+            if (mode == EncodingMode.CRAFTING) {
+                markCraftingRecipeDirty();
+            } else {
+                clearCraftingRecipeState();
+            }
         }
     }
 
@@ -1401,7 +1619,10 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
             this.encodingLogic.setSubstitution(substitute);
         }
         this.currentRecipe = null;
-        getAndUpdateOutput();
+        this.fluidSubstitutionSupportKnown = false;
+        if (isServerSide()) {
+            markCraftingRecipeDirty();
+        }
     }
 
     public boolean isSubstituteFluids() {
@@ -1509,7 +1730,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
             this.encodingLogic.setFluidSubstitution(substituteFluids);
         }
         this.currentRecipe = null;
-        getAndUpdateOutput();
+        this.fluidSubstitutionSupportKnown = false;
     }
 
     @Override
@@ -1546,6 +1767,91 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
             sendClientAction(ACTION_SET_HEI_PROCESSING_RECIPE,
                 new HeiProcessingRecipeRequest(recipeTypeUid, inputCandidateKeyTags));
         }
+    }
+
+    public void setHeiCraftingRecipe(@Nullable ResourceLocation recipeId) {
+        if (isClientSide()) {
+            sendClientAction(ACTION_SET_HEI_CRAFTING_RECIPE, recipeId == null ? "" : recipeId.toString());
+        }
+    }
+
+    private void setHeiCraftingRecipeFromClient(String serializedRecipeId) {
+        if (!isServerSide()) {
+            return;
+        }
+        if (serializedRecipeId == null || serializedRecipeId.isEmpty()) {
+            markCraftingRecipeDirty();
+            return;
+        }
+
+        ResourceLocation recipeId;
+        try {
+            recipeId = new ResourceLocation(serializedRecipeId);
+        } catch (RuntimeException e) {
+            AELog.warn(e, "HEI supplied a malformed crafting recipe id '%s'", serializedRecipeId);
+            markCraftingRecipeDirty();
+            return;
+        }
+
+        if (!applyHeiCraftingRecipe(recipeId)) {
+            AELog.warn("HEI crafting recipe %s is not registered or does not match the imported ingredients; falling back to recipe lookup",
+                recipeId);
+            markCraftingRecipeDirty();
+        }
+    }
+
+    private boolean applyHeiCraftingRecipe(ResourceLocation recipeId) {
+        if (this.mode != EncodingMode.CRAFTING) {
+            return false;
+        }
+
+        ItemStack[] ingredients = new ItemStack[CRAFTING_GRID_SLOTS];
+        boolean hasIngredient = false;
+        for (int i = 0; i < ingredients.length; i++) {
+            ingredients[i] = getEncodedCraftingIngredient(i);
+            if (ingredients[i] == null) {
+                return false;
+            }
+            hasIngredient |= !ingredients[i].isEmpty();
+        }
+        if (!hasIngredient) {
+            return false;
+        }
+
+        InventoryCrafting input = new InventoryCrafting(DUMMY_CONTAINER, CRAFTING_GRID_WIDTH, CRAFTING_GRID_HEIGHT);
+        for (int i = 0; i < ingredients.length; i++) {
+            input.setInventorySlotContents(i, ingredients[i]);
+        }
+
+        RecipeSelection.Candidate selected;
+        try {
+            selected = RecipeSelection.findCandidateById(input, this.getPlayer().world, recipeId);
+        } catch (RuntimeException | LinkageError e) {
+            AELog.warn(e, "HEI crafting recipe %s failed while validating imported ingredients", recipeId);
+            return false;
+        }
+        if (selected == null) {
+            return false;
+        }
+
+        IRecipe previousRecipe = this.currentRecipe;
+        this.craftingInventory = input;
+        this.lastCraftingIngredients = copyCraftingIngredients(ingredients);
+        this.craftingCandidatesValid = true;
+        this.recipeCandidates = List.of(selected);
+        this.recipeCandidatesInitialized = true;
+        this.currentRecipe = selected.recipe();
+        this.selectedRecipeId = selected.id();
+        this.lastResolvedRecipeId = selected.id();
+        this.recipeConflict = false;
+        this.recipeCandidatesRevision++;
+        setCraftingOutput(selected.output());
+        this.deferredRecipeLookup.clear();
+        if (this.currentRecipe != previousRecipe) {
+            this.slotsSupportingFluidSubstitution.clear();
+            this.fluidSubstitutionSupportKnown = false;
+        }
+        return true;
     }
 
     public boolean isMergeHeiProcessingInputs() {
@@ -1635,7 +1941,6 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
             renamed.setStackDisplayName(request.name);
         }
         setProcessingStack(slot, GenericStack.fromItemStack(renamed));
-        getAndUpdateOutput();
         broadcastChanges();
     }
 

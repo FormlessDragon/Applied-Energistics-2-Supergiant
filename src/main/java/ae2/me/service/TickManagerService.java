@@ -39,7 +39,6 @@ import ae2.tile.storage.TileDrive;
 import ae2.tile.storage.TileIOPort;
 import ae2.tile.storage.TileMEChest;
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.Iterators;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
@@ -53,7 +52,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.LongSummaryStatistics;
 import java.util.Objects;
-import java.util.PriorityQueue;
 import java.util.concurrent.TimeUnit;
 
 public class TickManagerService implements ITickManager, IGridServiceProvider {
@@ -66,10 +64,10 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
     private final Reference2ObjectMap<IGridNode, TickTracker> alertable = new Reference2ObjectOpenHashMap<>();
     private final Reference2ObjectMap<IGridNode, TickTracker> sleeping = new Reference2ObjectOpenHashMap<>();
     private final Reference2ObjectMap<IGridNode, TickTracker> awake = new Reference2ObjectOpenHashMap<>();
-    private final Int2ObjectMap<PriorityQueue<TickTracker>> upcomingTicks = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectMap<IdentityIndexedHeap<TickTracker>> upcomingTicks = new Int2ObjectOpenHashMap<>();
     private final TickSnapshot statistics = new TickSnapshot();
     private final Stopwatch stopWatch = Stopwatch.createUnstarted();
-    private PriorityQueue<TickTracker> currentlyTickingQueue = null;
+    private IdentityIndexedHeap<TickTracker> currentlyTickingQueue = null;
     private long currentTick = 0;
     @Nullable
     private IGridNode currentlyTicking;
@@ -94,7 +92,7 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
 
     private void tickLevelQueue(@Nullable World world) {
         int queueKey = getQueueKey(world);
-        PriorityQueue<TickTracker> queue = this.upcomingTicks.get(queueKey);
+        IdentityIndexedHeap<TickTracker> queue = this.upcomingTicks.get(queueKey);
 
         if (queue != null) {
             currentlyTickingQueue = queue;
@@ -111,7 +109,7 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
         }
     }
 
-    private void tickQueue(PriorityQueue<TickTracker> queue) {
+    private void tickQueue(IdentityIndexedHeap<TickTracker> queue) {
         TickTracker tt;
 
         while (!queue.isEmpty()) {
@@ -147,10 +145,10 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
             tt.setCurrentRate(newRate);
 
             if (mod == TickRateModulation.SLEEP) {
-                sleepDevice(tt.getNode());
+                this.movePolledTrackerToSleeping(tt);
             } else {
                 // Note that the node _may_ have been removed entirely from the grid in its own tick
-                if (this.awake.containsKey(tt.getNode())) {
+                if (this.awake.get(tt.getNode()) == tt) {
                     // Queue already known, no need to use addToQueue() to resolve it again.
                     queue.add(tt);
                 }
@@ -223,7 +221,12 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
         tt.setTickOnNextTick();
 
         // prevent dupes and tick build up.
-        this.updateQueuePosition(node, tt);
+        IdentityIndexedHeap<TickTracker> queue = this.getQueue(node.getLevel());
+        if (queue.contains(tt)) {
+            queue.updatePosition(tt);
+        } else {
+            queue.add(tt);
+        }
 
         return true;
     }
@@ -259,14 +262,11 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
             return;
         }
 
-        if (this.sleeping.containsKey(node)) {
-            final TickTracker tt = this.sleeping.get(node);
-            this.sleeping.remove(node);
+        final TickTracker tt = this.sleeping.remove(node);
+        if (tt != null) {
             this.awake.put(node, tt);
-            this.updateQueuePosition(node, tt);
-
+            this.addToQueue(node, tt);
         }
-
     }
 
     /**
@@ -340,18 +340,19 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
     /**
      * null as world could be used for virtual nodes.
      */
-    private PriorityQueue<TickTracker> getQueue(@Nullable World world) {
-        return this.upcomingTicks.computeIfAbsent(getQueueKey(world), ignored -> new PriorityQueue<>());
+    private IdentityIndexedHeap<TickTracker> getQueue(@Nullable World world) {
+        return this.upcomingTicks.computeIfAbsent(getQueueKey(world),
+            ignored -> new IdentityIndexedHeap<>(TickTracker::compareTo));
     }
 
     private void addToQueue(IGridNode node, TickTracker tt) {
-        PriorityQueue<TickTracker> queue = getQueue(node.getLevel());
+        IdentityIndexedHeap<TickTracker> queue = getQueue(node.getLevel());
         queue.add(tt);
     }
 
     private void removeFromQueue(IGridNode node, TickTracker tt) {
         int queueKey = getQueueKey(node.getLevel());
-        PriorityQueue<TickTracker> queue = this.upcomingTicks.get(queueKey);
+        IdentityIndexedHeap<TickTracker> queue = this.upcomingTicks.get(queueKey);
         if (queue == null) {
             return;
         }
@@ -365,9 +366,12 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
         }
     }
 
-    private void updateQueuePosition(IGridNode node, TickTracker tt) {
-        this.removeFromQueue(node, tt);
-        this.addToQueue(node, tt);
+    private void movePolledTrackerToSleeping(TickTracker tracker) {
+        IGridNode node = tracker.getNode();
+        if (this.awake.get(node) == tracker) {
+            this.awake.remove(node);
+            this.sleeping.put(node, tracker);
+        }
     }
 
     /**
@@ -388,7 +392,7 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
 
             stopWatch.stop();
             long elapsedTime = stopWatch.elapsed(TimeUnit.NANOSECONDS);
-            if (MONITORING_ENABLED) {
+            if (MONITORING_ENABLED && this.awake.get(tt.getNode()) == tt) {
                 LongSummaryStatistics nodeStatistics = tt.getStatistics();
                 nodeStatistics.accept(elapsedTime);
                 this.statistics.update(tt.getNode(), classify(tt.getNode().getOwner()),
@@ -417,9 +421,9 @@ public class TickManagerService implements ITickManager, IGridServiceProvider {
         // Also check if the node is _really_ queued for ticking. If it's awake
         // and not queued, this indicates a bug.
         boolean isQueued = false;
-        PriorityQueue<TickTracker> tickQueue = upcomingTicks.get(getQueueKey(node.getLevel()));
+        IdentityIndexedHeap<TickTracker> tickQueue = upcomingTicks.get(getQueueKey(node.getLevel()));
         if (awakeTracker != null && tickQueue != null) {
-            isQueued = Iterators.contains(tickQueue.iterator(), awakeTracker);
+            isQueued = tickQueue.contains(awakeTracker);
         }
 
         // Get the tick-request stats

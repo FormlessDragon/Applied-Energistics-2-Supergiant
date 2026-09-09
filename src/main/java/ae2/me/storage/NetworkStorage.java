@@ -32,24 +32,31 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectSortedMap;
 import it.unimi.dsi.fastutil.ints.IntComparator;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectLinkedOpenHashMap;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
 public class NetworkStorage implements MEStorageMonitor {
     private static final IntComparator PRIORITY_SORTER = (first, second) -> Integer.compare(second, first);
-    private final Int2ObjectSortedMap<ObjectList<MEStorageMonitor>> priorityInventory =
+    private final Int2ObjectSortedMap<MountBucket> priorityInventory =
         new Int2ObjectRBTreeMap<>(PRIORITY_SORTER);
+    private final Map<MEStorageMonitor, ObjectList<MountedStorage>> mountsByInventory = new IdentityHashMap<>();
     private final ObjectList<MEStorageMonitor> secondPassInventories = new ObjectArrayList<>();
-    private final ObjectList<ListenerRegistration> listeners = new ObjectArrayList<>();
+    private final Reference2ObjectLinkedOpenHashMap<MEStorageChangeListener, ListenerRegistration> listeners =
+        new Reference2ObjectLinkedOpenHashMap<>();
     private final ObjectList<ListenerRegistration> listenerDispatchBuffer = new ObjectArrayList<>();
     private final Supplier<KeyCounter> cachedContents;
     private final Runnable invalidationCallback;
     private boolean mountsInUse;
+    @Nullable
+    private MEStorageMonitor enumeratingInventory;
     @Nullable
     private ObjectList<QueuedOperation> queuedOperations;
     @Nullable
@@ -64,6 +71,7 @@ public class NetworkStorage implements MEStorageMonitor {
     }
 
     public void mount(int priority, MEStorageMonitor inventory) {
+        Objects.requireNonNull(inventory, "inventory");
         if (this.mountsInUse) {
             if (this.queuedOperations == null) {
                 this.queuedOperations = new ObjectArrayList<>();
@@ -72,10 +80,16 @@ public class NetworkStorage implements MEStorageMonitor {
             return;
         }
 
-        this.priorityInventory.computeIfAbsent(priority, ignored -> new ObjectArrayList<>()).add(inventory);
+        var bucket = this.priorityInventory.computeIfAbsent(priority, MountBucket::new);
+        if (bucket.shouldCompactBeforeAppend()) {
+            bucket.compact();
+        }
+        var mountedStorage = bucket.add(inventory);
+        this.mountsByInventory.computeIfAbsent(inventory, ignored -> new ObjectArrayList<>()).add(mountedStorage);
     }
 
     public void unmount(MEStorageMonitor inventory) {
+        Objects.requireNonNull(inventory, "inventory");
         if (this.mountsInUse) {
             if (this.queuedOperations == null) {
                 this.queuedOperations = new ObjectArrayList<>();
@@ -88,19 +102,23 @@ public class NetworkStorage implements MEStorageMonitor {
             return;
         }
 
-        var iterator = this.priorityInventory.int2ObjectEntrySet().iterator();
-        while (iterator.hasNext()) {
-            var entry = iterator.next();
-            var inventories = entry.getValue();
-            boolean removed = false;
-            for (int i = inventories.size() - 1; i >= 0; i--) {
-                if (inventories.get(i) == inventory) {
-                    inventories.remove(i);
-                    removed = true;
+        var mountedStorages = this.mountsByInventory.remove(inventory);
+        if (mountedStorages == null) {
+            return;
+        }
+
+        int mountCount = mountedStorages.size();
+        for (int i = 0; i < mountCount; i++) {
+            var mountedStorage = mountedStorages.get(i);
+            var bucket = mountedStorage.bucket;
+            bucket.remove(mountedStorage);
+            if (bucket.isEmpty()) {
+                var removedBucket = this.priorityInventory.remove(bucket.priority);
+                if (removedBucket != bucket) {
+                    throw new IllegalStateException("Storage priority index and mount bucket diverged");
                 }
-            }
-            if (removed && inventories.isEmpty()) {
-                iterator.remove();
+            } else if (bucket.shouldCompactBeforeAppend()) {
+                bucket.compact();
             }
         }
     }
@@ -113,15 +131,19 @@ public class NetworkStorage implements MEStorageMonitor {
         if (this.mountsInUse) {
             return 0;
         }
-
         long remaining = amount;
         boolean stickyStorageFound = false;
 
         this.mountsInUse = true;
         try {
-            for (var inventories : this.priorityInventory.values()) {
-                for (int i = 0; i < inventories.size(); i++) {
-                    var inventory = inventories.get(i);
+            for (var bucket : this.priorityInventory.values()) {
+                if (remaining <= 0) {
+                    break;
+                }
+                bucket.compact();
+                var mounts = bucket.mounts;
+                for (int i = 0; i < mounts.size(); i++) {
+                    var inventory = mounts.get(i).inventory;
                     if (remaining <= 0) {
                         break;
                     }
@@ -137,10 +159,15 @@ public class NetworkStorage implements MEStorageMonitor {
             }
 
             if (!stickyStorageFound) {
-                for (var inventories : this.priorityInventory.values()) {
+                for (var bucket : this.priorityInventory.values()) {
+                    if (remaining <= 0) {
+                        break;
+                    }
+                    bucket.compact();
                     this.secondPassInventories.clear();
-                    for (int i = 0; i < inventories.size(); i++) {
-                        var inventory = inventories.get(i);
+                    var mounts = bucket.mounts;
+                    for (int i = 0; i < mounts.size(); i++) {
+                        var inventory = mounts.get(i).inventory;
                         if (remaining <= 0) {
                             break;
                         }
@@ -169,10 +196,10 @@ public class NetworkStorage implements MEStorageMonitor {
                 }
             }
         } finally {
+            this.secondPassInventories.clear();
             this.mountsInUse = false;
+            flushQueued();
         }
-
-        flushQueued();
         return amount - remaining;
     }
 
@@ -184,14 +211,18 @@ public class NetworkStorage implements MEStorageMonitor {
         if (this.mountsInUse) {
             return 0;
         }
-
         long extracted = 0;
 
         this.mountsInUse = true;
         try {
-            for (var inventories : this.priorityInventory.values()) {
-                for (int i = 0; i < inventories.size(); i++) {
-                    var inventory = inventories.get(i);
+            for (var bucket : this.priorityInventory.values()) {
+                if (extracted >= amount) {
+                    break;
+                }
+                bucket.compact();
+                var mounts = bucket.mounts;
+                for (int i = 0; i < mounts.size(); i++) {
+                    var inventory = mounts.get(i).inventory;
                     if (extracted >= amount) {
                         break;
                     }
@@ -204,9 +235,8 @@ public class NetworkStorage implements MEStorageMonitor {
             }
         } finally {
             this.mountsInUse = false;
+            flushQueued();
         }
-
-        flushQueued();
         return extracted;
     }
 
@@ -220,23 +250,43 @@ public class NetworkStorage implements MEStorageMonitor {
 
     /**
      * Enumerates mounted storage directly. Only the owning storage service uses this to rebuild its aggregate cache.
+     *
+     * @return false if an active operation prevented enumeration; the caller must keep its previous cache
      */
-    public void getAvailableStacksRaw(KeyCounter out) {
+    public boolean getAvailableStacksRaw(KeyCounter out) {
+        if (this.mountsInUse) {
+            AELog.error("Reentrant raw network storage enumeration; invalidating the storage cache.");
+            this.invalidationCallback.run();
+            return false;
+        }
         this.mountsInUse = true;
         try {
-            for (var inventories : this.priorityInventory.values()) {
-                for (int i = 0; i < inventories.size(); i++) {
-                    var inventory = inventories.get(i);
+            for (var bucket : this.priorityInventory.values()) {
+                bucket.compact();
+                var mounts = bucket.mounts;
+                for (int i = 0; i < mounts.size(); i++) {
+                    var inventory = mounts.get(i).inventory;
                     if (isQueuedForRemoval(inventory)) {
                         continue;
                     }
+                    this.enumeratingInventory = inventory;
                     inventory.getAvailableStacks(out);
+                    this.enumeratingInventory = null;
                 }
             }
         } finally {
+            this.enumeratingInventory = null;
             this.mountsInUse = false;
             flushQueued();
         }
+        return true;
+    }
+
+    /**
+     * Identifies the source whose authoritative contents are currently being read by the owning service.
+     */
+    public boolean isEnumerating(MEStorageMonitor inventory) {
+        return this.enumeratingInventory == inventory;
     }
 
     @Override
@@ -248,23 +298,17 @@ public class NetworkStorage implements MEStorageMonitor {
 
     @Override
     public void addListener(MEStorageChangeListener listener, Object verificationToken) {
-        for (int i = 0; i < this.listeners.size(); i++) {
-            var registration = this.listeners.get(i);
-            if (registration.listener == listener) {
-                throw new IllegalStateException("The storage listener is already registered.");
-            }
+        if (this.listeners.containsKey(listener)) {
+            throw new IllegalStateException("The storage listener is already registered.");
         }
-        this.listeners.add(new ListenerRegistration(listener, verificationToken));
+        this.listeners.put(listener, new ListenerRegistration(listener, verificationToken));
     }
 
     @Override
     public void removeListener(MEStorageChangeListener listener) {
-        for (int i = this.listeners.size() - 1; i >= 0; i--) {
-            var registration = this.listeners.get(i);
-            if (registration.listener == listener) {
-                registration.active = false;
-                this.listeners.remove(i);
-            }
+        var registration = this.listeners.remove(listener);
+        if (registration != null) {
+            registration.active = false;
         }
     }
 
@@ -297,21 +341,34 @@ public class NetworkStorage implements MEStorageMonitor {
         this.dispatchingListeners = true;
         this.dispatchingListUpdate = listUpdate;
         this.listenerDispatchBuffer.clear();
-        this.listenerDispatchBuffer.addAll(this.listeners);
+        this.listenerDispatchBuffer.addAll(this.listeners.values());
         try {
             for (int i = 0; i < this.listenerDispatchBuffer.size(); i++) {
                 var registration = this.listenerDispatchBuffer.get(i);
                 if (!registration.active) {
                     continue;
                 }
-                if (!registration.listener.isValid(registration.verificationToken)) {
-                    registration.active = false;
-                    continue;
-                }
-                if (listUpdate) {
-                    registration.listener.onListUpdate();
-                } else {
-                    registration.listener.onStackChange(what, delta);
+                String callback = "isValid";
+                try {
+                    if (!registration.listener.isValid(registration.verificationToken)) {
+                        removeRegistration(registration);
+                        continue;
+                    }
+                    // Validation itself may unregister or replace this registration.
+                    if (!registration.active) {
+                        continue;
+                    }
+                    if (listUpdate) {
+                        callback = "onListUpdate";
+                        registration.listener.onListUpdate();
+                    } else {
+                        callback = "onStackChange";
+                        registration.listener.onStackChange(what, delta);
+                    }
+                } catch (RuntimeException exception) {
+                    removeRegistration(registration);
+                    AELog.error(exception, "Network storage listener " + registration.listener.getClass().getName()
+                        + " failed in " + callback + "; removing the failed registration.");
                 }
             }
         } finally {
@@ -319,7 +376,6 @@ public class NetworkStorage implements MEStorageMonitor {
             this.dispatchingListUpdate = false;
             this.dispatchingListeners = false;
         }
-        removeInactiveListeners();
 
         if (this.listUpdatePending) {
             this.listUpdatePending = false;
@@ -327,11 +383,10 @@ public class NetworkStorage implements MEStorageMonitor {
         }
     }
 
-    private void removeInactiveListeners() {
-        for (int i = this.listeners.size() - 1; i >= 0; i--) {
-            if (!this.listeners.get(i).active) {
-                this.listeners.remove(i);
-            }
+    private void removeRegistration(ListenerRegistration registration) {
+        registration.active = false;
+        if (this.listeners.get(registration.listener) == registration) {
+            this.listeners.remove(registration.listener);
         }
     }
 
@@ -364,6 +419,85 @@ public class NetworkStorage implements MEStorageMonitor {
     }
 
     private record QueuedOperation(boolean mount, int priority, MEStorageMonitor inventory) {
+    }
+
+    private static final class MountBucket {
+        private final int priority;
+        private final ObjectList<MountedStorage> mounts = new ObjectArrayList<>();
+        private int liveMountCount;
+        private boolean dirty;
+
+        private MountBucket(int priority) {
+            this.priority = priority;
+        }
+
+        private MountedStorage add(MEStorageMonitor inventory) {
+            var mountedStorage = new MountedStorage(this, inventory, this.mounts.size());
+            this.mounts.add(mountedStorage);
+            this.liveMountCount++;
+            return mountedStorage;
+        }
+
+        private void remove(MountedStorage mountedStorage) {
+            if (!mountedStorage.active || mountedStorage.bucket != this
+                || this.mounts.get(mountedStorage.index) != mountedStorage) {
+                throw new IllegalStateException("Storage identity index and mount position diverged");
+            }
+
+            this.mounts.set(mountedStorage.index, null);
+            mountedStorage.active = false;
+            this.liveMountCount--;
+            this.dirty = true;
+        }
+
+        private boolean isEmpty() {
+            return this.liveMountCount == 0;
+        }
+
+        private boolean shouldCompactBeforeAppend() {
+            return this.dirty && this.liveMountCount * 2 <= this.mounts.size();
+        }
+
+        private void compact() {
+            if (!this.dirty) {
+                return;
+            }
+
+            int writeIndex = 0;
+            int physicalSize = this.mounts.size();
+            for (int readIndex = 0; readIndex < physicalSize; readIndex++) {
+                var mountedStorage = this.mounts.get(readIndex);
+                if (mountedStorage == null) {
+                    continue;
+                }
+
+                if (writeIndex != readIndex) {
+                    this.mounts.set(writeIndex, mountedStorage);
+                }
+                mountedStorage.index = writeIndex++;
+            }
+
+            if (physicalSize > writeIndex) {
+                this.mounts.subList(writeIndex, physicalSize).clear();
+            }
+            if (writeIndex != this.liveMountCount) {
+                throw new IllegalStateException("Storage mount bucket live count diverged during compaction");
+            }
+            this.dirty = false;
+        }
+    }
+
+    private static final class MountedStorage {
+        private final MountBucket bucket;
+        private final MEStorageMonitor inventory;
+        private int index;
+        private boolean active = true;
+
+        private MountedStorage(MountBucket bucket, MEStorageMonitor inventory, int index) {
+            this.bucket = bucket;
+            this.inventory = inventory;
+            this.index = index;
+        }
     }
 
     private static final class ListenerRegistration {

@@ -51,6 +51,7 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.World;
 import net.minecraftforge.common.capabilities.Capability;
 import org.jetbrains.annotations.Nullable;
@@ -433,7 +434,7 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
         }
 
         this.oldLightValue = newLightValue;
-        this.world.checkLight(this.pos);
+        this.world.checkLightFor(EnumSkyBlock.BLOCK, this.pos);
         return true;
     }
 

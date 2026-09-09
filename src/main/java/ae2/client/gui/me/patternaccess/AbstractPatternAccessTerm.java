@@ -362,31 +362,7 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
         }
     }
 
-    @Override
-    protected void updateBeforeRender() {
-        super.updateBeforeRender();
-
-        beforePatternAccessUpdate();
-        this.showPatternProviders.set(this.container.getShownProviders());
-        this.patternModifierPanel.update();
-
-        String groupText = this.groupSearchField.getText();
-        String inputText = this.inputSearchField.getText();
-        String outputText = this.outputSearchField.getText();
-        if (!this.groupSearchText.equals(groupText) || !this.inputSearchText.equals(inputText)
-            || !this.outputSearchText.equals(outputText)) {
-            this.groupSearchText = groupText;
-            this.inputSearchText = inputText;
-            this.outputSearchText = outputText;
-            refreshList();
-            return;
-        }
-
-        int scroll = this.scrollbar.getCurrentScroll();
-        if (scroll != this.lastScroll) {
-            refreshVisiblePatternSlots();
-        }
-    }
+    private boolean providerLayoutDirty;
 
     protected void beforePatternAccessUpdate() {
     }
@@ -773,17 +749,51 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
     }
 
     @Override
+    protected void updateBeforeRender() {
+        super.updateBeforeRender();
+
+        beforePatternAccessUpdate();
+        this.showPatternProviders.set(this.container.getShownProviders());
+        this.patternModifierPanel.update();
+
+        String groupText = this.groupSearchField.getText();
+        String inputText = this.inputSearchField.getText();
+        String outputText = this.outputSearchField.getText();
+        if (this.providerLayoutDirty || !this.groupSearchText.equals(groupText) || !this.inputSearchText.equals(inputText)
+            || !this.outputSearchText.equals(outputText)) {
+            this.groupSearchText = groupText;
+            this.inputSearchText = inputText;
+            this.outputSearchText = outputText;
+            refreshList();
+            return;
+        }
+
+        int scroll = this.scrollbar.getCurrentScroll();
+        if (scroll != this.lastScroll) {
+            refreshVisiblePatternSlots();
+        }
+    }
+
+    @Override
     public void clear() {
         finishActiveGroupRename(false);
         finishActiveRename(false);
         this.patternAccessDisplay.clear();
-        refreshList();
+        this.providerLayoutDirty = true;
     }
 
     @Override
     public void postProviderInfo(long inventoryId, int dimensionId, BlockPos pos, @Nullable EnumFacing face) {
         this.patternAccessDisplay.postProviderInfo(inventoryId, dimensionId, pos, face);
-        refreshVisiblePatternSlots();
+        this.providerLayoutDirty = true;
+    }
+
+    @Override
+    public void removeProvider(long inventoryId) {
+        finishActiveGroupRename(false);
+        finishActiveRename(false);
+        this.patternAccessDisplay.removeProvider(inventoryId);
+        this.providerLayoutDirty = true;
     }
 
     @Override
@@ -792,18 +802,19 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
                                int inventorySize, Int2ObjectMap<ItemStack> slots) {
         if (this.patternAccessDisplay.postFullUpdate(inventoryId, sortBy, canEditTerminalName,
             canModifyTerminalVisibility, group, inventorySize, slots)) {
-            refreshList();
+            this.providerLayoutDirty = true;
         }
     }
 
     @Override
     public void postIncrementalUpdate(long inventoryId, Int2ObjectMap<ItemStack> slots) {
         if (this.patternAccessDisplay.postIncrementalUpdate(inventoryId, slots)) {
-            refreshList();
+            this.providerLayoutDirty = true;
         }
     }
 
     private void refreshList() {
+        this.providerLayoutDirty = false;
         this.patternAccessDisplay.refreshList(
             this.groupSearchField.getText(),
             this.inputSearchField.getText(),

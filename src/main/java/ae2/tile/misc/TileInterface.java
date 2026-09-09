@@ -76,7 +76,7 @@ public class TileInterface extends AENetworkedTile
     @Override
     public void onMainNodeStateChanged(IGridNodeListener.State reason) {
         if (this.getMainNode().hasGridBooted()) {
-            this.logic.notifyNeighbors();
+            this.logic.onNodeStateChanged();
         }
     }
 

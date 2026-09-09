@@ -4,6 +4,7 @@ import ae2.api.networking.GridHelper;
 import ae2.api.networking.IGridConnection;
 import ae2.api.networking.IGridNode;
 import ae2.api.util.AEColor;
+import ae2.core.AELog;
 import ae2.parts.networking.BeamFormerPart;
 import ae2.tile.networking.TileCableBus;
 import ae2.tile.networking.TileDenseBeamFormer;
@@ -118,7 +119,8 @@ public final class BeamFormerLinkLogic {
         IGridConnection newConnection;
         try {
             newConnection = GridHelper.createConnection(ourNode, theirNode);
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            AELog.error(exception, "Could not connect beam former endpoints " + ourNode + " and " + theirNode);
             if (clearEndpointState(endpoint, target)) {
                 endpoint.onBeamChanged();
             }
