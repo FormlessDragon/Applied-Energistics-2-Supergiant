@@ -32,7 +32,7 @@ import java.util.Objects;
 
 public class TileCraftingMonitor extends TileCraftingUnit implements IColorableBlockEntity {
 
-    private static final AEColor[] COLORS = AEColor.values();
+    private static final AEColor[] COLORS = AEColor.VALUES;
 
     private GenericStack display;
     private AEColor paintedColor = AEColor.TRANSPARENT;

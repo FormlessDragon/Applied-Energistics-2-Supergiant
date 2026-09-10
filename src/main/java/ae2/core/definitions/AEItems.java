@@ -76,8 +76,8 @@ import ae2.items.tools.powered.MatterCannonItem;
 import ae2.items.tools.powered.PortableCellItem;
 import ae2.items.tools.powered.WirelessCellTerminalItem;
 import ae2.items.tools.powered.WirelessCraftingTerminalItem;
-import ae2.items.tools.powered.WirelessPatternAccessTerminalItem;
 import ae2.items.tools.powered.WirelessPEATerminalItem;
+import ae2.items.tools.powered.WirelessPatternAccessTerminalItem;
 import ae2.items.tools.powered.WirelessPatternEncodingTerminalItem;
 import ae2.items.tools.powered.WirelessRequesterTerminalItem;
 import ae2.items.tools.powered.WirelessTerminalItem;
@@ -625,7 +625,7 @@ public final class AEItems {
     }
 
     private static void registerColored(RegistryEvent.Register<Item> event, ColoredItemDefinition<?> definition) {
-        for (AEColor color : AEColor.values()) {
+        for (AEColor color : AEColor.VALUES) {
             Item item = definition.item(color);
             if (item != null) {
                 event.getRegistry().register(item);

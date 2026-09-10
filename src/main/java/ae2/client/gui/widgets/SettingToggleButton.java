@@ -459,10 +459,7 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
 
     private static <T extends Enum<T>> void registerAppWithoutTitle(Icon icon, Setting<T> setting, T val,
                                                                     ITextComponent... tooltipLines) {
-        var lines = new ObjectArrayList<ITextComponent>(tooltipLines.length);
-        Collections.addAll(lines, tooltipLines);
-
-        appearances.put(new EnumPair<>(setting, val), new ButtonAppearance(icon, null, lines));
+        appearances.put(new EnumPair<>(setting, val), new ButtonAppearance(icon, null, new ObjectArrayList<>(tooltipLines)));
     }
 
     private static <T extends Enum<T>> void registerAppWithoutVisual(Setting<T> setting, T val,

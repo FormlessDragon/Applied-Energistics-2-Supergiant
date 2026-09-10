@@ -551,7 +551,7 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
             for (int i = 0; i < count; i++) {
                 readCpus.add(CraftingCpuListEntry.readFromPacket(buffer));
             }
-            this(List.copyOf(readCpus));
+            this(readCpus);
         }
 
         @Override

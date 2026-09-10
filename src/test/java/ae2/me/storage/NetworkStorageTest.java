@@ -9,6 +9,7 @@ import ae2.api.storage.IStorageProvider;
 import ae2.api.storage.MEStorageChangeListener;
 import ae2.api.storage.MEStorageMonitor;
 import ae2.me.service.StorageService;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.PacketBuffer;
@@ -68,7 +69,7 @@ class NetworkStorageTest {
         var parent = new StorageService();
         parent.addGlobalStorageProvider(mounts -> mounts.mount(service.getInventory(), 0));
         assertEquals(10, parent.getCachedInventory().get(KEY));
-        var changes = new ArrayList<Long>();
+        var changes = new LongArrayList();
         var lists = new AtomicInteger();
         service.getInventory().addListener(new MEStorageChangeListener() {
             public boolean isValid(Object token) {

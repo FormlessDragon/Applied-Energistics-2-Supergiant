@@ -6,19 +6,19 @@ import ae2.container.pattern.ContainerCraftingPattern;
 import ae2.container.pattern.ContainerProcessingPattern;
 import ae2.crafting.pattern.AECraftingPattern;
 import ae2.crafting.pattern.AEProcessingPattern;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
-import java.util.HashMap;
 import java.util.Map;
 
 @SideOnly(Side.CLIENT)
 public final class PatternGuiHandler {
 
-    private static final Map<Class<?> ,GuiScreenGetter> PATTERN_GUI_MAP = new HashMap<>();
+    private static final Map<Class<?>, GuiScreenGetter> PATTERN_GUI_MAP = new Reference2ObjectOpenHashMap<>();
     private static final Minecraft minecraft = Minecraft.getMinecraft();
 
     static {

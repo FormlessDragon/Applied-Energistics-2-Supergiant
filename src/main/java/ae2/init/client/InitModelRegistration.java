@@ -71,7 +71,7 @@ public final class InitModelRegistration {
         }
 
         for (ColoredItemDefinition<?> definition : AEParts.COLORED_PARTS) {
-            for (AEColor color : AEColor.values()) {
+            for (AEColor color : AEColor.VALUES) {
                 Item item = definition.item(color);
                 ResourceLocation id = definition.id(color);
                 if (item != null && id != null) {
@@ -82,7 +82,7 @@ public final class InitModelRegistration {
     }
 
     private static void registerColoredPaintBalls(ColoredItemDefinition<?> definition) {
-        for (AEColor color : AEColor.values()) {
+        for (AEColor color : AEColor.VALUES) {
             Item item = definition.item(color);
             ResourceLocation id = definition.id(color);
             if (item != null && id != null) {

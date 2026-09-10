@@ -22,16 +22,16 @@ import ae2.client.gui.style.Blitter;
 import ae2.client.gui.style.IconAtlas;
 import ae2.core.AppEng;
 import ae2.core.AppEngBase;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 public final class Icon {
-    private static final Map<ResourceLocation, Icon> icons = new LinkedHashMap<>();
+    private static final Map<ResourceLocation, Icon> icons = new Object2ObjectLinkedOpenHashMap<>();
     private static long registryVersion;
 
     public static final Icon REDSTONE_LOW = registerBuiltin("redstone_low");

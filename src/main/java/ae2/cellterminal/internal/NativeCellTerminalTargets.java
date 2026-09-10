@@ -61,6 +61,7 @@ import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -319,7 +320,7 @@ public final class NativeCellTerminalTargets {
         for (int slotIndex = 0; slotIndex < drive.getCellCount(); slotIndex++) {
             cellSlots.add(new DriveCellSlotTarget(storageTarget, drive, slotIndex));
         }
-        return List.copyOf(cellSlots);
+        return Collections.unmodifiableList(cellSlots);
     }
 
     private static String buildStableId(String type, int dimensionId, BlockPos pos, EnumFacing side) {
@@ -817,7 +818,7 @@ public final class NativeCellTerminalTargets {
             this.subnetId = Objects.requireNonNull(subnetId, "subnetId");
             this.locator = Objects.requireNonNull(locator, "locator");
             this.displayName = Objects.requireNonNull(displayName, "displayName");
-            this.connections = List.copyOf(Objects.requireNonNull(connections, "connections"));
+            this.connections = Collections.unmodifiableList(Objects.requireNonNull(connections, "connections"));
         }
 
         @Override

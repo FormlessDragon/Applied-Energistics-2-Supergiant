@@ -3,13 +3,15 @@ package ae2.api.upgrades;
 import ae2.items.materials.EnergyCardItem;
 import ae2.items.materials.UpgradeCardItem;
 import ae2.text.TextComponentItemStack;
+import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
-import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
@@ -20,7 +22,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,7 +31,7 @@ public final class Upgrades {
     private static final Reference2ObjectMap<Item, List<Association>> ASSOCIATIONS = new Reference2ObjectOpenHashMap<>();
     private static final Reference2ObjectMap<IUpgradeableItem, Set<Item>> SUPPORTED_ITEM_UPGRADES = new Reference2ObjectOpenHashMap<>();
     private static final Reference2ObjectMap<Item, List<ITextComponent>> UPGRADE_CARD_TOOLTIP_LINES = new Reference2ObjectOpenHashMap<>();
-    private static final Reference2ObjectMap<Item, Map<ResourceLocation, Integer>> ADDITIONAL_SLOTS =
+    private static final Reference2ObjectMap<Item, Object2IntMap<ResourceLocation>> ADDITIONAL_SLOTS =
         new Reference2ObjectOpenHashMap<>();
     private static final Set<Item> FROZEN_SLOT_REGISTRATIONS = new ReferenceOpenHashSet<>();
 
@@ -50,7 +51,7 @@ public final class Upgrades {
             } else {
                 var newSet = new ObjectOpenHashSet<>(upgrades);
                 newSet.add(upgradeCard);
-                SUPPORTED_ITEM_UPGRADES.put(upgradeableItem, Set.copyOf(newSet));
+                SUPPORTED_ITEM_UPGRADES.put(upgradeableItem, Collections.unmodifiableSet(newSet));
             }
         }
 
@@ -94,9 +95,13 @@ public final class Upgrades {
             throw new IllegalStateException("Upgrade slot registrations are already frozen for " + upgradableItem);
         }
 
-        var registrations = ADDITIONAL_SLOTS.computeIfAbsent(upgradableItem, ignored -> new LinkedHashMap<>());
+        var registrations = ADDITIONAL_SLOTS.computeIfAbsent(upgradableItem, ignored -> {
+            var m = new Object2IntLinkedOpenHashMap<ResourceLocation>();
+            m.defaultReturnValue(-1);
+            return m;
+        });
         var previous = registrations.putIfAbsent(registrationId, slots);
-        if (previous != null) {
+        if (previous != -1) {
             throw new IllegalStateException("Upgrade slot contribution " + registrationId
                 + " is already registered for " + upgradableItem);
         }
@@ -225,7 +230,7 @@ public final class Upgrades {
             }
         }
 
-        return List.copyOf(supportedTooltipLines);
+        return Collections.unmodifiableList(supportedTooltipLines);
     }
 
     private record Association(Item upgradeCard, Item upgradableItem, int maxCount, @Nullable String tooltipGroup) {

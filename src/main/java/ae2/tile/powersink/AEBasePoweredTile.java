@@ -35,15 +35,16 @@ import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.energy.CapabilityEnergy;
 import net.minecraftforge.energy.IEnergyStorage;
-
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 
 public abstract class AEBasePoweredTile extends AEBaseInvTile
     implements IAEPowerStorage, IExternalPowerSink {
 
-    protected static final Set<EnumFacing> ALL_SIDES = ImmutableSet.copyOf(EnumSet.allOf(EnumFacing.class));
+    protected static final Set<EnumFacing> ALL_SIDES = Collections.unmodifiableSet(EnumSet.allOf(EnumFacing.class));
     // the current power buffer.
     private final StoredEnergyAmount stored = new StoredEnergyAmount(0, 10000, this::handlePowerStateEvent);
     private final IEnergyStorage forgeEnergyAdapter;

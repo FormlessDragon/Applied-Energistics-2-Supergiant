@@ -111,7 +111,7 @@ public final class RegistryHandler {
     }
 
     private static void registerCableOre(String oreName, ColoredItemDefinition<?> cableDefinition) {
-        for (AEColor color : AEColor.values()) {
+        for (AEColor color : AEColor.VALUES) {
             ItemStack stack = cableDefinition.stack(color);
             if (stack.isEmpty()) {
                 throw new IllegalStateException("Missing cable item for ore dictionary entry " + oreName

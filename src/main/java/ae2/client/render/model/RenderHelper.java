@@ -18,7 +18,6 @@
 
 package ae2.client.render.model;
 
-import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.Vec3d;
@@ -58,7 +57,7 @@ final class RenderHelper {
                 Collections.reverse(corners);
             }
 
-            result.put(facing, ImmutableList.copyOf(corners));
+            result.put(facing, Collections.unmodifiableList(corners));
         }
 
         return result;

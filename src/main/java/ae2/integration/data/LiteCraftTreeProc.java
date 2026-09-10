@@ -8,6 +8,7 @@ import ae2.crafting.execution.CraftingSupplierLocation;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraft.network.PacketBuffer;
 
 import org.jetbrains.annotations.NotNull;
@@ -15,7 +16,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.RandomAccess;
@@ -98,7 +98,7 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
         limits.checkMachineCount(machineCount);
         List<PatternContainerGroup> machines = new ArrayList<>(machineCount);
         Map<PatternContainerGroup, List<CraftingSupplierLocation>> machineLocations =
-            new LinkedHashMap<>(machineCount);
+            new Object2ObjectLinkedOpenHashMap<>(machineCount);
         for (int i = 0; i < machineCount; i++) {
             PatternContainerGroup machine = PatternContainerGroup.readFromPacket(packetBuffer);
             machines.add(machine);

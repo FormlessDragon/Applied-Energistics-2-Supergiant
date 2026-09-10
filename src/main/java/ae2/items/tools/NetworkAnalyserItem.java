@@ -28,6 +28,7 @@ import ae2.me.netdata.State;
 import ae2.me.tracker.PlayerTracker;
 import ae2.util.EmptyArrays;
 import ae2.util.Platform;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
@@ -45,7 +46,6 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -169,7 +169,7 @@ public class NetworkAnalyserItem extends AEBaseItem implements IGuiItem {
 
     private NetworkData scanNetwork(IGrid grid, World world) {
         var connections = new ObjectOpenHashSet<IGridConnection>();
-        Map<BlockPos, NetworkData.ANode> nodes = new HashMap<>();
+        Map<BlockPos, NetworkData.ANode> nodes = new Object2ObjectOpenHashMap<>();
         for (IGridNode node : grid.getNodes()) {
             if (node.getLevel().provider.getDimension() != world.provider.getDimension()) {
                 continue;

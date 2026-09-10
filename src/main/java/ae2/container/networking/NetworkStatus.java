@@ -31,6 +31,7 @@ import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.network.PacketBuffer;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -129,7 +130,7 @@ public class NetworkStatus {
         for (int i = 0; i < count; i++) {
             machines.add(MachineGroup.read(data));
         }
-        status.groupedMachines = List.copyOf(machines);
+        status.groupedMachines = Collections.unmodifiableList(machines);
 
         return status;
     }

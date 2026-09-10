@@ -42,7 +42,7 @@ public enum CableCoreType {
     public static Collection<ResourceLocation> getTextureDependencies() {
         ObjectLinkedOpenHashSet<ResourceLocation> result = new ObjectLinkedOpenHashSet<>();
         for (CableCoreType type : values()) {
-            for (AEColor color : AEColor.values()) {
+            for (AEColor color : AEColor.VALUES) {
                 result.add(type.getTexture(color));
             }
         }

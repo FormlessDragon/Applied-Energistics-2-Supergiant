@@ -1,7 +1,6 @@
 package ae2.client.gui.me.common;
 
 import ae2.api.stacks.AEKey;
-import com.google.common.collect.ImmutableSet;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -52,7 +51,7 @@ public final class PinnedKeys {
         for (var pin : playerPins) {
             keys.add(pin.key());
         }
-        return ImmutableSet.copyOf(keys);
+        return Collections.unmodifiableSet(keys);
     }
 
     public static List<AEKey> getCraftingPinnedKeys() {

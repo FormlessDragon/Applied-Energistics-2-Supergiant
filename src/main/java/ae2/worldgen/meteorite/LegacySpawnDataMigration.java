@@ -1,6 +1,7 @@
 package ae2.worldgen.meteorite;
 
 import ae2.core.AELog;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.nbt.CompressedStreamTools;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.math.BlockPos;
@@ -12,7 +13,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -50,7 +50,7 @@ final class LegacySpawnDataMigration {
         boolean changed = false;
         boolean stateChanged = false;
         boolean complete = true;
-        Set<String> retainedFailedFiles = new HashSet<>();
+        Set<String> retainedFailedFiles = new ObjectOpenHashSet<>();
         for (File file : files) {
             Matcher fileName = SPAWN_DATA_FILE.matcher(file.getName());
             if (!file.isFile() || !fileName.matches()) {

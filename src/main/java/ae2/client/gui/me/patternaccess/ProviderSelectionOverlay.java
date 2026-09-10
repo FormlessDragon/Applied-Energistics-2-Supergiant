@@ -19,19 +19,23 @@ import ae2.client.gui.widgets.SimpleIconButton;
 import ae2.client.gui.widgets.TooltipButton;
 import ae2.container.AEBaseContainer;
 import ae2.container.me.patternencode.IProviderSelectionEndpoint;
-import ae2.core.localization.ButtonToolTips;
-import ae2.core.localization.GuiText;
-import ae2.core.localization.Tooltips;
-import ae2.core.worlddata.PatternProviderMappingData;
 import ae2.container.me.patternencode.ProviderDirectoryPage;
 import ae2.container.me.patternencode.ProviderDirectoryPageRequest;
 import ae2.container.me.patternencode.ProviderMappingPage;
 import ae2.container.me.patternencode.ProviderPageLimits;
+import ae2.core.localization.ButtonToolTips;
+import ae2.core.localization.GuiText;
+import ae2.core.localization.Tooltips;
+import ae2.core.worlddata.PatternProviderMappingData;
 import ae2.crafting.execution.CraftingSupplierLocator;
 import ae2.integration.Integrations;
 import ae2.integration.modules.hei.target.TextFieldTarget;
+import it.unimi.dsi.fastutil.ints.Int2LongMap;
+import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import mezz.jei.api.gui.IGhostIngredientHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
@@ -50,11 +54,7 @@ import org.lwjgl.input.Mouse;
 import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -234,15 +234,11 @@ public final class ProviderSelectionOverlay<C extends AEBaseContainer & IProvide
         return new Rectangle(this.bounds);
     }
 
-    @Override
-    public void populateScreen(Consumer<GuiButton> addWidget, Rectangle screenBounds, ae2.client.gui.AEBaseGui<?> screen) {
-        this.screenOrigin = Point.fromTopLeft(screenBounds);
-        synchronizeHostDirectory();
-        if (this.visible && !applyPendingOpenPositionReset()) {
-            clampToScreen();
-        }
-        syncTextFieldsFromState();
-        rebuildButtons();
+    private static void expirePendingPageRequests(Int2LongMap pendingPages, long now) {
+        pendingPages.int2LongEntrySet().removeIf(entry -> {
+            long elapsed = now - entry.getLongValue();
+            return elapsed >= PAGE_REQUEST_RETRY_NANOS;
+        });
     }
 
     @Override
@@ -1107,6 +1103,17 @@ public final class ProviderSelectionOverlay<C extends AEBaseContainer & IProvide
         rebuildButtons();
     }
 
+    @Override
+    public void populateScreen(Consumer<GuiButton> addWidget, Rectangle screenBounds, AEBaseGui<?> screen) {
+        this.screenOrigin = Point.fromTopLeft(screenBounds);
+        synchronizeHostDirectory();
+        if (this.visible && !applyPendingOpenPositionReset()) {
+            clampToScreen();
+        }
+        syncTextFieldsFromState();
+        rebuildButtons();
+    }
+
     /**
      * Mapping pages are only accepted for the provider currently being managed.
      */
@@ -1119,24 +1126,14 @@ public final class ProviderSelectionOverlay<C extends AEBaseContainer & IProvide
             return;
         }
         this.mapping.pendingPages.remove(page.page());
-        this.mapping.pages.put(page.page(), page.recipeTypeUids());
+        this.mapping.pages.putAndMoveToLast(page.page(), page.recipeTypeUids());
         while (this.mapping.pages.size() > MAX_MAPPING_CACHE_PAGES) {
-            this.mapping.pages.remove(this.mapping.pages.keySet().iterator().next());
+            this.mapping.pages.remove(this.mapping.pages.firstIntKey());
         }
         this.mapping.managedProvider = new ProviderEntry(provider.providerEntryId(), provider.icon(), provider.location(),
             provider.hasMappingTarget(), provider.providerName(), provider.emptySlots(), page.total(),
             provider.recipeTypeUids(), provider.acceptsProcessingPatterns());
         rebuildButtons();
-    }
-
-    @Nullable
-    private String getCachedMappingUid(int index) {
-        if (index < 0) {
-            return null;
-        }
-        List<String> mappingPage = this.mapping.pages.get(index / MAPPING_PROTOCOL_PAGE_SIZE);
-        int pageIndex = index % MAPPING_PROTOCOL_PAGE_SIZE;
-        return mappingPage != null && pageIndex < mappingPage.size() ? mappingPage.get(pageIndex) : null;
     }
 
     private void requestVisibleMappingPages(ProviderEntry provider) {
@@ -1360,11 +1357,14 @@ public final class ProviderSelectionOverlay<C extends AEBaseContainer & IProvide
         expirePendingPageRequests(this.mapping.pendingPages, now);
     }
 
-    private static void expirePendingPageRequests(Map<Integer, Long> pendingPages, long now) {
-        pendingPages.entrySet().removeIf(entry -> {
-            long elapsed = now - entry.getValue();
-            return elapsed >= PAGE_REQUEST_RETRY_NANOS;
-        });
+    @Nullable
+    private String getCachedMappingUid(int index) {
+        if (index < 0) {
+            return null;
+        }
+        List<String> mappingPage = this.mapping.pages.getAndMoveToLast(index / MAPPING_PROTOCOL_PAGE_SIZE);
+        int pageIndex = index % MAPPING_PROTOCOL_PAGE_SIZE;
+        return mappingPage != null && pageIndex < mappingPage.size() ? mappingPage.get(pageIndex) : null;
     }
 
     private void scheduleSearchRequest(boolean requestImmediately) {
@@ -1806,7 +1806,7 @@ public final class ProviderSelectionOverlay<C extends AEBaseContainer & IProvide
      */
     private static final class DirectoryState {
         private final ProviderDirectoryPageCache pageCache = new ProviderDirectoryPageCache();
-        private final Map<Integer, Long> pendingPages = new HashMap<>();
+        private final Int2LongMap pendingPages = new Int2LongOpenHashMap();
         private int scrollOffset;
         private String searchText = "";
         private int activeWindowId = -1;
@@ -1823,8 +1823,8 @@ public final class ProviderSelectionOverlay<C extends AEBaseContainer & IProvide
      * State used only while mapping-capable provider rows are shown or managed.
      */
     private static final class MappingState {
-        private final Map<Integer, Long> pendingPages = new HashMap<>();
-        private final LinkedHashMap<Integer, List<String>> pages = new LinkedHashMap<>(16, 0.75F, true);
+        private final Int2LongMap pendingPages = new Int2LongOpenHashMap();
+        private final Int2ObjectLinkedOpenHashMap<List<String>> pages = new Int2ObjectLinkedOpenHashMap<>();
         private boolean enabled;
         private String text = "";
         @Nullable
@@ -1863,7 +1863,7 @@ public final class ProviderSelectionOverlay<C extends AEBaseContainer & IProvide
                 throw new IllegalArgumentException("Provider entry exceeds "
                     + PatternProviderMappingData.DIRECTORY_RECIPE_TYPE_PREVIEW_SIZE + " recipe type preview UIDs");
             }
-            Set<String> uniqueRecipeTypeUids = new HashSet<>(recipeTypeUids.size());
+            Set<String> uniqueRecipeTypeUids = new ObjectOpenHashSet<>(recipeTypeUids.size());
             for (String recipeTypeUid : recipeTypeUids) {
                 Objects.requireNonNull(recipeTypeUid, "recipe type UID");
                 if (!uniqueRecipeTypeUids.add(recipeTypeUid)) {

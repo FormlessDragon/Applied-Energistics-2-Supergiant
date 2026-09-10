@@ -33,14 +33,16 @@ import ae2.parts.p2p.P2PTunnelPart;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanMap;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.Short2ByteLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.shorts.Short2ObjectMap;
+import it.unimi.dsi.fastutil.shorts.Short2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.ShortArrayList;
 import net.minecraft.nbt.NBTTagCompound;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Random;
 import java.util.stream.Stream;
 
@@ -59,7 +61,7 @@ public class P2PService implements IGridService, IGridServiceProvider {
     private final IGrid myGrid;
     private final Multimap<Short, P2PTunnelPart<?>> inputs = LinkedHashMultimap.create();
     private final Multimap<Short, P2PTunnelPart<?>> outputs = LinkedHashMultimap.create();
-    private final Map<Short, Map<Class<?>, Boolean>> inputMatchCache = new HashMap<>();
+    private final Short2ObjectMap<Reference2BooleanMap<Class<?>>> inputMatchCache = new Short2ObjectOpenHashMap<>();
     // Membership is immediately visible; peer callbacks run once per frequency after lifecycle changes settle.
     private final Short2ByteLinkedOpenHashMap pendingUpdates = new Short2ByteLinkedOpenHashMap();
     private final ShortArrayList frequencyDispatch = new ShortArrayList();
@@ -230,10 +232,10 @@ public class P2PService implements IGridService, IGridServiceProvider {
             return Stream.empty();
         }
         // Check that a matching input exists for the requested type
-        Map<Class<?>, Boolean> matches = this.inputMatchCache.computeIfAbsent(freq, ignored -> new HashMap<>());
+        Reference2BooleanMap<Class<?>> matches = this.inputMatchCache.computeIfAbsent(freq, ignored -> new Reference2BooleanOpenHashMap<>());
         boolean hasMatchingInput = matches.computeIfAbsent(c, type -> {
             for (P2PTunnelPart<?> input : this.inputs.get(freq)) {
-                if (type.isInstance(input)) {
+                if (((Class<?>) type).isInstance(input)) {
                     return true;
                 }
             }

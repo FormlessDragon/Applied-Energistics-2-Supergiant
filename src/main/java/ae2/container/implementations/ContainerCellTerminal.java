@@ -63,6 +63,8 @@ import ae2.core.network.clientbound.CellTerminalSyncPacket;
 import ae2.core.network.serverbound.GuiActionPacket;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.util.Platform;
+import it.unimi.dsi.fastutil.objects.Reference2IntMap;
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -84,9 +86,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -2720,7 +2720,7 @@ public class ContainerCellTerminal extends AEBaseContainer implements IKeyTypeSe
             return false;
         }
 
-        Map<Item, Integer> installed = new IdentityHashMap<>();
+        Reference2IntMap<Item> installed = new Reference2IntOpenHashMap<>();
         for (int slot = 0; slot < upgrades.size(); slot++) {
             ItemStack stack = upgrades.get(slot);
             if (stack == null) {

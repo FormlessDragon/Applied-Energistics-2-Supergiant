@@ -44,6 +44,7 @@ import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
@@ -213,7 +214,7 @@ public record CellTerminalClientState(String contextId,
         for (int index = 0; index < list.tagCount(); index++) {
             result.add(reader.read(list.getCompoundTagAt(index)));
         }
-        return List.copyOf(result);
+        return Collections.unmodifiableList(result);
     }
 
     private static List<String> readStrings(NBTTagList list) {
@@ -221,7 +222,7 @@ public record CellTerminalClientState(String contextId,
         for (int index = 0; index < list.tagCount(); index++) {
             result.add(list.getStringTagAt(index));
         }
-        return List.copyOf(result);
+        return Collections.unmodifiableList(result);
     }
 
     private static EnumSet<CellTerminalTab> copyEnabledTabs(EnumSet<CellTerminalTab> values) {
@@ -309,7 +310,7 @@ public record CellTerminalClientState(String contextId,
         for (int index = 0; index < list.tagCount(); index++) {
             result.add(new ItemStack(list.getCompoundTagAt(index)));
         }
-        return List.copyOf(result);
+        return Collections.unmodifiableList(result);
     }
 
     private static List<ContentEntry> displayContentEntries(List<GenericStack> entries) {
@@ -318,7 +319,7 @@ public record CellTerminalClientState(String contextId,
         for (int index = 0; index < limit; index++) {
             result.add(ContentEntry.fromStack(entries.get(index)));
         }
-        return List.copyOf(result);
+        return Collections.unmodifiableList(result);
     }
 
     private static int readContentEntryCount(NBTTagCompound tag, String key, List<ContentEntry> content) {

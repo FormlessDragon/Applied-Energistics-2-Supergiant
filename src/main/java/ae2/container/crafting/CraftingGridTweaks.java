@@ -1,10 +1,9 @@
 package ae2.container.crafting;
 
 import ae2.api.inventories.InternalInventory;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 import net.minecraft.item.ItemStack;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Server-side helpers for the crafting terminal's grid tweaks: rotating, balancing and filling the crafting grid.
@@ -49,7 +48,7 @@ public final class CraftingGridTweaks {
                 continue;
             }
 
-            List<Integer> slots = new ArrayList<>();
+            IntList slots = new IntArrayList();
             slots.add(first);
             String groupKey = balanceGroupKey(template);
             for (int other = first + 1; other < GRID_SIZE; other++) {
@@ -65,7 +64,7 @@ public final class CraftingGridTweaks {
             }
             int[] counts = distributeEvenly(total, slots.size());
             for (int i = 0; i < slots.size(); i++) {
-                int slot = slots.get(i);
+                int slot = slots.getInt(i);
                 ItemStack updated = grid.getStackInSlot(slot).copy();
                 updated.setCount(counts[i]);
                 grid.setItemDirect(slot, updated);

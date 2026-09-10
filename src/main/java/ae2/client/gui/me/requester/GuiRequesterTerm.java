@@ -25,6 +25,7 @@ import ae2.tile.crafting.requester.Request;
 import com.google.common.collect.HashMultimap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.ItemStack;
@@ -38,7 +39,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -242,7 +242,7 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
     }
 
     private Set<Object> searchByQuery(String searchQuery) {
-        Set<Object> cache = this.searchCache.computeIfAbsent(searchQuery, ignored -> new HashSet<>());
+        Set<Object> cache = this.searchCache.computeIfAbsent(searchQuery, ignored -> new ObjectOpenHashSet<>());
 
         if (cache.isEmpty() && searchQuery.length() > 1) {
             cache.addAll(searchByQuery(searchQuery.substring(0, searchQuery.length() - 1)));

@@ -18,10 +18,12 @@ import ae2.core.AELog;
 import ae2.me.cells.CreativeCellInventory;
 import ae2.me.cells.VoidCellInventory;
 import ae2.me.helpers.BaseActionSource;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -341,7 +343,7 @@ public final class CellTerminalNetworkToolImpl implements CellTerminalNetworkToo
     }
 
     private static void persistMovedCells(List<ExtractedMovement> extractedMovements) {
-        var persisted = Collections.newSetFromMap(new Reference2ObjectOpenHashMap<StorageCell, Boolean>());
+        var persisted = new ReferenceOpenHashSet<StorageCell>();
         for (var movement : extractedMovements) {
             if (persisted.add(movement.source.cell)) {
                 movement.source.cell.persist();
@@ -418,7 +420,7 @@ public final class CellTerminalNetworkToolImpl implements CellTerminalNetworkToo
         List<CellTerminalCellSlotHandle> handles,
         List<CellTerminalCellSlotTarget> slots,
         List<AEKey> orderedUniqueKeys) {
-        var nextSlotByType = new Object2ObjectOpenHashMap<String, Integer>();
+        var nextSlotByType = new Object2IntOpenHashMap<String>();
         var targetByKey = new Object2ObjectOpenHashMap<AEKey, CellTerminalCellSlotHandle>(orderedUniqueKeys.size());
         for (AEKey key : orderedUniqueKeys) {
             String keyType = keyTypeId(key.getType());
@@ -450,18 +452,19 @@ public final class CellTerminalNetworkToolImpl implements CellTerminalNetworkToo
         return null;
     }
 
-    private static void incrementBreakdown(Map<String, Integer> breakdown, String label) {
-        breakdown.merge(label, 1, Integer::sum);
+    private static void incrementBreakdown(Object2IntOpenHashMap<String> breakdown, String label) {
+        breakdown.addTo(label, 1);
     }
 
-    private static List<CellTerminalNetworkToolPreview.TargetBreakdown> targetBreakdown(Map<String, Integer> breakdown) {
-        var labels = new ObjectArrayList<>(breakdown.keySet());
-        labels.sort(String::compareToIgnoreCase);
-        var result = new ObjectArrayList<CellTerminalNetworkToolPreview.TargetBreakdown>(labels.size());
-        for (var label : labels) {
-            result.add(new CellTerminalNetworkToolPreview.TargetBreakdown(label, breakdown.get(label)));
+    private static List<CellTerminalNetworkToolPreview.TargetBreakdown> targetBreakdown(Object2IntMap<String> breakdown) {
+        var entries = new ObjectArrayList<>(breakdown.object2IntEntrySet());
+        entries.sort((a, b) -> a.getKey().compareToIgnoreCase(b.getKey()));
+        var result = new ObjectArrayList<CellTerminalNetworkToolPreview.TargetBreakdown>(entries.size());
+        for (var i = 0; i < entries.size(); i++) {
+            var e = entries.get(i);
+            result.add(new CellTerminalNetworkToolPreview.TargetBreakdown(e.getKey(), e.getIntValue()));
         }
-        return List.copyOf(result);
+        return Collections.unmodifiableList(result);
     }
 
     private static void recordAvailableCell(Map<String, UniqueTypeStats> typeStatsById, CellTerminalCellSlotTarget slot) {
@@ -890,7 +893,7 @@ public final class CellTerminalNetworkToolImpl implements CellTerminalNetworkToo
                     entry.what(),
                     entry.amount()));
             }
-            movementsBySource.add(List.copyOf(sourceMovements));
+            movementsBySource.add(Collections.unmodifiableList(sourceMovements));
         }
 
         var plans = new ObjectArrayList<CellTerminalPartitionPlan>(resolvedSlots.size());
@@ -928,7 +931,7 @@ public final class CellTerminalNetworkToolImpl implements CellTerminalNetworkToo
 
         var plans = new ObjectArrayList<CellTerminalPartitionPlan>();
         var failures = new ObjectArrayList<CellTerminalActionFailure>();
-        var breakdown = new Object2ObjectOpenHashMap<String, Integer>();
+        var breakdown = new Object2IntOpenHashMap<String>();
         for (var handle : slots) {
             try {
                 CellTerminalCellSlotTarget slot = this.targetAccess.resolveCellSlot(handle);
@@ -996,7 +999,7 @@ public final class CellTerminalNetworkToolImpl implements CellTerminalNetworkToo
 
         var plans = new ObjectArrayList<CellTerminalPartitionPlan>();
         var failures = new ObjectArrayList<CellTerminalActionFailure>();
-        var breakdown = new Object2ObjectOpenHashMap<String, Integer>();
+        var breakdown = new Object2IntOpenHashMap<String>();
         for (var handle : targets) {
             try {
                 CellTerminalBusTarget bus = this.targetAccess.resolveStorageBus(handle);

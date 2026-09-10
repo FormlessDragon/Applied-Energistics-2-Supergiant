@@ -29,6 +29,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
@@ -124,6 +125,6 @@ public final class ConfigManager implements IConfigManager {
         for (var entry : this.settings.entrySet()) {
             result.put(entry.getKey().getName(), entry.getValue().name());
         }
-        return Map.copyOf(result);
+        return Collections.unmodifiableMap(result);
     }
 }

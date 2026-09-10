@@ -50,6 +50,8 @@ import ae2.parts.reporting.CraftingTerminalPart;
 import ae2.util.inv.PlayerInternalInventory;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
@@ -69,7 +71,6 @@ import net.minecraft.util.NonNullList;
 import net.minecraft.util.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -573,7 +574,7 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
                 continue;
             }
 
-            List<Integer> targetSlots = new ArrayList<>();
+            IntList targetSlots = new IntArrayList();
             for (int targetSlot = firstSlot; targetSlot < recipe.size(); targetSlot++) {
                 ItemStack target = recipe.get(targetSlot);
                 if (ItemStack.areItemsEqual(wanted, target) && ItemStack.areItemStackTagsEqual(wanted, target)) {
@@ -609,7 +610,7 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
                 }
                 ItemStack stack = wanted.copy();
                 stack.setCount(counts[i]);
-                this.craftingGrid.setItemDirect(targetSlots.get(i), stack);
+                this.craftingGrid.setItemDirect(targetSlots.getInt(i), stack);
             }
         }
         onCraftMatrixChanged(this.craftingGrid.toContainer());

@@ -2,10 +2,12 @@ package ae2.container.me.patternencode;
 
 import ae2.api.stacks.AEItemKey;
 import ae2.core.worlddata.PatternProviderMappingData;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.util.EnumFacing;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -48,7 +50,7 @@ public record ProviderDirectoryPage(int windowId, long nonce, long directoryRevi
             throw new IllegalArgumentException("Provider directory page contains more entries than its total");
         }
 
-        Set<Long> providerEntryIds = new HashSet<>(entries.size());
+        LongSet providerEntryIds = new LongOpenHashSet(entries.size());
         for (Entry entry : entries) {
             Objects.requireNonNull(entry, "provider directory entry");
             if (!providerEntryIds.add(entry.providerEntryId())) {
@@ -98,7 +100,7 @@ public record ProviderDirectoryPage(int windowId, long nonce, long directoryRevi
                 throw new IllegalArgumentException("Provider directory entry exceeds "
                     + PatternProviderMappingData.DIRECTORY_RECIPE_TYPE_PREVIEW_SIZE + " recipe type preview UIDs");
             }
-            Set<String> uniqueRecipeTypeUids = new HashSet<>(recipeTypeUids.size());
+            Set<String> uniqueRecipeTypeUids = new ObjectOpenHashSet<>(recipeTypeUids.size());
             for (String recipeTypeUid : recipeTypeUids) {
                 PatternProviderMappingData.requireRecipeTypeUid(recipeTypeUid);
                 if (!uniqueRecipeTypeUids.add(recipeTypeUid)) {

@@ -28,6 +28,8 @@ import ae2.api.parts.IPartItem;
 import ae2.parts.p2p.P2PTunnelPart;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanMap;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
 import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -75,7 +77,7 @@ public final class P2PTunnelAttunement {
     public static final ResourceLocation LIGHT_TUNNEL = AEPartIds.LIGHT_P2P_TUNNEL;
     private static final int INITIAL_CAPACITY = 40;
     static final Map<String, Item> tagTunnels = new Object2ObjectOpenHashMap<>(INITIAL_CAPACITY);
-    static final Map<Item, Boolean> multipleInputTunnels = new Object2ObjectOpenHashMap<>(INITIAL_CAPACITY);
+    static final Reference2BooleanMap<Item> multipleInputTunnels = new Reference2BooleanOpenHashMap<>(INITIAL_CAPACITY);
     static final List<ApiAttunement> apiAttunements = new ObjectArrayList<>(INITIAL_CAPACITY);
     static final List<Item> manageableTunnels = new ObjectArrayList<>(INITIAL_CAPACITY);
 
@@ -176,7 +178,7 @@ public final class P2PTunnelAttunement {
     }
 
     private static void registerManageableTunnel(Item item, boolean supportsMultipleInputs) {
-        Boolean existing = multipleInputTunnels.get(item);
+        Boolean existing = multipleInputTunnels.getBoolean(item);
         if (existing != null && existing != supportsMultipleInputs) {
             throw new IllegalArgumentException("P2P tunnel " + item
                 + " was registered with conflicting multiple-input support");

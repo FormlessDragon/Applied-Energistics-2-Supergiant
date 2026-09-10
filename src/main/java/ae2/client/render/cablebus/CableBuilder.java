@@ -19,7 +19,7 @@ import java.util.function.Function;
 
 class CableBuilder {
     private static final CableCoreType[] CABLE_CORE_TYPES = CableCoreType.values();
-    private static final AEColor[] COLORS = AEColor.values();
+    private static final AEColor[] COLORS = AEColor.VALUES;
 
     private final EnumMap<CableCoreType, EnumMap<AEColor, TextureAtlasSprite>> coreTextures;
     private final EnumMap<AECableType, EnumMap<AEColor, TextureAtlasSprite>> connectionTextures;

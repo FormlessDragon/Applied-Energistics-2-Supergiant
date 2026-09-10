@@ -9,6 +9,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.util.ResourceLocation;
 import org.jspecify.annotations.NonNull;
 
+import java.util.Collections;
 import java.util.List;
 
 public final class MEChestStorageScanner implements CellTerminalScanner.Storage {
@@ -26,6 +27,6 @@ public final class MEChestStorageScanner implements CellTerminalScanner.Storage 
         for (var chest : machines) {
             result.add(NativeCellTerminalTargets.createMEChestStorageTarget(chest));
         }
-        return List.copyOf(result);
+        return Collections.unmodifiableList(result);
     }
 }

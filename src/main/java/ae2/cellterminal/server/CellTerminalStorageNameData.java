@@ -1,6 +1,7 @@
 package ae2.cellterminal.server;
 
 import ae2.core.worlddata.AESavedData;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.server.MinecraftServer;
@@ -10,7 +11,6 @@ import net.minecraft.world.storage.MapStorage;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.LinkedHashMap;
 import java.util.Objects;
 
 /**
@@ -25,7 +25,7 @@ public final class CellTerminalStorageNameData extends AESavedData {
     private static final String TAG_KEY = "key";
     private static final String TAG_DISPLAY_NAME = "displayName";
 
-    private final LinkedHashMap<String, String> displayNames = new LinkedHashMap<>();
+    private final Object2ObjectLinkedOpenHashMap<String, String> displayNames = new Object2ObjectLinkedOpenHashMap<>();
 
     public CellTerminalStorageNameData() {
         this(ID);

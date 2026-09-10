@@ -24,6 +24,7 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.LongSupplier;
@@ -507,29 +508,23 @@ public final class ProviderSelectionSession {
         this.host.syncProviderDirectoryRevision(this.directoryRevision);
     }
 
-    private List<ProviderSelectionEntry> collectDirectoryEntries(IGrid grid) {
-        List<ProviderDescriptor> providers = grid.getService(ActivePatternProviderDirectory.class)
-            .getSelectableProviderDescriptors();
-        ReferenceOpenHashSet<ProviderKey> currentProviderKeys = new ReferenceOpenHashSet<>();
-        for (ProviderDescriptor provider : providers) {
-            currentProviderKeys.add(provider.providerKey());
+    private static List<ProviderEntryFingerprint> createDirectoryFingerprint(List<ProviderSelectionEntry> entries,
+                                                                               PatternProviderMappingData mappingData) {
+        List<ProviderEntryFingerprint> fingerprint = new ArrayList<>(entries.size());
+        for (ProviderSelectionEntry entry : entries) {
+            fingerprint.add(new ProviderEntryFingerprint(entry, mappingData));
         }
-        this.entryIdsByProviderKey.keySet().removeIf(providerKey -> !currentProviderKeys.contains(providerKey));
-
-        List<ProviderSelectionEntry> entries = new ObjectArrayList<>(providers.size());
-        for (ProviderDescriptor provider : providers) {
-            entries.add(new ProviderSelectionEntry(getOrCreateEntryId(provider.providerKey()), provider.providerKey(),
-                provider));
-        }
-        return List.copyOf(entries);
+        return Collections.unmodifiableList(fingerprint);
     }
 
-    private void replaceDirectoryEntries(List<ProviderSelectionEntry> entries) {
-        this.directoryEntries = List.copyOf(entries);
-        this.entriesById.clear();
-        for (ProviderSelectionEntry entry : entries) {
-            this.entriesById.put(entry.id(), entry);
+    private static <T> List<T> getPage(List<T> values, int page) {
+        long start = (long) page * ProviderPageLimits.PAGE_SIZE;
+        if (start >= values.size()) {
+            return List.of();
         }
+        int fromIndex = (int) start;
+        return Collections.unmodifiableList(values.subList(fromIndex,
+            Math.min(values.size(), fromIndex + ProviderPageLimits.PAGE_SIZE)));
     }
 
     private long getOrCreateEntryId(ProviderKey providerKey) {
@@ -544,13 +539,21 @@ public final class ProviderSelectionSession {
         return providerEntryId;
     }
 
-    private static List<ProviderEntryFingerprint> createDirectoryFingerprint(List<ProviderSelectionEntry> entries,
-                                                                               PatternProviderMappingData mappingData) {
-        List<ProviderEntryFingerprint> fingerprint = new ArrayList<>(entries.size());
-        for (ProviderSelectionEntry entry : entries) {
-            fingerprint.add(new ProviderEntryFingerprint(entry, mappingData));
+    private List<ProviderSelectionEntry> collectDirectoryEntries(IGrid grid) {
+        List<ProviderDescriptor> providers = grid.getService(ActivePatternProviderDirectory.class)
+            .getSelectableProviderDescriptors();
+        ReferenceOpenHashSet<ProviderKey> currentProviderKeys = new ReferenceOpenHashSet<>();
+        for (ProviderDescriptor provider : providers) {
+            currentProviderKeys.add(provider.providerKey());
         }
-        return List.copyOf(fingerprint);
+        this.entryIdsByProviderKey.keySet().removeIf(providerKey -> !currentProviderKeys.contains(providerKey));
+
+        List<ProviderSelectionEntry> entries = new ObjectArrayList<>(providers.size());
+        for (ProviderDescriptor provider : providers) {
+            entries.add(new ProviderSelectionEntry(getOrCreateEntryId(provider.providerKey()), provider.providerKey(),
+                provider));
+        }
+        return Collections.unmodifiableList(entries);
     }
 
     private static void promoteFocusedProvider(List<ProviderSelectionEntry> entries,
@@ -579,13 +582,12 @@ public final class ProviderSelectionSession {
         }
     }
 
-    private static <T> List<T> getPage(List<T> values, int page) {
-        long start = (long) page * ProviderPageLimits.PAGE_SIZE;
-        if (start >= values.size()) {
-            return List.of();
+    private void replaceDirectoryEntries(List<ProviderSelectionEntry> entries) {
+        this.directoryEntries = Collections.unmodifiableList(entries);
+        this.entriesById.clear();
+        for (ProviderSelectionEntry entry : entries) {
+            this.entriesById.put(entry.id(), entry);
         }
-        int fromIndex = (int) start;
-        return List.copyOf(values.subList(fromIndex, Math.min(values.size(), fromIndex + ProviderPageLimits.PAGE_SIZE)));
     }
 
     @Nullable

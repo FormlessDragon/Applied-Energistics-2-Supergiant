@@ -34,6 +34,8 @@ import ae2.me.pathfinding.ChannelFinalizer;
 import ae2.me.pathfinding.PathingCalculation;
 import ae2.me.pathfinding.PathingCalculationTestAccess;
 import ae2.me.service.ActivePatternProviderDirectory;
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.util.EnumFacing;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -44,9 +46,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -54,14 +54,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GridPathingTest {
 
     private final List<GridNode> nodes = new ArrayList<>();
-    private final Map<IGridNode, Integer> channelNotifications = new IdentityHashMap<>();
+    private final Reference2IntOpenHashMap<IGridNode> channelNotifications = new Reference2IntOpenHashMap<>();
 
     @BeforeAll
     static void registerGridService() {
@@ -286,7 +285,7 @@ class GridPathingTest {
         GridHelper.destroyConnections(removed);
         assertSame(oldGrid, topology.controller.grid());
         assertEquals(1, oldGrid.size());
-        var components = Collections.newSetFromMap(new IdentityHashMap<IGrid, Boolean>());
+        var components = new ReferenceOpenHashSet<IGrid>();
         for (int i = 0; i < leaves.size(); i++) {
             assertEquals(2, leaves.get(i).grid().size());
             assertTrue(components.add(leaves.get(i).grid()));
@@ -435,18 +434,18 @@ class GridPathingTest {
         topology.connect(first, second);
         topology.connect(second, topology.controller);
 
-        var visitedNodes = new IdentityHashMap<IGridNode, Boolean>();
-        var visitedConnections = new IdentityHashMap<IGridConnection, Boolean>();
+        var visitedNodes = new ReferenceOpenHashSet<IGridNode>();
+        var visitedConnections = new ReferenceOpenHashSet<IGridConnection>();
         topology.controller.beginVisit(new IGridConnectionVisitor() {
             @Override
             public boolean visitNode(IGridNode node) {
-                assertNull(visitedNodes.put(node, Boolean.TRUE));
+                assertTrue(visitedNodes.add(node));
                 return true;
             }
 
             @Override
             public void visitConnection(IGridConnection connection) {
-                assertNull(visitedConnections.put(connection, Boolean.TRUE));
+                assertTrue(visitedConnections.add(connection));
             }
         });
 
@@ -830,7 +829,7 @@ class GridPathingTest {
                 @Override
                 public void onStateChanged(Object nodeOwner, IGridNode gridNode, State state) {
                     if (state == State.CHANNEL) {
-                        channelNotifications.merge(gridNode, 1, Integer::sum);
+                        channelNotifications.addTo(gridNode, 1);
                     }
                 }
             }, flagSet);

@@ -25,6 +25,7 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -81,7 +82,7 @@ public final class InterfaceSubnetScanner implements CellTerminalScanner.Subnet 
                 builder.displayName,
                 builder.connections));
         }
-        return List.copyOf(result);
+        return Collections.unmodifiableList(result);
     }
 
     private void scanOutboundConnections(IGrid mainGrid, Reference2ObjectMap<IGrid, SubnetBuilder> subnetBuilders) {

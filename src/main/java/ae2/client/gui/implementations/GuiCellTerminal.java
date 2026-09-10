@@ -99,6 +99,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import mezz.jei.api.gui.IGhostIngredientHandler;
 import net.minecraft.client.Minecraft;
@@ -122,7 +123,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -766,7 +766,7 @@ public class GuiCellTerminal extends AEBaseGui<ContainerCellTerminal> implements
 
     @SafeVarargs
     private static List<String> aggregateSearchValues(List<String>... groups) {
-        Set<String> values = new LinkedHashSet<>();
+        Set<String> values = new ObjectLinkedOpenHashSet<>();
         for (List<String> group : groups) {
             values.addAll(group);
         }
@@ -1571,7 +1571,7 @@ public class GuiCellTerminal extends AEBaseGui<ContainerCellTerminal> implements
                 }
             }
             case NETWORK_TOOLS -> {
-                for (CellTerminalNetworkToolOperation op : CellTerminalNetworkToolOperation.values()) {
+                for (CellTerminalNetworkToolOperation op : CellTerminalNetworkToolOperation.VALUES) {
                     this.lineData.add(new ToolRowData(op));
                 }
             }

@@ -33,11 +33,11 @@ import it.unimi.dsi.fastutil.ints.IntComparator;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -47,7 +47,7 @@ public class NetworkStorage implements MEStorageMonitor {
     private static final IntComparator PRIORITY_SORTER = (first, second) -> Integer.compare(second, first);
     private final Int2ObjectSortedMap<MountBucket> priorityInventory =
         new Int2ObjectRBTreeMap<>(PRIORITY_SORTER);
-    private final Map<MEStorageMonitor, ObjectList<MountedStorage>> mountsByInventory = new IdentityHashMap<>();
+    private final Map<MEStorageMonitor, ObjectList<MountedStorage>> mountsByInventory = new Reference2ObjectOpenHashMap<>();
     private final ObjectList<MEStorageMonitor> secondPassInventories = new ObjectArrayList<>();
     private final Reference2ObjectLinkedOpenHashMap<MEStorageChangeListener, ListenerRegistration> listeners =
         new Reference2ObjectLinkedOpenHashMap<>();
@@ -96,7 +96,7 @@ public class NetworkStorage implements MEStorageMonitor {
             }
             this.queuedOperations.add(new QueuedOperation(false, 0, inventory));
             if (this.queuedRemovals == null) {
-                this.queuedRemovals = Collections.newSetFromMap(new IdentityHashMap<>());
+                this.queuedRemovals = new ReferenceOpenHashSet<>();
             }
             this.queuedRemovals.add(inventory);
             return;

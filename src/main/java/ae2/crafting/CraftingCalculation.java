@@ -25,25 +25,25 @@ import ae2.api.networking.crafting.CalculationStrategy;
 import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.networking.crafting.ICraftingProvider;
 import ae2.api.networking.crafting.ICraftingService;
-import ae2.api.storage.AEKeyFilter;
 import ae2.api.networking.crafting.ICraftingSimulationRequester;
 import ae2.api.networking.storage.IStorageService;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKey2LongMap;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.api.storage.AEKeyFilter;
 import ae2.core.AEConfig;
 import ae2.core.AELog;
 import ae2.crafting.execution.CraftingSupplierLocation;
 import ae2.crafting.execution.CraftingSupplierLocator;
 import ae2.crafting.execution.InputTemplate;
+import ae2.crafting.graph.CraftingGraph;
+import ae2.crafting.graph.CraftingGraphNode;
 import ae2.crafting.graph.DemandPropagation;
 import ae2.crafting.graph.GraphBuilder;
 import ae2.crafting.graph.GraphExecutor;
-import ae2.crafting.graph.CraftingGraph;
-import ae2.crafting.graph.CraftingGraphNode;
-import ae2.crafting.graph.LocalDisplayFragment;
 import ae2.crafting.graph.LocalComponentPlan;
+import ae2.crafting.graph.LocalDisplayFragment;
 import ae2.crafting.graph.LocalPatternPlan;
 import ae2.crafting.graph.SccPlan;
 import ae2.crafting.inv.ChildCraftingSimulationState;
@@ -61,6 +61,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2LongMap;
 import it.unimi.dsi.fastutil.objects.Reference2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
@@ -105,8 +106,8 @@ public class CraftingCalculation {
     private final Map<IPatternDetails, AEKey2LongMap> patternInputCountCache = new Reference2ObjectOpenHashMap<>();
     private final Map<IPatternDetails, Map<AEKey, RecursivePatternBatch>> recursivePatternBatchCache =
         new Reference2ObjectOpenHashMap<>();
-    private final Reference2ObjectOpenHashMap<IPatternDetails, Boolean> positiveRecursiveNetCache =
-        new Reference2ObjectOpenHashMap<>();
+    private final Reference2BooleanOpenHashMap<IPatternDetails> positiveRecursiveNetCache =
+        new Reference2BooleanOpenHashMap<>();
     private final Reference2ObjectOpenHashMap<IPatternDetails, CraftingTreeProcess.MachineInfo> machineInfoCache =
         new Reference2ObjectOpenHashMap<>();
     private final Reference2ObjectOpenHashMap<ICraftingProvider, CraftingSupplierLocation> machineLocationCache =
@@ -1275,7 +1276,8 @@ public class CraftingCalculation {
      * from seed inventory without falling back to a legacy transaction.
      */
     public boolean hasPositiveRecursiveNet(IPatternDetails pattern) {
-        return this.positiveRecursiveNetCache.computeIfAbsent(pattern, this::computeHasPositiveRecursiveNet);
+        return this.positiveRecursiveNetCache.computeIfAbsent(pattern,
+            this::computeHasPositiveRecursiveNet);
     }
 
     private boolean computeHasPositiveRecursiveNet(IPatternDetails pattern) {

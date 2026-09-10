@@ -1,6 +1,8 @@
 package ae2.crafting.graph;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntComparator;
+import it.unimi.dsi.fastutil.ints.IntHeapPriorityQueue;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2IntMap;
@@ -142,20 +144,22 @@ public final class CraftingGraphTopology {
             }
         }
 
-        var queue = new PriorityQueue<Integer>(Comparator.comparingInt(componentId -> componentOrdinals[componentId]));
+        IntComparator componentOrdinalOrder =
+            (left, right) -> Integer.compare(componentOrdinals[left], componentOrdinals[right]);
+        var queue = new IntHeapPriorityQueue(componentOrdinalOrder);
         for (int i = 0; i < componentCount; i++) {
             if (inDegree[i] == 0) {
-                queue.add(i);
+                queue.enqueue(i);
             }
         }
 
         var orderedOldIds = new IntArrayList(componentCount);
         while (!queue.isEmpty()) {
-            int componentId = queue.remove();
+            int componentId = queue.dequeueInt();
             orderedOldIds.add(componentId);
             for (int dependencyId : dependencies[componentId]) {
                 if (--inDegree[dependencyId] == 0) {
-                    queue.add(dependencyId);
+                    queue.enqueue(dependencyId);
                 }
             }
         }

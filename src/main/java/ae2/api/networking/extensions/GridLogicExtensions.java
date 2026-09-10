@@ -1,7 +1,9 @@
 package ae2.api.networking.extensions;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.item.Item;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
@@ -9,7 +11,7 @@ import net.minecraft.util.math.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -21,8 +23,7 @@ import java.util.Set;
 public final class GridLogicExtensions {
     private static final Reference2ObjectMap<Item, Map<ResourceLocation, GridLogicExtensionFactory>> FACTORIES =
         new Reference2ObjectOpenHashMap<>();
-    private static final Set<Item> FROZEN_REGISTRATIONS = java.util.Collections.newSetFromMap(
-        new java.util.IdentityHashMap<>());
+    private static final Set<Item> FROZEN_REGISTRATIONS = new ReferenceOpenHashSet<>();
 
     private GridLogicExtensions() {
     }
@@ -40,7 +41,7 @@ public final class GridLogicExtensions {
             throw new IllegalStateException("Grid logic extension registrations are already frozen for " + machineType);
         }
 
-        var registrations = FACTORIES.computeIfAbsent(machineType, ignored -> new LinkedHashMap<>());
+        var registrations = FACTORIES.computeIfAbsent(machineType, ignored -> new Object2ObjectLinkedOpenHashMap<>());
         var previous = registrations.putIfAbsent(registrationId, factory);
         if (previous != null) {
             throw new IllegalStateException("Grid logic extension " + registrationId
@@ -65,7 +66,7 @@ public final class GridLogicExtensions {
         for (var factory : factories) {
             extensions.add(Objects.requireNonNull(factory.create(context), "extension factory returned null"));
         }
-        return List.copyOf(extensions);
+        return Collections.unmodifiableList(extensions);
     }
 
     /**

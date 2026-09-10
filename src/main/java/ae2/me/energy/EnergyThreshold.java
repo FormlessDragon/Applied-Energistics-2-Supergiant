@@ -19,16 +19,20 @@
 package ae2.me.energy;
 
 import ae2.api.networking.energy.IEnergyWatcher;
-
-import java.util.IdentityHashMap;
-import java.util.Map;
+import it.unimi.dsi.fastutil.objects.Reference2LongMap;
+import it.unimi.dsi.fastutil.objects.Reference2LongOpenHashMap;
 
 public class EnergyThreshold implements Comparable<EnergyThreshold> {
 
     private final double threshold;
     private final IEnergyWatcher watcher;
     private final int watcherHash;
-    private static final Map<IEnergyWatcher, Long> WATCHER_ORDERS = new IdentityHashMap<>();
+    private static final Reference2LongMap<IEnergyWatcher> WATCHER_ORDERS = new Reference2LongOpenHashMap<>();
+
+    static {
+        WATCHER_ORDERS.defaultReturnValue(-1);
+    }
+
     private static long nextWatcherOrder = 1;
     private final long watcherOrder;
 
@@ -63,12 +67,12 @@ public class EnergyThreshold implements Comparable<EnergyThreshold> {
      * Releases the stable ordering slot when a watcher is permanently destroyed.
      */
     static synchronized void releaseWatcher(IEnergyWatcher watcher) {
-        WATCHER_ORDERS.remove(watcher);
+        WATCHER_ORDERS.removeLong(watcher);
     }
 
     private static synchronized long watcherOrder(IEnergyWatcher watcher) {
-        Long existing = WATCHER_ORDERS.get(watcher);
-        if (existing != null) {
+        long existing = WATCHER_ORDERS.getLong(watcher);
+        if (existing != -1) {
             return existing;
         }
         if (nextWatcherOrder == Long.MAX_VALUE) {

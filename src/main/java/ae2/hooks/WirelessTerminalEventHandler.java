@@ -34,12 +34,16 @@ public class WirelessTerminalEventHandler {
     }
 
     private static void restockProjectile(EntityPlayerMP player) {
-        for (EnumHand hand : EnumHand.values()) {
-            ItemStack held = player.getHeldItem(hand);
-            if (held.getItem() instanceof ItemArrow) {
-                restockHeldItem(player, hand, held);
-                return;
-            }
+        ItemStack held = player.getHeldItem(EnumHand.MAIN_HAND);
+        if (held.getItem() instanceof ItemArrow) {
+            restockHeldItem(player, EnumHand.MAIN_HAND, held);
+            return;
+        }
+
+        held = player.getHeldItem(EnumHand.OFF_HAND);
+        if (held.getItem() instanceof ItemArrow) {
+            restockHeldItem(player, EnumHand.OFF_HAND, held);
+            return;
         }
 
         for (int slot = 0; slot < player.inventory.getSizeInventory(); slot++) {

@@ -1,8 +1,10 @@
 package ae2.core.worlddata;
 
-import ae2.core.AELog;
 import ae2.core.AEConfig;
+import ae2.core.AELog;
 import ae2.integration.Integrations;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.server.MinecraftServer;
@@ -11,17 +13,16 @@ import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
 import net.minecraftforge.common.util.Constants.NBT;
 
-import java.util.Collection;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-import java.nio.charset.StandardCharsets;
 
 public class PatternProviderMappingData extends AESavedData {
     public static final String ID = "ae2_pattern_provider_mappings";
@@ -41,8 +42,8 @@ public class PatternProviderMappingData extends AESavedData {
     private static final AtomicLong LAST_INVALID_UID_WARNING = new AtomicLong(Long.MIN_VALUE);
     private static final AtomicLong LAST_MAPPING_INDEX_WARNING = new AtomicLong(Long.MIN_VALUE);
 
-    private final Map<ProviderReference, LinkedHashSet<String>> recipeTypesByProvider = new LinkedHashMap<>();
-    private final Map<String, LinkedHashSet<ProviderReference>> providersByRecipeType = new LinkedHashMap<>();
+    private final Map<ProviderReference, Set<String>> recipeTypesByProvider = new Object2ObjectLinkedOpenHashMap<>();
+    private final Map<String, Set<ProviderReference>> providersByRecipeType = new Object2ObjectLinkedOpenHashMap<>();
     private long revision;
 
     public PatternProviderMappingData() {
@@ -128,18 +129,16 @@ public class PatternProviderMappingData extends AESavedData {
         return BindResult.ADDED;
     }
 
-    public boolean unbindAll(ProviderReference reference) {
-        Objects.requireNonNull(reference, "reference");
-
-        LinkedHashSet<String> recipeTypes = this.recipeTypesByProvider.get(reference);
-        if (recipeTypes == null) {
-            return false;
+    private static void addMapping(Map<ProviderReference, Set<String>> recipeTypesByProvider,
+                                   Map<String, Set<ProviderReference>> providersByRecipeType,
+                                   String recipeType, ProviderReference reference) {
+        boolean providerAdded = providersByRecipeType.computeIfAbsent(recipeType, ignored -> new ObjectLinkedOpenHashSet<>())
+            .add(reference);
+        boolean recipeTypeAdded = recipeTypesByProvider.computeIfAbsent(reference, ignored -> new ObjectLinkedOpenHashSet<>())
+            .add(recipeType);
+        if (providerAdded != recipeTypeAdded) {
+            throw inconsistentIndexes(recipeType, reference);
         }
-
-        validateProviderMappings(reference, recipeTypes);
-        removeProviderMappings(reference, recipeTypes);
-        recordChange();
-        return true;
     }
 
     public boolean unbind(ProviderReference reference, String recipeType) {
@@ -154,6 +153,26 @@ public class PatternProviderMappingData extends AESavedData {
         return true;
     }
 
+    public boolean unbindAll(ProviderReference reference) {
+        Objects.requireNonNull(reference, "reference");
+
+        Set<String> recipeTypes = this.recipeTypesByProvider.get(reference);
+        if (recipeTypes == null) {
+            return false;
+        }
+
+        validateProviderMappings(reference, recipeTypes);
+        removeProviderMappings(reference, recipeTypes);
+        recordChange();
+        return true;
+    }
+
+    public List<ProviderReference> getReferences(String recipeType) {
+        Set<ProviderReference> references = this.providersByRecipeType.get(Objects.requireNonNull(recipeType,
+            "recipe type UID"));
+        return references == null ? Collections.emptyList() : List.copyOf(references);
+    }
+
     public void replaceProviderMappings(ProviderReference reference, Collection<String> recipeTypes) {
         Objects.requireNonNull(reference, "reference");
         Objects.requireNonNull(recipeTypes, "recipeTypes");
@@ -164,7 +183,7 @@ public class PatternProviderMappingData extends AESavedData {
 
         int mappingLimit = getMappingLimit();
 
-        LinkedHashSet<String> replacementRecipeTypes = new LinkedHashSet<>();
+        Set<String> replacementRecipeTypes = new ObjectLinkedOpenHashSet<>();
         for (String recipeType : recipeTypes) {
             if (replacementRecipeTypes.size() == mappingLimit) {
                 AELog.warn("Truncating pattern provider mapping refresh at %d recipe types for provider %s",
@@ -174,7 +193,7 @@ public class PatternProviderMappingData extends AESavedData {
             replacementRecipeTypes.add(normalizeRecipeTypeUid(recipeType));
         }
 
-        LinkedHashSet<String> currentRecipeTypes = this.recipeTypesByProvider.get(reference);
+        Set<String> currentRecipeTypes = this.recipeTypesByProvider.get(reference);
         if ((currentRecipeTypes == null && replacementRecipeTypes.isEmpty())
             || (currentRecipeTypes != null && currentRecipeTypes.equals(replacementRecipeTypes))) {
             return;
@@ -190,10 +209,10 @@ public class PatternProviderMappingData extends AESavedData {
         recordChange();
     }
 
-    public List<ProviderReference> getReferences(String recipeType) {
-        Set<ProviderReference> references = this.providersByRecipeType.get(Objects.requireNonNull(recipeType,
-            "recipe type UID"));
-        return references == null ? Collections.emptyList() : List.copyOf(references);
+    public int getRecipeTypeCount(ProviderReference reference) {
+        Objects.requireNonNull(reference, "reference");
+        Set<String> recipeTypes = this.recipeTypesByProvider.get(reference);
+        return recipeTypes == null ? 0 : recipeTypes.size();
     }
 
     public Set<String> getRecipeTypes(ProviderReference reference) {
@@ -202,13 +221,7 @@ public class PatternProviderMappingData extends AESavedData {
         Set<String> recipeTypes = this.recipeTypesByProvider.get(reference);
         return recipeTypes == null
             ? Collections.emptySet()
-            : Collections.unmodifiableSet(new LinkedHashSet<>(recipeTypes));
-    }
-
-    public int getRecipeTypeCount(ProviderReference reference) {
-        Objects.requireNonNull(reference, "reference");
-        Set<String> recipeTypes = this.recipeTypesByProvider.get(reference);
-        return recipeTypes == null ? 0 : recipeTypes.size();
+            : Collections.unmodifiableSet(new ObjectLinkedOpenHashSet<>(recipeTypes));
     }
 
     /**
@@ -224,10 +237,10 @@ public class PatternProviderMappingData extends AESavedData {
         List<String> preview = new ArrayList<>(DIRECTORY_RECIPE_TYPE_PREVIEW_SIZE);
         if (!normalizedQuery.isEmpty()) {
             for (String uid : recipeTypes) {
-                if (uid.toLowerCase(java.util.Locale.ROOT).contains(normalizedQuery)) {
+                if (uid.toLowerCase(Locale.ROOT).contains(normalizedQuery)) {
                     preview.add(uid);
                     if (preview.size() == DIRECTORY_RECIPE_TYPE_PREVIEW_SIZE) {
-                        return List.copyOf(preview);
+                        return Collections.unmodifiableList(preview);
                     }
                 }
             }
@@ -240,24 +253,7 @@ public class PatternProviderMappingData extends AESavedData {
                 }
             }
         }
-        return List.copyOf(preview);
-    }
-
-    public List<String> getRecipeTypePage(ProviderReference reference, int page, int pageSize) {
-        Objects.requireNonNull(reference, "reference");
-        if (page < 0 || pageSize <= 0 || page > Integer.MAX_VALUE / pageSize) {
-            throw new IllegalArgumentException("Invalid recipe type mapping page");
-        }
-        Set<String> recipeTypes = this.recipeTypesByProvider.get(reference);
-        if (recipeTypes == null || recipeTypes.isEmpty()) {
-            return List.of();
-        }
-        int from = page * pageSize;
-        if (from >= recipeTypes.size()) {
-            return List.of();
-        }
-        int to = Math.min(recipeTypes.size(), from + pageSize);
-        return List.copyOf(new ArrayList<>(recipeTypes).subList(from, to));
+        return Collections.unmodifiableList(preview);
     }
 
     public long getRevision() {
@@ -284,13 +280,39 @@ public class PatternProviderMappingData extends AESavedData {
         return providerIndexContains;
     }
 
+    public List<String> getRecipeTypePage(ProviderReference reference, int page, int pageSize) {
+        Objects.requireNonNull(reference, "reference");
+        if (page < 0 || pageSize <= 0 || page > Integer.MAX_VALUE / pageSize) {
+            throw new IllegalArgumentException("Invalid recipe type mapping page");
+        }
+        Set<String> recipeTypes = this.recipeTypesByProvider.get(reference);
+        if (recipeTypes == null || recipeTypes.isEmpty()) {
+            return List.of();
+        }
+        int from = page * pageSize;
+        if (from >= recipeTypes.size()) {
+            return List.of();
+        }
+        int to = Math.min(recipeTypes.size(), from + pageSize);
+        return Collections.unmodifiableList(new ArrayList<>(recipeTypes).subList(from, to));
+    }
+
+    private void validateProviderMappings(ProviderReference reference, Set<String> recipeTypes) {
+        for (String recipeType : recipeTypes) {
+            Set<ProviderReference> providers = this.providersByRecipeType.get(recipeType);
+            if (providers == null || !providers.contains(reference)) {
+                throw inconsistentIndexes(recipeType, reference);
+            }
+        }
+    }
+
     private boolean removeMapping(String recipeType, ProviderReference reference) {
         if (!containsMapping(recipeType, reference)) {
             return false;
         }
 
-        LinkedHashSet<ProviderReference> providers = this.providersByRecipeType.get(recipeType);
-        LinkedHashSet<String> recipeTypes = this.recipeTypesByProvider.get(reference);
+        Set<ProviderReference> providers = this.providersByRecipeType.get(recipeType);
+        Set<String> recipeTypes = this.recipeTypesByProvider.get(reference);
         if (!Objects.requireNonNull(providers, "providers").remove(reference)
             || !Objects.requireNonNull(recipeTypes, "recipeTypes").remove(recipeType)) {
             throw inconsistentIndexes(recipeType, reference);
@@ -304,18 +326,14 @@ public class PatternProviderMappingData extends AESavedData {
         return true;
     }
 
-    private void validateProviderMappings(ProviderReference reference, Set<String> recipeTypes) {
-        for (String recipeType : recipeTypes) {
-            Set<ProviderReference> providers = this.providersByRecipeType.get(recipeType);
-            if (providers == null || !providers.contains(reference)) {
-                throw inconsistentIndexes(recipeType, reference);
-            }
-        }
+    private void recordChange() {
+        this.revision++;
+        markDirty();
     }
 
     private void removeProviderMappings(ProviderReference reference, Set<String> recipeTypes) {
         for (String recipeType : recipeTypes) {
-            LinkedHashSet<ProviderReference> providers = this.providersByRecipeType.get(recipeType);
+            Set<ProviderReference> providers = this.providersByRecipeType.get(recipeType);
             if (!Objects.requireNonNull(providers, "providers").remove(reference)) {
                 throw inconsistentIndexes(recipeType, reference);
             }
@@ -326,16 +344,11 @@ public class PatternProviderMappingData extends AESavedData {
         this.recipeTypesByProvider.remove(reference);
     }
 
-    private void recordChange() {
-        this.revision++;
-        markDirty();
-    }
-
     @Override
     public void readFromNBT(NBTTagCompound nbt) {
         Objects.requireNonNull(nbt, "nbt");
-        Map<ProviderReference, LinkedHashSet<String>> loadedRecipeTypesByProvider = new LinkedHashMap<>();
-        Map<String, LinkedHashSet<ProviderReference>> loadedProvidersByRecipeType = new LinkedHashMap<>();
+        Map<ProviderReference, Set<String>> loadedRecipeTypesByProvider = new Object2ObjectLinkedOpenHashMap<>();
+        Map<String, Set<ProviderReference>> loadedProvidersByRecipeType = new Object2ObjectLinkedOpenHashMap<>();
         NBTTagList mappingTags = nbt.getTagList(TAG_MAPPINGS, NBT.TAG_COMPOUND);
         int invalidRecipeTypeCount = 0;
         int cappedMappingCount = 0;
@@ -390,9 +403,9 @@ public class PatternProviderMappingData extends AESavedData {
 
     @Override
     public NBTTagCompound writeToNBT(NBTTagCompound compound) {
-        Map<String, LinkedHashSet<ProviderReference>> mappings = sanitizeIndexesForWrite();
+        Map<String, Set<ProviderReference>> mappings = sanitizeIndexesForWrite();
         NBTTagList mappingTags = new NBTTagList();
-        for (Map.Entry<String, LinkedHashSet<ProviderReference>> entry : mappings.entrySet()) {
+        for (Map.Entry<String, Set<ProviderReference>> entry : mappings.entrySet()) {
             String recipeType = entry.getKey();
 
             NBTTagCompound mappingTag = new NBTTagCompound();
@@ -409,10 +422,10 @@ public class PatternProviderMappingData extends AESavedData {
         return compound;
     }
 
-    private Map<String, LinkedHashSet<ProviderReference>> sanitizeIndexesForWrite() {
-        Map<String, LinkedHashSet<ProviderReference>> validMappings = new LinkedHashMap<>();
+    private Map<String, Set<ProviderReference>> sanitizeIndexesForWrite() {
+        Map<String, Set<ProviderReference>> validMappings = new Object2ObjectLinkedOpenHashMap<>();
         int skippedMappingCount = 0;
-        for (Map.Entry<String, LinkedHashSet<ProviderReference>> entry : this.providersByRecipeType.entrySet()) {
+        for (Map.Entry<String, Set<ProviderReference>> entry : this.providersByRecipeType.entrySet()) {
             String recipeType = entry.getKey();
             Set<ProviderReference> references = entry.getValue();
             if (recipeType == null || references == null || references.isEmpty()) {
@@ -426,7 +439,7 @@ public class PatternProviderMappingData extends AESavedData {
                 continue;
             }
 
-            LinkedHashSet<ProviderReference> validReferences = new LinkedHashSet<>();
+            Set<ProviderReference> validReferences = new ObjectLinkedOpenHashSet<>();
             for (ProviderReference reference : references) {
                 Set<String> recipeTypes = reference == null ? null : this.recipeTypesByProvider.get(reference);
                 if (recipeTypes == null || !recipeTypes.contains(recipeType)) {
@@ -442,7 +455,7 @@ public class PatternProviderMappingData extends AESavedData {
             }
         }
 
-        for (Map.Entry<ProviderReference, LinkedHashSet<String>> entry : this.recipeTypesByProvider.entrySet()) {
+        for (Map.Entry<ProviderReference, Set<String>> entry : this.recipeTypesByProvider.entrySet()) {
             ProviderReference reference = entry.getKey();
             Set<String> recipeTypes = entry.getValue();
             if (reference == null || recipeTypes == null || recipeTypes.isEmpty()) {
@@ -450,7 +463,7 @@ public class PatternProviderMappingData extends AESavedData {
                 continue;
             }
             for (String recipeType : recipeTypes) {
-                LinkedHashSet<ProviderReference> references = validMappings.get(recipeType);
+                Set<ProviderReference> references = validMappings.get(recipeType);
                 if (references == null || !references.contains(reference)) {
                     skippedMappingCount++;
                 }
@@ -468,25 +481,13 @@ public class PatternProviderMappingData extends AESavedData {
 
         this.providersByRecipeType.clear();
         this.recipeTypesByProvider.clear();
-        for (Map.Entry<String, LinkedHashSet<ProviderReference>> entry : validMappings.entrySet()) {
+        for (Map.Entry<String, Set<ProviderReference>> entry : validMappings.entrySet()) {
             for (ProviderReference reference : entry.getValue()) {
                 addMapping(this.recipeTypesByProvider, this.providersByRecipeType, entry.getKey(), reference);
             }
         }
         markDirty();
         return validMappings;
-    }
-
-    private static void addMapping(Map<ProviderReference, LinkedHashSet<String>> recipeTypesByProvider,
-                                   Map<String, LinkedHashSet<ProviderReference>> providersByRecipeType,
-                                   String recipeType, ProviderReference reference) {
-        boolean providerAdded = providersByRecipeType.computeIfAbsent(recipeType, ignored -> new LinkedHashSet<>())
-            .add(reference);
-        boolean recipeTypeAdded = recipeTypesByProvider.computeIfAbsent(reference, ignored -> new LinkedHashSet<>())
-            .add(recipeType);
-        if (providerAdded != recipeTypeAdded) {
-            throw inconsistentIndexes(recipeType, reference);
-        }
     }
 
     private static boolean shouldLogInvalidUidWarning(long now) {

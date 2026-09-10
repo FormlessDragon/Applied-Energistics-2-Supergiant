@@ -16,6 +16,7 @@ import ae2.helpers.IPriorityHost;
 import ae2.items.AEBaseItem;
 import ae2.items.contents.PriorityTunerGuiHost;
 import ae2.util.Platform;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -29,13 +30,13 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -209,7 +210,7 @@ public class PriorityTunerItem extends AEBaseItem implements IGuiItem {
         lines.add(GuiText.PriorityTunerPriority.text(settings.priority()).getFormattedText());
     }
 
-    private static net.minecraft.util.text.ITextComponent modeText(Mode mode) {
+    private static ITextComponent modeText(Mode mode) {
         return switch (mode) {
             case INPUT -> GuiText.PriorityTunerModeInput.text();
             case OUTPUT -> GuiText.PriorityTunerModeOutput.text();
@@ -284,7 +285,7 @@ public class PriorityTunerItem extends AEBaseItem implements IGuiItem {
         int applied = 0;
         int currentDimension = world.provider.getDimension();
         NBTTagList pending = tag.getTagList(PENDING_TAG, Constants.NBT.TAG_COMPOUND);
-        Set<PendingIdentity> appliedTargets = new HashSet<>();
+        Set<PendingIdentity> appliedTargets = new ObjectOpenHashSet<>();
         for (int i = 0; i < pending.tagCount(); i++) {
             NBTTagCompound entry = pending.getCompoundTagAt(i);
             if (entry.getInteger(PENDING_DIMENSION_TAG) != currentDimension) {

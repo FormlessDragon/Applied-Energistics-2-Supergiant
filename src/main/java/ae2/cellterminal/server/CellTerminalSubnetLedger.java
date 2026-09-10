@@ -1,11 +1,13 @@
 package ae2.cellterminal.server;
 
+import it.unimi.dsi.fastutil.objects.Object2BooleanLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2BooleanMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -32,8 +34,8 @@ public final class CellTerminalSubnetLedger {
     private static final String TAG_PLAYER_ID = "playerId";
     private static final String TAG_FAVORITES = "favorites";
 
-    private final Map<String, Entry> entries = new LinkedHashMap<>();
-    private final Map<UUID, PlayerEntry> playerEntries = new LinkedHashMap<>();
+    private final Map<String, Entry> entries = new Object2ObjectLinkedOpenHashMap<>();
+    private final Map<UUID, PlayerEntry> playerEntries = new Object2ObjectLinkedOpenHashMap<>();
     @Nullable
     private CellTerminalSubnetHighlightResult lastHighlightResult;
 
@@ -141,7 +143,7 @@ public final class CellTerminalSubnetLedger {
                 playerTag.setTag(TAG_LAST_LOADED, playerEntry.getValue().lastLoadedHandle.toTag());
             }
             var favoritesTag = new NBTTagList();
-            for (var favorite : playerEntry.getValue().favoriteKeys.entrySet()) {
+            for (var favorite : playerEntry.getValue().favoriteKeys.object2BooleanEntrySet()) {
                 Entry entry = this.entries.get(favorite.getKey());
                 if (entry == null) {
                     entry = entryBySubnetId(favorite.getKey());
@@ -149,7 +151,7 @@ public final class CellTerminalSubnetLedger {
                 if (entry != null && entry.handle != null) {
                     var favoriteTag = new NBTTagCompound();
                     favoriteTag.setTag(TAG_HANDLE, entry.handle.toTag());
-                    favoriteTag.setBoolean(TAG_FAVORITE, favorite.getValue());
+                    favoriteTag.setBoolean(TAG_FAVORITE, favorite.getBooleanValue());
                     favoritesTag.appendTag(favoriteTag);
                 }
             }
@@ -258,11 +260,11 @@ public final class CellTerminalSubnetLedger {
         Objects.requireNonNull(playerId, "playerId");
         PlayerEntry playerEntry = this.playerEntries.get(playerId);
         if (playerEntry != null) {
-            Boolean favorite = playerEntry.favoriteKeys.get(key(handle));
+            Boolean favorite = playerEntry.favoriteKeys.getBoolean(key(handle));
             if (favorite != null) {
                 return favorite;
             }
-            favorite = playerEntry.favoriteKeys.get(handle.subnetId());
+            favorite = playerEntry.favoriteKeys.getBoolean(handle.subnetId());
             if (favorite != null) {
                 return favorite;
             }
@@ -340,7 +342,7 @@ public final class CellTerminalSubnetLedger {
     }
 
     private static final class PlayerEntry {
-        private final Map<String, Boolean> favoriteKeys = new LinkedHashMap<>();
+        private final Object2BooleanMap<String> favoriteKeys = new Object2BooleanLinkedOpenHashMap<>();
         @Nullable
         private CellTerminalSubnetHandle lastLoadedHandle;
     }

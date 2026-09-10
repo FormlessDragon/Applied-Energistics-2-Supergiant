@@ -95,7 +95,7 @@ public class TileMEChest extends AENetworkedPoweredTile
     IStorageProvider, ServerTickingTile, KeyTypeSelectionHost, IViewCellStorage {
 
     private static final CellState[] CELL_STATES = CellState.values();
-    private static final AEColor[] COLORS = AEColor.values();
+    private static final AEColor[] COLORS = AEColor.VALUES;
 
     private final AppEngInternalInventory inputInventory = new AppEngInternalInventory(this, 1, 64,
         new InputInventoryFilter());

@@ -24,6 +24,7 @@ import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentTranslation;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -46,7 +47,7 @@ public final class TempCellStorageTarget implements CellTerminalStorageTarget {
         for (int slotIndex = 0; slotIndex < inventory.size(); slotIndex++) {
             slots.add(new TempCellSlotTarget(this, slotIndex));
         }
-        this.cellSlots = List.copyOf(slots);
+        this.cellSlots = Collections.unmodifiableList(slots);
     }
 
     @Override

@@ -3,6 +3,7 @@ package ae2.recipes.game;
 import ae2.items.tools.powered.WirelessTerminalItem;
 import ae2.items.tools.powered.WirelessTerminalRegistry;
 import ae2.items.tools.powered.WirelessUniversalTerminalItem;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.IRecipe;
@@ -11,7 +12,6 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.registries.IForgeRegistryEntry;
 
-import java.util.LinkedHashSet;
 
 public final class WirelessUniversalTerminalRecipe extends IForgeRegistryEntry.Impl<IRecipe> implements IRecipe {
 
@@ -30,7 +30,7 @@ public final class WirelessUniversalTerminalRecipe extends IForgeRegistryEntry.I
     public ItemStack getCraftingResult(InventoryCrafting inv) {
         ItemStack universal = ItemStack.EMPTY;
         boolean hasTerminal = false;
-        var terminals = new LinkedHashSet<WirelessTerminalItem>();
+        var terminals = new ObjectOpenHashSet<WirelessTerminalItem>();
         for (int i = 0; i < inv.getSizeInventory(); i++) {
             ItemStack stack = inv.getStackInSlot(i);
             if (stack.isEmpty()) {

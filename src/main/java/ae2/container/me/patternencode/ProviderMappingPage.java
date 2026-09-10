@@ -1,8 +1,8 @@
 package ae2.container.me.patternencode;
 
 import ae2.core.worlddata.PatternProviderMappingData;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -20,7 +20,7 @@ public record ProviderMappingPage(int windowId, long nonce, long directoryRevisi
         if (recipeTypeUids.size() > ProviderPageLimits.PAGE_SIZE || recipeTypeUids.size() > total) {
             throw new IllegalArgumentException("Invalid provider mapping page size");
         }
-        Set<String> unique = new HashSet<>(recipeTypeUids.size());
+        Set<String> unique = new ObjectOpenHashSet<>(recipeTypeUids.size());
         for (String recipeTypeUid : recipeTypeUids) {
             PatternProviderMappingData.requireRecipeTypeUid(recipeTypeUid);
             if (!unique.add(recipeTypeUid)) {

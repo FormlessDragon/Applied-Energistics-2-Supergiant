@@ -2,25 +2,25 @@ package ae2.init.client;
 
 import ae2.api.orientation.BlockOrientation;
 import ae2.api.orientation.RelativeSide;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraft.util.EnumFacing;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.StringJoiner;
 
 final class FullBlockVariant {
     private final EnumFacing facing;
     private final int spin;
-    private final LinkedHashMap<String, String> properties;
+    private final Map<String, String> properties;
 
-    private FullBlockVariant(EnumFacing facing, int spin, LinkedHashMap<String, String> properties) {
+    private FullBlockVariant(EnumFacing facing, int spin, Map<String, String> properties) {
         this.facing = facing;
         this.spin = spin;
         this.properties = properties;
     }
 
     static FullBlockVariant parse(String variant) {
-        LinkedHashMap<String, String> properties = new LinkedHashMap<>();
+        Map<String, String> properties = new Object2ObjectLinkedOpenHashMap<>();
         for (String property : variant.split(",")) {
             int equalsAt = property.indexOf('=');
             if (equalsAt <= 0 || equalsAt >= property.length() - 1) {

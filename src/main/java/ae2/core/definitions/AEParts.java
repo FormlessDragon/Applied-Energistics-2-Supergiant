@@ -288,7 +288,7 @@ public final class AEParts {
             event.getRegistry().register(definition.item());
         }
         for (ColoredItemDefinition<?> definition : COLORED_PARTS) {
-            for (AEColor color : AEColor.values()) {
+            for (AEColor color : AEColor.VALUES) {
                 event.getRegistry().register(definition.item(color));
             }
         }
@@ -324,7 +324,7 @@ public final class AEParts {
         PartModels.registerModels(PartModelsHelper.createModels(partClass));
 
         ColoredItemDefinition<ColoredPartItem<T>> definition = new ColoredItemDefinition<>();
-        for (AEColor color : AEColor.values()) {
+        for (AEColor color : AEColor.VALUES) {
             ResourceLocation id = ids.get(color);
             definition.add(color, id, new ItemDefinition<>(id, new ColoredPartItem<>(partClass, factory, color)));
         }

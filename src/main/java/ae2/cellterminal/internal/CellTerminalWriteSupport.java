@@ -11,13 +11,13 @@ import ae2.api.upgrades.Upgrades;
 import ae2.core.AELog;
 import ae2.util.ConfigInventory;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2IntMap;
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 public final class CellTerminalWriteSupport {
@@ -173,7 +173,7 @@ public final class CellTerminalWriteSupport {
     }
 
     private static void validateUpgradeSnapshot(IUpgradeInventory inventory, List<ItemStack> slots) {
-        Map<Item, Integer> installed = new Reference2ObjectOpenHashMap<>();
+        Reference2IntMap<Item> installed = new Reference2IntOpenHashMap<>();
 
         for (int slot = 0; slot < slots.size(); slot++) {
             ItemStack stack = slots.get(slot);

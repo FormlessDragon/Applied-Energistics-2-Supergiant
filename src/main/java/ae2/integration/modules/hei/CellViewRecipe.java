@@ -21,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
 import java.text.NumberFormat;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
@@ -119,7 +120,7 @@ final class CellViewRecipe implements IRecipeWrapper {
                 PageLayout page = pagination.pages().get(i);
                 recipes.add(new CellViewRecipe(page.contents(), page.slotCount(), text));
             }
-            return List.copyOf(recipes);
+            return Collections.unmodifiableList(recipes);
         } catch (RuntimeException | LinkageError e) {
             AELog.warn(e, "Storage cell returned inconsistent contents for HEI: %s", cell);
             return List.of();
@@ -141,11 +142,11 @@ final class CellViewRecipe implements IRecipeWrapper {
             int fromIndex = page * PAGE_SIZE;
             int toIndex = Math.min(fromIndex + PAGE_SIZE, sorted.size());
             List<GenericStack> pageContents = fromIndex < toIndex
-                ? List.copyOf(sorted.subList(fromIndex, toIndex))
+                ? Collections.unmodifiableList(sorted.subList(fromIndex, toIndex))
                 : List.of();
             pages.add(new PageLayout(pageContents, slotCountForPage(slotCapacity, page)));
         }
-        return new Pagination(List.copyOf(pages), storedTypes);
+        return new Pagination(Collections.unmodifiableList(pages), storedTypes);
     }
 
     static List<GenericStack> sortContents(List<GenericStack> contents) {
@@ -185,7 +186,7 @@ final class CellViewRecipe implements IRecipeWrapper {
         for (int i = 0; i < sorted.size(); i++) {
             result.add(sorted.get(i).stack());
         }
-        return List.copyOf(result);
+        return Collections.unmodifiableList(result);
     }
 
     private static void sortSerializedGroup(ObjectArrayList<SortableStack> sorted, int fromIndex, int toIndex) {

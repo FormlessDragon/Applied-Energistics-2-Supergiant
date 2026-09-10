@@ -7,6 +7,7 @@ import ae2.integration.abstraction.IC2PowerSink;
 import ae2.tile.powersink.IExternalPowerSink;
 import ic2.api.energy.prefab.BasicSink;
 import ic2.api.energy.tile.IEnergyEmitter;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
@@ -14,7 +15,6 @@ import net.minecraft.world.World;
 
 import java.lang.ref.WeakReference;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -61,7 +61,7 @@ public final class IC2PowerSinkAdapter extends BasicSink implements IC2PowerSink
             }
 
             Map<BlockPos, WeakReference<IC2PowerSinkAdapter>> worldSinks =
-                ACTIVE_SINKS.computeIfAbsent(world, ignored -> new HashMap<>());
+                ACTIVE_SINKS.computeIfAbsent(world, ignored -> new Object2ObjectOpenHashMap<>());
             BlockPos pos = sink.tileEntity.getPos().toImmutable();
             WeakReference<IC2PowerSinkAdapter> previousReference = worldSinks.put(pos, new WeakReference<>(sink));
             IC2PowerSinkAdapter previous = previousReference == null ? null : previousReference.get();

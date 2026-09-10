@@ -19,6 +19,7 @@ import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -92,7 +93,8 @@ public class NetworkCraftingProviders {
             }
             this.initializing = true;
             expectedRevision = this.registrationsRevision;
-            registrations = new ObjectArrayList<>(this.craftingProviders.values());
+            registrations = new ObjectArrayList<>(this.craftingProviders.size() + this.globalProviders.size());
+            registrations.addAll(this.craftingProviders.values());
             registrations.addAll(this.globalProviders.values());
         }
         try {
@@ -635,7 +637,7 @@ public class NetworkCraftingProviders {
                 deduplicatedPatterns.add(pattern);
             }
 
-            sortedPatterns = List.copyOf(deduplicatedPatterns);
+            sortedPatterns = Collections.unmodifiableList(deduplicatedPatterns);
             needsSorting = false;
         }
 
@@ -705,7 +707,7 @@ public class NetworkCraftingProviders {
         }
 
         @Override
-        public Iterator<ICraftingProvider> iterator() {
+        public @NonNull Iterator<ICraftingProvider> iterator() {
             synchronized (lock) {
                 ensureOrder();
                 return new Iterator<>() {
@@ -744,7 +746,7 @@ public class NetworkCraftingProviders {
                     newSnapshot.add(handle.provider);
                     handle = handle.next;
                 }
-                snapshot = List.copyOf(newSnapshot);
+                snapshot = Collections.unmodifiableList(newSnapshot);
                 snapshotDirty = false;
             }
             return snapshot;

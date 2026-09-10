@@ -48,6 +48,7 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -139,12 +140,12 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         }
     }
 
-    private void rememberProviderDirectory(IGrid grid, ShowPatternProviders shownProviders, List<ProviderStamp> signature) {
-        this.observedGrid = Objects.requireNonNull(grid, "grid");
-        this.observedShownProviders = Objects.requireNonNull(shownProviders, "shownProviders");
-        this.providerDirectorySignature = List.copyOf(Objects.requireNonNull(signature, "signature"));
-        this.ticksUntilProviderDirectoryScan = PROVIDER_DIRECTORY_SCAN_INTERVAL_TICKS;
-        this.providerDirectoryInitialized = true;
+    private static List<ProviderStamp> createProviderSignature(List<ProviderDirectoryEntry> providers) {
+        List<ProviderStamp> signature = new ObjectArrayList<>(providers.size());
+        for (int i = 0; i < providers.size(); i++) {
+            signature.add(new ProviderStamp(providers.get(i)));
+        }
+        return Collections.unmodifiableList(signature);
     }
 
     public void openProvider(EntityPlayer player, long inventoryId) {
@@ -321,12 +322,12 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         return true;
     }
 
-    private static List<ProviderStamp> createProviderSignature(List<ProviderDirectoryEntry> providers) {
-        List<ProviderStamp> signature = new ObjectArrayList<>(providers.size());
-        for (int i = 0; i < providers.size(); i++) {
-            signature.add(new ProviderStamp(providers.get(i)));
-        }
-        return List.copyOf(signature);
+    private void rememberProviderDirectory(IGrid grid, ShowPatternProviders shownProviders, List<ProviderStamp> signature) {
+        this.observedGrid = Objects.requireNonNull(grid, "grid");
+        this.observedShownProviders = Objects.requireNonNull(shownProviders, "shownProviders");
+        this.providerDirectorySignature = Collections.unmodifiableList(Objects.requireNonNull(signature, "signature"));
+        this.ticksUntilProviderDirectoryScan = PROVIDER_DIRECTORY_SCAN_INTERVAL_TICKS;
+        this.providerDirectoryInitialized = true;
     }
 
     private boolean sendIncrementalUpdate() {
@@ -625,7 +626,7 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         this.pinnedHosts.removeIf(container -> !activeProviders.contains(container));
         this.providerIdentityOrdinals.keySet().removeIf(container -> !activeProviders.contains(container));
         providers.sort(PatternAccessSession::compareProviderEntries);
-        return List.copyOf(providers);
+        return Collections.unmodifiableList(providers);
     }
 
     @Nullable

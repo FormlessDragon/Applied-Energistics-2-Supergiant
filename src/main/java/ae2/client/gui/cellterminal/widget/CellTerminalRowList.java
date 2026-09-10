@@ -18,6 +18,8 @@
 
 package ae2.client.gui.cellterminal.widget;
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.item.ItemStack;
@@ -106,8 +108,10 @@ public class CellTerminalRowList {
     }
 
     private void propagateTreeLines(List<?> allLines, int firstVisibleIndex) {
-        Map<BranchKey, Integer> branchCutYs = new Object2ObjectOpenHashMap<>();
-        Map<BranchKey, Integer> previousRowCutYs = new Object2ObjectOpenHashMap<>();
+        Object2IntMap<BranchKey> branchCutYs = new Object2IntOpenHashMap<>();
+        Object2IntMap<BranchKey> previousRowCutYs = new Object2IntOpenHashMap<>();
+        branchCutYs.defaultReturnValue(-1);
+        previousRowCutYs.defaultReturnValue(-1);
         for (int i = 0; i < visibleRows.size(); i++) {
             IWidget widget = visibleRows.get(i);
             int currentIndex = firstVisibleIndex + i;
@@ -148,7 +152,7 @@ public class CellTerminalRowList {
                 if (info.continuesTrunkBelow()) {
                     branchCutYs.put(branchKey, line.getTreeLineCutY());
                 } else {
-                    branchCutYs.remove(branchKey);
+                    branchCutYs.removeInt(branchKey);
                 }
                 previousRowCutYs.clear();
                 previousRowCutYs.put(branchKey, line.getTreeLineCutY());
@@ -168,28 +172,23 @@ public class CellTerminalRowList {
     }
 
     private int treeLineSourceY(List<?> allLines, int currentIndex, TreeLineInfo info, AbstractLine line,
-                                Map<BranchKey, Integer> branchCutYs,
-                                Map<BranchKey, Integer> previousRowCutYs) {
-        Integer cutY = branchCutYs.get(branchKey(info));
-        if (cutY != null) {
+                                Object2IntMap<BranchKey> branchCutYs,
+                                Object2IntMap<BranchKey> previousRowCutYs) {
+        int cutY = branchCutYs.getInt(branchKey(info));
+        if (cutY != -1) {
             return cutY;
         }
-        Integer sourceCutY = previousSourceBranchCutY(info, previousRowCutYs);
-        if (sourceCutY != null) {
-            return sourceCutY;
+        BranchKind sourceBranchKindAbove = info.sourceBranchKindAbove();
+        if (sourceBranchKindAbove != null) {
+            int sourceCutY = previousRowCutYs.getInt(new BranchKey(info.sectionKey(), sourceBranchKindAbove));
+            if (sourceCutY != -1) {
+                return sourceCutY;
+            }
         }
         if (hasBranchSourceAbove(allLines, currentIndex, info)) {
             return CellTerminalLayout.CONTENT_START_Y;
         }
         return line.getTreeLineCutY();
-    }
-
-    private Integer previousSourceBranchCutY(TreeLineInfo info, Map<BranchKey, Integer> previousRowCutYs) {
-        BranchKind sourceBranchKindAbove = info.sourceBranchKindAbove();
-        if (sourceBranchKindAbove == null) {
-            return null;
-        }
-        return previousRowCutYs.get(new BranchKey(info.sectionKey(), sourceBranchKindAbove));
     }
 
     private boolean hasBranchSourceAbove(List<?> allLines, int currentIndex, TreeLineInfo info) {

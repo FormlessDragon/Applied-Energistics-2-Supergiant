@@ -6,20 +6,21 @@ import ae2.api.networking.IGrid;
 import ae2.core.AppEng;
 import ae2.parts.storagebus.StorageBusPart;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.util.ResourceLocation;
 import org.jspecify.annotations.NonNull;
 
-import java.util.IdentityHashMap;
+import java.util.Collections;
 import java.util.List;
 
 public final class StorageBusScanner implements CellTerminalScanner.Bus {
     private static final ResourceLocation ID = AppEng.makeId("cell_terminal/storage_bus_scanner");
 
     static List<StorageBusPart> storageBuses(IGrid grid) {
-        var seen = new IdentityHashMap<StorageBusPart, Boolean>();
+        var seen = new ReferenceOpenHashSet<StorageBusPart>();
         var result = new ObjectArrayList<StorageBusPart>();
         for (var node : grid.getNodes()) {
-            if (node.getOwner() instanceof StorageBusPart storageBus && seen.put(storageBus, Boolean.TRUE) == null) {
+            if (node.getOwner() instanceof StorageBusPart storageBus && seen.add(storageBus)) {
                 result.add(storageBus);
             }
         }
@@ -39,6 +40,6 @@ public final class StorageBusScanner implements CellTerminalScanner.Bus {
                 result.add(NativeCellTerminalTargets.createStorageBusTarget(storageBus));
             }
         }
-        return List.copyOf(result);
+        return Collections.unmodifiableList(result);
     }
 }

@@ -36,7 +36,7 @@ public record CraftConfirmCpuList(List<Entry> cpus) implements PacketWritable {
         for (int i = 0; i < count; i++) {
             readCpus.add(Entry.readFromPacket(buffer));
         }
-        this(List.copyOf(readCpus));
+        this(readCpus);
     }
 
     public static CraftConfirmCpuList fromRecords(List<CraftingCPURecord> records, int selectedCpuSerial,

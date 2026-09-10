@@ -12,6 +12,7 @@ import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.PlayerMessages;
 import ae2.helpers.WirelessTerminalGuiHost;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.player.EntityPlayer;
@@ -30,7 +31,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -171,7 +171,7 @@ public class WirelessUniversalTerminalItem extends WirelessTerminalItem {
     }
 
     public Set<String> getInstalledTerminalIds(ItemStack stack) {
-        Set<String> ids = new LinkedHashSet<>();
+        Set<String> ids = new ObjectLinkedOpenHashSet<>();
         NBTTagCompound tag = stack.getTagCompound();
         if (tag == null || !tag.hasKey(WirelessTerminals.TAG_INSTALLED_TERMINALS, Constants.NBT.TAG_LIST)) {
             return ids;

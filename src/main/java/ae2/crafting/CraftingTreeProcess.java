@@ -36,15 +36,15 @@ import ae2.me.service.CraftingService;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Reference2LongMap;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -103,14 +103,15 @@ public class CraftingTreeProcess {
             return new MachineInfo(List.of(), Map.of());
         }
 
-        Map<PatternContainerGroup, LinkedHashSet<CraftingSupplierLocation>> locationsByGroup = new LinkedHashMap<>();
+        Map<PatternContainerGroup, ObjectLinkedOpenHashSet<CraftingSupplierLocation>> locationsByGroup =
+            new Object2ObjectLinkedOpenHashMap<>();
         var providers = service.getProvidersSnapshot(details);
         var grid = service.getGrid();
         for (int i = 0, size = providers.size(); i < size; i++) {
             var provider = providers.get(i);
             PatternContainerGroup group = getMachineGroup(provider);
             if (group != null) {
-                locationsByGroup.computeIfAbsent(group, ignored -> new LinkedHashSet<>());
+                locationsByGroup.computeIfAbsent(group, ignored -> new ObjectLinkedOpenHashSet<>());
                 CraftingSupplierLocation location = getMachineLocation(calculation, grid, provider);
                 if (location != null) {
                     locationsByGroup.get(group).add(location);
@@ -120,7 +121,7 @@ public class CraftingTreeProcess {
         var sourceGroups = new ObjectArrayList<>(locationsByGroup.keySet());
         sourceGroups.sort(MACHINE_GROUP_COMPARATOR);
         var groups = new ObjectArrayList<PatternContainerGroup>(sourceGroups.size());
-        Map<PatternContainerGroup, List<CraftingSupplierLocation>> locations = new LinkedHashMap<>();
+        Map<PatternContainerGroup, List<CraftingSupplierLocation>> locations = new Object2ObjectLinkedOpenHashMap<>();
         for (int i = 0, size = sourceGroups.size(); i < size; i++) {
             var sourceGroup = sourceGroups.get(i);
             var tooltip = sourceGroup.tooltip().stream().map(ITextComponent::createCopy)

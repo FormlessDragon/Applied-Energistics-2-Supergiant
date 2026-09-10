@@ -29,13 +29,14 @@ import ae2.api.stacks.KeyCounter;
 import ae2.crafting.inv.ICraftingInventory;
 import ae2.crafting.inv.ListCraftingInventory;
 import com.google.common.math.LongMath;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -246,7 +247,7 @@ public class CraftingCpuHelper {
                                                                 IPatternDetails.IInput input, World level) {
         return () -> new Iterator<>() {
             private final GenericStack[] possibleInputs = input.possibleInputs();
-            private final HashSet<FuzzyInputKey> checkedInputs = new HashSet<>();
+            private final Set<FuzzyInputKey> checkedInputs = new ObjectOpenHashSet<>();
             private int possibleInputIndex;
             private Iterator<AEKey> fuzzyIterator;
             private long fuzzyAmount;

@@ -24,7 +24,6 @@ import ae2.client.render.cablebus.CubeBuilder;
 import ae2.core.AELog;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -55,7 +54,7 @@ class MemoryCardBakedModel implements IBakedModel {
     private final MemoryCardColors colors;
     private final Function<ItemStack, MemoryCardColors> colorProvider;
     private final Cache<MemoryCardColors, MemoryCardBakedModel> modelCache;
-    private final ImmutableList<BakedQuad> generalQuads;
+    private final List<BakedQuad> generalQuads;
     private final ItemOverrideList overrides = new ItemOverrideList(Collections.emptyList()) {
         @Override
         public IBakedModel handleItemState(IBakedModel originalModel, ItemStack stack, World world,
@@ -89,7 +88,7 @@ class MemoryCardBakedModel implements IBakedModel {
         this.texture = texture;
         this.colors = colors;
         this.colorProvider = colorProvider;
-        this.generalQuads = ImmutableList.copyOf(this.buildGeneralQuads());
+        this.generalQuads = Collections.unmodifiableList(this.buildGeneralQuads());
         this.modelCache = modelCache;
     }
 

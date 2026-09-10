@@ -28,7 +28,7 @@ public final class BeamFormerRenderer {
     }
 
     private static GlowColor[] buildColorCache() {
-        AEColor[] colors = AEColor.values();
+        AEColor[] colors = AEColor.VALUES;
         GlowColor[] cache = new GlowColor[colors.length];
         for (AEColor color : colors) {
             cache[color.ordinal()] = GlowColor.fromRgb(color.mediumVariant);

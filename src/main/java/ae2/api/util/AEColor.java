@@ -54,6 +54,7 @@ public enum AEColor implements LocalizationEnum {
     GREEN("Green", "gui.ae2.Green", "green", EnumDyeColor.GREEN, 0x079b6b, 0x17b86d, 0x32d850, 0x000000),
     TRANSPARENT("Fluix", "gui.ae2.Fluix", "fluix", null, 0x5a479e, 0x915dcd, 0xe2a3e3, 0x000000);
 
+    public static final AEColor[] VALUES = values();
     public static final AEColor[] VALID_COLORS = new AEColor[]{WHITE, LIGHT_GRAY, GRAY, BLACK, LIME, YELLOW,
         ORANGE, BROWN, RED, PINK, MAGENTA, PURPLE, BLUE, LIGHT_BLUE, CYAN, GREEN};
 

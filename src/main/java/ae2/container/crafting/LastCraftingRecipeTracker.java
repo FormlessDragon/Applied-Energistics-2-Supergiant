@@ -1,16 +1,16 @@
 package ae2.container.crafting;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 public final class LastCraftingRecipeTracker {
-    private static final Map<UUID, List<ItemStack>> LAST_RECIPES = new HashMap<>();
+    private static final Map<UUID, List<ItemStack>> LAST_RECIPES = new Object2ObjectOpenHashMap<>();
 
     private LastCraftingRecipeTracker() {
     }

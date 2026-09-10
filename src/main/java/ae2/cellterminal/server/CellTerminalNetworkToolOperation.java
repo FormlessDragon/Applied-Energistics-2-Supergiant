@@ -17,5 +17,7 @@ public enum CellTerminalNetworkToolOperation {
     /**
      * Partitions each selected storage bus from its visible external contents.
      */
-    PARTITION_STORAGE_BUSES_BY_CONTENT
+    PARTITION_STORAGE_BUSES_BY_CONTENT;
+
+    public static final CellTerminalNetworkToolOperation[] VALUES = values();
 }

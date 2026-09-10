@@ -1371,7 +1371,7 @@ public class CPUSelectionList implements ICompositeWidget {
                 ? selectedCpuSerial
                 : filtered.isEmpty() ? -1 : filtered.getFirst().serial();
 
-            return new ViewResult(List.copyOf(filtered), resolvedSelectedCpuSerial);
+            return new ViewResult(filtered, resolvedSelectedCpuSerial);
         }
 
         private Comparator<ContainerCraftingStatus.CraftingCpuListEntry> comparator() {

@@ -1,10 +1,10 @@
 package ae2.client.gui.me.patternaccess;
 
 import ae2.container.me.patternencode.ProviderDirectoryPage;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -19,8 +19,8 @@ public final class ProviderDirectoryPageCache {
     public static final int DEFAULT_MAX_PAGES = 64;
 
     private final int maximumPages;
-    private final LinkedHashMap<DirectoryPageKey, DirectoryPageView> pages =
-        new LinkedHashMap<>(16, 0.75F, true);
+    private final Object2ObjectLinkedOpenHashMap<DirectoryPageKey, DirectoryPageView> pages =
+        new Object2ObjectLinkedOpenHashMap<>();
 
     public ProviderDirectoryPageCache() {
         this(DEFAULT_MAX_PAGES);
@@ -43,7 +43,7 @@ public final class ProviderDirectoryPageCache {
     }
 
     public DirectoryPageView getDirectoryPage(int windowId, long nonce, long revision, int page) {
-        return this.pages.get(new DirectoryPageKey(windowId, nonce, revision, page));
+        return this.pages.getAndMoveToLast(new DirectoryPageKey(windowId, nonce, revision, page));
     }
 
     public void clear() {
@@ -51,16 +51,15 @@ public final class ProviderDirectoryPageCache {
     }
 
     private DirectoryPageView getOrCreate(DirectoryPageKey key, Supplier<DirectoryPageView> factory) {
-        DirectoryPageView current = this.pages.get(key);
+        DirectoryPageView current = this.pages.getAndMoveToLast(key);
         if (current != null) {
             return current;
         }
 
         DirectoryPageView created = Objects.requireNonNull(factory.get(), "created page view");
-        this.pages.put(key, created);
+        this.pages.putAndMoveToLast(key, created);
         while (this.pages.size() > this.maximumPages) {
-            DirectoryPageKey eldest = this.pages.keySet().iterator().next();
-            this.pages.remove(eldest);
+            this.pages.removeFirst();
         }
         return created;
     }

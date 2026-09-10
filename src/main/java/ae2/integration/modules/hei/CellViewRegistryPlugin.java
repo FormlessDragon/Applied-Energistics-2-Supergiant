@@ -75,7 +75,7 @@ final class CellViewRegistryPlugin implements IRecipeRegistryPlugin {
             if (!createdPages.isEmpty()) {
                 this.focus = candidate.copy();
                 this.languageCode = candidateLanguageCode;
-                this.pages = List.copyOf(createdPages);
+                this.pages = createdPages;
             }
         }
     }

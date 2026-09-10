@@ -24,7 +24,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.Vec3d;
 
 public class Splotch {
-    private static final AEColor[] COLORS = AEColor.values();
+    private static final AEColor[] COLORS = AEColor.VALUES;
 
     private final EnumFacing side;
     private final boolean lumen;

@@ -7,19 +7,19 @@ import ae2.core.network.InitNetwork;
 import ae2.core.network.clientbound.RestorePreviousGuiPacket;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.IContainerListener;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 public final class PatternContainerGuiReturnContext {
     private static final ThreadLocal<AEBaseContainer> ACTIVE_RETURN_CONTAINER = new ThreadLocal<>();
-    private static final Map<UUID, Int2ObjectMap<Container>> EXTERNAL_RETURN_CONTAINERS = new HashMap<>();
+    private static final Map<UUID, Int2ObjectMap<Container>> EXTERNAL_RETURN_CONTAINERS = new Object2ObjectOpenHashMap<>();
 
     private PatternContainerGuiReturnContext() {
     }

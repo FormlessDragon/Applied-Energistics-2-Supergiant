@@ -5,6 +5,7 @@ import ae2.container.me.patternaccess.IPatternAccess;
 import ae2.core.AELog;
 import ae2.core.network.ClientboundPacket;
 import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.PacketBuffer;
 import net.minecraftforge.fml.relauncher.Side;
@@ -12,7 +13,6 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 import org.jetbrains.annotations.ApiStatus;
 
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -29,7 +29,8 @@ public class PatternAccessTerminalChunkPacket extends ClientboundPacket {
     static final int MAX_PENDING_WIRE_BYTES = 8 * 1_048_576;
     static final long PENDING_TIMEOUT_NANOS = 5_000_000_000L;
     private static final int MAX_PENDING_TRANSFERS = 16;
-    private static final Map<ChunkKey, PendingTransfer> PENDING_TRANSFERS = new LinkedHashMap<>(16, 0.75F, true);
+    private static final Object2ObjectLinkedOpenHashMap<ChunkKey, PendingTransfer> PENDING_TRANSFERS =
+        new Object2ObjectLinkedOpenHashMap<>();
     private static int nextTransferId;
     private static int pendingWireBytes;
 
@@ -166,12 +167,12 @@ public class PatternAccessTerminalChunkPacket extends ClientboundPacket {
             return null;
         }
 
-        PendingTransfer transfer = PENDING_TRANSFERS.get(key);
+        PendingTransfer transfer = PENDING_TRANSFERS.getAndMoveToLast(key);
         if (transfer == null) {
             makePendingCapacity(packet.totalWireBytes);
             transfer = new PendingTransfer(packet.totalChunks, packet.compressed, packet.uncompressedLength,
                 packet.totalWireBytes, now);
-            PENDING_TRANSFERS.put(key, transfer);
+            PENDING_TRANSFERS.putAndMoveToLast(key, transfer);
             pendingWireBytes += packet.totalWireBytes;
         }
         if (!transfer.accept(packet, now)) {
@@ -242,10 +243,10 @@ public class PatternAccessTerminalChunkPacket extends ClientboundPacket {
         while (!PENDING_TRANSFERS.isEmpty()
             && (PENDING_TRANSFERS.size() >= MAX_PENDING_TRANSFERS
                 || pendingWireBytes + requiredWireBytes > MAX_PENDING_WIRE_BYTES)) {
-            Map.Entry<ChunkKey, PendingTransfer> eldest = PENDING_TRANSFERS.entrySet().iterator().next();
+            ChunkKey eldest = PENDING_TRANSFERS.firstKey();
             AELog.warn("Discarding LRU Pattern Access Terminal sync chunk transfer: inventory=%s, transfer=%s",
-                eldest.getKey().inventoryId, eldest.getKey().transferId);
-            removeTransfer(eldest.getKey());
+                eldest.inventoryId, eldest.transferId);
+            removeTransfer(eldest);
         }
     }
 

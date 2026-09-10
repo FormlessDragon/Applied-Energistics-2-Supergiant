@@ -11,6 +11,7 @@ import ae2.text.TextComponentItemStack;
 import ae2.text.TextComponents;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.item.Item;
@@ -28,7 +29,6 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -41,7 +41,7 @@ public record PatternContainerGroup(
     private static final PatternContainerGroup NOTHING = new PatternContainerGroup(null,
         GuiText.Nothing.text(), Collections.emptyList());
     private static final int MAX_TOOLTIP_LINES = 256;
-    private static final Set<Block> PICK_BLOCK_FAILURES = Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<Block> PICK_BLOCK_FAILURES = new ReferenceOpenHashSet<>();
 
     public static PatternContainerGroup nothing() {
         return NOTHING;

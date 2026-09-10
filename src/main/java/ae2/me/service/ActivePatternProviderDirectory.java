@@ -17,6 +17,7 @@ import ae2.helpers.patternprovider.PatternProviderLogicHost;
 import ae2.parts.AEBasePart;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
@@ -28,7 +29,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -123,7 +123,7 @@ public final class ActivePatternProviderDirectory implements IGridService, IGrid
             }
         }
         descriptors.sort(PROVIDER_DESCRIPTOR_ORDER);
-        return List.copyOf(descriptors);
+        return Collections.unmodifiableList(descriptors);
     }
 
     private void refreshActiveProvidersIfNeeded() {
@@ -135,7 +135,7 @@ public final class ActivePatternProviderDirectory implements IGridService, IGrid
 
     private void refreshActiveProviders() {
         List<PatternContainer> providers = new ArrayList<>();
-        Set<PatternContainer> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<PatternContainer> seen = new ReferenceOpenHashSet<>();
         for (var candidate : this.candidates.values()) {
             if (candidate.active && seen.add(candidate.container)) {
                 providers.add(candidate.container);
@@ -153,7 +153,7 @@ public final class ActivePatternProviderDirectory implements IGridService, IGrid
             }
             this.providersByKey.put(key, provider);
         }
-        this.activeProviders = List.copyOf(providers);
+        this.activeProviders = Collections.unmodifiableList(providers);
     }
 
     @Override

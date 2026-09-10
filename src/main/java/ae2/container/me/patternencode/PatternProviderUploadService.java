@@ -19,6 +19,7 @@ import ae2.me.service.ActivePatternProviderDirectory.ProviderDescriptor;
 import ae2.me.service.ActivePatternProviderDirectory.ProviderKey;
 import ae2.util.inv.FilteredInternalInventory;
 import ae2.util.inv.filter.IAEItemFilter;
+import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraft.entity.player.EntityPlayer;
@@ -26,7 +27,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.LinkedHashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -112,13 +113,6 @@ public final class PatternProviderUploadService {
         }
     }
 
-    private record ProviderMappingReplacement(ProviderReference reference, List<String> recipeTypes) {
-        private ProviderMappingReplacement {
-            Objects.requireNonNull(reference, "reference");
-            recipeTypes = List.copyOf(Objects.requireNonNull(recipeTypes, "recipeTypes"));
-        }
-    }
-
     public static List<PatternContainer> findProcessingPatternUploadTargets(PatternProviderMappingData mappingData,
                                                                             IGrid grid,
                                                                             String recipeTypeUid) {
@@ -146,7 +140,14 @@ public final class PatternProviderUploadService {
                 uploadTargets.add(container);
             }
         }
-        return List.copyOf(uploadTargets);
+        return Collections.unmodifiableList(uploadTargets);
+    }
+
+    private record ProviderMappingReplacement(ProviderReference reference, List<String> recipeTypes) {
+        private ProviderMappingReplacement {
+            Objects.requireNonNull(reference, "reference");
+            recipeTypes = Collections.unmodifiableList(Objects.requireNonNull(recipeTypes, "recipeTypes"));
+        }
     }
 
     public static boolean hasAvailableProvider(IGrid grid) {
@@ -369,7 +370,7 @@ public final class PatternProviderUploadService {
     static final class ProviderActionWarningLimiter {
         private final int maximumTrackedKeys;
         private final long intervalNanos;
-        private final LinkedHashMap<Object, Long> lastWarningNanos = new LinkedHashMap<>(16, 0.75f, true);
+        private final Object2LongLinkedOpenHashMap<Object> lastWarningNanos = new Object2LongLinkedOpenHashMap<>();
 
         ProviderActionWarningLimiter(int maximumTrackedKeys, long intervalNanos) {
             if (maximumTrackedKeys <= 0) {
@@ -384,19 +385,18 @@ public final class PatternProviderUploadService {
 
         synchronized boolean shouldLog(Object key, long nowNanos) {
             Objects.requireNonNull(key, "key");
-            Long lastWarning = this.lastWarningNanos.get(key);
-            if (lastWarning != null) {
-                long elapsed = nowNanos - lastWarning;
+            boolean known = this.lastWarningNanos.containsKey(key);
+            if (known) {
+                long elapsed = nowNanos - this.lastWarningNanos.getLong(key);
                 if (elapsed >= 0 && elapsed < this.intervalNanos) {
                     return false;
                 }
             }
 
-            if (lastWarning == null && this.lastWarningNanos.size() >= this.maximumTrackedKeys) {
-                Object oldestKey = this.lastWarningNanos.keySet().iterator().next();
-                this.lastWarningNanos.remove(oldestKey);
+            if (!known && this.lastWarningNanos.size() >= this.maximumTrackedKeys) {
+                this.lastWarningNanos.removeFirstLong();
             }
-            this.lastWarningNanos.put(key, nowNanos);
+            this.lastWarningNanos.putAndMoveToLast(key, nowNanos);
             return true;
         }
 

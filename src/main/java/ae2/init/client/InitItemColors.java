@@ -75,7 +75,7 @@ public final class InitItemColors {
         }
 
         for (ColoredItemDefinition<?> definition : AEParts.COLORED_PARTS) {
-            for (AEColor color : AEColor.values()) {
+            for (AEColor color : AEColor.VALUES) {
                 Item item = definition.item(color);
                 if (item instanceof ColoredPartItem) {
                     itemColors.registerItemColorHandler(new StaticItemColor(color), item);
