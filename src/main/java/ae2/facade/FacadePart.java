@@ -183,7 +183,7 @@ public class FacadePart implements IFacadePart {
 
     @Override
     public boolean onUseItemOn(ItemStack heldItem, EntityPlayer player, EnumHand hand, Vec3d pos, BlockPos worldPos) {
-        if (!InteractionUtil.canWrenchRotate(player, heldItem, worldPos)) {
+        if (!InteractionUtil.canWrenchRotate(player, heldItem, worldPos, getBlockState())) {
             return false;
         }
 
@@ -193,7 +193,7 @@ public class FacadePart implements IFacadePart {
     @Override
     public boolean onClicked(EntityPlayer player, Vec3d pos, BlockPos worldPos) {
         ItemStack heldItem = player.getHeldItemMainhand();
-        if (!InteractionUtil.canWrenchRotate(player, heldItem, worldPos)) {
+        if (!InteractionUtil.canWrenchRotate(player, heldItem, worldPos, getBlockState())) {
             return false;
         }
 

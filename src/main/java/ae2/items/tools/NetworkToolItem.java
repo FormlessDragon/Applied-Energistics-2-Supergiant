@@ -44,6 +44,8 @@ import ae2.util.inv.AppEngInternalInventory;
 import ae2.util.inv.InternalInventoryHost;
 import ae2.util.inv.filter.IAEItemFilter;
 import cofh.api.item.IToolHammer;
+import crazypants.enderio.api.tool.ITool;
+import crazypants.enderio.base.conduit.ConduitDisplayMode;
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -66,14 +68,16 @@ import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+@net.minecraftforge.fml.common.Optional.Interface(iface = "crazypants.enderio.api.tool.ITool", modid = "enderio")
 @net.minecraftforge.fml.common.Optional.Interface(iface = "cofh.api.item.IToolHammer", modid = "cofhcore")
-public class NetworkToolItem extends AEBaseItem implements IGuiItem, IStackTooltipDataProvider, IAEWrench, IToolHammer {
+public class NetworkToolItem extends AEBaseItem implements IGuiItem, IStackTooltipDataProvider, IAEWrench, IToolHammer, ITool {
     private static final String INVENTORY_TAG = "inv";
 
     public NetworkToolItem() {
@@ -283,5 +287,21 @@ public class NetworkToolItem extends AEBaseItem implements IGuiItem, IStackToolt
         public boolean allowInsert(InternalInventory inv, int slot, ItemStack stack) {
             return Upgrades.isUpgradeCardItem(stack.getItem());
         }
+    }
+
+    @Override
+    public boolean canUse(@NonNull EnumHand enumHand, @NonNull EntityPlayer entityPlayer, @NonNull BlockPos blockPos) {
+        return true;
+    }
+
+    @Override
+    public void used(@NonNull EnumHand enumHand, @NonNull EntityPlayer entityPlayer, @NonNull BlockPos blockPos) {
+
+    }
+
+    @Override
+    public boolean shouldHideFacades(@NonNull ItemStack itemStack, @NonNull EntityPlayer entityPlayer) {
+        ConduitDisplayMode curMode = ConduitDisplayMode.getDisplayMode(itemStack);
+        return curMode != ConduitDisplayMode.NONE && curMode != ConduitDisplayMode.NEUTRAL;
     }
 }

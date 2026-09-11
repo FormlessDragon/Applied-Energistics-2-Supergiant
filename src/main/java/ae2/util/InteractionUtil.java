@@ -21,6 +21,7 @@ package ae2.util;
 import ae2.api.util.IAEWrench;
 import ae2.items.tools.NetworkToolItem;
 import cofh.api.item.IToolHammer;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
@@ -38,15 +39,13 @@ public final class InteractionUtil {
     private InteractionUtil() {
     }
 
-    public static boolean canWrenchRotate(final EntityPlayer player, final ItemStack tool, final BlockPos pos) {
-        return canUseBlockWrench(player, tool, pos);
+    public static boolean canWrenchRotate(final EntityPlayer player, final ItemStack tool, final BlockPos pos,
+                                          final IBlockState blockState) {
+        return canUseBlockWrench(player, tool, pos, blockState);
     }
 
-    public static boolean canWrenchDisassemble(final EntityPlayer player, final ItemStack tool, final BlockPos pos) {
-        return canUseBlockWrench(player, tool, pos);
-    }
-
-    private static boolean canUseBlockWrench(final EntityPlayer player, final ItemStack tool, final BlockPos pos) {
+    private static boolean canUseBlockWrench(final EntityPlayer player, final ItemStack tool, final BlockPos pos,
+                                             final IBlockState blockState) {
         if (tool.isEmpty()) {
             return false;
         }
@@ -54,10 +53,11 @@ public final class InteractionUtil {
             return false;
         }
 
-        return isWrench(player, tool, pos);
+        return isWrench(player, tool, pos, blockState);
     }
 
-    public static boolean isWrench(final EntityPlayer player, final ItemStack tool, final BlockPos pos) {
+    public static boolean isWrench(final EntityPlayer player, final ItemStack tool, final BlockPos pos,
+                                   final IBlockState blockState) {
         if (tool.isEmpty()) {
             return false;
         }
@@ -75,7 +75,7 @@ public final class InteractionUtil {
 
             }
         }
-        return false;
+        return tool.getItem().getHarvestLevel(tool, "wrench", player, blockState) >= 0;
     }
 
     public static boolean isInAlternateUseMode(EntityPlayer player) {

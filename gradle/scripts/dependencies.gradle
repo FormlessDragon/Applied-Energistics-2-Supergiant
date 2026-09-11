@@ -44,9 +44,9 @@ dependencies {
     modImplementation 'mezz:jei:4.34.0'
     // The One Probe
     modImplementation "curse.maven:the-one-probe-245211:2667280"
-    //EIO Core
-    modCompileOnly("com.enderio.core:EnderCore:1.12.2-0.5.78:core")
-    modCompileOnly("com.enderio.core:EnderCore:1.12.2-0.5.78")
+    //EIO
+    modCompileOnly("curse.maven:ender-core-ceu-1530852:8707400")
+    modCompileOnly("curse.maven:enderio-ceu-1530854:8707396")
     // Baubles
     modCompileOnly "curse.maven:baubles-227083:2518667"
     // CodeChickenLib

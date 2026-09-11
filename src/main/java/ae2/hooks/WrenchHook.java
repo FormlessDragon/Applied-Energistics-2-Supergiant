@@ -42,8 +42,8 @@ public final class WrenchHook {
         }
 
         ItemStack itemStack = player.getHeldItem(hand);
-        if (InteractionUtil.isInAlternateUseMode(player)
-            && InteractionUtil.canWrenchDisassemble(player, itemStack, pos)) {
+        IBlockState state = world.getBlockState(pos);
+        if (InteractionUtil.isInAlternateUseMode(player) && InteractionUtil.canWrenchRotate(player, itemStack, pos, state)) {
             EnumActionResult cableBusResult = disassembleCableBusPart(player, world, pos, localHit);
             if (cableBusResult != EnumActionResult.PASS) {
                 return cableBusResult;
@@ -51,7 +51,7 @@ public final class WrenchHook {
             return disassemble(player, world, pos);
         }
 
-        if (!InteractionUtil.isInAlternateUseMode(player) && InteractionUtil.canWrenchRotate(player, itemStack, pos)) {
+        if (!InteractionUtil.isInAlternateUseMode(player) && InteractionUtil.canWrenchRotate(player, itemStack, pos, state)) {
             EnumActionResult beamFormerResult = toggleBeamRendering(player, world, pos, localHit);
             if (beamFormerResult != EnumActionResult.PASS) {
                 return beamFormerResult;
