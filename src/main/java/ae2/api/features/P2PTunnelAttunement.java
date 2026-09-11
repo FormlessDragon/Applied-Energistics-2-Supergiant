@@ -178,8 +178,7 @@ public final class P2PTunnelAttunement {
     }
 
     private static void registerManageableTunnel(Item item, boolean supportsMultipleInputs) {
-        Boolean existing = multipleInputTunnels.getBoolean(item);
-        if (existing != null && existing != supportsMultipleInputs) {
+        if (multipleInputTunnels.containsKey(item) && multipleInputTunnels.getBoolean(item) != supportsMultipleInputs) {
             throw new IllegalArgumentException("P2P tunnel " + item
                 + " was registered with conflicting multiple-input support");
         }

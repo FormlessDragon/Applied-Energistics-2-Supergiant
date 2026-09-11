@@ -260,13 +260,13 @@ public final class CellTerminalSubnetLedger {
         Objects.requireNonNull(playerId, "playerId");
         PlayerEntry playerEntry = this.playerEntries.get(playerId);
         if (playerEntry != null) {
-            Boolean favorite = playerEntry.favoriteKeys.getBoolean(key(handle));
-            if (favorite != null) {
-                return favorite;
+            String handleKey = key(handle);
+            if (playerEntry.favoriteKeys.containsKey(handleKey)) {
+                return playerEntry.favoriteKeys.getBoolean(handleKey);
             }
-            favorite = playerEntry.favoriteKeys.getBoolean(handle.subnetId());
-            if (favorite != null) {
-                return favorite;
+            String subnetId = handle.subnetId();
+            if (playerEntry.favoriteKeys.containsKey(subnetId)) {
+                return playerEntry.favoriteKeys.getBoolean(subnetId);
             }
         }
         return isFavorite(handle);
