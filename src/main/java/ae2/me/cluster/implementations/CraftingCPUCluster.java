@@ -23,6 +23,7 @@ import ae2.api.config.CpuSelectionMode;
 import ae2.api.config.Settings;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
+import ae2.api.networking.crafting.CraftingCpuGroup;
 import ae2.api.networking.crafting.CraftingJobOptions;
 import ae2.api.networking.crafting.CraftingJobStatus;
 import ae2.api.networking.crafting.ICraftingCPU;
@@ -415,5 +416,16 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
 
     public Icon getFocusedCpuListBackgroundIcon() {
         return Icon.CRAFTING_CPU_LIST_ROW_BACKGROUND_FOCUSED;
+    }
+
+    /**
+     * Groups this CPU with other CPUs in the crafting status list. Returning null, the default, leaves the CPU
+     * ungrouped and sorted purely by the player's active sort mode.
+     *
+     * @see CraftingCpuGroup
+     */
+    @Nullable
+    public CraftingCpuGroup getCpuListGroup() {
+        return null;
     }
 }

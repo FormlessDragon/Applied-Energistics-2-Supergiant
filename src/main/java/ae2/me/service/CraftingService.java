@@ -28,6 +28,7 @@ import ae2.api.networking.IGridServiceProvider;
 import ae2.api.networking.crafting.CalculationStrategy;
 import ae2.api.networking.crafting.CraftingJobOptions;
 import ae2.api.networking.crafting.ICraftingCPU;
+import ae2.api.networking.crafting.ICraftingCpuProvider;
 import ae2.api.networking.crafting.ICraftingLink;
 import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.networking.crafting.ICraftingProvider;
@@ -232,7 +233,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
         this.craftingProviders.removeProvider(gridNode);
 
-        if (gridNode.getOwner() instanceof ICraftingCPUTileEntity) {
+        if (ownsCraftingCpus(gridNode)) {
             this.craftingCpuNodes.remove(gridNode);
             this.updateList = true;
         }
@@ -263,10 +264,19 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
             }
         }
 
-        if (gridNode.getOwner() instanceof ICraftingCPUTileEntity) {
+        if (ownsCraftingCpus(gridNode)) {
             this.craftingCpuNodes.add(gridNode);
             this.updateList = true;
         }
+    }
+
+    /**
+     * @return true if the node's owner contributes crafting CPUs, either as a single CPU multi-block or through
+     * {@link ICraftingCpuProvider}.
+     */
+    private static boolean ownsCraftingCpus(IGridNode gridNode) {
+        var owner = gridNode.getOwner();
+        return owner instanceof ICraftingCPUTileEntity || owner instanceof ICraftingCpuProvider;
     }
 
     private static long clampRecursiveIngredientReserveAmount(long amount) {
@@ -294,19 +304,31 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         this.executionOrder.clear();
 
         for (var node : this.craftingCpuNodes) {
-            if (!(node.getOwner() instanceof ICraftingCPUTileEntity tile)) {
-                continue;
-            }
-
-            final CraftingCPUCluster cluster = tile.getCluster();
-            if (cluster != null && !cluster.isDestroyed() && this.craftingCPUClusters.add(cluster)) {
-                this.executionOrder.add(cluster);
-
-                ICraftingLink maybeLink = cluster.craftingLogic.getLastLink();
-                if (maybeLink instanceof CraftingLink craftingLink) {
-                    this.addLink(craftingLink);
+            var owner = node.getOwner();
+            if (owner instanceof ICraftingCPUTileEntity tile) {
+                this.registerCpuCluster(tile.getCluster());
+            } else if (owner instanceof ICraftingCpuProvider provider) {
+                for (var cluster : provider.getProvidedCraftingCpus()) {
+                    this.registerCpuCluster(cluster);
                 }
             }
+        }
+    }
+
+    /**
+     * Adds a CPU to the active set and execution order, ignoring destroyed CPUs and CPUs that were already added.
+     * De-duplication by identity is what allows every node of a multi-block to report the same CPUs.
+     */
+    private void registerCpuCluster(@Nullable CraftingCPUCluster cluster) {
+        if (cluster == null || cluster.isDestroyed() || !this.craftingCPUClusters.add(cluster)) {
+            return;
+        }
+
+        this.executionOrder.add(cluster);
+
+        ICraftingLink maybeLink = cluster.craftingLogic.getLastLink();
+        if (maybeLink instanceof CraftingLink craftingLink) {
+            this.addLink(craftingLink);
         }
     }
 

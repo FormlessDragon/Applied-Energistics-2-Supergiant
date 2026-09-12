@@ -21,6 +21,7 @@ package ae2.container.implementations;
 import ae2.api.config.CpuSelectionMode;
 import ae2.api.config.Settings;
 import ae2.api.networking.IGrid;
+import ae2.api.networking.crafting.CraftingCpuGroup;
 import ae2.api.networking.crafting.ICraftingCPU;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.ISubGuiHost;
@@ -33,6 +34,7 @@ import ae2.core.AELog;
 import ae2.core.network.NetworkPacketHelper;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
 import ae2.text.TextComponents;
+import ae2.util.ContiguousGrouping;
 import ae2.util.EnumCycler;
 import com.google.common.collect.ImmutableSet;
 import io.netty.buffer.ByteBuf;
@@ -54,8 +56,9 @@ import java.util.WeakHashMap;
 
 public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISubGui {
     private static final int MAX_CPU_LIST_ENTRIES = 1024;
-    private static final int MIN_CPU_LIST_ENTRY_BYTES = 51;
+    private static final int MIN_CPU_LIST_ENTRY_BYTES = 56;
     private static final int MAX_ICON_ID_LENGTH = 128;
+    private static final int MAX_GROUP_ID_LENGTH = 128;
 
     private static final CraftingCpuList EMPTY_CPU_LIST = new CraftingCpuList(Collections.emptyList());
 
@@ -195,6 +198,17 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         }
     }
 
+    private static void validateGroupIdLength(ResourceLocation groupId) {
+        if (groupId.toString().length() > MAX_GROUP_ID_LENGTH) {
+            String message = String.format(
+                "Crafting CPU list group id %s exceeds max packet length %d",
+                groupId,
+                MAX_GROUP_ID_LENGTH);
+            AELog.error(message);
+            throw new IllegalStateException(message);
+        }
+    }
+
     private static CraftingCPUCluster requireCraftingCpuCluster(ICraftingCPU cpu, int serial, String operation) {
         if (cpu instanceof CraftingCPUCluster cluster) {
             return cluster;
@@ -299,6 +313,8 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
                 progress = (float) (status.progress() / (double) status.totalItems());
             }
 
+            CraftingCpuGroup group = getCpuListGroup(cluster, serial);
+
             entries.add(new CraftingCpuListEntry(
                 serial,
                 cpu.getAvailableStorage(),
@@ -314,10 +330,38 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
                 world.provider.getDimension(),
                 corePos,
                 cluster.getBoundsMin(),
-                cluster.getBoundsMax()));
+                cluster.getBoundsMax(),
+                group != null ? group.groupId() : null,
+                group != null ? group.memberOrdinal() : 0));
         }
         entries.sort(CPU_COMPARATOR);
-        return new CraftingCpuList(entries);
+        return new CraftingCpuList(ContiguousGrouping.groupContiguously(
+            entries,
+            CraftingCpuListEntry::groupId,
+            CraftingCpuListEntry::groupMemberOrdinal));
+    }
+
+    /**
+     * Reads the optional list group from a CPU, validating it the same way the row background icons are validated so
+     * a broken addon fails loudly instead of corrupting the packet.
+     */
+    @Nullable
+    private static CraftingCpuGroup getCpuListGroup(CraftingCPUCluster cluster, int serial) {
+        CraftingCpuGroup group;
+        try {
+            group = cluster.getCpuListGroup();
+        } catch (RuntimeException e) {
+            AELog.error(e, String.format(
+                "Failed to get crafting CPU list group from %s for serial %d",
+                cluster.getClass().getName(),
+                serial));
+            throw e;
+        }
+
+        if (group != null) {
+            validateGroupIdLength(group.groupId());
+        }
+        return group;
     }
 
     public void cycleCpuMode(int serial, boolean backwards) {
@@ -512,7 +556,9 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
             cpu.dimensionId(),
             cpu.corePos(),
             cpu.boundsMin(),
-            cpu.boundsMax());
+            cpu.boundsMax(),
+            cpu.groupId(),
+            cpu.groupMemberOrdinal());
     }
 
     public int getSelectedCpuSerial() {
@@ -579,7 +625,9 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         int dimensionId,
         BlockPos corePos,
         BlockPos boundsMin,
-        BlockPos boundsMax) {
+        BlockPos boundsMax,
+        @Nullable ResourceLocation groupId,
+        int groupMemberOrdinal) {
 
         public CraftingCpuListEntry {
             Objects.requireNonNull(mode, "mode");
@@ -620,7 +668,9 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
                 dimensionId,
                 corePos,
                 boundsMin,
-                boundsMax);
+                boundsMax,
+                readGroupId(buffer),
+                buffer.readInt());
         }
 
         private static ResourceLocation readIconId(PacketBuffer buffer, String state) {
@@ -635,6 +685,26 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         private static void writeIconId(PacketBuffer buffer, ResourceLocation iconId) {
             validateIconIdLength(iconId, "crafting CPU list row background icon");
             buffer.writeString(iconId.toString());
+        }
+
+        @Nullable
+        private static ResourceLocation readGroupId(PacketBuffer buffer) {
+            if (!buffer.readBoolean()) {
+                return null;
+            }
+            try {
+                return new ResourceLocation(buffer.readString(MAX_GROUP_ID_LENGTH));
+            } catch (RuntimeException e) {
+                throw new IllegalArgumentException("Invalid crafting CPU list group id", e);
+            }
+        }
+
+        private static void writeGroupId(PacketBuffer buffer, @Nullable ResourceLocation groupId) {
+            buffer.writeBoolean(groupId != null);
+            if (groupId != null) {
+                validateGroupIdLength(groupId);
+                buffer.writeString(groupId.toString());
+            }
         }
 
         public void writeToPacket(PacketBuffer buffer) {
@@ -653,6 +723,8 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
             buffer.writeFloat(this.progress);
             buffer.writeVarLong(this.elapsedTimeNanos);
             buffer.writeInt(this.priority);
+            writeGroupId(buffer, this.groupId);
+            buffer.writeInt(this.groupMemberOrdinal);
         }
     }
 

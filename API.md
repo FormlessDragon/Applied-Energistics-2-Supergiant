@@ -424,6 +424,33 @@ not be used to remove an otherwise valid provider.
 changed. Consumers can retain the last observed revision and avoid calling `getCraftables(...)` again while it remains
 unchanged. The value describes craftable-provider structure only; it is not a replacement for storage monitor changes.
 
+##### Grouping CPUs in the Crafting Status List
+
+A crafting CPU can declare that it belongs to a group, which keeps it adjacent to the other members of that group in
+the crafting status CPU list. This is meant for machines that expose several CPUs backed by one physical multi-block,
+so those CPUs stay visually together instead of scattering across the list.
+
+Override `getCpuListGroup()` on the CPU and return a `CraftingCpuGroup`:
+
+```java
+@Override
+public CraftingCpuGroup getCpuListGroup() {
+    return new CraftingCpuGroup(this.groupId, this.memberOrdinal);
+}
+```
+
+The `groupId` must be unique per group instance rather than per machine type, so two separate multi-blocks of the same
+kind form two separate groups. `memberOrdinal` orders members within the group; equal ordinals keep the order the
+active sort mode produced.
+
+Grouping is applied after sorting on both the server and the client, so it is orthogonal to the player's sort mode:
+the group as a whole takes the list position of whichever member sorts first, and grouping never reorders the list
+beyond making each group contiguous. Returning `null`, the default, leaves a CPU ungrouped.
+
+Group members can also be told apart visually by overriding `getUnfocusedCpuListBackgroundIcon()` and
+`getFocusedCpuListBackgroundIcon()` to return icons registered through `Icon.register(...)`. Row background icons must
+be registered and exactly 67x22 pixels.
+
 #### Merged Pattern Push
 
 Crafting providers can opt a pattern into a merged push path through
@@ -793,6 +820,27 @@ buttons, and page selection.
 created its built-in toolbar buttons. Addons append their own controls with `event.addToLeftToolbar(button)` and can
 read the `PatternProviderLogicHost` from `event.getHost()`.
 
+### Crafting Job State Event
+
+`ae2.api.client.CraftingJobStateEvent` is posted on the Forge event bus when the client is told that a crafting job
+started by the local player was started, cancelled, or finished. It exposes the job id, the crafted key, the
+requested and remaining amounts, and a `CraftingJobState`.
+
+```java
+@SubscribeEvent
+public void onCraftingJobState(CraftingJobStateEvent event) {
+    if (event.getState() == CraftingJobState.FINISHED) {
+        // React to the finished job.
+    }
+}
+```
+
+The event is posted before AE2 applies its own handling, such as the finished-job toast, so a listener observes the
+update regardless of whether the player carries a wireless terminal. Only jobs owned by the local player are
+reported, because the server sends these updates only to the requesting player, and the event never fires on a
+dedicated server. Exceptions thrown by a listener are logged and swallowed so job tracking cannot be broken by a
+faulty add-on.
+
 ## Cell Terminal Integration
 
 The Cell Terminal discovers storage targets, storage buses, and subnets through pluggable scanners. Addons register
@@ -901,6 +949,29 @@ public cell APIs in `ae2.api.storage.cells` over depending on AE2 implementation
 
 The grid statistics events in `ae2.api.networking.events.statistics` exist for statistics reporting but are explicitly
 subject to change and not a stable API surface yet.
+
+`ae2.api.networking.crafting.ICraftingCpuProvider` lets a grid node owner contribute several crafting CPUs at once,
+which `ICraftingCPUTileEntity` cannot express because it models exactly one CPU per block entity. It is intended for
+machines that run multiple concurrent jobs out of a shared pool of storage.
+
+```java
+public class MyMachineTile extends AENetworkedTile implements ICraftingCpuProvider {
+    @Override
+    public Collection<? extends CraftingCPUCluster> getProvidedCraftingCpus() {
+        return this.myCluster.getMyCpus(); // your own CPUs, each extending CraftingCPUCluster
+    }
+}
+```
+
+Whenever the returned set would change, post `GridCraftingCpuChange` on the grid; the crafting service only re-reads
+providers when that event marks its CPU list dirty, and does not poll every tick. `getProvidedCraftingCpus()` must be
+a pure query, because it is called while the service rebuilds its list. For a multi-block where every block owns a
+node, all of those nodes may return the same CPUs: the service de-duplicates by identity.
+
+This is an internal-facing extension point. Its contract type is the implementation class `CraftingCPUCluster` rather
+than the `ICraftingCPU` interface, because the crafting service depends on behavior that `ICraftingCPU` does not
+expose, so provided CPUs must extend `CraftingCPUCluster`. Expect this signature to change if that internal type is
+ever generalized.
 
 ## Crank
 

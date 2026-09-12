@@ -1,6 +1,8 @@
 package ae2.client.gui.me.common;
 
 import ae2.api.client.AEKeyRendering;
+import ae2.api.client.CraftingJobState;
+import ae2.api.client.CraftingJobStateEvent;
 import ae2.api.implementations.items.IAEItemPowerStorage;
 import ae2.api.stacks.AEKey;
 import ae2.core.AELog;
@@ -14,6 +16,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -51,6 +54,8 @@ public final class PendingCraftingJobs {
         AELog.debug("Crafting job " + id + " for " + requestedAmount
             + "x" + AEKeyRendering.getDisplayName(what).getFormattedText() + ". State=" + status);
 
+        postStateEvent(id, what, requestedAmount, remainingAmount, status);
+
         PendingJob existing = jobs.get(id);
         switch (status) {
             case STARTED -> {
@@ -69,6 +74,29 @@ public final class PendingCraftingJobs {
             }
             default -> {
             }
+        }
+    }
+
+    /**
+     * Notifies add-ons before AE2 applies its own handling. A misbehaving listener must not break job tracking, so
+     * failures are logged rather than propagated.
+     */
+    private static void postStateEvent(UUID id,
+                                       AEKey what,
+                                       long requestedAmount,
+                                       long remainingAmount,
+                                       CraftingJobStatusPacket.Status status) {
+        CraftingJobState state = switch (status) {
+            case STARTED -> CraftingJobState.STARTED;
+            case CANCELLED -> CraftingJobState.CANCELLED;
+            case FINISHED -> CraftingJobState.FINISHED;
+        };
+
+        try {
+            MinecraftForge.EVENT_BUS.post(
+                new CraftingJobStateEvent(id, what, requestedAmount, remainingAmount, state));
+        } catch (RuntimeException e) {
+            AELog.error(e, "A listener of CraftingJobStateEvent failed for crafting job " + id);
         }
     }
 

@@ -40,6 +40,7 @@ import ae2.core.definitions.AEParts;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.crafting.execution.CraftingSupplierLocator;
+import ae2.util.ContiguousGrouping;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
@@ -1366,6 +1367,12 @@ public class CPUSelectionList implements ICompositeWidget {
                                                                               .filter(activityFilter::matches)
                                                                               .sorted(comparator)
                                                                               .toList();
+
+            // Keep CPUs of the same group together no matter which sort mode is active.
+            filtered = ContiguousGrouping.groupContiguously(
+                filtered,
+                ContainerCraftingStatus.CraftingCpuListEntry::groupId,
+                ContainerCraftingStatus.CraftingCpuListEntry::groupMemberOrdinal);
 
             int resolvedSelectedCpuSerial = filtered.stream().anyMatch(cpu -> cpu.serial() == selectedCpuSerial)
                 ? selectedCpuSerial

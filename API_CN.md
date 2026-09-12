@@ -290,6 +290,25 @@ AE2 为接入网络的机器提供了先进的刻调度系统，具备以下特�
 
 `getCraftablesVersion()` 返回一个单调递增的版本号，每当可合成资源集合可能发生变化时它都会改变。使用方可以记录上次观察到的版本号，在版本号不变期间避免再次调用 `getCraftables(...)`。该值只描述可合成提供方的结构，不能替代存储监视器的变化通知。
 
+##### 在合成状态列表中分组 CPU
+
+合成 CPU 可以声明自己属于某个分组，从而在合成状态 CPU 列表中与同组成员保持相邻。它面向那些由同一个物理多方块结构承载多台 CPU 的机器，使这些 CPU 在视觉上聚在一起，而不是散落在列表各处。
+
+在 CPU 上覆盖 `getCpuListGroup()` 并返回 `CraftingCpuGroup`：
+
+```java
+@Override
+public CraftingCpuGroup getCpuListGroup() {
+    return new CraftingCpuGroup(this.groupId, this.memberOrdinal);
+}
+```
+
+`groupId` 必须按分组实例而非机器类型保持唯一，这样同种机器的两个独立多方块结构才会形成两个独立分组。`memberOrdinal` 决定组内成员的顺序；序号相同的成员保持当前排序模式产生的相对顺序。
+
+分组在服务端与客户端都是在排序之后应用的，因此与玩家选择的排序模式相互正交：整个分组占据其中排序最靠前的那个成员的位置，除了让各分组连续之外，分组不会改变列表的其他顺序。返回默认值 `null` 表示该 CPU 不参与分组。
+
+也可以通过覆盖 `getUnfocusedCpuListBackgroundIcon()` 与 `getFocusedCpuListBackgroundIcon()`，返回经 `Icon.register(...)` 注册的图标，从视觉上区分分组成员。行背景图标必须已注册且尺寸恰好为 67x22 像素。
+
 #### 合并样板推送
 
 合成提供方可以通过 `ICraftingProvider.canMergePatternPush(IPatternDetails)` 将某个样板加入合并推送路径。该方法只决定 CPU 是否可以使用特殊的批处理路径；若返回 `false`，CPU 必须使用常规的单样板分发尝试，且不得调用 `getMaxPatternPushMultiplier(...)`。
@@ -550,6 +569,21 @@ AE2 在评估某个样板供应器组能否进行合成样板快速移动时，�
 
 `ae2.api.client.PatternProviderGuiInitEvent` 在样板供应器 GUI 创建完内置工具栏按钮后发布到 Forge 事件总线。附加模组通过 `event.addToLeftToolbar(button)` 追加自己的控件，并可通过 `event.getHost()` 读取 `PatternProviderLogicHost`。
 
+### 合成任务状态事件
+
+当客户端收到本地玩家发起的合成任务已开始、已取消或已完成的通知时，`ae2.api.client.CraftingJobStateEvent` 会发布到 Forge 事件总线。它提供任务 id、合成目标键、请求数量与剩余数量，以及一个 `CraftingJobState`。
+
+```java
+@SubscribeEvent
+public void onCraftingJobState(CraftingJobStateEvent event) {
+    if (event.getState() == CraftingJobState.FINISHED) {
+        // 对完成的任务作出响应。
+    }
+}
+```
+
+该事件在 AE2 执行自身处理（例如完成提示 toast）之前发布，因此无论玩家是否携带无线终端，监听方都能收到通知。由于服务端只会把这些更新发送给发起请求的玩家，事件仅上报本地玩家所拥有的任务，并且永远不会在专用服务器上触发。监听方抛出的异常会被记录并吞掉，以免有缺陷的附加模组破坏任务跟踪。
+
 ## 存储管理终端集成
 
 存储管理终端通过可插拔的扫描器发现存储目标、存储总线和子网。附加模组在通用初始化阶段通过 `ae2.api.cellterminal.CellTerminalApi` 注册自己的扫描器与目标解析器：
@@ -627,6 +661,21 @@ PartTooltips.addServerData(MyPart.class, (player, part, serverData) -> serverDat
 自定义存储元件基于统一的键存储模型。附加模组元件必须通过相应的元件 API 暴露 `StorageCell`（它继承 `MEStorageMonitor`），并且必须同步上报带符号的内容增量。需要时应使用键过滤器限制接受的键类型。物品与流体的存储计算仍可能不同，因此请优先使用 `ae2.api.storage.cells` 中的公开元件 API，而不是依赖 AE2 实现类。
 
 `ae2.api.networking.events.statistics` 中的网络统计事件仅用于统计上报，明确可能变化，尚不是稳定的 API 面。
+
+`ae2.api.networking.crafting.ICraftingCpuProvider` 允许一个网络节点的所有者一次性提供多台合成 CPU，这是 `ICraftingCPUTileEntity` 无法表达的——后者把「一个方块实体」建模为「恰好一台 CPU」。它面向那些以共享存储池同时运行多个任务的机器。
+
+```java
+public class MyMachineTile extends AENetworkedTile implements ICraftingCpuProvider {
+    @Override
+    public Collection<? extends CraftingCPUCluster> getProvidedCraftingCpus() {
+        return this.myCluster.getMyCpus(); // 你自己的 CPU，每个都继承 CraftingCPUCluster
+    }
+}
+```
+
+每当返回的集合将要发生变化时，都必须在网络上发布 `GridCraftingCpuChange`；合成服务只有在该事件把 CPU 列表标记为脏之后才会重新读取提供方，并不会每 tick 轮询。`getProvidedCraftingCpus()` 必须是纯查询，因为它会在服务重建列表的过程中被调用。对于每个方块都拥有独立节点的多方块结构，这些节点可以全部返回同一组 CPU：服务会按对象标识去重。
+
+这是一个面向内部的扩展点。它的契约类型是实现类 `CraftingCPUCluster` 而非 `ICraftingCPU` 接口，因为合成服务依赖了 `ICraftingCPU` 未暴露的行为，所以提供的 CPU 必须继承 `CraftingCPUCluster`。如果将来该内部类型被泛化，本签名预期会随之变化。
 
 ## 曲柄
 
