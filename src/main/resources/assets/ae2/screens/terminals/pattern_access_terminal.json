@@ -22,19 +22,19 @@
       "left": 16,
       "top": 17,
       "width": 65,
-      "height": 10
+      "height": 12
     },
     "inputSearch": {
       "left": 113,
       "top": 4,
       "width": 65,
-      "height": 10
+      "height": 12
     },
     "outputSearch": {
       "left": 113,
       "top": 17,
       "width": 65,
-      "height": 10
+      "height": 12
     },
     "patternModifierPanel": {
       "left": -126,
