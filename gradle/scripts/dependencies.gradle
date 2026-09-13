@@ -32,6 +32,11 @@ dependencies {
         compileOnly "com.cleanroommc:lwjglx:1.0.0"
     }
 
+    modRuntimeOnly 'curse.maven:fugue-1005815:8403977'
+    modRuntimeOnly 'curse.maven:scalar-legacy-1235372:6842491'
+    modRuntimeOnly 'org.scala-lang:scala-library:2.12.20'
+    modRuntimeOnly 'org.scala-lang:scala-reflect:2.12.20'
+    
     //cofhcore
     modCompileOnly "curse.maven:CoFHCore-69162:2920433"
     //crt
@@ -48,7 +53,7 @@ dependencies {
     modCompileOnly("curse.maven:ender-core-ceu-1530852:8707400")
     modCompileOnly("curse.maven:enderio-ceu-1530854:8707396")
     // Baubles
-    modCompileOnly "curse.maven:baubles-227083:2518667"
+    modImplementation "curse.maven:baubles-227083:2518667"
     // CodeChickenLib
     modCompileOnly "curse.maven:codechicken-lib-1-8-242818:2779848"
     // Chisel
@@ -65,4 +70,5 @@ dependencies {
     modCompileOnly "curse.maven:ctm-267602:2915363"
 
     modRuntimeOnly("curse.maven:spark-361579:3542217")
+    modRuntimeOnly 'curse.maven:thaumcraft-223628:2629023'
 }

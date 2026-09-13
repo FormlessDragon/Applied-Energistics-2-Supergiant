@@ -120,7 +120,7 @@ public class GuiSpecialPreciseExportBus extends GuiSpecialExportBus<ContainerIOB
                 itemTooltip.add(Tooltips.getAmountTooltipLocal(ButtonToolTips.Amount, unwrapped));
             }
             itemTooltip.add(Tooltips.getSetAmountTooltipLocal());
-            drawTooltipLines(mouseX, mouseY, itemTooltip);
+            drawTooltipLines(slot.getStack(), mouseX, mouseY, itemTooltip);
             return;
         }
         super.renderHoveredToolTip(mouseX, mouseY);

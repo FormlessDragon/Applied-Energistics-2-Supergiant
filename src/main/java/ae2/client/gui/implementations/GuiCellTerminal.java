@@ -3265,13 +3265,13 @@ public class GuiCellTerminal extends AEBaseGui<ContainerCellTerminal> implements
 
         List<String> priorityTooltip = PriorityFieldManager.getInstance().getTooltip(mouseX, mouseY);
         if (!priorityTooltip.isEmpty()) {
-            drawTooltipLines(mouseX, mouseY, priorityTooltip);
+            drawTooltipLines(ItemStack.EMPTY, mouseX, mouseY, priorityTooltip);
             return;
         }
 
         List<String> rowTooltip = this.rowList.getTooltip(localX, localY);
         if (!rowTooltip.isEmpty()) {
-            drawTooltipLines(mouseX, mouseY, rowTooltip);
+            drawTooltipLines(ItemStack.EMPTY, mouseX, mouseY, rowTooltip);
             return;
         }
 
@@ -3284,7 +3284,7 @@ public class GuiCellTerminal extends AEBaseGui<ContainerCellTerminal> implements
 
         List<String> tabTooltip = tabTooltip(localX, localY);
         if (!tabTooltip.isEmpty()) {
-            drawTooltipLines(mouseX, mouseY, tabTooltip);
+            drawTooltipLines(ItemStack.EMPTY, mouseX, mouseY, tabTooltip);
             return;
         }
 

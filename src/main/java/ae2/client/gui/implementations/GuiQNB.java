@@ -52,7 +52,7 @@ public class GuiQNB extends AEBaseGui<ContainerQNB> {
             if (AEItems.QUANTUM_ENTANGLED_SINGULARITY.is(stack) && !isValidEntangledSingularity(stack)) {
                 List<String> tooltip = new ObjectArrayList<>(this.getItemToolTip(stack));
                 tooltip.add(TextFormatting.RED + GuiText.InvalidSingularity.getLocal());
-                this.drawTooltipLines(mouseX, mouseY, tooltip);
+                this.drawTooltipLines(stack, mouseX, mouseY, tooltip);
                 return;
             }
         }

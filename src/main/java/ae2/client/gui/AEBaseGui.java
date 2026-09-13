@@ -513,12 +513,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return false;
         }
 
-        GuiUtils.preItemToolTip(displayStack);
-        try {
-            drawHoveringTextAtTopZ(getItemToolTip(displayStack), mouseX, mouseY);
-        } finally {
-            GuiUtils.postItemToolTip();
-        }
+        drawHoveringTextAtTopZ(displayStack, getItemToolTip(displayStack), mouseX, mouseY);
         return true;
     }
 
@@ -554,7 +549,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             return true;
         }
 
-        drawHoveringTextAtTopZ(getItemToolTip(displayStack), mouseX, mouseY);
+        drawHoveringTextAtTopZ(displayStack, getItemToolTip(displayStack), mouseX, mouseY);
         return true;
     }
 
@@ -575,12 +570,12 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
             if (what != null) {
                 drawKeyTooltipLinesWithImages(mouseX, mouseY, what, anchorTooltipLines);
             } else {
-                drawTooltipLines(mouseX, mouseY, anchorTooltipLines);
+                drawTooltipLines(hoveredStack, mouseX, mouseY, anchorTooltipLines);
             }
             return;
         }
 
-        drawHoveringTextAtTopZ(anchorTooltipLines, mouseX, mouseY);
+        drawHoveringTextAtTopZ(hoveredStack, anchorTooltipLines, mouseX, mouseY);
         renderStorageCellTooltipImage(mouseX, mouseY, hoveredStack, anchorTooltipLines);
     }
 
@@ -636,7 +631,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     }
 
     private void drawTooltip(int mouseX, int mouseY, List<ITextComponent> tooltip) {
-        drawTooltipLines(mouseX, mouseY, formatTooltipLines(tooltip));
+        drawTooltipLines(ItemStack.EMPTY, mouseX, mouseY, formatTooltipLines(tooltip));
     }
 
     protected final void drawKeyTooltipWithImages(int mouseX, int mouseY, AEKey what, List<ITextComponent> tooltip) {
@@ -647,13 +642,13 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
                                                        List<String> visibleTooltipLines) {
         ItemStack imageStack = getImageTooltipStack(what);
         if (imageStack.isEmpty()) {
-            drawHoveringTextAtTopZ(visibleTooltipLines, mouseX, mouseY);
+            drawHoveringTextAtTopZ(getKeyTooltipStack(what), visibleTooltipLines, mouseX, mouseY);
             return;
         }
 
         for (String line : visibleTooltipLines) {
             if (StackTooltipRenderer.isReservedTooltipLine(line)) {
-                drawHoveringTextAtTopZ(visibleTooltipLines, mouseX, mouseY);
+                drawHoveringTextAtTopZ(imageStack, visibleTooltipLines, mouseX, mouseY);
                 renderStorageCellTooltipImage(mouseX, mouseY, imageStack, visibleTooltipLines);
                 return;
             }
@@ -674,11 +669,11 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         }
 
         if (imageTooltipLines.size() == visibleTooltipLines.size()) {
-            drawHoveringTextAtTopZ(visibleTooltipLines, mouseX, mouseY);
+            drawHoveringTextAtTopZ(imageStack, visibleTooltipLines, mouseX, mouseY);
             return;
         }
 
-        drawHoveringTextAtTopZ(imageTooltipLines, mouseX, mouseY);
+        drawHoveringTextAtTopZ(imageStack, imageTooltipLines, mouseX, mouseY);
         renderStorageCellTooltipImage(mouseX, mouseY, imageStack, imageTooltipLines);
     }
 
@@ -695,11 +690,15 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         return stack;
     }
 
-    protected final void drawTooltipLines(int mouseX, int mouseY, List<String> tooltip) {
-        drawHoveringTextAtTopZ(tooltip, mouseX, mouseY);
+    private static ItemStack getKeyTooltipStack(AEKey what) {
+        return what instanceof AEItemKey itemKey ? itemKey.getReadOnlyStack() : ItemStack.EMPTY;
     }
 
-    private void drawHoveringTextAtTopZ(List<String> tooltip, int mouseX, int mouseY) {
+    protected final void drawTooltipLines(ItemStack tooltipStack, int mouseX, int mouseY, List<String> tooltip) {
+        drawHoveringTextAtTopZ(tooltipStack, tooltip, mouseX, mouseY);
+    }
+
+    private void drawHoveringTextAtTopZ(ItemStack tooltipStack, List<String> tooltip, int mouseX, int mouseY) {
         GlStateManager.pushMatrix();
         RenderHelper.disableStandardItemLighting();
         GlStateManager.disableLighting();
@@ -708,7 +707,12 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         this.zLevel = TOOLTIP_Z_LEVEL;
         this.itemRender.zLevel = TOOLTIP_Z_LEVEL;
         try {
-            drawHoveringText(tooltip, mouseX, mouseY);
+            GuiUtils.preItemToolTip(tooltipStack);
+            try {
+                drawHoveringText(tooltip, mouseX, mouseY);
+            } finally {
+                GuiUtils.postItemToolTip();
+            }
         } finally {
             this.itemRender.zLevel = 0.0F;
             this.zLevel = 0.0F;

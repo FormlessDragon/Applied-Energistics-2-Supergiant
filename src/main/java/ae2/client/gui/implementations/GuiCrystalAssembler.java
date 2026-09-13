@@ -64,7 +64,7 @@ public class GuiCrystalAssembler extends GuiUpgradeable<ContainerCrystalAssemble
             long amount = unwrapped == null ? 0 : unwrapped.amount();
             tooltip.add(TextFormatting.GRAY + GuiText.CrystalAssemblerAmount.getLocal(amount,
                 TileCrystalAssembler.TANK_CAPACITY));
-            drawTooltipLines(mouseX, mouseY, tooltip);
+            drawTooltipLines(slot.getStack(), mouseX, mouseY, tooltip);
             return;
         }
         super.renderHoveredToolTip(mouseX, mouseY);

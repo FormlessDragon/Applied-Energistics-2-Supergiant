@@ -88,7 +88,7 @@ public class GuiPreciseStorageBus extends GuiSpecialStorageBus<ContainerStorageB
                 itemTooltip.add(Tooltips.getAmountTooltipLocal(ButtonToolTips.Amount, unwrapped));
             }
             itemTooltip.add(Tooltips.getSetAmountTooltipLocal());
-            drawTooltipLines(mouseX, mouseY, itemTooltip);
+            drawTooltipLines(slot.getStack(), mouseX, mouseY, itemTooltip);
             return;
         }
         super.renderHoveredToolTip(mouseX, mouseY);

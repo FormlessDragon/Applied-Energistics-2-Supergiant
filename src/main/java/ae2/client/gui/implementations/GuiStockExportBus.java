@@ -129,7 +129,7 @@ public class GuiStockExportBus<T extends ContainerStockExportBus> extends GuiUpg
                 itemTooltip.add(Tooltips.getAmountTooltipLocal(ButtonToolTips.Amount, unwrapped));
             }
             itemTooltip.add(Tooltips.getSetAmountTooltipLocal());
-            drawTooltipLines(mouseX, mouseY, itemTooltip);
+            drawTooltipLines(slot.getStack(), mouseX, mouseY, itemTooltip);
             return;
         }
         super.renderHoveredToolTip(mouseX, mouseY);
