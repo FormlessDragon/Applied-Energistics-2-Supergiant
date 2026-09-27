@@ -21,13 +21,14 @@ package ae2.client.gui.me.networktool;
 import ae2.api.client.AEKeyRendering;
 import ae2.api.stacks.GenericStack;
 import ae2.client.gui.AEBaseGui;
+import ae2.client.gui.Icon;
 import ae2.client.gui.StackWithBounds;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.PaletteColor;
-import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.CommonButtons;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.container.implementations.ContainerNetworkStatus;
+import ae2.client.gui.widgets.SimpleIconButton;
 import ae2.container.networking.MachineGroup;
 import ae2.container.networking.NetworkStatus;
 import ae2.core.AEConfig;
@@ -54,7 +55,7 @@ public class GuiNetworkStatus extends AEBaseGui<ContainerNetworkStatus> {
     private static final int CELL_HEIGHT = 18;
 
     private final Scrollbar scrollbar;
-    private final AE2Button exportGridButton;
+    private final SimpleIconButton exportGrid;
     @Nullable
     private StackWithBounds hoveredMachine;
     @Nullable
@@ -71,7 +72,8 @@ public class GuiNetworkStatus extends AEBaseGui<ContainerNetworkStatus> {
         super(container, playerInventory, style);
         this.scrollbar = widgets.addScrollBar("scrollbar", Scrollbar.BIG);
         this.addToLeftToolbar(CommonButtons.togglePowerUnit());
-        this.exportGridButton = widgets.addButton("export_grid", GuiText.ExportGrid.text(), container::exportGrid);
+        this.exportGrid = new SimpleIconButton(Icon.EXPORT_GRID, GuiText.ExportGrid.text(), container::exportGrid);
+        this.addToLeftToolbar(exportGrid);
     }
 
     @Override
@@ -83,8 +85,8 @@ public class GuiNetworkStatus extends AEBaseGui<ContainerNetworkStatus> {
 
         int overflowRows = (status.getGroupedMachines().size() + COLUMNS - 1) / COLUMNS - ROWS;
         scrollbar.setRange(0, Math.max(0, overflowRows), 1);
-        this.exportGridButton.visible = container.canExportGrid();
-        this.exportGridButton.enabled = container.canExportGrid();
+        this.exportGrid.visible = container.canExportGrid();
+        this.exportGrid.enabled = container.canExportGrid();
     }
 
     @Override
