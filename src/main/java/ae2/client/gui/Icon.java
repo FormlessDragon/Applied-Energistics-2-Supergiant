@@ -321,6 +321,7 @@ public final class Icon {
         "cell_terminal_subnet_visibility_show_favorites");
     public static final Icon CELL_TERMINAL_SUBNET_VISIBILITY_DONT_SHOW = registerBuiltin(
         "cell_terminal_subnet_visibility_dont_show");
+    public static final Icon EXPORT_GRID = registerBuiltin("export_grid");
 
     private final Size manualSize;
     public int width;
