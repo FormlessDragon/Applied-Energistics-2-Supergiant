@@ -22,10 +22,8 @@ import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IInWorldGridNodeHost;
 import ae2.container.AEBaseContainer;
-import ae2.container.networking.INetworkStatusContainer;
 import ae2.container.networking.NetworkStatus;
 import ae2.core.network.clientbound.NetworkStatusPacket;
-import ae2.items.contents.NetworkToolGuiHost;
 import ae2.me.Grid;
 import ae2.server.Commands;
 import ae2.server.subcommands.GridsCommand;
@@ -33,7 +31,7 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.EnumFacing;
 import org.jetbrains.annotations.Nullable;
 
-public class ContainerNetworkStatus extends AEBaseContainer implements INetworkStatusContainer {
+public class ContainerNetworkStatus extends AEBaseContainer {
     private static final String ACTION_EXPORT_GRID = "export_grid";
 
     @Nullable
@@ -42,10 +40,10 @@ public class ContainerNetworkStatus extends AEBaseContainer implements INetworkS
     private NetworkStatus status = new NetworkStatus();
     private boolean canExportGrid;
 
-    public ContainerNetworkStatus(InventoryPlayer ip, NetworkToolGuiHost<?> host) {
-        super(ip, host);
+    public ContainerNetworkStatus(InventoryPlayer ip, IInWorldGridNodeHost host) {
+        super(ip, null);
 
-        buildForGridHost(host.getGridHost());
+        buildForGridHost(host);
     }
 
     private void buildForGridHost(@Nullable IInWorldGridNodeHost gridHost) {

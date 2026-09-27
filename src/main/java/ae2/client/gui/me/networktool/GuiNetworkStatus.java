@@ -27,8 +27,7 @@ import ae2.client.gui.style.PaletteColor;
 import ae2.client.gui.widgets.AE2Button;
 import ae2.client.gui.widgets.CommonButtons;
 import ae2.client.gui.widgets.Scrollbar;
-import ae2.container.AEBaseContainer;
-import ae2.container.networking.INetworkStatusContainer;
+import ae2.container.implementations.ContainerNetworkStatus;
 import ae2.container.networking.MachineGroup;
 import ae2.container.networking.NetworkStatus;
 import ae2.core.AEConfig;
@@ -46,7 +45,7 @@ import org.jetbrains.annotations.Nullable;
 import java.awt.Rectangle;
 import java.util.List;
 
-public class GuiNetworkStatus<T extends AEBaseContainer & INetworkStatusContainer> extends AEBaseGui<T> {
+public class GuiNetworkStatus extends AEBaseGui<ContainerNetworkStatus> {
     private static final int ROWS = 4;
     private static final int COLUMNS = 5;
     private static final int TABLE_X = 14;
@@ -68,7 +67,7 @@ public class GuiNetworkStatus<T extends AEBaseContainer & INetworkStatusContaine
     private NetworkStatus cachedStatusForMachines;
     private List<MachineGroup> cachedSortedMachines = List.of();
 
-    public GuiNetworkStatus(T container, InventoryPlayer playerInventory, GuiStyle style) {
+    public GuiNetworkStatus(ContainerNetworkStatus container, InventoryPlayer playerInventory, GuiStyle style) {
         super(container, playerInventory, style);
         this.scrollbar = widgets.addScrollBar("scrollbar", Scrollbar.BIG);
         this.addToLeftToolbar(CommonButtons.togglePowerUnit());

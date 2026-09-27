@@ -66,7 +66,6 @@ import ae2.client.gui.me.patternaccess.GuiPatternAccessTerm;
 import ae2.client.gui.me.patternencode.GuiPEATerm;
 import ae2.client.gui.me.patternencode.GuiPatternEncodingTerm;
 import ae2.client.gui.me.requester.GuiRequesterTerm;
-import ae2.client.gui.networking.GuiControllerStatus;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.container.AEBaseContainer;
 import ae2.container.GuiIds;
@@ -129,7 +128,6 @@ import ae2.container.me.items.ContainerBasicCellChest;
 import ae2.container.me.items.ContainerCraftingTerm;
 import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
 import ae2.container.me.items.ContainerWirelessCraftingTerm;
-import ae2.container.networking.ContainerControllerStatus;
 import ae2.core.gui.locator.GuiHostLocator;
 import ae2.core.gui.locator.GuiHostLocators;
 import ae2.core.gui.locator.ItemGuiHostLocator;
@@ -355,7 +353,7 @@ public class AEGuiHandler implements IGuiHandler {
         switch (bridge) {
             case CONTROLLER_STATUS -> {
                 if (te instanceof TileController) {
-                    return initTileContainer(new ContainerControllerStatus(player.inventory, (TileController) te),
+                    return initTileContainer(new ContainerNetworkStatus(player.inventory, (TileController) te),
                         te, ID);
                 }
             }
@@ -732,9 +730,10 @@ public class AEGuiHandler implements IGuiHandler {
         switch (bridge) {
             case CONTROLLER_STATUS -> {
                 if (te instanceof TileController) {
-                    ContainerControllerStatus container = initTileContainer(new ContainerControllerStatus(
+                    ContainerNetworkStatus container = initTileContainer(new ContainerNetworkStatus(
                         player.inventory, (TileController) te), te, ID);
-                    return new GuiControllerStatus(container, player.inventory);
+                    return new GuiNetworkStatus(container, player.inventory,
+                        GuiStyleManager.loadStyleDoc("/screens/network_status.json"));
                 }
             }
             case ME_CHEST -> {
@@ -1213,7 +1212,7 @@ public class AEGuiHandler implements IGuiHandler {
                 ContainerNetworkStatus networkStatusContainer = createNetworkStatusContainer(player, y >> 8,
                     new BlockPos(x, y & 255, z), ID);
                 if (networkStatusContainer != null) {
-                    return new GuiNetworkStatus<>(networkStatusContainer, player.inventory,
+                    return new GuiNetworkStatus(networkStatusContainer, player.inventory,
                         GuiStyleManager.loadStyleDoc("/screens/network_status.json"));
                 }
                 return null;
@@ -1389,7 +1388,7 @@ public class AEGuiHandler implements IGuiHandler {
             return null;
         }
 
-        return initContainer(new ContainerNetworkStatus(player.inventory, host), locator, guiId);
+        return initContainer(new ContainerNetworkStatus(player.inventory, host.getGridHost()), locator, guiId);
     }
 
     private @Nullable ContainerAdvancedMemoryCard createAdvancedMemoryCardContainer(EntityPlayer player, int x, int y,
