@@ -1,6 +1,6 @@
 package ae2.core.network.clientbound;
 
-import ae2.container.networking.INetworkStatusContainer;
+import ae2.container.implementations.ContainerNetworkStatus;
 import ae2.container.networking.NetworkStatus;
 import ae2.core.network.ClientboundPacket;
 import io.netty.buffer.ByteBuf;
@@ -44,7 +44,7 @@ public class NetworkStatusPacket extends ClientboundPacket {
     @Override
     @SideOnly(Side.CLIENT)
     public void handleClient(Minecraft minecraft) {
-        if (minecraft.player != null && minecraft.player.openContainer instanceof INetworkStatusContainer container
+        if (minecraft.player != null && minecraft.player.openContainer instanceof ContainerNetworkStatus container
             && this.status != null) {
             container.setStatus(this.status);
             container.setCanExportGrid(this.canExportGrid);
