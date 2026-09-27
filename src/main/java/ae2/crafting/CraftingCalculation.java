@@ -192,7 +192,8 @@ public class CraftingCalculation {
     /**
      * Snapshots the network inventory on the server thread before the job runs. Small networks are copied in full
      * (cheap); large networks reuse the cached graph structure of the requested output to copy only the fuzzy groups
-     * that the crafting graph actually touches. Cold starts without a cached graph fall back to the full copy.
+     * that the crafting graph actually touches, provided that is fewer keys than the network holds. Cold starts
+     * without a cached graph fall back to the full copy.
      */
     private NetworkCraftingSimulationState createNetworkInventory(IStorageService storage) {
         // Fetch the cached network inventory exactly once: fetching may trigger an expensive full rebuild when the
@@ -203,9 +204,13 @@ public class CraftingCalculation {
             var graph = service.peekCachedGraph(this.output);
             if (graph != null) {
                 var keys = graph.getSnapshotKeys();
-                var subset = new NetworkCraftingSimulationState(cached, keys);
-                recordPerformanceCount("inventorySnapshotKeys", subset.getSnapshotEntryCount());
-                return subset;
+                // Subsetting only pays off when the graph touches fewer keys than the network holds: otherwise the
+                // subset would end up copying the whole inventory anyway, on top of one fuzzy lookup per key.
+                if (keys.size() < cached.size()) {
+                    var subset = new NetworkCraftingSimulationState(cached, keys);
+                    recordPerformanceCount("inventorySnapshotKeys", subset.getSnapshotEntryCount());
+                    return subset;
+                }
             }
         }
         var snapshot = new NetworkCraftingSimulationState(cached);

@@ -36,7 +36,7 @@ public class NetworkCraftingSimulationState extends CraftingSimulationState {
      * Networks with at most this many distinct available keys are copied in full: the copy is cheap and avoids the
      * graph-peek/subset machinery entirely.
      */
-    public static final int SNAPSHOT_SUBSET_THRESHOLD = 1024;
+    public static final int SNAPSHOT_SUBSET_THRESHOLD = 512;
 
     private final KeyCounter list;
 
@@ -58,7 +58,7 @@ public class NetworkCraftingSimulationState extends CraftingSimulationState {
     }
 
     private static KeyCounter fullSnapshot(KeyCounter cachedInventory) {
-        var result = KeyCounter.saturating();
+        var result = KeyCounter.saturating(cachedInventory.size());
         for (var entry : cachedInventory) {
             if (entry.getLongValue() > 0) {
                 result.add(entry.getKey(), entry.getLongValue());
@@ -68,7 +68,7 @@ public class NetworkCraftingSimulationState extends CraftingSimulationState {
     }
 
     private static KeyCounter subsetSnapshot(KeyCounter cachedInventory, Collection<AEKey> wantedKeys) {
-        var result = KeyCounter.saturating();
+        var result = KeyCounter.saturating(wantedKeys.size());
         for (var key : wantedKeys) {
             for (var variant : cachedInventory.findFuzzy(key, FuzzyMode.IGNORE_ALL)) {
                 if (variant.getLongValue() > 0) {

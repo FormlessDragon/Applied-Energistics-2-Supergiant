@@ -43,7 +43,7 @@ import java.util.Set;
  */
 public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     // First map contains a mapping from AEKey#primaryKey
-    private final Reference2ObjectMap<Object, VariantCounter> lists = new Reference2ObjectOpenHashMap<>();
+    private final Reference2ObjectMap<Object, VariantCounter> lists;
     private final boolean saturating;
 
     public KeyCounter() {
@@ -52,6 +52,12 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
 
     private KeyCounter(boolean saturating) {
         this.saturating = saturating;
+        this.lists = new Reference2ObjectOpenHashMap<>();
+    }
+
+    private KeyCounter(boolean saturating, int expectedKeys) {
+        this.saturating = saturating;
+        this.lists = new Reference2ObjectOpenHashMap<>(expectedKeys);
     }
 
     /**
@@ -59,6 +65,14 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
      */
     public static KeyCounter saturating() {
         return new KeyCounter(true);
+    }
+
+    /**
+     * Creates a counter that clamps additions to the signed long range, pre-sized for the given key count so bulk
+     * copies avoid rehashing while they fill.
+     */
+    public static KeyCounter saturating(int expectedKeys) {
+        return new KeyCounter(true, expectedKeys);
     }
 
     public Collection<Object2LongMap.Entry<AEKey>> findFuzzy(AEKey key, FuzzyMode fuzzy) {
