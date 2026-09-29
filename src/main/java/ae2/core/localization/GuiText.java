@@ -663,7 +663,9 @@ public enum GuiText implements LocalizationEnum {
     Yes,
     No,
     CantFitInsideStorageCell,
-    CraftTree;
+    CraftTree,
+    FlowRateFull,
+    FlowRateShort;
 
     private final String translationKey;
 

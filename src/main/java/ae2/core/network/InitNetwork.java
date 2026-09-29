@@ -17,6 +17,8 @@ import ae2.core.network.clientbound.CraftingStatusPacket;
 import ae2.core.network.clientbound.CraftingSupplierLocationsPacket;
 import ae2.core.network.clientbound.CraftingTreeDataPacket;
 import ae2.core.network.clientbound.ExportedGridContent;
+import ae2.core.network.clientbound.FlowLocationsPacket;
+import ae2.core.network.clientbound.FlowRatesPacket;
 import ae2.core.network.clientbound.GuiDataSyncPacket;
 import ae2.core.network.clientbound.ItemTransitionEffectPacket;
 import ae2.core.network.clientbound.LightningPacket;
@@ -126,6 +128,10 @@ public final class InitNetwork {
         registerClientbound(AppEngPayloadHandler.Client.class, CellTerminalSyncPacket.class);
         registerClientbound(AppEngPayloadHandler.Client.class, CellTerminalSyncChunkPacket.class);
         registerClientbound(AppEngPayloadHandler.Client.class, CellTerminalSubnetHighlightPacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, ProviderDirectoryPagePacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, ProviderMappingPagePacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, FlowRatesPacket.class);
+        registerClientbound(AppEngPayloadHandler.Client.class, FlowLocationsPacket.class);
         CHANNEL.registerMessage(ConfigValuePacket.ClientHandler.class, ConfigValuePacket.class, nextPacketId++, Side.CLIENT);
         registerServerbound(AppEngPayloadHandler.Server.class, ColorApplicatorSelectColorPacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, CableBusPartLeftClickPacket.class);
@@ -158,8 +164,6 @@ public final class InitNetwork {
         registerServerbound(AppEngPayloadHandler.Server.class, TickConfigSavePacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, TickProfilerRequestPacket.class);
         registerServerbound(AppEngPayloadHandler.Server.class, ConfigValueServerPacket.class);
-        registerClientbound(AppEngPayloadHandler.Client.class, ProviderDirectoryPagePacket.class);
-        registerClientbound(AppEngPayloadHandler.Client.class, ProviderMappingPagePacket.class);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

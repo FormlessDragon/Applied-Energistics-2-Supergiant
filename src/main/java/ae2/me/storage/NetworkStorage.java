@@ -54,6 +54,7 @@ public class NetworkStorage implements MEStorageMonitor {
     private final ObjectList<ListenerRegistration> listenerDispatchBuffer = new ObjectArrayList<>();
     private final Supplier<KeyCounter> cachedContents;
     private final Runnable invalidationCallback;
+    private final FlowRecorder flowRecorder;
     private boolean mountsInUse;
     @Nullable
     private MEStorageMonitor enumeratingInventory;
@@ -66,8 +67,13 @@ public class NetworkStorage implements MEStorageMonitor {
     private boolean listUpdatePending;
 
     public NetworkStorage(Supplier<KeyCounter> cachedContents, Runnable invalidationCallback) {
+        this(cachedContents, invalidationCallback, null);
+    }
+
+    public NetworkStorage(Supplier<KeyCounter> cachedContents, Runnable invalidationCallback, FlowRecorder flowRecorder) {
         this.cachedContents = cachedContents;
         this.invalidationCallback = invalidationCallback;
+        this.flowRecorder = flowRecorder;
     }
 
     public void mount(int priority, MEStorageMonitor inventory) {
@@ -107,9 +113,7 @@ public class NetworkStorage implements MEStorageMonitor {
             return;
         }
 
-        int mountCount = mountedStorages.size();
-        for (int i = 0; i < mountCount; i++) {
-            var mountedStorage = mountedStorages.get(i);
+        for (MountedStorage mountedStorage : mountedStorages) {
             var bucket = mountedStorage.bucket;
             bucket.remove(mountedStorage);
             if (bucket.isEmpty()) {
@@ -142,8 +146,8 @@ public class NetworkStorage implements MEStorageMonitor {
                 }
                 bucket.compact();
                 var mounts = bucket.mounts;
-                for (int i = 0; i < mounts.size(); i++) {
-                    var inventory = mounts.get(i).inventory;
+                for (MountedStorage mount : mounts) {
+                    var inventory = mount.inventory;
                     if (remaining <= 0) {
                         break;
                     }
@@ -166,8 +170,8 @@ public class NetworkStorage implements MEStorageMonitor {
                     bucket.compact();
                     this.secondPassInventories.clear();
                     var mounts = bucket.mounts;
-                    for (int i = 0; i < mounts.size(); i++) {
-                        var inventory = mounts.get(i).inventory;
+                    for (MountedStorage mount : mounts) {
+                        var inventory = mount.inventory;
                         if (remaining <= 0) {
                             break;
                         }
@@ -182,8 +186,7 @@ public class NetworkStorage implements MEStorageMonitor {
                         }
                     }
 
-                    for (int i = 0; i < this.secondPassInventories.size(); i++) {
-                        var inventory = this.secondPassInventories.get(i);
+                    for (MEStorageMonitor inventory : this.secondPassInventories) {
                         if (remaining <= 0) {
                             break;
                         }
@@ -200,7 +203,11 @@ public class NetworkStorage implements MEStorageMonitor {
             this.mountsInUse = false;
             flushQueued();
         }
-        return amount - remaining;
+        long inserted = amount - remaining;
+        if (mode == Actionable.MODULATE && inserted > 0 && this.flowRecorder != null) {
+            this.flowRecorder.record(what, inserted, source);
+        }
+        return inserted;
     }
 
     @Override
@@ -221,8 +228,8 @@ public class NetworkStorage implements MEStorageMonitor {
                 }
                 bucket.compact();
                 var mounts = bucket.mounts;
-                for (int i = 0; i < mounts.size(); i++) {
-                    var inventory = mounts.get(i).inventory;
+                for (MountedStorage mount : mounts) {
+                    var inventory = mount.inventory;
                     if (extracted >= amount) {
                         break;
                     }
@@ -236,6 +243,9 @@ public class NetworkStorage implements MEStorageMonitor {
         } finally {
             this.mountsInUse = false;
             flushQueued();
+        }
+        if (mode == Actionable.MODULATE && extracted > 0 && this.flowRecorder != null) {
+            this.flowRecorder.record(what, -extracted, source);
         }
         return extracted;
     }
@@ -264,8 +274,8 @@ public class NetworkStorage implements MEStorageMonitor {
             for (var bucket : this.priorityInventory.values()) {
                 bucket.compact();
                 var mounts = bucket.mounts;
-                for (int i = 0; i < mounts.size(); i++) {
-                    var inventory = mounts.get(i).inventory;
+                for (MountedStorage mount : mounts) {
+                    var inventory = mount.inventory;
                     if (isQueuedForRemoval(inventory)) {
                         continue;
                     }
@@ -343,8 +353,7 @@ public class NetworkStorage implements MEStorageMonitor {
         this.listenerDispatchBuffer.clear();
         this.listenerDispatchBuffer.addAll(this.listeners.values());
         try {
-            for (int i = 0; i < this.listenerDispatchBuffer.size(); i++) {
-                var registration = this.listenerDispatchBuffer.get(i);
+            for (ListenerRegistration registration : this.listenerDispatchBuffer) {
                 if (!registration.active) {
                     continue;
                 }
@@ -404,8 +413,7 @@ public class NetworkStorage implements MEStorageMonitor {
         ObjectList<QueuedOperation> queued = this.queuedOperations;
         this.queuedOperations = null;
         this.queuedRemovals = null;
-        for (int i = 0; i < queued.size(); i++) {
-            var operation = queued.get(i);
+        for (QueuedOperation operation : queued) {
             if (operation.mount()) {
                 mount(operation.priority(), operation.inventory());
             } else {
@@ -509,5 +517,14 @@ public class NetworkStorage implements MEStorageMonitor {
             this.listener = listener;
             this.verificationToken = verificationToken;
         }
+    }
+
+    /**
+     * Receives the signed content changes performed on this network storage. Only invoked for actual changes, i.e.
+     * never for {@link Actionable#SIMULATE} and never with a zero delta.
+     */
+    @FunctionalInterface
+    public interface FlowRecorder {
+        void record(AEKey what, long delta, IActionSource source);
     }
 }

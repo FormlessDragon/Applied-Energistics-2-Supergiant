@@ -35,8 +35,10 @@ import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.AEKeyFilter;
 import ae2.api.storage.ILinkStatus;
+import ae2.api.util.FlowRate;
 import ae2.api.util.IConfigManager;
 import ae2.client.Point;
+import ae2.client.ActionKey;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.me.items.WirelessUniversalTerminalSelectorWindow;
@@ -68,6 +70,7 @@ import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
+import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.core.network.serverbound.ConfigValueServerPacket;
 import ae2.core.network.serverbound.SwitchGuisPacket;
 import ae2.helpers.InventoryAction;
@@ -117,6 +120,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -150,6 +154,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     private String searchText = "";
     private int rows;
     private boolean displayFrozen;
+    private boolean needsViewUpdate = false;
 
     public GuiMEStorage(C container, InventoryPlayer playerInventory, ITextComponent title, GuiStyle style) {
         super(container, playerInventory, style);
@@ -322,8 +327,12 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         syncButtons();
         syncViewCellFilter();
         this.repo.setEnabled(canInteractWithRepo());
-        this.repo.updateView();
-        updateScrollbar();
+        this.needsViewUpdate = true;
+    }
+
+    public void updateFlowRates(final Map<AEKey, FlowRate> rates) {
+        this.repo.updateFlowRates(rates);
+        this.needsViewUpdate = true;
     }
 
     private void syncButtons() {
@@ -332,6 +341,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         }
         if (this.viewModeToggle != null) {
             this.viewModeToggle.set(getSortDisplay());
+            this.viewModeToggle.setValidValues(ViewItems.FLOWING, this.container.flowTrackingActive);
         }
         this.sortDirToggle.set(getSortDir());
     }
@@ -362,6 +372,12 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
 
     @Override
     public void updateScreen() {
+        if (this.needsViewUpdate) {
+            this.needsViewUpdate = false;
+            this.repo.updateView();
+            this.updateScrollbar();
+        }
+
         super.updateScreen();
         syncViewCellFilter();
     }
@@ -1269,6 +1285,12 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             tooltip.add(Tooltips.getAmountTooltip(ButtonToolTips.StoredAmount, what, entry.storedAmount()));
         }
 
+        ITextComponent flowRateLine = FlowRateFormatter.format(what, this.repo.getFlowRate(what),
+            AEConfig.instance().getIngredientFlowTrackingWindowMinutes());
+        if (flowRateLine != null) {
+            tooltip.add(muted(flowRateLine));
+        }
+
         long requestableAmount = entry.requestableAmount();
         if (requestableAmount > 0) {
             String formattedAmount = what.formatAmount(requestableAmount, AmountFormat.FULL);
@@ -1325,7 +1347,33 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
             this.searchField.setFocused(false);
             return;
         }
+        if (locateItemFlow(keyCode)) {
+            return;
+        }
         super.keyTyped(typedChar, keyCode);
+    }
+
+    /**
+     * Handles the item flow hotkey: remembers the hovered item and asks the server for its tracked flow locations.
+     *
+     * @return true if the hotkey was pressed and handled.
+     */
+    private boolean locateItemFlow(int keyCode) {
+        if (!ActionKey.LOCATE_INGREDIENT_FLOW.isActiveAndMatches(keyCode)) {
+            return false;
+        }
+
+        int mouseX = Mouse.getEventX() * this.width / this.mc.displayWidth;
+        int mouseY = this.height - Mouse.getEventY() * this.height / this.mc.displayHeight - 1;
+        RepoSlot repoSlot = getRepoSlotAt(mouseX, mouseY);
+        if (repoSlot == null || repoSlot.getEntry() == null) {
+            return false;
+        }
+
+        InitNetwork.sendToServer(new InventoryActionPacket(this.container.windowId,
+            InventoryAction.LOCATE_ITEM_FLOW, this.container.inventorySlots.size(), repoSlot.getEntry().what()));
+        this.mc.displayGuiScreen(null);
+        return true;
     }
 
     private boolean shouldAutoFocusSearch() {

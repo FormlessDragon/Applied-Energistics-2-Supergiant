@@ -27,11 +27,13 @@ import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.PaletteColor;
 import ae2.client.gui.widgets.CommonButtons;
 import ae2.client.gui.widgets.Scrollbar;
+import ae2.client.gui.widgets.ToggleButton;
 import ae2.container.implementations.ContainerNetworkStatus;
 import ae2.client.gui.widgets.SimpleIconButton;
 import ae2.container.networking.MachineGroup;
 import ae2.container.networking.NetworkStatus;
 import ae2.core.AEConfig;
+import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.util.Platform;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -56,6 +58,7 @@ public class GuiNetworkStatus extends AEBaseGui<ContainerNetworkStatus> {
 
     private final Scrollbar scrollbar;
     private final SimpleIconButton exportGrid;
+    private final ToggleButton flowTracking;
     @Nullable
     private StackWithBounds hoveredMachine;
     @Nullable
@@ -74,6 +77,8 @@ public class GuiNetworkStatus extends AEBaseGui<ContainerNetworkStatus> {
         this.addToLeftToolbar(CommonButtons.togglePowerUnit());
         this.exportGrid = new SimpleIconButton(Icon.EXPORT_GRID, GuiText.ExportGrid.text(), container::exportGrid);
         this.addToLeftToolbar(exportGrid);
+        this.flowTracking = new ToggleButton(Icon.FLOW_TRACKING, Icon.FLOW_TRACKING_OFF, ButtonToolTips.FlowTracking.text(), ButtonToolTips.FlowTracking.text(), _ -> container.toggleFlowTrackingMode());
+        this.addToLeftToolbar(flowTracking);
     }
 
     @Override
@@ -87,6 +92,9 @@ public class GuiNetworkStatus extends AEBaseGui<ContainerNetworkStatus> {
         scrollbar.setRange(0, Math.max(0, overflowRows), 1);
         this.exportGrid.visible = container.canExportGrid();
         this.exportGrid.enabled = container.canExportGrid();
+        this.flowTracking.visible = this.container.isFlowTrackingGloballyEnabled();
+        this.flowTracking.enabled = this.container.isFlowTrackingGloballyEnabled();
+        this.flowTracking.setState(this.container.isFlowTrackingMode());
     }
 
     @Override

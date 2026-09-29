@@ -46,6 +46,7 @@ import ae2.api.storage.MEStorageChangeListener;
 import ae2.api.storage.MEStorageMonitor;
 import ae2.api.storage.StorageHelper;
 import ae2.api.storage.cells.IBasicCellItem;
+import ae2.api.util.FlowRate;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigurableObject;
 import ae2.api.util.KeyTypeSelection;
@@ -60,10 +61,13 @@ import ae2.container.implementations.ContainerCraftAmount;
 import ae2.container.interfaces.IKeyTypeSelectionContainer;
 import ae2.container.slot.AppEngSlot;
 import ae2.container.slot.RestrictedInputSlot;
+import ae2.core.AEConfig;
 import ae2.core.AELog;
 import ae2.core.gui.locator.GuiHostLocator;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.bidirectional.ConfigValuePacket;
+import ae2.core.network.clientbound.FlowLocationsPacket;
+import ae2.core.network.clientbound.FlowRatesPacket;
 import ae2.core.network.clientbound.MEInventoryUpdatePacket;
 import ae2.core.network.clientbound.RecursiveIngredientReserveAmountPacket;
 import ae2.core.network.clientbound.SetLinkStatusPacket;
@@ -73,6 +77,7 @@ import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.items.misc.GenericResourcePackageItem;
 import ae2.items.misc.PackageInsertResult;
 import ae2.me.helpers.ActionHostEnergySource;
+import ae2.me.service.IngredientFlowService;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
@@ -91,6 +96,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -175,6 +181,13 @@ public class ContainerMEStorage extends AEBaseContainer
     @Nullable
     private ICraftingService previousCraftingService;
     private long previousCraftablesVersion = Long.MIN_VALUE;
+    @GuiSync(102)
+    public boolean flowTrackingActive = false;
+    private int flowRateSyncCounter = 0;
+    private boolean lastFlowRatesEmpty = true;
+
+    @Nullable
+    private AEKey clientRequestedTargetItem;
 
     public ContainerMEStorage(GuiIds.GuiKey guiKey, InventoryPlayer ip, ITerminalHost host) {
         this(guiKey, ip, host, true);
@@ -283,6 +296,7 @@ public class ContainerMEStorage extends AEBaseContainer
 
             this.updateActiveCraftingJobs();
             this.updateRecursiveIngredientReserveAmount();
+            this.updateFlowTrackingState();
 
             for (Setting<?> set : this.serverCM.getSettings()) {
                 if (!canSyncSetting(this.serverCM, this.clientCM, set)) {
@@ -338,6 +352,8 @@ public class ContainerMEStorage extends AEBaseContainer
             if (this.gridStorageService == null) {
                 previousAvailableStacks = availableStacks;
             }
+
+            this.updateFlowRates();
 
             super.broadcastChanges();
         }
@@ -984,5 +1000,91 @@ public class ContainerMEStorage extends AEBaseContainer
     @Override
     public SyncedKeyTypes getClientKeyTypeSelection() {
         return searchKeyTypes;
+    }
+
+    private void updateFlowTrackingState() {
+        if (!isServerSide()) {
+            return;
+        }
+
+        boolean active = false;
+
+        if (AEConfig.instance().isIngredientFlowTrackingEnabled() && this.getGridNode() != null) {
+            final IGrid grid = this.getGridNode().grid();
+            if (grid != null) {
+                final IngredientFlowService flowService = grid.getService(IngredientFlowService.class);
+                active = flowService != null && flowService.isTrackingEnabled();
+            }
+        }
+
+        this.flowTrackingActive = active;
+
+        if (!active && this.serverCM.getSetting(Settings.VIEW_MODE) == ViewItems.FLOWING) {
+            this.serverCM.putSetting(Settings.VIEW_MODE, ViewItems.ALL);
+        }
+    }
+
+    private void updateFlowRates() {
+        if (!AEConfig.instance().isIngredientFlowTrackingEnabled() || this.getGridNode() == null) {
+            return;
+        }
+
+        if (++this.flowRateSyncCounter < 10) {
+            return;
+        }
+
+        this.flowRateSyncCounter = 0;
+
+        final IGrid grid = this.getGridNode().grid();
+        if (grid == null) {
+            return;
+        }
+
+        final IngredientFlowService flowService = grid.getService(IngredientFlowService.class);
+        final Map<AEKey, FlowRate> rates = flowService.getAllRecentFlow();
+        if (rates.isEmpty() && this.lastFlowRatesEmpty) {
+            return;
+        }
+        this.lastFlowRatesEmpty = rates.isEmpty();
+
+        final FlowRatesPacket packet = new FlowRatesPacket(rates);
+        if (this.getPlayer() instanceof EntityPlayerMP player) {
+            InitNetwork.CHANNEL.sendTo(packet, player);
+        }
+    }
+
+    @Override
+    public void doAction(EntityPlayerMP player, InventoryAction action, int slot, long id) {
+        if (action == InventoryAction.LOCATE_ITEM_FLOW) {
+            if (this.clientRequestedTargetItem == null) {
+                return;
+            }
+
+            final IGridNode node = this.getGridNode();
+            if (node == null) {
+                return;
+            }
+
+            final IGrid grid = node.grid();
+            if (grid == null) {
+                return;
+            }
+
+            final IngredientFlowService flowService = grid.getService(IngredientFlowService.class);
+            if (flowService == null) {
+                return;
+            }
+
+            InitNetwork.CHANNEL.sendTo(new FlowLocationsPacket(
+                flowService.getRecentFlow(this.clientRequestedTargetItem), this.clientRequestedTargetItem), player);
+            return;
+        }
+
+        super.doAction(player, action, slot, id);
+    }
+
+    @Override
+    public void setTargetKey(@Nullable AEKey what) {
+        this.clientRequestedTargetItem = what;
     }
 }

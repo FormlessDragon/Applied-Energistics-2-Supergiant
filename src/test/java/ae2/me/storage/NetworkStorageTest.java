@@ -9,6 +9,7 @@ import ae2.api.storage.IStorageProvider;
 import ae2.api.storage.MEStorageChangeListener;
 import ae2.api.storage.MEStorageMonitor;
 import ae2.me.service.StorageService;
+import ae2.test.EmptyGrid;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
@@ -40,7 +41,7 @@ class NetworkStorageTest {
     @ParameterizedTest
     @ValueSource(ints = {0, 1, 2})
     void failedListenerDoesNotInterruptAnOperationOrLaterParentNotifications(int failure) {
-        var service = new StorageService();
+        var service = new StorageService(new EmptyGrid());
         var target = new RecordingStorage("target", new ArrayList<>());
         target.available = 10;
         service.addGlobalStorageProvider(mounts -> mounts.mount(target, 0));
@@ -66,7 +67,7 @@ class NetworkStorageTest {
                 failAt(2);
             }
         }, null);
-        var parent = new StorageService();
+        var parent = new StorageService(new EmptyGrid());
         parent.addGlobalStorageProvider(mounts -> mounts.mount(service.getInventory(), 0));
         assertEquals(10, parent.getCachedInventory().get(KEY));
         var changes = new LongArrayList();
@@ -106,7 +107,7 @@ class NetworkStorageTest {
 
     @Test
     void insertionKeepsItsResultWhenAListenerThrowsAfterTheInventoryChanged() {
-        var service = new StorageService();
+        var service = new StorageService(new EmptyGrid());
         var target = new RecordingStorage("target", new ArrayList<>());
         service.addGlobalStorageProvider(mounts -> mounts.mount(target, 0));
         assertEquals(0, service.getCachedInventory().get(KEY));
@@ -364,9 +365,9 @@ class NetworkStorageTest {
 
     @Test
     void parentFirstRebuildReadsThreeLevelSubnetOnlyOnce() {
-        var leaf = new StorageService();
-        var middle = new StorageService();
-        var root = new StorageService();
+        var leaf = new StorageService(new EmptyGrid());
+        var middle = new StorageService(new EmptyGrid());
+        var root = new StorageService(new EmptyGrid());
         var target = new RecordingStorage("leaf", new ArrayList<>());
         target.available = 10;
         leaf.addGlobalStorageProvider(mounts -> mounts.mount(target, 0));
@@ -389,7 +390,7 @@ class NetworkStorageTest {
 
     @Test
     void removedSourceCannotChangeCacheAfterTheSameStorageIsRemounted() {
-        var service = new StorageService();
+        var service = new StorageService(new EmptyGrid());
         var target = new RecordingStorage("target", new ArrayList<>());
         target.available = 10;
         IStorageProvider provider = mounts -> mounts.mount(target, 0);
@@ -449,7 +450,7 @@ class NetworkStorageTest {
 
     @Test
     void serviceRetainsInvalidationRaisedDuringEnumeration() {
-        var service = new StorageService();
+        var service = new StorageService(new EmptyGrid());
         var target = new RecordingStorage("target", new ArrayList<>());
         target.available = 10;
         service.addGlobalStorageProvider(mounts -> mounts.mount(target, 0));
@@ -466,7 +467,7 @@ class NetworkStorageTest {
 
     @Test
     void serviceRebuildIncludesMountQueuedDuringEnumeration() {
-        var service = new StorageService();
+        var service = new StorageService(new EmptyGrid());
         var target = new RecordingStorage("target", new ArrayList<>());
         var added = new RecordingStorage("added", new ArrayList<>());
         target.available = 10;
@@ -482,7 +483,7 @@ class NetworkStorageTest {
 
     @Test
     void synchronousOperationDeltaUpdatesCacheWithoutRescanOrDoubleCounting() {
-        var service = new StorageService();
+        var service = new StorageService(new EmptyGrid());
         var target = new RecordingStorage("target", new ArrayList<>());
         target.available = 10;
         service.addGlobalStorageProvider(mounts -> mounts.mount(target, 0));
@@ -502,7 +503,7 @@ class NetworkStorageTest {
 
     @Test
     void rejectedReentrantScanNeverReplacesTheServiceCache() {
-        var service = new StorageService();
+        var service = new StorageService(new EmptyGrid());
         var target = new RecordingStorage("target", new ArrayList<>());
         target.available = 10;
         service.addGlobalStorageProvider(mounts -> mounts.mount(target, 0));
@@ -519,7 +520,7 @@ class NetworkStorageTest {
 
     @Test
     void invalidationListenerCanReadWithoutRecursivelyRebuilding() {
-        var service = new StorageService();
+        var service = new StorageService(new EmptyGrid());
         var target = new RecordingStorage("target", new ArrayList<>());
         target.available = 10;
         service.addGlobalStorageProvider(mounts -> mounts.mount(target, 0));
@@ -551,7 +552,7 @@ class NetworkStorageTest {
 
     @Test
     void failedScanKeepsPreviousContentsAndCanRetry() {
-        var service = new StorageService();
+        var service = new StorageService(new EmptyGrid());
         var target = new RecordingStorage("target", new ArrayList<>());
         target.available = 10;
         service.addGlobalStorageProvider(mounts -> mounts.mount(target, 0));

@@ -13,11 +13,13 @@ import ae2.items.parts.PartItem;
 import ae2.me.GridNode;
 import ae2.me.service.StorageService;
 import ae2.me.storage.NetworkStorage;
+import ae2.test.EmptyGrid;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.init.Items;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -40,7 +42,7 @@ class StorageBusMonitorTest {
         var key = AEItemKey.of(Items.APPLE);
         var source = new TestSource(key);
         var bus = new StorageBusPart.StorageBusInventory(source);
-        var parent = new StorageService();
+        var parent = new StorageService(new EmptyGrid());
         parent.addGlobalStorageProvider(mounts -> mounts.mount(bus, 0));
         assertEquals(1, parent.getCachedInventory().get(key));
         source.listener.onStackChange(key, Long.MAX_VALUE);
@@ -86,7 +88,7 @@ class StorageBusMonitorTest {
         var old = new TestSource(key);
         var replacement = new TestSource(key);
         var bus = new StorageBusPart.StorageBusInventory(old);
-        var parent = new StorageService();
+        var parent = new StorageService(new EmptyGrid());
         parent.addGlobalStorageProvider(mounts -> mounts.mount(bus, 0));
         assertEquals(1, parent.getCachedInventory().get(key));
         var worker = new Thread(old.listener::onListUpdate);
@@ -111,7 +113,7 @@ class StorageBusMonitorTest {
                 targetReads.incrementAndGet();
             }
         };
-        var node = new GridNode(null, bus, (owner, changedNode) -> {
+        var node = new GridNode(null, bus, (_, _) -> {
         },
             EnumSet.noneOf(GridFlags.class));
         for (int i = 0; i < 20; i++) {
@@ -125,7 +127,24 @@ class StorageBusMonitorTest {
         var key = AEItemKey.of(Items.APPLE);
         var scans = new AtomicInteger();
         var amount = new AtomicInteger(10);
-        var child = new StorageService();
+        var child = createChild(scans, key, amount);
+        var bus = new StorageBusPart.StorageBusInventory(child.getInventory());
+        var parent = new StorageService(new EmptyGrid());
+        IStorageProvider provider = mounts -> mounts.mount(bus, 0);
+        parent.addGlobalStorageProvider(provider);
+        assertEquals(0, scans.get());
+        assertEquals(10, parent.getCachedInventory().get(key));
+        amount.set(20);
+        child.invalidateCache();
+        assertEquals(20, parent.getCachedInventory().get(key));
+        parent.onServerEndTick();
+        assertEquals(2, scans.get());
+        parent.removeGlobalStorageProvider(provider);
+        assertFalse(((NetworkStorage) child.getInventory()).hasListeners());
+    }
+
+    private static @NonNull StorageService createChild(AtomicInteger scans, AEItemKey key, AtomicInteger amount) {
+        var child = new StorageService(new EmptyGrid());
         child.addGlobalStorageProvider(mounts -> mounts.mount(new MEStorageMonitor() {
             public void getAvailableStacks(KeyCounter out) {
                 scans.incrementAndGet();
@@ -142,19 +161,7 @@ class StorageBusMonitorTest {
             public void removeListener(MEStorageChangeListener listener) {
             }
         }, 0));
-        var bus = new StorageBusPart.StorageBusInventory(child.getInventory());
-        var parent = new StorageService();
-        IStorageProvider provider = mounts -> mounts.mount(bus, 0);
-        parent.addGlobalStorageProvider(provider);
-        assertEquals(0, scans.get());
-        assertEquals(10, parent.getCachedInventory().get(key));
-        amount.set(20);
-        child.invalidateCache();
-        assertEquals(20, parent.getCachedInventory().get(key));
-        parent.onServerEndTick();
-        assertEquals(2, scans.get());
-        parent.removeGlobalStorageProvider(provider);
-        assertFalse(((NetworkStorage) child.getInventory()).hasListeners());
+        return child;
     }
 
     @Test

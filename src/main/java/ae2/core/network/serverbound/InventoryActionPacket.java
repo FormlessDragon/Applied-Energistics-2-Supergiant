@@ -1,5 +1,6 @@
 package ae2.core.network.serverbound;
 
+import ae2.api.stacks.AEKey;
 import ae2.container.AEBaseContainer;
 import ae2.core.network.NetworkPacketHelper;
 import ae2.core.network.ServerboundPacket;
@@ -8,6 +9,7 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketBuffer;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 
@@ -19,6 +21,8 @@ public class InventoryActionPacket extends ServerboundPacket {
     private int slot;
     private long extraId;
     private ItemStack slotItem = ItemStack.EMPTY;
+    @Nullable
+    private AEKey key;
     private boolean invalid;
 
     public InventoryActionPacket() {
@@ -46,6 +50,18 @@ public class InventoryActionPacket extends ServerboundPacket {
         this.slotItem = slotItem.copy();
     }
 
+    public InventoryActionPacket(int windowId, InventoryAction action, int slot, @Nullable AEKey key) {
+        this.windowId = windowId;
+        this.action = action;
+        this.slot = slot;
+        this.key = key;
+    }
+
+    @Nullable
+    public AEKey getKey() {
+        return this.key;
+    }
+
     @Override
     protected void read(ByteBuf buf) {
         if (buf.readableBytes() > MAX_PACKET_BYTES) {
@@ -60,6 +76,7 @@ public class InventoryActionPacket extends ServerboundPacket {
             this.slot = packetBuffer.readInt();
             this.extraId = packetBuffer.readVarLong();
             this.slotItem = packetBuffer.readItemStack();
+            this.key = AEKey.readOptionalKey(packetBuffer);
             if (buf.isReadable()) {
                 invalidate(buf, new IllegalArgumentException(
                     "Trailing inventory action packet payload bytes: " + buf.readableBytes()));
@@ -76,6 +93,7 @@ public class InventoryActionPacket extends ServerboundPacket {
     private void invalidate(ByteBuf buf, Exception exception) {
         this.invalid = true;
         this.slotItem = ItemStack.EMPTY;
+        this.key = null;
         invalidateMalformed(buf, exception instanceof RuntimeException runtimeException
             ? runtimeException
             : new IllegalArgumentException("Could not read inventory action packet", exception));
@@ -89,6 +107,7 @@ public class InventoryActionPacket extends ServerboundPacket {
         packetBuffer.writeInt(this.slot);
         packetBuffer.writeVarLong(this.extraId);
         packetBuffer.writeItemStack(this.slotItem);
+        AEKey.writeOptionalKey(packetBuffer, this.key);
     }
 
     @Override
@@ -102,6 +121,7 @@ public class InventoryActionPacket extends ServerboundPacket {
         if (container.windowId != this.windowId) {
             return;
         }
+        container.setTargetKey(this.key);
         if (this.action == InventoryAction.SET_FILTER) {
             container.setFilter(this.slot, this.slotItem, this.extraId != 0);
         } else {

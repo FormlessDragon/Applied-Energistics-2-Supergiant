@@ -22,9 +22,12 @@ import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IInWorldGridNodeHost;
 import ae2.container.AEBaseContainer;
+import ae2.container.guisync.GuiSync;
 import ae2.container.networking.NetworkStatus;
+import ae2.core.AEConfig;
 import ae2.core.network.clientbound.NetworkStatusPacket;
 import ae2.me.Grid;
+import ae2.me.service.IngredientFlowService;
 import ae2.server.Commands;
 import ae2.server.subcommands.GridsCommand;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -33,15 +36,20 @@ import org.jetbrains.annotations.Nullable;
 
 public class ContainerNetworkStatus extends AEBaseContainer {
     private static final String ACTION_EXPORT_GRID = "export_grid";
+    private static final String ACTION_TOGGLE_FLOW_TRACKING = "toggle_flow_tracking";
 
     @Nullable
     private IGrid grid;
     private int delay = 40;
     private NetworkStatus status = new NetworkStatus();
     private boolean canExportGrid;
+    @GuiSync(35)
+    public boolean flowTrackingMode;
+    @GuiSync(36)
+    public boolean flowTrackingGloballyEnabled;
 
     public ContainerNetworkStatus(InventoryPlayer ip, IInWorldGridNodeHost host) {
-        super(ip, null);
+        super(ip, host);
 
         buildForGridHost(host);
     }
@@ -58,6 +66,7 @@ public class ContainerNetworkStatus extends AEBaseContainer {
         }
 
         registerClientAction(ACTION_EXPORT_GRID, this::exportGrid);
+        registerClientAction(ACTION_TOGGLE_FLOW_TRACKING, this::toggleFlowTrackingMode);
     }
 
     private void findNode(IInWorldGridNodeHost host, EnumFacing side) {
@@ -76,6 +85,7 @@ public class ContainerNetworkStatus extends AEBaseContainer {
             this.delay = 0;
             this.status = NetworkStatus.fromGrid(this.grid);
             this.canExportGrid = computeCanExportGrid();
+            this.refreshFlowTrackingState();
             sendPacketToClient(new NetworkStatusPacket(this.status, this.canExportGrid));
         }
         super.broadcastChanges();
@@ -136,5 +146,43 @@ public class ContainerNetworkStatus extends AEBaseContainer {
 
         return player.canUseCommand(Commands.GRIDS.level,
             Commands.GRIDS.getName());
+    }
+
+    private IngredientFlowService getIngredientFlowGridService() {
+        if (!(this.grid instanceof Grid)) {
+            return null;
+        }
+
+        return this.grid.getService(IngredientFlowService.class);
+    }
+
+    private void refreshFlowTrackingState() {
+        final IngredientFlowService service = this.getIngredientFlowGridService();
+        this.flowTrackingMode = service != null && service.isTrackingEnabled();
+        this.flowTrackingGloballyEnabled = AEConfig.instance().isIngredientFlowTrackingEnabled();
+    }
+
+    public void toggleFlowTrackingMode() {
+        if (isClientSide()) {
+            sendClientAction(ACTION_TOGGLE_FLOW_TRACKING);
+            return;
+        }
+
+        final IngredientFlowService service = this.getIngredientFlowGridService();
+        if (service == null || !AEConfig.instance().isIngredientFlowTrackingEnabled()) {
+            return;
+        }
+
+        service.setTrackingEnabled(!service.isTrackingEnabled());
+        this.refreshFlowTrackingState();
+        detectAndSendChanges();
+    }
+
+    public boolean isFlowTrackingMode() {
+        return this.flowTrackingMode;
+    }
+
+    public boolean isFlowTrackingGloballyEnabled() {
+        return this.flowTrackingGloballyEnabled;
     }
 }
