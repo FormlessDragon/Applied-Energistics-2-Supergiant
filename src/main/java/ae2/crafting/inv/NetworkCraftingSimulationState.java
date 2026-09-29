@@ -25,6 +25,7 @@ import com.google.common.collect.Iterables;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Currently, extracts the whole network contents when the job starts. Lazily extracting is unfortunately not possible
@@ -49,12 +50,17 @@ public class NetworkCraftingSimulationState extends CraftingSimulationState {
     }
 
     /**
-     * Snapshots only the fuzzy groups of the given keys. All variants of each primary key are included, so fuzzy
-     * substitution behaves exactly like the full snapshot while the copied entry count stays proportional to the
-     * crafting graph instead of the whole network. Must be called on the server thread before the job is submitted.
+     * Snapshots only the given keys. The copied entries are always entries of the full inventory, so trimming can
+     * never cost more than copying everything, while the size stays proportional to the crafting structure. Must be
+     * called on the server thread before the job is submitted.
+     *
+     * @param fuzzyKeys the subset of {@code wantedKeys} whose whole fuzzy group the crafting tree can consume, i.e.
+     *                  inputs of pattern slots with ingredient substitution. All other keys, and every key read by
+     *                  the graph executor, are extracted exactly and only need their own entry.
      */
-    public NetworkCraftingSimulationState(KeyCounter cachedInventory, Collection<AEKey> wantedKeys) {
-        this.list = subsetSnapshot(cachedInventory, wantedKeys);
+    public NetworkCraftingSimulationState(KeyCounter cachedInventory, Collection<AEKey> wantedKeys,
+                                          Set<AEKey> fuzzyKeys) {
+        this.list = subsetSnapshot(cachedInventory, wantedKeys, fuzzyKeys);
     }
 
     private static KeyCounter fullSnapshot(KeyCounter cachedInventory) {
@@ -67,12 +73,22 @@ public class NetworkCraftingSimulationState extends CraftingSimulationState {
         return result;
     }
 
-    private static KeyCounter subsetSnapshot(KeyCounter cachedInventory, Collection<AEKey> wantedKeys) {
-        var result = KeyCounter.saturating(wantedKeys.size());
+    private static KeyCounter subsetSnapshot(KeyCounter cachedInventory, Collection<AEKey> wantedKeys,
+                                             Set<AEKey> fuzzyKeys) {
+        var result = KeyCounter.saturating(wantedKeys.size() + fuzzyKeys.size());
         for (var key : wantedKeys) {
-            for (var variant : cachedInventory.findFuzzy(key, FuzzyMode.IGNORE_ALL)) {
-                if (variant.getLongValue() > 0) {
-                    result.add(variant.getKey(), variant.getLongValue());
+            if (fuzzyKeys.contains(key)) {
+                for (var variant : cachedInventory.findFuzzy(key, FuzzyMode.IGNORE_ALL)) {
+                    // set(), not add(): several wanted keys can share one fuzzy group, and a repeated visit must
+                    // never accumulate the network's amount past what it really holds.
+                    if (variant.getLongValue() > 0) {
+                        result.set(variant.getKey(), variant.getLongValue());
+                    }
+                }
+            } else {
+                long amount = cachedInventory.get(key);
+                if (amount > 0) {
+                    result.set(key, amount);
                 }
             }
         }

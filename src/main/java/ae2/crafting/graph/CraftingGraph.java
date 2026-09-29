@@ -32,8 +32,12 @@ public class CraftingGraph {
         new Reference2ObjectOpenHashMap<>();
     private Object2ObjectMap<AEKey, CraftingGraphNode> nodeByWhat;
     private boolean requiresLegacyFallback;
+    private boolean hasRecursion;
     private long cacheRevision = Long.MIN_VALUE;
+    private final ObjectOpenHashSet<AEKey> fuzzyKeys = new ObjectOpenHashSet<>();
     private ObjectSet<AEKey> snapshotKeys;
+    private final ObjectOpenHashSet<AEKey> extraSnapshotKeys = new ObjectOpenHashSet<>();
+    private final Object2ObjectMap<AEKey, MaterialClosure.Node> closureNodes = new Object2ObjectOpenHashMap<>();
 
     public record NodeKey(AEKey what, @Nullable IPatternDetails pattern) {
         @Override
@@ -106,6 +110,53 @@ public class CraftingGraph {
         this.cacheRevision = cacheRevision;
     }
 
+    /**
+     * Records a key the simulation can consume even though it has no node of its own, such as material reached only
+     * through fuzzy ingredient substitution.
+     */
+    public void addExtraSnapshotKey(AEKey key) {
+        if (this.extraSnapshotKeys.add(key)) {
+            this.snapshotKeys = null;
+        }
+    }
+
+    /**
+     * Records the material structure of a key for {@link MaterialClosure}.
+     */
+    public void addClosureNode(AEKey what, MaterialClosure.Node node) {
+        this.closureNodes.put(what, node);
+    }
+
+    public Object2ObjectMap<AEKey, MaterialClosure.Node> getClosureNodes() {
+        return this.closureNodes;
+    }
+
+    /**
+     * Marks a key whose fuzzy variants the crafting tree can consume: an input of an assembler pattern that allows
+     * ingredient substitution. Every other key is only ever extracted exactly.
+     */
+    public void addFuzzyKey(AEKey key) {
+        this.fuzzyKeys.add(key);
+    }
+
+    /**
+     * @return the keys whose whole fuzzy group has to be part of an inventory snapshot
+     */
+    public ObjectSet<AEKey> getFuzzyKeys() {
+        return ObjectSets.unmodifiable(this.fuzzyKeys);
+    }
+
+    /**
+     * Marks that the structure contains a crafting cycle, whose material can also be supplied by net-positive loops.
+     */
+    public void markRecursion() {
+        this.hasRecursion = true;
+    }
+
+    public boolean hasRecursion() {
+        return this.hasRecursion;
+    }
+
     public synchronized ObjectSet<AEKey> getSnapshotKeys() {
         if (this.snapshotKeys == null) {
             var keys = new ObjectOpenHashSet<AEKey>();
@@ -115,6 +166,7 @@ public class CraftingGraph {
                     keys.add(edge.inputKey());
                 }
             }
+            keys.addAll(this.extraSnapshotKeys);
             this.snapshotKeys = ObjectSets.unmodifiable(keys);
         }
         return this.snapshotKeys;

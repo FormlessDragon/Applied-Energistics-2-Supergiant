@@ -24,15 +24,19 @@ import ae2.api.networking.crafting.ICraftingLink;
 import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.networking.crafting.ICraftingRequester;
 import ae2.api.networking.crafting.ICraftingService;
+import ae2.api.networking.crafting.ICraftingSimulationRequester;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEKey;
 import ae2.api.storage.StorageHelper;
+import ae2.crafting.graph.MaterialClosure;
 import ae2.hooks.ticking.TickHandler;
+import ae2.me.service.CraftingService;
 import com.google.common.collect.ImmutableSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -123,7 +127,15 @@ public class MultiCraftingTracker {
                 this.setJob(x, null);
             }
         } else if (this.getLink(x) == null) {
-            this.setJob(x, cg.beginCraftingCalculation(level, () -> mySrc, what, amount, CalculationStrategy.REPORT_MISSING_ITEMS));
+            var check = materialClosureCheck(cg, what, amount);
+            if (check != null && check.guaranteedMissing()) {
+                // The structure proves the request can only report missing items: settle without a calculation.
+                this.markFailure(x, what, amount);
+            } else {
+                this.setJob(x, cg.beginCraftingCalculation(level,
+                    new CardSimulationRequester(mySrc, cg, check == null ? null : check.subset()), what, amount,
+                    CalculationStrategy.REPORT_MISSING_ITEMS));
+            }
         }
         return false;
     }
@@ -301,6 +313,42 @@ public class MultiCraftingTracker {
 
         if (!hasStuff) {
             this.jobs = null;
+        }
+    }
+
+    /**
+     * Judges the request top-down against the inventory using the cached material closure, or null when no closure is
+     * known or the owner may force-start plans: the walk only settles requests that can exclusively miss.
+     */
+    @Nullable
+    private MaterialClosure.CheckResult materialClosureCheck(ICraftingService cg, AEKey what, long amount) {
+        if (this.owner instanceof ICraftingForceStartRequester || !(cg instanceof CraftingService service)) {
+            return null;
+        }
+        var closure = service.peekSimulationClosure(what);
+        return closure == null
+            ? null
+            : closure.check(amount, service.getGrid().getStorageService().getCachedInventory());
+    }
+
+    /**
+     * Simulation requester of crafting-card driven jobs (interface, export bus). It carries no cache of its own and
+     * answers with the material closure walked by {@link #materialClosureCheck}, or null to let the calculation
+     * derive the subset itself.
+     */
+    private record CardSimulationRequester(IActionSource source, ICraftingService crafting,
+                                           @Nullable Collection<AEKey> subset)
+        implements ICraftingSimulationRequester {
+
+        @Override
+        public IActionSource getActionSource() {
+            return this.source;
+        }
+
+        @Nullable
+        @Override
+        public Collection<AEKey> getSimulationSubset(AEKey output) {
+            return this.subset;
         }
     }
 }

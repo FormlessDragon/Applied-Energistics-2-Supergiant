@@ -21,6 +21,12 @@ public final class RequestState implements StatusState {
             return IDLE;
         }
 
+        if (!request.isForceStart() && host.planMaterialSubset(key, amountToCraft)) {
+            // The structure proves the request can only report missing items: settle without a calculation.
+            host.markMissingRetry(slot);
+            return BlockedState.missing();
+        }
+
         if (!host.hasIdleCpu()) {
             return BlockedState.cpu();
         }

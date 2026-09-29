@@ -53,6 +53,7 @@ import ae2.crafting.CraftingLink;
 import ae2.crafting.CraftingLinkNexus;
 import ae2.crafting.execution.CraftingSubmitResult;
 import ae2.crafting.graph.CraftingGraph;
+import ae2.crafting.graph.MaterialClosure;
 import ae2.hooks.ticking.TickHandler;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
 import ae2.me.helpers.InterestManager;
@@ -148,6 +149,15 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
      */
     private final ConcurrentMap<AEKey, CraftingGraph> graphCache = new ConcurrentHashMap<>();
     private volatile long graphCacheRevision;
+    /**
+     * Material closures keyed by output, remembered when a calculation's graph is published. Callers answer
+     * {@link ICraftingSimulationRequester#getSimulationSubset} from here instead of holding caches of their own; the
+     * closure stays available even while a graph for the same output is taken by a running calculation.
+     */
+    private final ConcurrentMap<AEKey, CachedClosure> simulationClosures = new ConcurrentHashMap<>();
+
+    private record CachedClosure(long revision, MaterialClosure closure) {
+    }
 
     public CraftingService(IGrid grid, IStorageService storageGrid, IEnergyService energyGrid) {
         this.grid = grid;
@@ -410,6 +420,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
             // Patterns changed: any cached graph structure is stale.
             this.graphCache.clear();
             this.graphCacheRevision = currentRevision;
+            this.simulationClosures.clear();
         }
 
         final CraftingCalculation job = new CraftingCalculation(world, this.grid, simRequester,
@@ -441,6 +452,18 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         return this.graphCache.get(output);
     }
 
+    /**
+     * Returns the material closure remembered for the given output, or null when none is remembered or the pattern
+     * revision has changed since it was derived.
+     */
+    @Nullable
+    public MaterialClosure peekSimulationClosure(AEKey output) {
+        var entry = this.simulationClosures.get(output);
+        return entry != null && entry.revision() == this.craftingProviders.getCraftablesRevision()
+            ? entry.closure()
+            : null;
+    }
+
     public long getGraphCacheRevision() {
         return this.graphCacheRevision;
     }
@@ -459,6 +482,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         }
         graph.setCacheRevision(currentRevision);
         this.graphCache.put(output, graph);
+        this.simulationClosures.put(output, new CachedClosure(currentRevision, MaterialClosure.of(output, graph)));
     }
 
     @Override

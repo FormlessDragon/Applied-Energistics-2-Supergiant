@@ -1,5 +1,6 @@
 package ae2.crafting.graph;
 
+import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
@@ -7,6 +8,7 @@ import ae2.crafting.CraftingCalculation;
 import ae2.helpers.patternprovider.PseudoPatternDetails;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 
 import java.util.List;
@@ -18,6 +20,7 @@ public class GraphBuilder {
     private long patternLookupNanos;
     private long emitLookupNanos;
     private long nodeCount;
+    private final Set<AEKey> substituteClosureVisited = new ObjectOpenHashSet<>();
 
     public GraphBuilder(CraftingCalculation calc) {
         this.calc = calc;
@@ -29,6 +32,7 @@ public class GraphBuilder {
         this.patternLookupNanos = 0;
         this.emitLookupNanos = 0;
         this.nodeCount = 0;
+        this.substituteClosureVisited.clear();
         var graph = new CraftingGraph();
         var requestStack = new ObjectOpenHashSet<AEKey>();
 
@@ -65,6 +69,7 @@ public class GraphBuilder {
             if (existing != null) {
                 return existing;
             }
+            graph.addClosureNode(what, MaterialClosure.Node.EMITTER);
             var emitter = new CraftingGraphNode(what, null, List.of(new GenericStack(what, 1)), 1);
             graph.putNode(nodeKey, emitter);
             this.nodeCount++;
@@ -77,9 +82,12 @@ public class GraphBuilder {
             this.patternLookupNanos += System.nanoTime() - patternStart;
         }
         if (patterns.isEmpty()) {
-            if (!root && calc.getFuzzyCraftable(what) != null) {
+            var substitute = root ? null : calc.getFuzzyCraftable(what);
+            if (substitute != null) {
                 graph.requireLegacyFallback();
+                collectSubstituteClosure(substitute, graph);
             }
+            graph.addClosureNode(what, new MaterialClosure.Node(false, substitute, List.of(), List.of()));
             if (root) {
                 var nodeKey = new CraftingGraph.NodeKey(what, null);
                 var leaf = new CraftingGraphNode(what, null, List.of(), 1, false, true);
@@ -101,6 +109,7 @@ public class GraphBuilder {
         }
 
         if (requestStack.contains(what)) {
+            graph.markRecursion();
             return graph.getNode(nodeKey);
         }
 
@@ -125,11 +134,16 @@ public class GraphBuilder {
 
         var graphInputs = new Object2LongLinkedOpenHashMap<AEKey>();
         var patternsToScan = localUnit ? patterns : List.of(primaryPattern);
+        var candidates = new ObjectArrayList<MaterialClosure.Candidate>(patternsToScan.size());
         for (var pattern : patternsToScan) {
             var patternInputs = new Object2LongLinkedOpenHashMap<AEKey>();
             for (var inputEntry : pattern.getInputs()) {
                 var possibleInputs = inputEntry.possibleInputs();
                 if (possibleInputs.length == 0 || inputEntry.getMultiplier() <= 0) continue;
+                // Fuzzy variants are only consumed by ingredient substitution, an assembler-pattern feature, so gate
+                // on the pattern type instead of inferring it from the input list. Pseudo patterns wrap the real one.
+                boolean substitutable = PseudoPatternDetails.unwrap(pattern) instanceof IAssemblerPattern assembler
+                    && assembler.canSubstitute();
                 int possibleInputIndex = 0;
                 while (possibleInputIndex < possibleInputs.length) {
                     var possible = possibleInputs[possibleInputIndex++];
@@ -137,6 +151,9 @@ public class GraphBuilder {
                         long amount = LongMath.saturatedMultiply(possible.amount(), inputEntry.getMultiplier());
                         patternInputs.put(possible.what(),
                             LongMath.saturatedAdd(patternInputs.getLong(possible.what()), amount));
+                        if (substitutable) {
+                            graph.addFuzzyKey(possible.what());
+                        }
                     }
                 }
             }
@@ -145,7 +162,13 @@ public class GraphBuilder {
             for (var input : patternInputs.object2LongEntrySet()) {
                 graphInputs.put(input.getKey(), Math.max(graphInputs.getLong(input.getKey()), input.getLongValue()));
             }
+            long candidateOutput = pattern == primaryPattern ? outputAmount : candidateOutputAmount(what, pattern);
+            if (candidateOutput > 0) {
+                candidates.add(new MaterialClosure.Candidate(candidateOutput, copyInputs(patternInputs)));
+            }
         }
+        graph.addClosureNode(what, new MaterialClosure.Node(false, null, copyInputs(graphInputs), candidates));
+
         for (var graphInput : graphInputs.object2LongEntrySet()) {
             var inputKey = graphInput.getKey();
             long inputAmount = graphInput.getLongValue();
@@ -163,6 +186,100 @@ public class GraphBuilder {
 
         requestStack.remove(what);
         return node;
+    }
+
+    /**
+     * Records the material structure the tree can reach through fuzzy substitution.
+     *
+     * <p>The tree replaces a key without patterns of its own by a craftable fuzzy variant and crafts that variant's
+     * patterns instead, so their material is consumed even though the graph never expands it. Every craftable fuzzy
+     * variant and every candidate pattern is followed so the snapshot keeps a complete material set.</p>
+     */
+    private void collectSubstituteClosure(AEKey what, CraftingGraph graph) throws InterruptedException {
+        if (!this.substituteClosureVisited.add(what)) {
+            return;
+        }
+        graph.addExtraSnapshotKey(what);
+        calc.handlePausing();
+        var patterns = calc.getCraftingFor(what);
+        var aggregated = new Object2LongLinkedOpenHashMap<AEKey>();
+        var candidates = new ObjectArrayList<MaterialClosure.Candidate>(patterns.size());
+        for (var pattern : patterns) {
+            var patternInputs = new Object2LongLinkedOpenHashMap<AEKey>();
+            for (var input : pattern.getInputs()) {
+                if (input.getMultiplier() <= 0) {
+                    continue;
+                }
+                for (var possible : input.possibleInputs()) {
+                    if (possible.amount() <= 0) {
+                        continue;
+                    }
+                    var amount = LongMath.saturatedMultiply(possible.amount(), input.getMultiplier());
+                    patternInputs.put(possible.what(), Math.max(patternInputs.getLong(possible.what()), amount));
+                }
+            }
+            for (var entry : patternInputs.object2LongEntrySet()) {
+                aggregated.put(entry.getKey(), Math.max(aggregated.getLong(entry.getKey()), entry.getLongValue()));
+            }
+            long candidateOutput = candidateOutputAmount(what, pattern);
+            if (candidateOutput > 0) {
+                candidates.add(new MaterialClosure.Candidate(candidateOutput, copyInputs(patternInputs)));
+            }
+        }
+        boolean emittable = calc.canEmitFor(what);
+        graph.addClosureNode(what, new MaterialClosure.Node(emittable, null, copyInputs(aggregated), candidates));
+        if (emittable) {
+            return;
+        }
+        if (patterns.isEmpty()) {
+            collectFuzzyVariants(what, graph);
+            return;
+        }
+        for (var pattern : patterns) {
+            for (var input : pattern.getInputs()) {
+                if (input.getMultiplier() <= 0) {
+                    continue;
+                }
+                for (var possible : input.possibleInputs()) {
+                    if (possible.amount() > 0) {
+                        collectSubstituteClosure(possible.what(), graph);
+                    }
+                }
+            }
+        }
+    }
+
+    private static List<MaterialClosure.Input> copyInputs(Object2LongLinkedOpenHashMap<AEKey> inputs) {
+        var result = new ObjectArrayList<MaterialClosure.Input>(inputs.size());
+        for (var entry : inputs.object2LongEntrySet()) {
+            result.add(new MaterialClosure.Input(entry.getKey(), entry.getLongValue()));
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * @return how much of the key one craft of the pattern yields, or 0 when the pattern cannot produce the key
+     */
+    private static long candidateOutputAmount(AEKey what, IPatternDetails pattern) {
+        long amount = 0;
+        for (var output : pattern.getOutputs()) {
+            if (output.amount() > 0 && output.what().equals(what)) {
+                amount = LongMath.saturatedAdd(amount, output.amount());
+            }
+        }
+        return amount;
+    }
+
+    private void collectFuzzyVariants(AEKey what, CraftingGraph graph) throws InterruptedException {
+        var collected = new ObjectOpenHashSet<AEKey>();
+        while (true) {
+            var variant = calc.getFuzzyCraftable(what, candidate -> !collected.contains(candidate));
+            if (variant == null) {
+                return;
+            }
+            collected.add(variant);
+            collectSubstituteClosure(variant, graph);
+        }
     }
 
     private static long getRequestedOutputAmount(AEKey what, IPatternDetails pattern) {

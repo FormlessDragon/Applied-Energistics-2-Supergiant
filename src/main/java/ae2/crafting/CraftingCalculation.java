@@ -190,24 +190,42 @@ public class CraftingCalculation {
     }
 
     /**
-     * Snapshots the network inventory on the server thread before the job runs. Small networks are copied in full
-     * (cheap); large networks reuse the cached graph structure of the requested output to copy only the fuzzy groups
-     * that the crafting graph actually touches, provided that is fewer keys than the network holds. Cold starts
-     * without a cached graph fall back to the full copy.
+     * Snapshots the network inventory on the server thread before the job runs.
+     *
+     * <p>The snapshot only holds keys the request can consume, so it never costs more than copying the whole
+     * inventory. A requester that already knows the material closure supplies it directly; otherwise small networks
+     * are copied in full (cheap), and large networks reuse the cached graph structure of the requested output. Fuzzy
+     * groups are only expanded for the legacy tree, which substitutes ingredients: the graph executor extracts keys
+     * exactly, and an exact ingredient never consumes a variant.</p>
      */
     private NetworkCraftingSimulationState createNetworkInventory(IStorageService storage) {
         // Fetch the cached network inventory exactly once: fetching may trigger an expensive full rebuild when the
         // cache is dirty, so it must not happen once per snapshot branch.
         var cached = storage.getCachedInventory();
-        if (cached.size() > NetworkCraftingSimulationState.SNAPSHOT_SUBSET_THRESHOLD
-            && this.craftingService instanceof CraftingService service) {
+
+        var service = this.craftingService instanceof CraftingService craftingService ? craftingService : null;
+        var closure = service == null ? null : service.peekSimulationClosure(this.output);
+
+        var requestedSubset = this.simRequester.getSimulationSubset(this.output);
+        if (requestedSubset != null && !requestedSubset.isEmpty() && requestedSubset.size() < cached.size()) {
+            // Without a remembered closure the substitution behavior is unknown, so keep the whole group of each key.
+            var fuzzyKeys = closure != null ? closure.fuzzyKeysOf(requestedSubset) : Set.copyOf(requestedSubset);
+            var state = new NetworkCraftingSimulationState(cached, requestedSubset, fuzzyKeys);
+            recordPerformanceCount("inventorySnapshotKeys", state.getSnapshotEntryCount());
+            return state;
+        }
+
+        if (cached.size() > NetworkCraftingSimulationState.SNAPSHOT_SUBSET_THRESHOLD && service != null) {
             var graph = service.peekCachedGraph(this.output);
             if (graph != null) {
                 var keys = graph.getSnapshotKeys();
                 // Subsetting only pays off when the graph touches fewer keys than the network holds: otherwise the
                 // subset would end up copying the whole inventory anyway, on top of one fuzzy lookup per key.
                 if (keys.size() < cached.size()) {
-                    var subset = new NetworkCraftingSimulationState(cached, keys);
+                    var fuzzyKeys = new ObjectOpenHashSet<AEKey>();
+                    fuzzyKeys.addAll(keys);
+                    fuzzyKeys.retainAll(graph.getFuzzyKeys());
+                    var subset = new NetworkCraftingSimulationState(cached, keys, fuzzyKeys);
                     recordPerformanceCount("inventorySnapshotKeys", subset.getSnapshotEntryCount());
                     return subset;
                 }
@@ -432,7 +450,12 @@ public class CraftingCalculation {
 
     @Nullable
     public AEKey getFuzzyCraftable(AEKey what) {
-        return this.craftingService.getFuzzyCraftable(what, AEKeyFilter.none());
+        return getFuzzyCraftable(what, AEKeyFilter.none());
+    }
+
+    @Nullable
+    public AEKey getFuzzyCraftable(AEKey what, AEKeyFilter filter) {
+        return this.craftingService.getFuzzyCraftable(what, filter);
     }
 
     CraftingTreeProcess.MachineInfo getMachineInfo(ICraftingService craftingService, IPatternDetails pattern) {

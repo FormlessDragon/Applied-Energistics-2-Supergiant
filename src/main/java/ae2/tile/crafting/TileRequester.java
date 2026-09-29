@@ -16,6 +16,8 @@ import ae2.api.networking.storage.IStorageWatcherNode;
 import ae2.api.networking.ticking.IGridTickable;
 import ae2.api.networking.ticking.TickRateModulation;
 import ae2.api.networking.ticking.TickingRequest;
+import ae2.api.networking.crafting.ICraftingSimulationRequester;
+import ae2.api.networking.IGrid;
 import ae2.api.orientation.BlockOrientation;
 import ae2.api.orientation.RelativeSide;
 import ae2.api.stacks.AEKey;
@@ -23,8 +25,10 @@ import ae2.api.storage.StorageHelper;
 import ae2.core.AEConfig;
 import ae2.core.definitions.AEBlocks;
 import ae2.hooks.ticking.TickHandler;
+import ae2.me.service.CraftingService;
 import ae2.text.TextComponentItemStack;
 import ae2.tile.crafting.requester.LinkState;
+import ae2.tile.crafting.requester.MaterialSubsetCache;
 import ae2.tile.crafting.requester.NoPatternState;
 import ae2.tile.crafting.requester.PlanState;
 import ae2.tile.crafting.requester.RequestHost;
@@ -44,6 +48,7 @@ import net.minecraft.util.text.TextComponentString;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -64,8 +69,10 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
     private final StatusState[] requestStatus;
     private final long[] missingRetryUntil;
     private final long[] cpuRetryUntil;
+    private final MaterialSubsetCache materialSubsets;
     private final IActionSource actionSource = IActionSource.ofMachine(this);
     private final RequesterServices services = new GridRequesterServices();
+    private final ICraftingSimulationRequester simulationSource = new RequesterSimulationSource();
     private boolean submittingForceStart;
 
     public TileRequester() {
@@ -75,6 +82,7 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
         this.requestStatus = new StatusState[requestCount];
         this.missingRetryUntil = new long[requestCount];
         this.cpuRetryUntil = new long[requestCount];
+        this.materialSubsets = new MaterialSubsetCache(requestCount);
 
         Arrays.fill(this.requestStatus, StatusState.IDLE);
         this.getMainNode()
@@ -129,6 +137,7 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
         if (mode == SettingsFrom.MEMORY_CARD && input.hasKey(MEMORY_CARD_REQUESTS_TAG, 10)) {
             this.requestManager.replaceFromNBT(input.getCompoundTag(MEMORY_CARD_REQUESTS_TAG));
             this.resetRuntimeState();
+            this.materialSubsets.clearAll();
             this.saveChanges();
         }
     }
@@ -172,7 +181,96 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
         this.storageManager.clear(index);
         this.clearRetry(index);
         this.setRequestState(index, StatusState.IDLE);
+        this.materialSubsets.clear(index);
         this.saveChanges();
+    }
+
+    @Nullable
+    private Collection<AEKey> getSimulationSubset(AEKey output) {
+        var grid = this.getMainNode().getGrid();
+        if (grid == null || this.world == null) {
+            return null;
+        }
+        long revision = craftingRevision(grid);
+        var cached = this.materialSubsets.peekByKey(output, grid, revision);
+        if (cached != null) {
+            return cached;
+        }
+        // First request for this output: seed the slot cache from the closure the crafting service remembered for the
+        // last completed calculation. Absent until one has completed, in which case the calculation derives the
+        // closure itself and the next request hits the cache.
+        if (grid.getCraftingService() instanceof CraftingService service) {
+            var closure = service.peekSimulationClosure(output);
+            if (closure != null) {
+                var keys = closure.keys();
+                rememberSubset(output, grid, revision, keys);
+                return keys;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Judges the request top-down against the inventory using the cached material closure. Returns true when the
+     * closure proves a required material is entirely missing, so the calculation could only ever report missing
+     * items; otherwise the walked subset is remembered for the calculation.
+     */
+    public boolean planMaterialSubset(AEKey key, long amount) {
+        var grid = this.getMainNode().getGrid();
+        if (grid == null || this.world == null) {
+            return false;
+        }
+        if (!(grid.getCraftingService() instanceof CraftingService service)) {
+            return false;
+        }
+        var closure = service.peekSimulationClosure(key);
+        if (closure == null) {
+            return false;
+        }
+        var result = closure.check(amount, grid.getStorageService().getCachedInventory());
+        if (result.guaranteedMissing()) {
+            return true;
+        }
+        rememberSubset(key, grid, craftingRevision(grid), result.subset());
+        return false;
+    }
+
+    /**
+     * Caches a material closure for every slot requesting the given output. Runs on the server thread.
+     */
+    private void rememberSubset(AEKey output, IGrid grid, long revision, Collection<AEKey> keys) {
+        for (int i = 0; i < this.requestManager.size(); i++) {
+            if (output.equals(this.requestManager.get(i).getKey())) {
+                this.materialSubsets.put(i, output, grid, revision, keys);
+            }
+        }
+    }
+
+    private static long craftingRevision(IGrid grid) {
+        return grid.getCraftingService().getCraftablesVersion();
+    }
+
+    /**
+     * Simulation requester handed to the crafting calculation: forwards the request lifecycle to the tile while
+     * answering with the material subset cached for it.
+     */
+    private final class RequesterSimulationSource implements ICraftingSimulationRequester {
+        @Override
+        public IActionSource getActionSource() {
+            return actionSource;
+        }
+
+        @Nullable
+        @Override
+        public IGridNode getGridNode() {
+            return TileRequester.this.getMainNode().getNode();
+        }
+
+        @Nullable
+        @Override
+        public Collection<AEKey> getSimulationSubset(AEKey output) {
+            return TileRequester.this.getSimulationSubset(output);
+        }
     }
 
     @Override
@@ -411,6 +509,7 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
             this.clearRetry(i);
             this.setRequestState(i, StatusState.IDLE);
         }
+        this.materialSubsets.clearAll();
     }
 
     @Override
@@ -488,7 +587,7 @@ public class TileRequester extends AENetworkedTile implements RequestHost, IGrid
             if (grid == null || world == null) {
                 return CompletableFuture.completedFuture(null);
             }
-            return grid.getCraftingService().beginCraftingCalculation(world, TileRequester.this::getActionSource,
+            return grid.getCraftingService().beginCraftingCalculation(world, simulationSource,
                 key, amount, CalculationStrategy.REPORT_MISSING_ITEMS);
         }
 

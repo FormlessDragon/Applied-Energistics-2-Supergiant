@@ -4,8 +4,10 @@ import ae2.api.crafting.IPatternDetails;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.security.IActionHost;
 import ae2.api.networking.security.IActionSource;
+import ae2.api.stacks.AEKey;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -40,5 +42,19 @@ public interface ICraftingSimulationRequester {
 
     default List<ICraftingProvider> getAdditionalProviders() {
         return List.of();
+    }
+
+    /**
+     * Returns the material closure of the given output if the requester already has it cached, or null to let the
+     * calculation derive it itself.
+     * <p>
+     * The returned keys are copied from the network inventory before the job runs, so an incomplete answer makes the
+     * simulation see less than the network holds and report missing ingredients. Implementations must therefore only
+     * return a closure covering every key the request can consume, not just the keys one demand touches, and must
+     * return null unless they are certain of it.
+     */
+    @Nullable
+    default Collection<AEKey> getSimulationSubset(AEKey output) {
+        return null;
     }
 }
