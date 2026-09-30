@@ -790,8 +790,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
 
     /**
      * Runs the crafting-event simulation over a candidate's output so the displayed preview matches what gets
-     * baked into the encoded pattern. Returns null when the recipe depends on real player context (dimension or
-     * position) and therefore cannot be encoded.
+     * baked into the encoded pattern. Returns null when the simulation fails, which marks the candidate as not
+     * encodable.
      */
     @Nullable
     private RecipeSelection.Candidate simulateCandidateOutput(@Nullable RecipeSelection.Candidate candidate) {
@@ -815,7 +815,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
                 processed.add(new RecipeSelection.Candidate(candidate.id(), candidate.recipe(),
                     CraftingEventSimulation.processCraftingResult(candidate.output(), input, world)));
             } catch (RuntimeException ignored) {
-                // Recipe depends on real player context (position/dimension) and cannot be encoded.
+                // The simulation failed for this candidate, so it cannot be encoded.
             }
         }
         return processed;
