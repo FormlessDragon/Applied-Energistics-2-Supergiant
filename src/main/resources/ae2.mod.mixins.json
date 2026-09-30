@@ -11,6 +11,7 @@
     "hei.MixinGuiContainerWrapper",
     "hei.MixinGuiScreenHelper",
     "hei.MixinInputHandler",
+    "hei.MixinInputHandlerFocus",
     "hei.MixinRecipeLayout",
     "hei.MixinRecipesGui"
   ],

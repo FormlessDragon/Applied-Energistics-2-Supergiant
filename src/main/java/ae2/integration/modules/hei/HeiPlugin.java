@@ -8,10 +8,10 @@ import ae2.api.stacks.GenericStack;
 import ae2.api.upgrades.IUpgradeableItem;
 import ae2.api.upgrades.Upgrades;
 import ae2.client.gui.Icon;
-import ae2.container.me.patternencode.ContainerPEATerm;
 import ae2.container.me.items.ContainerCraftingTerm;
-import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
 import ae2.container.me.items.ContainerWirelessCraftingTerm;
+import ae2.container.me.patternencode.ContainerPEATerm;
+import ae2.container.me.patternencode.ContainerPatternEncodingTerm;
 import ae2.core.AEConfig;
 import ae2.core.AELog;
 import ae2.core.definitions.AEBlocks;
@@ -266,12 +266,16 @@ public class HeiPlugin implements IModPlugin {
                 return emptyIngredientSortRanks();
             }
 
-            Collection<IIngredientListElement<?>> ingredients = ingredientFilter.getRawIngredients("");
+            Collection<?> ingredients = ingredientSortSource(ingredientFilter);
             var ranks = new Object2IntOpenHashMap<>();
             ranks.defaultReturnValue(-1);
 
             int rank = 0;
-            for (IIngredientListElement<?> ingredient : ingredients) {
+            for (var element : ingredients) {
+                if (!(element instanceof IIngredientListElement<?> ingredient)) {
+                    continue;
+                }
+
                 GenericStack stack = GenericIngredientHelper.ingredientToStack(ingredient.getIngredient());
                 if (stack != null) {
                     Object primaryKey = stack.what().getPrimaryKey();
@@ -287,6 +291,18 @@ public class HeiPlugin implements IModPlugin {
             AELog.warn(e, "Failed to build HEI ingredient sort ranks");
             return emptyIngredientSortRanks();
         }
+    }
+
+    /**
+     * The ingredients in the order the overlay shows them, which is what the ranks express.
+     * <p>
+     * HEI keeps the raw list next to the filtered one, plain JEI only has the filtered list both sides know.
+     */
+    private static Collection<?> ingredientSortSource(IngredientFilter ingredientFilter) {
+        if (HeiCompat.isHei()) {
+            return ingredientFilter.getRawIngredients("");
+        }
+        return ingredientFilter.getIngredientList();
     }
 
     private static Object2IntMap<Object> emptyIngredientSortRanks() {

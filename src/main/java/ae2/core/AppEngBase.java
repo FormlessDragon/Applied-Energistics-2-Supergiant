@@ -21,6 +21,7 @@ package ae2.core;
 import ae2.api.implementations.items.AddWirelessTerminalEvent;
 import ae2.capabilities.Capabilities;
 import ae2.cellterminal.internal.InitCellTerminalApi;
+import ae2.container.crafting.LastCraftingRecipeTracker;
 import ae2.core.definitions.AEBlockEntities;
 import ae2.core.definitions.AEEntities;
 import ae2.core.gui.AEGuiHandler;
@@ -30,7 +31,6 @@ import ae2.core.registries.CraftingUnitTransformationRegistry;
 import ae2.helpers.WirelessTerminalActions;
 import ae2.hooks.CableBusLeftClickHook;
 import ae2.hooks.SkyStoneBreakSpeed;
-import ae2.container.crafting.LastCraftingRecipeTracker;
 import ae2.hooks.WirelessTerminalEventHandler;
 import ae2.hooks.WrenchHook;
 import ae2.hooks.ticking.TickHandler;
@@ -80,8 +80,7 @@ import java.util.Objects;
  * Note that a client will still have zero or more embedded servers (although only one at a time).
  */
 @Mod(modid = Tags.MOD_ID, name = Tags.MOD_NAME, version = Tags.VERSION, acceptedMinecraftVersions = "[1.12.2]",
-    dependencies = "after:jei@[4.30.3,);" +
-        "before:bogosorter"
+    dependencies = "before:bogosorter"
 )
 public final class AppEngBase implements AppEng {
 

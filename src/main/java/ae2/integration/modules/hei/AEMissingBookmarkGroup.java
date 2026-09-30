@@ -1,15 +1,18 @@
 package ae2.integration.modules.hei;
 
 import ae2.api.stacks.GenericStack;
-import ae2.mixins.hei.AccessorBookmarkItem;
 import mezz.jei.bookmarks.BookmarkGroup;
 import mezz.jei.bookmarks.BookmarkItem;
-import mezz.jei.config.Config;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.Color;
 import java.util.List;
 
+/**
+ * The bookmark group the terminal puts the materials of an order into.
+ * <p>
+ * Only HEI knows bookmark groups, so this class is only loaded after {@link HeiCompat#isHei()} said yes.
+ */
 final class AEMissingBookmarkGroup extends BookmarkGroup {
 
     AEMissingBookmarkGroup(int id, List<GenericStack> missingStacks) {
@@ -21,13 +24,7 @@ final class AEMissingBookmarkGroup extends BookmarkGroup {
                 continue;
             }
 
-            if (!Config.isBookmarkOverlayEnabled()) {
-                Config.toggleBookmarkEnabled();
-            }
-
-            AccessorBookmarkItem<?> bookmarkItem = (AccessorBookmarkItem<?>) new BookmarkItem<>(ingredient);
-            bookmarkItem.i_setAmount(Math.max(1, stack.amount()));
-            addItemInternal((BookmarkItem<?>) bookmarkItem);
+            addItemInternal(HeiBookmarkItems.createItem(ingredient, stack.amount()));
         }
     }
 

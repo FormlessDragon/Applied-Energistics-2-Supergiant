@@ -8,21 +8,21 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
 /**
- * Redirects what clicking an ingredient in a JEI screen looks up to the pattern output it stands for.
+ * Redirects what the recipe and uses keybindings look up to the pattern output the hovered ingredient stands for.
  * <p>
- * The keybinding that does the same through {@code showRecipeOrUses} is handled by {@link MixinInputHandlerFocus},
- * because only HEI has that method.
+ * {@code InputHandler.showRecipeOrUses} only exists in HEI, so {@code AE2MixinPlugin} only applies this mixin when it
+ * finds that method. The plain JEI equivalent part is in {@link MixinInputHandler}.
  */
 @Mixin(value = InputHandler.class, remap = false)
-public class MixinInputHandler {
+public class MixinInputHandlerFocus {
 
     @ModifyArg(
-        method = "handleMouseClickedFocus(ILmezz/jei/input/IClickedIngredient;)Z",
+        method = "showRecipeOrUses(Lmezz/jei/api/recipe/IFocus$Mode;)Z",
         at = @At(
             value = "INVOKE",
             target = "Lmezz/jei/gui/Focus;<init>(Lmezz/jei/api/recipe/IFocus$Mode;Ljava/lang/Object;)V"),
         index = 1)
-    private Object ae2$redirectMouseLookupToPatternOutput(Object ingredient) {
+    private Object ae2$redirectKeyLookupToPatternOutput(Object ingredient) {
         return PatternIngredientLookup.redirectToPrimaryOutput(ingredient, Minecraft.getMinecraft().world);
     }
 }

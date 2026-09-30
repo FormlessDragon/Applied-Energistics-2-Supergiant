@@ -4,6 +4,7 @@ import ae2.api.stacks.GenericStack;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import mezz.jei.api.IJeiRuntime;
 import mezz.jei.bookmarks.BookmarkList;
+import mezz.jei.config.Config;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Field;
@@ -11,9 +12,14 @@ import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Marks materials in HEI's bookmark list, which is what puts them on top of the item list.
+ * <p>
+ * Both HEI and plain JEI have bookmarks. They differ in what a bookmark can be: HEI bookmarks carry an amount and can be
+ * grouped, plain JEI only knows the ingredient. The parts that need more live in {@link HeiBookmarkItems}, so this class
+ * works with either.
+ */
 public final class HeiBookmarkHelper {
-    private static int fallbackNextGroupId = 1_000_000_000;
-
     private HeiBookmarkHelper() {
     }
 
@@ -22,18 +28,8 @@ public final class HeiBookmarkHelper {
             return;
         }
 
-        IJeiRuntime runtime = HeiPlugin.getRuntime();
-        if (runtime == null) {
-            return;
-        }
-
-        Object overlay = runtime.getBookmarkOverlay();
-        if (overlay == null) {
-            return;
-        }
-
-        Object bookmarkListObject = readBookmarkListField(overlay);
-        if (!(bookmarkListObject instanceof BookmarkList bookmarkList)) {
+        BookmarkList bookmarkList = getBookmarkList();
+        if (bookmarkList == null) {
             return;
         }
 
@@ -48,22 +44,36 @@ public final class HeiBookmarkHelper {
             return;
         }
 
-        var group = new AEMissingBookmarkGroup(nextBookmarkGroupId(bookmarkList), convertibleStacks);
-        bookmarkList.add(group);
+        if (HeiCompat.isHei()) {
+            HeiBookmarkItems.addGroup(bookmarkList, convertibleStacks);
+            return;
+        }
+
+        // Plain JEI has no groups to put them in, so every material becomes a bookmark of its own.
+        for (GenericStack stack : convertibleStacks) {
+            Object ingredient = GenericIngredientHelper.stackToIngredient(stack);
+            if (ingredient != null) {
+                addItem(bookmarkList, ingredient, stack.amount());
+            }
+        }
+    }
+
+    /**
+     * Adds a single ingredient to the given bookmark list.
+     */
+    @SuppressWarnings("deprecation")
+    public static void addItem(BookmarkList bookmarkList, Object ingredient, long amount) {
+        if (HeiCompat.isHei()) {
+            HeiBookmarkItems.addItem(bookmarkList, ingredient, amount);
+            return;
+        }
+
+        enableBookmarkOverlay();
+        bookmarkList.add(ingredient);
     }
 
     public static List<GenericStack> getBookmarkedStacks() {
-        IJeiRuntime runtime = HeiPlugin.getRuntime();
-        if (runtime == null) {
-            return Collections.emptyList();
-        }
-
-        Object overlay = runtime.getBookmarkOverlay();
-        if (overlay == null) {
-            return Collections.emptyList();
-        }
-
-        Object bookmarkList = readBookmarkListField(overlay);
+        BookmarkList bookmarkList = getBookmarkList();
         if (bookmarkList == null) {
             return Collections.emptyList();
         }
@@ -84,9 +94,34 @@ public final class HeiBookmarkHelper {
         return result;
     }
 
+    /**
+     * Turns the bookmark overlay on, so the bookmarks that are about to be added are visible right away.
+     */
+    private static void enableBookmarkOverlay() {
+        if (!Config.isBookmarkOverlayEnabled()) {
+            Config.toggleBookmarkEnabled();
+        }
+    }
+
+    @Nullable
+    private static BookmarkList getBookmarkList() {
+        IJeiRuntime runtime = HeiPlugin.getRuntime();
+        if (runtime == null) {
+            return null;
+        }
+
+        Object overlay = runtime.getBookmarkOverlay();
+        if (overlay == null) {
+            return null;
+        }
+
+        Object bookmarkListObject = readBookmarkListField(overlay);
+        return bookmarkListObject instanceof BookmarkList bookmarkList ? bookmarkList : null;
+    }
+
     @Nullable
     private static Object readBookmarkListField(Object instance) {
-        Field field = findField(instance.getClass(), "bookmarkList");
+        Field field = findBookmarkListField(instance.getClass());
         if (field == null) {
             return null;
         }
@@ -98,33 +133,15 @@ public final class HeiBookmarkHelper {
         }
     }
 
-    private static int nextBookmarkGroupId(BookmarkList bookmarkList) {
-        Object nextId = invokeNoArg(bookmarkList, "nextId");
-        if (nextId instanceof Integer id) {
-            return id;
-        }
-
-        Field field = findField(bookmarkList.getClass(), "nextId");
-        if (field == null) {
-            return fallbackNextGroupId++;
-        }
-
-        try {
-            field.setAccessible(true);
-            int id = field.getInt(bookmarkList);
-            field.setInt(bookmarkList, id + 1);
-            return id;
-        } catch (ReflectiveOperationException ignored) {
-            return fallbackNextGroupId++;
-        }
-    }
-
+    /**
+     * The bookmark list sits in a private field of the overlay, and in one of its superclasses on some versions.
+     */
     @Nullable
-    private static Field findField(Class<?> type, String name) {
+    private static Field findBookmarkListField(Class<?> type) {
         Class<?> current = type;
         while (current != null) {
             try {
-                return current.getDeclaredField(name);
+                return current.getDeclaredField("bookmarkList");
             } catch (NoSuchFieldException ignored) {
                 current = current.getSuperclass();
             }

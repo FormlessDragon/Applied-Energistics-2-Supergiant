@@ -47,6 +47,13 @@ public final class PendingGridFills {
     }
 
     /**
+     * Forgets the player's pending slots.
+     */
+    public static void clear(EntityPlayer player) {
+        pendingByPlayer.remove(player.getUniqueID());
+    }
+
+    /**
      * Forgets the slots of materials that cannot be obtained at all, so the terminal does not keep showing slots that
      * nothing will ever be put into.
      */

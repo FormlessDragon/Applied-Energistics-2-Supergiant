@@ -45,8 +45,9 @@ dependencies {
     modCompileOnly "curse.maven:Hwyla-253449:2568751"
     // IndustrialCraft 2
     modCompileOnly "curse.maven:industrial-craft-242638:2746892"
-    // HEI
-    modImplementation 'mezz:jei:4.34.0'
+    // JEI
+    modImplementation 'mezz:jei:4.35.0'
+    modCompileOnly 'curse.maven:jei-238222:8964563'
     // The One Probe
     modImplementation "curse.maven:the-one-probe-245211:2667280"
     //EIO

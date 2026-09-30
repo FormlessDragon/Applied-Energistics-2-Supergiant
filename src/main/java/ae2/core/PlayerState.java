@@ -1,5 +1,6 @@
 package ae2.core;
 
+import ae2.container.PendingGridFills;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -77,5 +78,8 @@ public final class PlayerState {
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerLoggedOutEvent event) {
         clear(event.player);
+        // A player who left is not in a crafting terminal anymore, so the slots a batch order wanted to fill are
+        // dropped rather than filled the next time that player opens the terminal.
+        PendingGridFills.clear(event.player);
     }
 }

@@ -3,7 +3,6 @@ package ae2.integration.modules.hei;
 import ae2.api.integrations.hei.IngredientConverter;
 import ae2.api.integrations.hei.IngredientConverters;
 import ae2.api.stacks.GenericStack;
-import ae2.mixins.hei.AccessorBookmarkItem;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import mezz.jei.api.gui.IGuiIngredient;
@@ -21,12 +20,13 @@ public final class GenericIngredientHelper {
     @Nullable
     public static GenericStack ingredientToStack(Object ingredient) {
         if (ingredient == null) return null;
-        if (ingredient instanceof AccessorBookmarkItem<?> bookmarkItem) {
-            GenericStack stack = ingredientToStack(bookmarkItem.i_getIngredient());
-            if (stack != null && bookmarkItem.i_getAmount() > 0) {
-                return new GenericStack(stack.what(), bookmarkItem.i_getAmount());
+
+        // HEI bookmark items wrap an ingredient and carry the amount they were bookmarked with.
+        if (HeiCompat.isHei()) {
+            GenericStack bookmarkStack = HeiBookmarkItems.asBookmarkStack(ingredient);
+            if (bookmarkStack != null) {
+                return bookmarkStack;
             }
-            return stack;
         }
 
         for (IngredientConverter<?> converter : IngredientConverters.getConverters()) {

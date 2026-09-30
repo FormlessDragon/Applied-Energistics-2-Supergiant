@@ -8,7 +8,8 @@ import ae2.client.gui.AEBaseGui;
 import ae2.container.slot.FakeSlot;
 import ae2.container.slot.FakeSlotFilterSupport;
 import ae2.integration.modules.hei.GenericIngredientHelper;
-import ae2.mixins.hei.AccessorBookmarkItem;
+import ae2.integration.modules.hei.HeiBookmarkItems;
+import ae2.integration.modules.hei.HeiCompat;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidUtil;
 import org.jetbrains.annotations.Nullable;
@@ -47,8 +48,8 @@ public final class HeiGhostTargetSupport {
 
     @Nullable
     public static String getTextFieldInsertionText(Object ingredient, int mouseButton) {
-        if (ingredient instanceof AccessorBookmarkItem<?> bookmarkItem) {
-            return getTextFieldInsertionText(bookmarkItem.i_getIngredient(), mouseButton);
+        if (HeiCompat.isHei() && HeiBookmarkItems.isBookmarkItem(ingredient)) {
+            return getTextFieldInsertionText(HeiBookmarkItems.unwrapBookmark(ingredient), mouseButton);
         }
 
         if (ingredient instanceof ItemStack itemStack) {
@@ -93,8 +94,8 @@ public final class HeiGhostTargetSupport {
     }
 
     public static ItemStack toPacketFilterStack(Object ingredient) {
-        if (ingredient instanceof AccessorBookmarkItem<?> bookmarkItem) {
-            return toPacketFilterStack(bookmarkItem.i_getIngredient());
+        if (HeiCompat.isHei() && HeiBookmarkItems.isBookmarkItem(ingredient)) {
+            return toPacketFilterStack(HeiBookmarkItems.unwrapBookmark(ingredient));
         }
 
         if (ingredient instanceof ItemStack itemStack) {
@@ -107,10 +108,11 @@ public final class HeiGhostTargetSupport {
 
     @Nullable
     public static GenericStack toManualPinStack(Object ingredient, int mouseButton) {
-        if (ingredient instanceof AccessorBookmarkItem<?> bookmarkItem) {
-            GenericStack stack = toManualPinStack(bookmarkItem.i_getIngredient(), mouseButton);
-            if (stack != null && bookmarkItem.i_getAmount() > 0) {
-                return new GenericStack(stack.what(), bookmarkItem.i_getAmount());
+        if (HeiCompat.isHei() && HeiBookmarkItems.isBookmarkItem(ingredient)) {
+            GenericStack stack = toManualPinStack(HeiBookmarkItems.unwrapBookmark(ingredient), mouseButton);
+            long amount = HeiBookmarkItems.bookmarkAmount(ingredient);
+            if (stack != null && amount > 0) {
+                return new GenericStack(stack.what(), amount);
             }
             return stack;
         }

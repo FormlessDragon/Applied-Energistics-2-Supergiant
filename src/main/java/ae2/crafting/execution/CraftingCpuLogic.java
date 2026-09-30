@@ -869,10 +869,6 @@ public class CraftingCpuLogic {
         }
     }
 
-    private void notifyJobOwner(ExecutingCraftingJob job, CraftingJobStatusPacket.Status status) {
-        notifyJobOwner(job, status, false);
-    }
-
     private void notifyJobOwner(ExecutingCraftingJob job, CraftingJobStatusPacket.Status status,
                                 boolean showFinishedToast) {
         notifyJobOwner(job, status, showFinishedToast, List.of());
