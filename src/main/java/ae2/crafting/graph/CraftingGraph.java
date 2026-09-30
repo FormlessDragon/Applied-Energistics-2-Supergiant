@@ -1,6 +1,7 @@
 package ae2.crafting.graph;
 
 import ae2.api.crafting.IPatternDetails;
+import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -37,6 +38,7 @@ public class CraftingGraph {
     private final ObjectOpenHashSet<AEKey> fuzzyKeys = new ObjectOpenHashSet<>();
     private ObjectSet<AEKey> snapshotKeys;
     private final ObjectOpenHashSet<AEKey> extraSnapshotKeys = new ObjectOpenHashSet<>();
+    private final ObjectSet<AEItemKey> patternDefinitions = new ObjectOpenHashSet<>();
     private final Object2ObjectMap<AEKey, MaterialClosure.Node> closureNodes = new Object2ObjectOpenHashMap<>();
 
     public record NodeKey(AEKey what, @Nullable IPatternDetails pattern) {
@@ -151,10 +153,24 @@ public class CraftingGraph {
      */
     public void markRecursion() {
         this.hasRecursion = true;
+    }    public boolean hasRecursion() {
+        return this.hasRecursion;
     }
 
-    public boolean hasRecursion() {
-        return this.hasRecursion;
+    /**
+     * Records a pattern definition the structure was built from. Definitions of transient patterns, such as the
+     * pseudo patterns injected for a single HEI transfer, are not part of the network's pattern registry, so the
+     * structure must not be cached for reuse by a later calculation that does not supply them.
+     */
+    public void recordPatternDefinition(AEItemKey definition) {
+        this.patternDefinitions.add(definition);
+    }
+
+    /**
+     * @return every pattern definition this structure was built from
+     */
+    public ObjectSet<AEItemKey> getPatternDefinitions() {
+        return ObjectSets.unmodifiable(this.patternDefinitions);
     }
 
     public synchronized ObjectSet<AEKey> getSnapshotKeys() {

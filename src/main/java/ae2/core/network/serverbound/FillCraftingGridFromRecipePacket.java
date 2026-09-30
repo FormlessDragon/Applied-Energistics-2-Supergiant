@@ -425,6 +425,7 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
         int[] reservedPlayerItems = new int[player.inventory.mainInventory.size()];
         List<PlayerTake> playerTakes = new ObjectArrayList<>();
         Object2ObjectMap<AEItemKey, AutoCraftRequest> toAutoCraft = new Object2ObjectLinkedOpenHashMap<>();
+        List<GenericStack> temporaryMissing = new ObjectArrayList<>();
 
         int slotsToFill = Math.min(craftMatrix.size(), ingredients.size());
         for (int slot = 0; slot < slotsToFill; slot++) {
@@ -462,10 +463,55 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
             if (!scheduledCraft && !useTemporaryPseudoCraft) {
                 return null;
             }
+            if (useTemporaryPseudoCraft) {
+                addTemporaryMissing(temporaryMissing, ingredient, missingAmount, craftingService);
+            }
         }
 
         gridCache.removeIf(ItemStack::isEmpty);
-        return new PlannedTransfer(plannedGrid, gridCache, networkRequests, playerTakes, toAutoCraft);
+        return new PlannedTransfer(plannedGrid, gridCache, networkRequests, playerTakes, toAutoCraft,
+            temporaryMissing);
+    }
+
+    /**
+     * Records the material a grid slot is missing as a target of the batch order, merging it with the entry of the same
+     * key so identical materials end up in a single sub-plan.
+     *
+     * <p>The server decides what is missing instead of trusting the list the client sent. The client only knows its own
+     * view of the network, which lags behind the extractions and crafts that a transfer triggers. A stale view orders
+     * crafts for materials the network already holds, and the calculation then takes those from stock instead of
+     * crafting them, handing the player a plan that never delivers the material.
+     */
+    private void addTemporaryMissing(List<GenericStack> missing, Ingredient ingredient, int amount,
+                                     @Nullable ICraftingService craftingService) {
+        if (amount <= 0) {
+            return;
+        }
+
+        AEItemKey key = null;
+        if (craftingService != null) {
+            key = findCraftableKey(ingredient, craftingService).orElse(null);
+        }
+        if (key == null) {
+            for (ItemStack stack : ingredient.getMatchingStacks()) {
+                key = AEItemKey.of(stack);
+                if (key != null) {
+                    break;
+                }
+            }
+        }
+        if (key == null) {
+            return;
+        }
+
+        for (int i = 0, size = missing.size(); i < size; i++) {
+            GenericStack existing = missing.get(i);
+            if (existing.what().equals(key)) {
+                missing.set(i, GenericStack.sum(existing, new GenericStack(key, amount)));
+                return;
+            }
+        }
+        missing.add(new GenericStack(key, amount));
     }
 
     private boolean canApplyPlayerTakes(EntityPlayerMP player, List<PlayerTake> playerTakes) {
@@ -671,7 +717,10 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
                 storageService.invalidateCache();
             }
 
-            container.startTemporaryPseudoCrafting(this.temporaryPseudoInputs, this.temporaryPseudoOutputs);
+            List<GenericStack> missingMaterials = plannedTransfer.temporaryMissing();
+            if (!missingMaterials.isEmpty()) {
+                container.startTemporaryPseudoCrafting(missingMaterials, this.temporaryPseudoOutputs);
+            }
             return;
         }
 
@@ -757,7 +806,8 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
 
     private record PlannedTransfer(NonNullList<ItemStack> grid, List<ItemStack> gridCacheRemainders,
                                    KeyCounter networkRequests, List<PlayerTake> playerTakes,
-                                   Object2ObjectMap<AEItemKey, AutoCraftRequest> toAutoCraft) {
+                                   Object2ObjectMap<AEItemKey, AutoCraftRequest> toAutoCraft,
+                                   List<GenericStack> temporaryMissing) {
     }
 
     private record PlayerTake(int slot, int amount) {

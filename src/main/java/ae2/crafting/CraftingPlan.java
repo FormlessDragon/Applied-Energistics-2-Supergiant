@@ -31,7 +31,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-public final class CraftingPlan implements ICraftingPlan {
+public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarrier, CraftingPlanDisplaySource {
     private final GenericStack finalOutput;
     private final long bytes;
     private final boolean simulation;
@@ -111,6 +111,7 @@ public final class CraftingPlan implements ICraftingPlan {
         return tree;
     }
 
+    @Override
     public List<ICraftingProvider> temporaryProviders() {
         return temporaryProviders;
     }
@@ -123,6 +124,7 @@ public final class CraftingPlan implements ICraftingPlan {
         return attemptMetrics.snapshot();
     }
 
+    @Override
     public CompletableFuture<LiteCraftTreeNode> requestDisplayTree() {
         return display.requestTree();
     }

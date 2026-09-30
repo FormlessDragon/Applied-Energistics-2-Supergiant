@@ -470,7 +470,12 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
     /**
      * Returns a graph structure for reuse. The graph is discarded if the pattern revision changed while the calculation
-     * was running, otherwise the next calculation for the same output reuses it.
+     * was running, if any pattern it was built from is not registered in the network, otherwise the next calculation
+     * for the same output reuses it.
+     * <p>
+     * Patterns that a calculation injected itself, such as the pseudo pattern of a single HEI transfer, are not part
+     * of the registry and must never be reused: a later calculation for the same output would otherwise be planned
+     * against a structure whose inputs the network cannot supply, leaving the missing material unaccounted for.
      */
     public void putCachedGraph(AEKey output, CraftingGraph graph) {
         long currentRevision = this.craftingProviders.getRevision();
@@ -479,6 +484,11 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
         }
         if (this.graphCacheRevision != currentRevision) {
             return;
+        }
+        for (var definition : graph.getPatternDefinitions()) {
+            if (!this.craftingProviders.isKnownPattern(definition)) {
+                return;
+            }
         }
         graph.setCacheRevision(currentRevision);
         this.graphCache.put(output, graph);

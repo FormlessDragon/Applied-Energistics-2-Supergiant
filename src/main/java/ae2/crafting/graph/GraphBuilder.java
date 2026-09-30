@@ -101,6 +101,9 @@ public class GraphBuilder {
         String localReason = localUnit ? "multiple-pattern-candidates" : null;
 
         var primaryPattern = patterns.getFirst();
+        for (var pattern : patterns) {
+            graph.recordPatternDefinition(pattern.getDefinition());
+        }
         var nodeKey = new CraftingGraph.NodeKey(what, primaryPattern);
 
         var existing = graph.getNode(nodeKey);
@@ -202,6 +205,9 @@ public class GraphBuilder {
         graph.addExtraSnapshotKey(what);
         calc.handlePausing();
         var patterns = calc.getCraftingFor(what);
+        for (var pattern : patterns) {
+            graph.recordPatternDefinition(pattern.getDefinition());
+        }
         var aggregated = new Object2LongLinkedOpenHashMap<AEKey>();
         var candidates = new ObjectArrayList<MaterialClosure.Candidate>(patterns.size());
         for (var pattern : patterns) {

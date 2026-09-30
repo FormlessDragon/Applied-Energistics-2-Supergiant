@@ -21,6 +21,7 @@ import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -49,7 +50,8 @@ public final class PendingCraftingJobs {
                                  long requestedAmount,
                                  long remainingAmount,
                                  CraftingJobStatusPacket.Status status,
-                                 boolean showFinishedToast) {
+                                 boolean showFinishedToast,
+                                 List<AEKey> trackedKeys) {
 
         AELog.debug("Crafting job " + id + " for " + requestedAmount
             + "x" + AEKeyRendering.getDisplayName(what).getFormattedText() + ". State=" + status);
@@ -60,8 +62,15 @@ public final class PendingCraftingJobs {
         switch (status) {
             case STARTED -> {
                 if (existing == null) {
-                    jobs.put(id, new PendingJob(id, what, requestedAmount, remainingAmount));
-                    pendingJobCounts.put(what, pendingJobCounts.getInt(what) + 1);
+                    // A job tracks the items it makes. A batch order of the crafting terminal reports a placeholder
+                    // output that nothing is crafted into and makes the materials it really crafts instead, so those
+                    // are the items the terminal has to show as in progress. Tracking the placeholder would leave the
+                    // materials looking finished and pruned on the next look at the terminal.
+                    var tracked = trackedKeys.isEmpty() ? List.of(what) : List.copyOf(trackedKeys);
+                    jobs.put(id, new PendingJob(id, what, requestedAmount, remainingAmount, tracked));
+                    for (var trackedKey : tracked) {
+                        pendingJobCounts.put(trackedKey, pendingJobCounts.getInt(trackedKey) + 1);
+                    }
                 }
             }
             case CANCELLED -> removeJob(id);
@@ -106,12 +115,13 @@ public final class PendingCraftingJobs {
             return;
         }
 
-        AEKey what = removed.what();
-        int count = pendingJobCounts.getInt(what) - 1;
-        if (count > 0) {
-            pendingJobCounts.put(what, count);
-        } else {
-            pendingJobCounts.removeInt(what);
+        for (var trackedKey : removed.trackedKeys()) {
+            int count = pendingJobCounts.getInt(trackedKey) - 1;
+            if (count > 0) {
+                pendingJobCounts.put(trackedKey, count);
+            } else {
+                pendingJobCounts.removeInt(trackedKey);
+            }
         }
     }
 
@@ -129,6 +139,7 @@ public final class PendingCraftingJobs {
         return false;
     }
 
-    private record PendingJob(UUID jobId, AEKey what, long requestedAmount, long remainingAmount) {
+    private record PendingJob(UUID jobId, AEKey what, long requestedAmount, long remainingAmount,
+                              List<AEKey> trackedKeys) {
     }
 }

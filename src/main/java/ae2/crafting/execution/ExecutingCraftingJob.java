@@ -30,8 +30,8 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.crafting.CraftingLink;
-import ae2.crafting.CraftingPlan;
 import ae2.crafting.TemporaryPseudoCraftingProvider;
+import ae2.crafting.TemporaryProviderCarrier;
 import ae2.crafting.inv.ListCraftingInventory;
 import ae2.helpers.patternprovider.PseudoPatternDetails;
 import ae2.me.service.CraftingService;
@@ -232,6 +232,14 @@ public class ExecutingCraftingJob {
         return this.temporaryProviders.containsKey(PseudoPatternDetails.unwrap(details).getDefinition());
     }
 
+    /**
+     * True when the final output of this job is only a placeholder that the player crafts by hand, as a batch order of
+     * the crafting terminal submits it.
+     */
+    boolean hasPlaceholderFinalOutput() {
+        return !this.temporaryProviders.isEmpty();
+    }
+
     void merge(ICraftingPlan plan, KeyCounter remainingMissingItems, int priority) {
         var planFinalOutput = plan.finalOutput();
         if (!this.finalOutput.what().equals(planFinalOutput.what())) {
@@ -254,8 +262,8 @@ public class ExecutingCraftingJob {
     }
 
     private void addTemporaryProviders(ICraftingPlan plan) {
-        if (plan instanceof CraftingPlan craftingPlan) {
-            for (var provider : craftingPlan.temporaryProviders()) {
+        if (plan instanceof TemporaryProviderCarrier carrier) {
+            for (var provider : carrier.temporaryProviders()) {
                 for (var pattern : provider.getAvailablePatterns()) {
                     var temporaryProvider = provider instanceof TemporaryPseudoCraftingProvider temporary
                         ? temporary

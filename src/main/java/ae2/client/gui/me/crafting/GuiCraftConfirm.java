@@ -258,7 +258,8 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> implements
         this.taskPriority.enabled = plan != null;
         this.taskSubscription.visible = this.container.canSubscribe;
         this.taskSubscription.enabled = this.container.canSubscribe;
-        boolean canBookmarkMissing = Integrations.hei().isEnabled() && hasMissingEntries;
+        boolean canBookmarkMissing = Integrations.hei().isEnabled()
+            && (hasMissingEntries || plan != null && plan.hasBatchTargets());
         this.bookmarkMissing.visible = canBookmarkMissing;
         this.bookmarkMissing.enabled = canBookmarkMissing;
 
@@ -394,14 +395,26 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> implements
             return;
         }
 
-        List<GenericStack> missingStacks = new ObjectArrayList<>(plan.entries().size());
+        // A batch order crafts the materials the transferred recipe was missing, and those are the items the player
+        // wants at the top of the item list. Its reported output is only a placeholder that nothing is crafted into,
+        // so marking that instead would pin an item the order never produces.
+        List<GenericStack> bookmarked = new ObjectArrayList<>(plan.entries().size());
         for (CraftingPlanSummaryEntry entry : plan.entries()) {
-            if (entry.missingAmount() > 0) {
-                missingStacks.add(new GenericStack(entry.what(), entry.missingAmount()));
+            if (entry.batchTarget()) {
+                long amount = entry.craftAmount() > 0 ? entry.craftAmount() : entry.missingAmount();
+                bookmarked.add(new GenericStack(entry.what(), Math.max(1, amount)));
             }
         }
 
-        Integrations.hei().addBookmarkGroup(missingStacks);
+        if (bookmarked.isEmpty()) {
+            for (CraftingPlanSummaryEntry entry : plan.entries()) {
+                if (entry.missingAmount() > 0) {
+                    bookmarked.add(new GenericStack(entry.what(), entry.missingAmount()));
+                }
+            }
+        }
+
+        Integrations.hei().addBookmarkGroup(bookmarked);
     }
 
     private void showCraftingTree() {

@@ -78,6 +78,11 @@ public interface ICraftingGridContainer {
     default void startAutoCrafting(List<AutoCraftEntry> toCraft) {
     }
 
+    /**
+     * Orders the passed missing materials as one batch, reported under the passed output of the transferred recipe.
+     * Every material is calculated on its own and the results are merged into a single job, so one CPU crafts all of
+     * them at once. Will open the craft confirm container, so this container should not be used afterward.
+     */
     default void startTemporaryPseudoCrafting(List<GenericStack> inputs, List<GenericStack> outputs) {
     }
 

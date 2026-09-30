@@ -231,7 +231,7 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
 
     @Override
     public void startTemporaryPseudoCrafting(List<GenericStack> inputs, List<GenericStack> outputs) {
-        if (!(getPlayer() instanceof EntityPlayerMP player) || outputs.isEmpty()) {
+        if (!(getPlayer() instanceof EntityPlayerMP player) || outputs.isEmpty() || inputs.isEmpty()) {
             return;
         }
 
@@ -240,8 +240,10 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
             return;
         }
 
+        // The inputs are the distinct materials the transfer could not supply. Each of them becomes a real sub-plan,
+        // and the provider only stands in for the recipe output, which the player crafts by hand from those materials.
         var provider = new TemporaryPseudoCraftingProvider(inputs, outputs);
-        ContainerCraftConfirm.openWithTemporaryPseudoPattern(getActionHost(), player, getLocator(), provider);
+        ContainerCraftConfirm.openWithBatchCrafting(getActionHost(), player, getLocator(), inputs, provider);
     }
 
     @Nullable

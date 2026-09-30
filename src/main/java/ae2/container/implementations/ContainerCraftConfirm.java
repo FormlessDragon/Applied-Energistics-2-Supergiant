@@ -18,7 +18,6 @@
 
 package ae2.container.implementations;
 
-import ae2.api.crafting.IPatternDetails;
 import ae2.api.implementations.items.IAEItemPowerStorage;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
@@ -27,9 +26,7 @@ import ae2.api.networking.crafting.CraftingJobOptions;
 import ae2.api.networking.crafting.CraftingSubmitErrorCode;
 import ae2.api.networking.crafting.ICraftingCPU;
 import ae2.api.networking.crafting.ICraftingPlan;
-import ae2.api.networking.crafting.ICraftingProvider;
 import ae2.api.networking.crafting.ICraftingService;
-import ae2.api.networking.crafting.ICraftingSimulationRequester;
 import ae2.api.networking.crafting.ICraftingSubmitResult;
 import ae2.api.networking.crafting.UnsuitableCpus;
 import ae2.api.networking.security.IActionHost;
@@ -53,6 +50,7 @@ import ae2.core.localization.PlayerMessages;
 import ae2.core.network.NetworkPacketHelper;
 import ae2.core.network.clientbound.CraftConfirmPlanPacket;
 import ae2.core.network.serverbound.SwitchGuisPacket;
+import ae2.crafting.BatchCraftingPlan;
 import ae2.crafting.CraftingCalculationFailure;
 import ae2.crafting.TemporaryPseudoCraftingProvider;
 import ae2.crafting.execution.CraftingSubmitResult;
@@ -61,6 +59,7 @@ import ae2.me.helpers.PlayerSource;
 import ae2.util.SearchInventoryEvent;
 import com.google.common.primitives.Ints;
 import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanMap;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
 import net.minecraft.entity.player.EntityPlayer;
@@ -135,8 +134,15 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     private long cachedMergeableCpuStateChangeTick = Long.MIN_VALUE;
     @Nullable
     private List<ICraftingGridContainer.AutoCraftEntry> autoCraftingQueue;
+    /**
+     * One calculation per distinct material a batch order is missing. Their results are merged into a single plan.
+     */
     @Nullable
-    private TemporaryPseudoCraftingProvider temporaryPseudoProvider;
+    private List<Future<ICraftingPlan>> batchJobs;
+    @Nullable
+    private List<GenericStack> batchTargets;
+    @Nullable
+    private TemporaryPseudoCraftingProvider batchMainProvider;
 
     public ContainerCraftConfirm(InventoryPlayer ip, ISubGuiHost host) {
         super(ip, host);
@@ -185,10 +191,18 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         }
     }
 
-    public static void openWithTemporaryPseudoPattern(@Nullable IActionHost terminal, EntityPlayerMP player,
-                                                      @Nullable GuiHostLocator locator,
-                                                      TemporaryPseudoCraftingProvider provider) {
-        if (terminal == null || locator == null) {
+    /**
+     * Opens the confirmation for a batch order of the crafting terminal.
+     *
+     * <p>Instead of pretending that one pattern is the whole recipe, every distinct material the transfer could not
+     * supply is calculated as its own plan against the current network, and the confirmation shows the merged result:
+     * one job that crafts all of the missing materials at once. The output of the transferred recipe stays the final
+     * output of that job, but it is only a placeholder, because the player crafts it by hand.
+     */
+    public static void openWithBatchCrafting(@Nullable IActionHost terminal, EntityPlayerMP player,
+                                             @Nullable GuiHostLocator locator, List<GenericStack> missingMaterials,
+                                             TemporaryPseudoCraftingProvider mainProvider) {
+        if (terminal == null || locator == null || missingMaterials.isEmpty()) {
             return;
         }
 
@@ -196,11 +210,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             SwitchGuisPacket.openSubGui(player, locator, GuiIds.GuiKey.CRAFT_CONFIRM, null);
 
             if (player.openContainer instanceof ContainerCraftConfirm container) {
-                var primaryOutput = provider.pattern().getPrimaryOutput();
-                container.temporaryPseudoProvider = provider;
-                if (!container.planTemporaryPseudoJob(primaryOutput.what(), primaryOutput.amount(),
-                    CalculationStrategy.REPORT_MISSING_ITEMS)) {
-                    container.temporaryPseudoProvider = null;
+                if (!container.planBatchJob(missingMaterials, mainProvider)) {
                     container.setValidContainer(false);
                     return;
                 }
@@ -247,9 +257,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     }
 
     public boolean planJob(AEKey what, long amount, CalculationStrategy strategy) {
-        if (this.job != null) {
-            this.job.cancel(true);
-        }
+        this.cancelPendingCalculations();
         this.result = null;
         this.mergeAvailable = false;
         invalidateMergeCache();
@@ -269,28 +277,49 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         return true;
     }
 
-    private boolean planTemporaryPseudoJob(AEKey what, long amount, CalculationStrategy strategy) {
-        if (this.job != null) {
-            this.job.cancel(true);
-        }
+    /**
+     * Starts one calculation per distinct missing material. Their results are merged into a single plan once they are
+     * all done, so one CPU job crafts every missing material at once.
+     */
+    private boolean planBatchJob(List<GenericStack> missingMaterials, TemporaryPseudoCraftingProvider mainProvider) {
+        this.cancelPendingCalculations();
         this.result = null;
         this.mergeAvailable = false;
         invalidateMergeCache();
         invalidateMergeableCpuCache();
         this.clearError();
-        this.whatToCraft = what;
-        this.amount = amount;
-        this.strategy = strategy;
+
+        var mainOutput = mainProvider.pattern().getPrimaryOutput();
+        this.whatToCraft = mainOutput.what();
+        this.amount = mainOutput.amount();
+        this.strategy = CalculationStrategy.REPORT_MISSING_ITEMS;
 
         IGrid grid = getGrid();
-        TemporaryPseudoCraftingProvider provider = this.temporaryPseudoProvider;
-        if (grid == null || provider == null) {
+        if (grid == null) {
             return false;
         }
 
-        this.job = grid.getCraftingService().beginCraftingCalculation(getPlayer().world,
-            new TemporaryPseudoSimulationRequester(provider), what, amount, strategy);
+        ICraftingService craftingService = grid.getCraftingService();
+        var jobs = new ObjectArrayList<Future<ICraftingPlan>>(missingMaterials.size());
+        for (var material : missingMaterials) {
+            jobs.add(craftingService.beginCraftingCalculation(getPlayer().world, this::getActionSrc,
+                material.what(), material.amount(), CalculationStrategy.REPORT_MISSING_ITEMS));
+        }
+
+        this.batchJobs = jobs;
+        this.batchTargets = List.copyOf(missingMaterials);
+        this.batchMainProvider = mainProvider;
         return true;
+    }
+
+    private void cancelPendingCalculations() {
+        if (this.job != null) {
+            this.job.cancel(true);
+            this.job = null;
+        }
+        this.batchJobs = null;
+        this.batchTargets = null;
+        this.batchMainProvider = null;
     }
 
     public void cycleSelectedCPU(boolean next) {
@@ -352,6 +381,46 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             return;
         }
 
+        if (this.batchJobs != null && allBatchJobsDone(this.batchJobs)) {
+            var batchJobs = this.batchJobs;
+            this.batchJobs = null;
+            try {
+                var subPlans = new ObjectArrayList<ICraftingPlan>(batchJobs.size());
+                for (var batchJob : batchJobs) {
+                    subPlans.add(batchJob.get());
+                }
+                var mainProvider = this.batchMainProvider;
+                if (mainProvider == null) {
+                    throw new IllegalStateException("Batch order is missing its placeholder output provider");
+                }
+
+                this.result = BatchCraftingPlan.combine(mainProvider.pattern().getPrimaryOutput(), subPlans,
+                    List.of(mainProvider));
+                if (shouldAutoStart(this.result, this.isAutoStart())) {
+                    this.startJob(false, true);
+                    return;
+                }
+
+                if (!this.result.missingItems().isEmpty()) {
+                    this.setAutoStart(false);
+                }
+
+                this.plan = CraftingPlanSummary.fromJob(grid, this.result);
+                this.mergeAvailable = canMergeCurrentResult(grid);
+                sendPacketToClient(new CraftConfirmPlanPacket(this.plan));
+            } catch (Throwable e) {
+                ITextComponent error = getCraftingErrorText(e);
+                this.getPlayerInventory().player.sendMessage(PlayerMessages.CraftingJobError.text(error));
+                AELog.warn("Failed to start crafting job.", e);
+                this.setValidContainer(false);
+                this.result = null;
+                this.batchTargets = null;
+                this.batchMainProvider = null;
+                invalidateMergeCache();
+                return;
+            }
+        }
+
         if (this.job != null && this.job.isDone()) {
             try {
                 this.result = this.job.get();
@@ -393,6 +462,15 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         this.canSubscribe = hasUsableWirelessTerminal(this.getPlayer());
         syncCpuList(grid);
         super.broadcastChanges();
+    }
+
+    private static boolean allBatchJobsDone(List<Future<ICraftingPlan>> jobs) {
+        for (int i = 0, size = jobs.size(); i < size; i++) {
+            if (!jobs.get(i).isDone()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void syncCpuList(IGrid grid) {
@@ -531,9 +609,6 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             if (submitResult.successful()) {
                 boolean hasQueuedJobs = this.autoCraftingQueue != null && !this.autoCraftingQueue.isEmpty();
                 EntityPlayer player = getPlayer();
-                if (this.temporaryPseudoProvider != null) {
-                    this.temporaryPseudoProvider = null;
-                }
                 if (hasQueuedJobs) {
                     if (player instanceof EntityPlayerMP serverPlayer) {
                         ContainerCraftConfirm.openWithCraftingList(getActionHost(), serverPlayer, getLocator(),
@@ -566,11 +641,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     @Override
     public void onContainerClosed(EntityPlayer player) {
         super.onContainerClosed(player);
-        if (this.job != null) {
-            this.job.cancel(true);
-            this.job = null;
-        }
-        this.temporaryPseudoProvider = null;
+        this.cancelPendingCalculations();
     }
 
     private void onCPUSelectionChanged(@Nullable CraftingCPURecord cpuRecord, boolean cpusAvailable) {
@@ -668,11 +739,17 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             return;
         }
 
+        var batchTargets = this.batchTargets;
+        var batchMainProvider = this.batchMainProvider;
+        if (batchTargets != null && batchMainProvider != null) {
+            if (!planBatchJob(batchTargets, batchMainProvider)) {
+                goBack();
+            }
+            return;
+        }
+
         if (this.whatToCraft != null) {
-            boolean planned = this.temporaryPseudoProvider != null
-                ? planTemporaryPseudoJob(this.whatToCraft, this.amount, this.strategy)
-                : planJob(this.whatToCraft, this.amount, this.strategy);
-            if (!planned) {
+            if (!planJob(this.whatToCraft, this.amount, this.strategy)) {
                 goBack();
             }
         } else {
@@ -767,36 +844,6 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             this.skipMerge = skipMerge;
             this.priority = priority;
             this.subscribed = subscribed;
-        }
-    }
-
-    private final class TemporaryPseudoSimulationRequester implements ICraftingSimulationRequester {
-        private final TemporaryPseudoCraftingProvider provider;
-
-        private TemporaryPseudoSimulationRequester(TemporaryPseudoCraftingProvider provider) {
-            this.provider = provider;
-        }
-
-        @Override
-        public IActionSource getActionSource() {
-            return ContainerCraftConfirm.this.getActionSrc();
-        }
-
-        @Override
-        @Nullable
-        public IGridNode getGridNode() {
-            IActionHost actionHost = ContainerCraftConfirm.this.getActionHost();
-            return actionHost != null ? actionHost.getActionableNode() : null;
-        }
-
-        @Override
-        public List<IPatternDetails> getAdditionalPatterns() {
-            return List.of(this.provider.pattern());
-        }
-
-        @Override
-        public List<ICraftingProvider> getAdditionalProviders() {
-            return List.of(this.provider);
         }
     }
 }

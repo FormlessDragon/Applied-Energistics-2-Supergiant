@@ -9,7 +9,7 @@ import ae2.core.AppEngBase;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.ServerboundPacket;
 import ae2.core.network.clientbound.CraftingTreeDataPacket;
-import ae2.crafting.CraftingPlan;
+import ae2.crafting.CraftingPlanDisplaySource;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.PacketBuffer;
@@ -63,7 +63,7 @@ public class SwitchCraftingTreePacket extends ServerboundPacket {
             return;
         }
 
-        if (!(result instanceof CraftingPlan job)) {
+        if (!(result instanceof CraftingPlanDisplaySource displaySource)) {
             return;
         }
 
@@ -78,7 +78,7 @@ public class SwitchCraftingTreePacket extends ServerboundPacket {
         fakeFuture.run();
         int windowId = craftingTree.windowId;
         int requestId = CraftingTreeDataPacket.nextRequestId();
-        job.requestDisplayTree()
+        displaySource.requestDisplayTree()
            .thenCompose(CraftingTreeDataPacket::encodeAsync)
            .whenComplete((payload, failure) -> player.getServerWorld().addScheduledTask(() -> {
                if (player.openContainer != craftingTree || craftingTree.windowId != windowId) {

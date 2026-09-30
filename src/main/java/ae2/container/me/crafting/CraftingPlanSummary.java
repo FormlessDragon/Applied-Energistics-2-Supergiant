@@ -22,7 +22,8 @@ import ae2.api.crafting.IPatternDetails;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.stacks.AEKey;
-import ae2.crafting.CraftingPlan;
+import ae2.crafting.BatchCraftingPlan;
+import ae2.crafting.TemporaryProviderCarrier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
@@ -63,6 +64,7 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
     public static CraftingPlanSummary fromJob(IGrid grid, ICraftingPlan job) {
         Object2ObjectMap<AEKey, KeyStats> plan = new Object2ObjectOpenHashMap<>();
         var hiddenOutputs = getHiddenTemporaryOutputs(job);
+        var batchTargets = getBatchTargets(job);
 
         for (var used : job.usedItems()) {
             mapping(plan, used.getKey()).stored += used.getLongValue();
@@ -120,7 +122,8 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
                 intermediateCraftAmount = job.intermediateFinalOutputAmount();
             }
             entries.add(new CraftingPlanSummaryEntry(out.getKey(), missingAmount, storedAmount, craftAmount,
-                requestCount, intermediateCraftAmount, inventoryAmount, finalOutputEntry));
+                requestCount, intermediateCraftAmount, inventoryAmount, finalOutputEntry,
+                batchTargets.contains(out.getKey())));
         }
 
         Collections.sort(entries);
@@ -129,17 +132,23 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
 
     private static ObjectOpenHashSet<AEKey> getHiddenTemporaryOutputs(ICraftingPlan job) {
         var hiddenOutputs = new ObjectOpenHashSet<AEKey>();
-        if (job instanceof CraftingPlan craftingPlan) {
-            for (var provider : craftingPlan.temporaryProviders()) {
+        if (job instanceof TemporaryProviderCarrier carrier) {
+            var finalOutput = job.finalOutput().what();
+            for (var provider : carrier.temporaryProviders()) {
                 for (var pattern : provider.getAvailablePatterns()) {
                     var outputs = pattern.getOutputs();
                     if (outputs instanceof RandomAccess) {
                         for (int i = 0, size = outputs.size(); i < size; i++) {
-                            hiddenOutputs.add(outputs.get(i).what());
+                            var what = outputs.get(i).what();
+                            if (!what.equals(finalOutput)) {
+                                hiddenOutputs.add(what);
+                            }
                         }
                     } else {
                         for (var output : outputs) {
-                            hiddenOutputs.add(output.what());
+                            if (!output.what().equals(finalOutput)) {
+                                hiddenOutputs.add(output.what());
+                            }
                         }
                     }
                 }
@@ -148,9 +157,43 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
         return hiddenOutputs;
     }
 
+    /**
+     * The materials a batch order crafts. A plan that produces its own output has none.
+     */
+    private static ObjectOpenHashSet<AEKey> getBatchTargets(ICraftingPlan job) {
+        var targets = new ObjectOpenHashSet<AEKey>();
+        if (job instanceof BatchCraftingPlan batchPlan) {
+            for (var target : batchPlan.batchTargets()) {
+                targets.add(target.what());
+            }
+        }
+        return targets;
+    }
+
     private static KeyStats mapping(Object2ObjectMap<AEKey, KeyStats> plan, AEKey key) {
         Objects.requireNonNull(key, "Key may not be null");
         return plan.computeIfAbsent(key, ignored -> new KeyStats());
+    }
+
+    /**
+     * True if this plan orders materials on behalf of the player, as a batch order of the crafting terminal does. The
+     * reported output of such a plan is only a placeholder, so the ordered materials are the ones worth marking.
+     */
+    public boolean hasBatchTargets() {
+        if (this.entries instanceof RandomAccess) {
+            for (int i = 0, size = this.entries.size(); i < size; i++) {
+                if (this.entries.get(i).batchTarget()) {
+                    return true;
+                }
+            }
+        } else {
+            for (var entry : this.entries) {
+                if (entry.batchTarget()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public boolean hasMissingEntries() {

@@ -27,7 +27,7 @@ import java.util.Objects;
 
 public record CraftingPlanSummaryEntry(AEKey what, long missingAmount, long storedAmount,
                                        long craftAmount, long requestCount, long intermediateCraftAmount,
-                                       long inventoryAmount, boolean finalOutput)
+                                       long inventoryAmount, boolean finalOutput, boolean batchTarget)
         implements Comparable<CraftingPlanSummaryEntry> {
     private static final Comparator<CraftingPlanSummaryEntry> COMPARATOR = Comparator
         .comparing(CraftingPlanSummaryEntry::missingAmount)
@@ -53,8 +53,9 @@ public record CraftingPlanSummaryEntry(AEKey what, long missingAmount, long stor
         }
 
         boolean finalOutput = buffer.readBoolean();
+        boolean batchTarget = buffer.readBoolean();
         return new CraftingPlanSummaryEntry(what, missingAmount, storedAmount, craftAmount, requestCount,
-            intermediateCraftAmount, inventoryAmount, finalOutput);
+            intermediateCraftAmount, inventoryAmount, finalOutput, batchTarget);
     }
 
     @Override
@@ -72,6 +73,7 @@ public record CraftingPlanSummaryEntry(AEKey what, long missingAmount, long stor
         buffer.writeVarLong(this.intermediateCraftAmount);
         buffer.writeVarLong(this.inventoryAmount);
         buffer.writeBoolean(this.finalOutput);
+        buffer.writeBoolean(this.batchTarget);
     }
 
     public long inventoryUsageAmount() {

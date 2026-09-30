@@ -36,7 +36,9 @@ import ae2.api.stacks.KeyCounter;
 import ae2.core.AELog;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.clientbound.CraftingJobStatusPacket;
+import ae2.crafting.BatchCraftingPlan;
 import ae2.crafting.CraftingLink;
+import ae2.crafting.TemporaryProviderCarrier;
 import ae2.crafting.inv.ICraftingInventory;
 import ae2.crafting.inv.ListCraftingInventory;
 import ae2.crafting.pattern.AEProcessingPattern;
@@ -46,6 +48,7 @@ import ae2.me.cluster.implementations.CraftingCPUCluster;
 import ae2.me.service.CraftingService;
 import com.google.common.base.Preconditions;
 import com.google.common.math.LongMath;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
@@ -163,7 +166,7 @@ public class CraftingCpuLogic {
 
         // TODO: post monitor difference?
 
-        notifyJobOwner(job, CraftingJobStatusPacket.Status.STARTED);
+        notifyJobOwner(job, CraftingJobStatusPacket.Status.STARTED, false, trackedKeys(plan));
 
         // Non-standalone jobs need another link for the requester, and both links need to be submitted to the cache.
         if (requester != null) {
@@ -186,9 +189,30 @@ public class CraftingCpuLogic {
         if (!this.job.finalOutput.what().equals(plan.finalOutput().what())) {
             return false;
         }
+        if (this.job.hasPlaceholderFinalOutput() != hasPlaceholderFinalOutput(plan)) {
+            // A job whose output is only pretended must never merge with a real job for the same item, or the other way
+            // around: the pretended production would satisfy a real demand without anything being crafted.
+            return false;
+        }
 
         long mergedBytes = LongMath.saturatedAdd(this.job.estimateRemainingPlanBytes(), plan.bytes());
         return cluster.getAvailableStorage() >= mergedBytes;
+    }
+
+    /**
+     * True if the plan fakes its final output through a temporary pattern instead of producing it.
+     */
+    private static boolean hasPlaceholderFinalOutput(ICraftingPlan plan) {
+        if (plan instanceof TemporaryProviderCarrier carrier) {
+            for (var provider : carrier.temporaryProviders()) {
+                for (var pattern : provider.getAvailablePatterns()) {
+                    if (PseudoPatternDetails.isPseudo(pattern)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     public ICraftingSubmitResult tryMergeJob(IGrid grid, ICraftingPlan plan, IActionSource src) {
@@ -851,6 +875,29 @@ public class CraftingCpuLogic {
 
     private void notifyJobOwner(ExecutingCraftingJob job, CraftingJobStatusPacket.Status status,
                                 boolean showFinishedToast) {
+        notifyJobOwner(job, status, showFinishedToast, List.of());
+    }
+
+    /**
+     * The items a started job makes the terminal pin in its own row on top of the item list and show as in progress.
+     * <p>
+     * A batch order of the crafting terminal orders the materials the transferred recipe was missing, so those are the
+     * items it crafts. Its reported output is only a placeholder, nothing is crafted into it, so tracking that instead
+     * would leave the materials looking finished and drop them from the terminal.
+     */
+    private static List<AEKey> trackedKeys(ICraftingPlan plan) {
+        if (plan instanceof BatchCraftingPlan batchPlan) {
+            var keys = new ObjectArrayList<AEKey>(batchPlan.batchTargets().size());
+            for (var target : batchPlan.batchTargets()) {
+                keys.add(target.what());
+            }
+            return keys;
+        }
+        return List.of();
+    }
+
+    private void notifyJobOwner(ExecutingCraftingJob job, CraftingJobStatusPacket.Status status,
+                                boolean showFinishedToast, List<AEKey> trackedKeys) {
         this.lastModifiedOnTick = TickHandler.instance().getCurrentTick();
 
         var playerId = job.playerId;
@@ -880,7 +927,7 @@ public class CraftingCpuLogic {
                 finalOutputKey,
                 finalOutputAmount,
                 job.remainingAmount,
-                status, showFinishedToast), connectedPlayer);
+                status, showFinishedToast, trackedKeys), connectedPlayer);
         }
     }
 
