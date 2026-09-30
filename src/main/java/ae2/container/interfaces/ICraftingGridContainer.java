@@ -23,6 +23,7 @@ import ae2.api.networking.IGridNode;
 import ae2.api.networking.energy.IEnergySource;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.ILinkStatus;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -79,11 +80,24 @@ public interface ICraftingGridContainer {
     }
 
     /**
-     * Orders the passed missing materials as one batch, reported under the passed output of the transferred recipe.
+     * Orders the passed materials as one batch, reported under the passed output of the transferred recipe, and
+     * remembers which crafting grid slot each of them belongs to.
+     * <p>
      * Every material is calculated on its own and the results are merged into a single job, so one CPU crafts all of
-     * them at once. Will open the craft confirm container, so this container should not be used afterward.
+     * them at once. The terminal shows them in their slots while they are being crafted, and puts them in place once
+     * they arrive. Will open the craft confirm container, so this container should not be used afterward.
      */
-    default void startTemporaryPseudoCrafting(List<GenericStack> inputs, List<GenericStack> outputs) {
+    default void startTemporaryPseudoCrafting(List<GridFill> gridFills, List<GenericStack> outputs) {
+    }
+
+    /**
+     * One crafting grid slot of a transferred recipe that is missing its material and is ordered as part of a batch.
+     *
+     * @param slot   index of the crafting grid slot the material belongs to
+     * @param what   the material to fill into that slot
+     * @param amount how many items that slot is missing
+     */
+    record GridFill(int slot, AEKey what, long amount) {
     }
 
     /**

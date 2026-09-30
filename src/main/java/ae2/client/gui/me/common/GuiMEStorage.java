@@ -641,7 +641,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         }
     }
 
-    private void renderRainbowBorder(int x, int y, boolean animated) {
+    protected void renderRainbowBorder(int x, int y, boolean animated) {
         float phase = animated ? (Minecraft.getSystemTime() % 2400L) / 2400.0F : 0.0F;
 
         GlStateManager.pushMatrix();

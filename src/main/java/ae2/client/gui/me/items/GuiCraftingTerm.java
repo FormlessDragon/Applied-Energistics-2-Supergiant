@@ -19,6 +19,7 @@
 package ae2.client.gui.me.items;
 
 import ae2.api.config.ActionItems;
+import ae2.api.stacks.AEItemKey;
 import ae2.client.gui.Icon;
 import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.client.gui.style.GuiStyle;
@@ -30,17 +31,33 @@ import ae2.core.AEConfig;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.Tooltips;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.block.model.IBakedModel;
+import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
+import net.minecraft.client.renderer.texture.TextureMap;
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraftforge.client.ForgeHooksClient;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.opengl.GL11;
 
 import java.io.IOException;
 import java.util.List;
 
 public class GuiCraftingTerm extends GuiMEStorage<ContainerCraftingTerm> {
+    /**
+     * How opaque the preview of a material that is still being crafted is drawn.
+     */
+    private static final float GHOST_ALPHA = 0.45F;
+
     private final RecipeSelectionButton recipeSelectionButton;
 
     public GuiCraftingTerm(ContainerCraftingTerm container, InventoryPlayer playerInventory, @Nullable ITextComponent title,
@@ -93,6 +110,138 @@ public class GuiCraftingTerm extends GuiMEStorage<ContainerCraftingTerm> {
     protected void updateBeforeRender() {
         super.updateBeforeRender();
         this.recipeSelectionButton.update(true);
+    }
+
+    @Override
+    public void drawFG(int offsetX, int offsetY, int mouseX, int mouseY) {
+        super.drawFG(offsetX, offsetY, mouseX, mouseY);
+        renderPendingGridFills();
+    }
+
+    /**
+     * Shows the materials a batch order is still crafting in the crafting grid slots they will be put into, so the
+     * player sees what the terminal is waiting for. They are drawn semi-transparently because they are not there yet,
+     * and their slot gets the same flowing border a pinned slot has. Once the material arrived it is put into the slot
+     * and both stop.
+     */
+    private void renderPendingGridFills() {
+        for (var fill : this.container.getPendingGridFills()) {
+            if (fill.slot() < 0 || fill.slot() >= 9 || !(fill.what() instanceof AEItemKey itemKey)) {
+                continue;
+            }
+
+            var slot = this.container.getCraftingSlot(fill.slot());
+            if (!slot.getStack().isEmpty()) {
+                // The player put something into this slot themselves.
+                continue;
+            }
+
+            renderGhostItem(itemKey.toStack(), slot.xPos, slot.yPos);
+            renderRainbowBorder(slot.xPos - 1, slot.yPos - 1, true);
+        }
+    }
+
+    /**
+     * Draws an item in the slot it will arrive in, translucent but otherwise exactly like the real item, including the
+     * shading of block models.
+     * <p>
+     * The vanilla item renderer cannot be used for this: it writes a fully opaque alpha into every single vertex, so
+     * the preview would look exactly like an item that is already in the slot. Its model is used directly instead, with
+     * the same GUI transform the renderer would apply and the same quad data, only with a translucent alpha.
+     */
+    private void renderGhostItem(ItemStack stack, int x, int y) {
+        var model = ForgeHooksClient.handleCameraTransforms(
+            this.itemRender.getItemModelWithOverrides(stack, null, null),
+            ItemCameraTransforms.TransformType.GUI, false);
+
+        boolean lighting = GL11.glIsEnabled(GL11.GL_LIGHTING);
+
+        this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
+        GlStateManager.pushMatrix();
+        GlStateManager.disableDepth();
+        GlStateManager.enableBlend();
+        GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA,
+            GL11.GL_ONE, GL11.GL_ZERO);
+        GlStateManager.enableRescaleNormal();
+        GlStateManager.enableAlpha();
+        GlStateManager.alphaFunc(GL11.GL_GREATER, 0.1F);
+        // Where the vanilla renderer would put this model in a GUI.
+        GlStateManager.translate(x, y, 100.0F + this.itemRender.zLevel);
+        GlStateManager.translate(8.0F, 8.0F, 0.0F);
+        GlStateManager.scale(1.0F, -1.0F, 1.0F);
+        GlStateManager.scale(16.0F, 16.0F, 16.0F);
+        if (model.isGui3d()) {
+            GlStateManager.enableLighting();
+        } else {
+            GlStateManager.disableLighting();
+        }
+        // An item model spans -0.5 to 0.5, the renderer shifts it into the slot before drawing it.
+        GlStateManager.translate(-0.5F, -0.5F, -0.5F);
+        GlStateManager.color(1.0F, 1.0F, 1.0F, GHOST_ALPHA);
+
+        emitGhostQuads(model, stack);
+
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        if (!lighting) {
+            GlStateManager.disableLighting();
+        }
+        GlStateManager.disableRescaleNormal();
+        GlStateManager.disableBlend();
+        GlStateManager.enableDepth();
+        GlStateManager.popMatrix();
+    }
+
+    /**
+     * Emits the quads of an item model with a translucent alpha. The quads use the vertex format of the item renderer,
+     * whose alpha cannot be changed, so the vertex data is copied into a format that can carry one.
+     */
+    private static void emitGhostQuads(IBakedModel model, ItemStack stack) {
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder buffer = tessellator.getBuffer();
+        // The very format the item renderer bakes its quads in, which carries a per-vertex color the alpha belongs to.
+        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.ITEM);
+        for (var facing : EnumFacing.values()) {
+            emitGhostQuads(buffer, model.getQuads(null, facing, 0L), stack);
+        }
+        emitGhostQuads(buffer, model.getQuads(null, null, 0L), stack);
+        tessellator.draw();
+    }
+
+    private static void emitGhostQuads(BufferBuilder buffer, List<BakedQuad> quads, ItemStack stack) {
+        var itemColors = Minecraft.getMinecraft().getItemColors();
+        for (var quad : quads) {
+            int[] data = quad.getVertexData();
+            // Position, color, texture coordinates and normal, the layout the item renderer bakes its quads in.
+            int stride = data.length / 4;
+            if (stride != 7) {
+                continue;
+            }
+
+            // Tinted quads, such as the grass on a block of grass, carry the stack's color for that tint index.
+            int tintIndex = quad.getTintIndex();
+            int tint = tintIndex == -1 ? -1 : itemColors.colorMultiplier(stack, tintIndex);
+            float red = tint == -1 ? 1.0F : (tint >> 16 & 0xFF) / 255.0F;
+            float green = tint == -1 ? 1.0F : (tint >> 8 & 0xFF) / 255.0F;
+            float blue = tint == -1 ? 1.0F : (tint & 0xFF) / 255.0F;
+
+            for (int vertex = 0; vertex < 4; vertex++) {
+                int offset = vertex * stride;
+                int normal = data[offset + 6];
+                buffer.pos(
+                        Float.intBitsToFloat(data[offset]),
+                        Float.intBitsToFloat(data[offset + 1]),
+                        Float.intBitsToFloat(data[offset + 2]))
+                    .color(red, green, blue, GHOST_ALPHA)
+                    .tex(
+                        Float.intBitsToFloat(data[offset + 4]),
+                        Float.intBitsToFloat(data[offset + 5]))
+                    .normal(
+                        (byte) (normal & 0xFF) / 127.0F,
+                        (byte) (normal >> 8 & 0xFF) / 127.0F,
+                        (byte) (normal >> 16 & 0xFF) / 127.0F)
+                    .endVertex();
+            }
+        }
     }
 
     @Override

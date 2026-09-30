@@ -37,6 +37,7 @@ import ae2.api.storage.ISubGuiHost;
 import ae2.container.AEBaseContainer;
 import ae2.container.GuiIds;
 import ae2.container.ISubGui;
+import ae2.container.PendingGridFills;
 import ae2.container.guisync.GuiSync;
 import ae2.container.guisync.PacketWritable;
 import ae2.container.interfaces.ICraftingGridContainer;
@@ -116,6 +117,11 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     private Future<ICraftingPlan> job;
     @Nullable
     private ICraftingPlan result;
+    /**
+     * True once this confirmation submitted its plan. Only then do the crafting grid slots a batch order wants to fill
+     * outlive this container.
+     */
+    private boolean jobStarted;
     @Nullable
     private CraftingPlanSummary plan;
     @Nullable
@@ -403,6 +409,9 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
 
                 if (!this.result.missingItems().isEmpty()) {
                     this.setAutoStart(false);
+                    // Slots whose material can never be obtained are dropped, so the terminal stops showing slots that
+                    // nothing will ever be put into.
+                    PendingGridFills.dropUnavailable(getPlayer(), this.result.missingItems());
                 }
 
                 this.plan = CraftingPlanSummary.fromJob(grid, this.result);
@@ -607,6 +616,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
                 this.getActionSrc(), forceStart, skipMerge, new CraftingJobOptions(this.taskPriority, subscribed));
             this.setAutoStart(false);
             if (submitResult.successful()) {
+                this.jobStarted = true;
                 boolean hasQueuedJobs = this.autoCraftingQueue != null && !this.autoCraftingQueue.isEmpty();
                 EntityPlayer player = getPlayer();
                 if (hasQueuedJobs) {
@@ -642,6 +652,10 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     public void onContainerClosed(EntityPlayer player) {
         super.onContainerClosed(player);
         this.cancelPendingCalculations();
+        if (!this.jobStarted) {
+            // The order was abandoned, so the crafting grid slots it wanted to fill are dropped as well.
+            PendingGridFills.scheduleAbandonCheck(player);
+        }
     }
 
     private void onCPUSelectionChanged(@Nullable CraftingCPURecord cpuRecord, boolean cpusAvailable) {

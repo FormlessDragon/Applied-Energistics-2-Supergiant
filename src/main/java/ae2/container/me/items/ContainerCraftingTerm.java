@@ -22,17 +22,21 @@ import ae2.api.inventories.ISegmentedInventory;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.energy.IEnergySource;
+import ae2.api.config.Actionable;
 import ae2.api.stacks.AEItemKey;
+import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.ITerminalHost;
 import ae2.api.storage.StorageHelper;
 import ae2.container.GuiIds;
+import ae2.container.PendingGridFills;
 import ae2.container.SlotSemantics;
 import ae2.container.crafting.CraftingGridTweaks;
 import ae2.container.crafting.DeferredRecipeLookup;
 import ae2.container.crafting.LastCraftingRecipeTracker;
 import ae2.container.crafting.RecipeSelection;
 import ae2.container.guisync.GuiSync;
+import ae2.container.guisync.PacketWritable;
 import ae2.container.implementations.ContainerCraftConfirm;
 import ae2.container.interfaces.ICraftingGridContainer;
 import ae2.container.me.common.ContainerMEStorage;
@@ -56,9 +60,12 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.shorts.ShortSet;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.network.PacketBuffer;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.IInventory;
@@ -114,6 +121,8 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
     private boolean authoritativeRecipeSelection;
     @GuiSync(92)
     private long recipeSelectionRevision;
+    @GuiSync(93)
+    private GridFillSync pendingGridFills = GridFillSync.EMPTY;
     private boolean clearGridOnClose;
 
     public ContainerCraftingTerm(InventoryPlayer ip, ITerminalHost host) {
@@ -169,6 +178,7 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
     public void broadcastChanges() {
         if (isServerSide()) {
             resolveDeferredCraftingRecipe();
+            updatePendingGridFills();
         }
         super.broadcastChanges();
     }
@@ -230,8 +240,8 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
     }
 
     @Override
-    public void startTemporaryPseudoCrafting(List<GenericStack> inputs, List<GenericStack> outputs) {
-        if (!(getPlayer() instanceof EntityPlayerMP player) || outputs.isEmpty() || inputs.isEmpty()) {
+    public void startTemporaryPseudoCrafting(List<GridFill> gridFills, List<GenericStack> outputs) {
+        if (!(getPlayer() instanceof EntityPlayerMP player) || outputs.isEmpty() || gridFills.isEmpty()) {
             return;
         }
 
@@ -240,10 +250,90 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
             return;
         }
 
-        // The inputs are the distinct materials the transfer could not supply. Each of them becomes a real sub-plan,
-        // and the provider only stands in for the recipe output, which the player crafts by hand from those materials.
-        var provider = new TemporaryPseudoCraftingProvider(inputs, outputs);
-        ContainerCraftConfirm.openWithBatchCrafting(getActionHost(), player, getLocator(), inputs, provider);
+        // Every material the transfer could not supply becomes a real sub-plan, and the provider only stands in for the
+        // recipe output, which the player crafts by hand from those materials. The slots the materials belong to are
+        // remembered so the terminal shows them there and fills them once they arrive.
+        var targets = mergeGridFills(gridFills);
+        PendingGridFills.set(player, gridFills);
+        var provider = new TemporaryPseudoCraftingProvider(targets, outputs);
+        ContainerCraftConfirm.openWithBatchCrafting(getActionHost(), player, getLocator(), targets, provider);
+    }
+
+    /**
+     * Identical materials of several slots end up in a single sub-plan.
+     */
+    private static List<GenericStack> mergeGridFills(List<GridFill> gridFills) {
+        var merged = new ObjectArrayList<GenericStack>(gridFills.size());
+        for (var fill : gridFills) {
+            boolean found = false;
+            for (int i = 0; i < merged.size(); i++) {
+                GenericStack existing = merged.get(i);
+                if (existing.what().equals(fill.what())) {
+                    merged.set(i, GenericStack.sum(existing, new GenericStack(fill.what(), fill.amount())));
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                merged.add(new GenericStack(fill.what(), fill.amount()));
+            }
+        }
+        return merged;
+    }
+
+    /**
+     * The slots a batch order still has to fill. The GUI draws the ordered materials there, and this container puts
+     * them in place as they arrive.
+     */
+    public List<GridFill> getPendingGridFills() {
+        return this.pendingGridFills.fills();
+    }
+
+    public CraftingMatrixSlot getCraftingSlot(int index) {
+        return this.craftingSlots[index];
+    }
+
+    /**
+     * One batch of crafting grid slots. Sent to the client so the GUI can show what the terminal is waiting for.
+     */
+    public record GridFillSync(List<GridFill> fills) implements PacketWritable {
+        public static final GridFillSync EMPTY = new GridFillSync(List.of());
+
+        @SuppressWarnings("unused")
+        public GridFillSync(ByteBuf data) {
+            this(readFills(data));
+        }
+
+        private static List<GridFill> readFills(ByteBuf data) {
+            var buffer = new PacketBuffer(data);
+            int count = buffer.readByte();
+            if (count < 0 || count > 9) {
+                throw new IllegalArgumentException("Invalid crafted grid fill count: " + count);
+            }
+
+            var fills = new ObjectArrayList<GridFill>(count);
+            for (int i = 0; i < count; i++) {
+                int slot = buffer.readByte();
+                var what = AEKey.readKey(buffer);
+                long amount = buffer.readVarLong();
+                if (what == null || amount <= 0 || slot < 0 || slot > 8) {
+                    throw new IllegalArgumentException("Invalid crafting grid fill");
+                }
+                fills.add(new GridFill(slot, what, amount));
+            }
+            return fills;
+        }
+
+        @Override
+        public void writeToPacket(ByteBuf data) {
+            var buffer = new PacketBuffer(data);
+            buffer.writeByte(this.fills.size());
+            for (var fill : this.fills) {
+                buffer.writeByte(fill.slot());
+                AEKey.writeKey(buffer, fill.what());
+                buffer.writeVarLong(fill.amount());
+            }
+        }
     }
 
     @Nullable
@@ -419,10 +509,90 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
 
     @Override
     public void onContainerClosed(EntityPlayer player) {
-        if (isServerSide() && this.clearGridOnClose) {
-            moveCraftingGridToNetwork();
+        if (isServerSide()) {
+            if (this.clearGridOnClose) {
+                moveCraftingGridToNetwork();
+            }
+            // The crafting confirmation closes this container as well, so the pending slots are only dropped when the
+            // player does not come back to a container of this terminal.
+            PendingGridFills.scheduleInterrupt(player);
         }
         super.onContainerClosed(player);
+    }
+
+    /**
+     * Keeps the client's view of the pending slots up to date and puts the materials that have arrived into them.
+     */
+    private void updatePendingGridFills() {
+        var player = getPlayerInventory().player;
+        List<GridFill> fills = PendingGridFills.get(player);
+        if (fills == null || fills.isEmpty()) {
+            this.pendingGridFills = GridFillSync.EMPTY;
+            return;
+        }
+
+        fillAvailableSlots(fills);
+        this.pendingGridFills = new GridFillSync(List.copyOf(fills));
+    }
+
+    /**
+     * Moves every material the network can already supply into its slot, and forgets the slot once it is complete or
+     * the player put something else into it.
+     */
+    private void fillAvailableSlots(List<GridFill> fills) {
+        IGridNode node = getGridNode();
+        var storage = node == null ? null : node.grid().getStorageService().getInventory();
+        if (storage == null) {
+            return;
+        }
+
+        boolean changed = false;
+        for (int i = fills.size() - 1; i >= 0; i--) {
+            GridFill fill = fills.get(i);
+            if (fill.slot() < 0 || fill.slot() >= this.craftingGrid.size()
+                || !(fill.what() instanceof AEItemKey itemKey)) {
+                fills.remove(i);
+                continue;
+            }
+
+            ItemStack inSlot = this.craftingGrid.getStackInSlot(fill.slot());
+            if (!inSlot.isEmpty() && !itemKey.matches(inSlot)) {
+                // The player put something else there, so this slot is no longer ours to fill.
+                fills.remove(i);
+                continue;
+            }
+
+            long present = inSlot.isEmpty() ? 0 : Math.min(inSlot.getCount(), fill.amount());
+            long needed = fill.amount() - present;
+            if (needed <= 0) {
+                fills.remove(i);
+                continue;
+            }
+
+            long extracted = StorageHelper.poweredExtraction(getEnergySource(), storage, fill.what(), needed,
+                getActionSource(), Actionable.MODULATE);
+            if (extracted <= 0) {
+                continue;
+            }
+
+            int toAdd = (int) Math.min(extracted, needed);
+            if (inSlot.isEmpty()) {
+                this.craftingGrid.setItemDirect(fill.slot(), itemKey.toStack(toAdd));
+            } else {
+                ItemStack grown = inSlot.copy();
+                grown.grow(toAdd);
+                this.craftingGrid.setItemDirect(fill.slot(), grown);
+            }
+            changed = true;
+
+            if (needed - toAdd <= 0) {
+                fills.remove(i);
+            }
+        }
+
+        if (changed) {
+            onCraftMatrixChanged(this.craftingGrid.toContainer());
+        }
     }
 
     @Override
