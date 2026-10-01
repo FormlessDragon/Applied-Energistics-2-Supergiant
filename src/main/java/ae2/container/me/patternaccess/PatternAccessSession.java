@@ -116,6 +116,9 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         Objects.requireNonNull(shownProviders, "shownProviders");
 
         boolean visible = container.isVisibleInTerminal();
+        if (container.isReadOnly() && container.getTerminalPatternInventory().isEmpty()) {
+            return false;
+        }
         return switch (shownProviders) {
             case VISIBLE -> visible;
             case HIDDEN -> !visible;
@@ -239,6 +242,9 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         ProviderActionContext actionContext = createProviderActionContext();
         ContainerTracker inv = getCurrentProviderTracker(actionContext, id);
         if (inv == null) {
+            return false;
+        }
+        if (inv.container.isReadOnly()) {
             return false;
         }
         if (slot < 0 || slot >= inv.server.size()) {
@@ -790,6 +796,7 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
                                   PatternContainerGroup group, int inventorySize,
                                   boolean visibleInTerminal,
                                   boolean canEditTerminalName, boolean canModifyTerminalVisibility,
+                                  boolean readOnly,
                                   @Nullable ProviderReference reference, boolean hasLocation,
                                   int locationDimension, long locationPos, int locationSide) {
         ProviderDirectoryEntry {
@@ -811,7 +818,7 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
             return new ProviderDirectoryEntry(container, identityOrdinal, container.getTerminalSortOrder(),
                 container.getTerminalGroup(), inventory.size(),
                 container.isVisibleInTerminal(), container.canEditTerminalName(),
-                container.canModifyTerminalVisibility(), reference,
+                container.canModifyTerminalVisibility(), container.isReadOnly(), reference,
                 location != null, location == null ? 0 : location.dimensionId(),
                 location == null ? 0L : location.pos(), location == null ? -1 : location.side());
         }
@@ -838,6 +845,7 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
                 && left.visibleInTerminal() == right.visibleInTerminal()
                 && left.canEditTerminalName() == right.canEditTerminalName()
                 && left.canModifyTerminalVisibility() == right.canModifyTerminalVisibility()
+                && left.readOnly() == right.readOnly()
                 && left.hasLocation() == right.hasLocation()
                 && left.locationDimension() == right.locationDimension()
                 && left.locationPos() == right.locationPos()
@@ -865,6 +873,7 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         private final InternalInventory server;
         private final boolean canEditTerminalName;
         private final boolean canModifyTerminalVisibility;
+        private final boolean readOnly;
         private final boolean hasLocation;
         private final int locationDimension;
         private final long locationPos;
@@ -888,6 +897,7 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
             this.sortBy = provider.sortBy();
             this.canEditTerminalName = provider.canEditTerminalName();
             this.canModifyTerminalVisibility = provider.canModifyTerminalVisibility();
+            this.readOnly = provider.readOnly();
             this.hasLocation = provider.hasLocation();
             this.locationDimension = provider.locationDimension();
             this.locationPos = provider.locationPos();
@@ -925,7 +935,7 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
 
             this.snapshotPrepared = true;
             return PatternAccessTerminalPacket.fullUpdate(this.serverId, this.server.size(), this.sortBy,
-                this.canEditTerminalName, this.canModifyTerminalVisibility, this.group, slots);
+                this.canEditTerminalName, this.canModifyTerminalVisibility, this.readOnly, this.group, slots);
         }
 
         @Nullable
@@ -1026,7 +1036,8 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
 
         @Override
         public boolean allowInsert(InternalInventory inv, int slot, ItemStack stack) {
-            return !stack.isEmpty()
+            return !this.container.isReadOnly()
+                && !stack.isEmpty()
                 && isAcceptedByContainer(this.container, this.patternDecoder.decode(stack, this.level));
         }
     }

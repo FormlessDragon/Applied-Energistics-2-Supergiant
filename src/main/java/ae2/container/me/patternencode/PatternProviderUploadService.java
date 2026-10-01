@@ -499,7 +499,8 @@ public final class PatternProviderUploadService {
 
         @Override
         public boolean allowInsert(InternalInventory inv, int slot, ItemStack stack) {
-            return !stack.isEmpty()
+            return !this.container.isReadOnly()
+                && !stack.isEmpty()
                 && isAcceptedByContainer(this.container, PatternDetailsHelper.decodePattern(stack, this.level));
         }
     }

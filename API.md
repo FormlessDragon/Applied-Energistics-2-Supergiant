@@ -16,25 +16,25 @@ Stable references to AE2's own content are available as constants in `ae2.api.id
 AE2 offers various extension points for your mod to hook into. The following table lists the API classes that are most
 relevant during normal Forge mod initialization:
 
-| Class                                          | Purpose                                                                                             |
-|------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| `ae2.api.stacks.AEKeyTypes`                 | Addons can register custom storage types similar to `AEItemKey` and `AEFluidKey`.                   |
-| `ae2.api.networking.GridServices`           | Addons can register their own grid-wide services here.                                              |
-| `ae2.api.movable.BlockEntityMoveStrategies` | Allows mods to register custom strategies for moving tile entities in and out of spatial storage.   |
-| `ae2.api.features.GridLinkables`            | For working with and adding items that can be linked to a specific grid, such as linking wireless terminals at a wireless access point. |
-| `ae2.api.features.ChargeableItems`          | For registering external item energy adapters handled by the AE2 charger.                           |
-| `ae2.api.storage.StorageCells`              | For working with and adding items that serve as storage cells for grids.                            |
-| `ae2.api.features.Locatables`               | For discovering quantum network bridges and other locatable objects based on their unique keys.     |
-| `ae2.api.parts.PartModels`                  | For registering JSON block models used by custom cable bus parts.                                   |
-| `ae2.api.features.P2PTunnelAttunement`      | For registering new items that attune P2P tunnels to specific types when right-clicked.             |
-| `ae2.api.client.StorageCellModels`          | For customizing the models of storage cells when they are inserted into drives or ME chests.        |
-| `ae2.api.upgrades.Upgrades`                 | For managing upgrade cards and associating them with upgradable items, parts, or blocks.            |
-| `ae2.api.upgrades.UpgradeInventories`       | For creating upgrade inventories for upgradable machines and item-backed hosts.                     |
-| `ae2.api.networking.extensions.GridLogicExtensions` | Adds runtime behavior to supported AE2 grid logic instances without mixins.                  |
-| `ae2.api.behaviors.GenericInternalInventoryAdapters` | Allows addons to expose AE2 generic inventories through Forge capabilities.                         |
-| `ae2.api.crafting.cpu.ICraftingUnitRegistry` | For adding custom crafting CPU unit blocks that reuse AE2's cluster logic.                          |
-| `ae2.api.client.AEKeyRendering`             | For registering the client-side GUI rendering of custom key types.                                  |
-| `ae2.api.cellterminal.CellTerminalApi`      | For registering Cell Terminal scanners and live target resolvers.                                   |
+| Class                                                | Purpose                                                                                                                                 |
+|------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| `ae2.api.stacks.AEKeyTypes`                          | Addons can register custom storage types similar to `AEItemKey` and `AEFluidKey`.                                                       |
+| `ae2.api.networking.GridServices`                    | Addons can register their own grid-wide services here.                                                                                  |
+| `ae2.api.movable.BlockEntityMoveStrategies`          | Allows mods to register custom strategies for moving tile entities in and out of spatial storage.                                       |
+| `ae2.api.features.GridLinkables`                     | For working with and adding items that can be linked to a specific grid, such as linking wireless terminals at a wireless access point. |
+| `ae2.api.features.ChargeableItems`                   | For registering external item energy adapters handled by the AE2 charger.                                                               |
+| `ae2.api.storage.StorageCells`                       | For working with and adding items that serve as storage cells for grids.                                                                |
+| `ae2.api.features.Locatables`                        | For discovering quantum network bridges and other locatable objects based on their unique keys.                                         |
+| `ae2.api.parts.PartModels`                           | For registering JSON block models used by custom cable bus parts.                                                                       |
+| `ae2.api.features.P2PTunnelAttunement`               | For registering new items that attune P2P tunnels to specific types when right-clicked.                                                 |
+| `ae2.api.client.StorageCellModels`                   | For customizing the models of storage cells when they are inserted into drives or ME chests.                                            |
+| `ae2.api.upgrades.Upgrades`                          | For managing upgrade cards and associating them with upgradable items, parts, or blocks.                                                |
+| `ae2.api.upgrades.UpgradeInventories`                | For creating upgrade inventories for upgradable machines and item-backed hosts.                                                         |
+| `ae2.api.networking.extensions.GridLogicExtensions`  | Adds runtime behavior to supported AE2 grid logic instances without mixins.                                                             |
+| `ae2.api.behaviors.GenericInternalInventoryAdapters` | Allows addons to expose AE2 generic inventories through Forge capabilities.                                                             |
+| `ae2.api.crafting.cpu.ICraftingUnitRegistry`         | For adding custom crafting CPU unit blocks that reuse AE2's cluster logic.                                                              |
+| `ae2.api.client.AEKeyRendering`                      | For registering the client-side GUI rendering of custom key types.                                                                      |
+| `ae2.api.cellterminal.CellTerminalApi`               | For registering Cell Terminal scanners and live target resolvers.                                                                       |
 
 In general, these registries are synchronized and may be used during mod loading. Finish registration before gameplay
 starts using the affected systems. Changes after mod initialization can leave already-created grids, storage cells,
@@ -492,6 +492,37 @@ patterns and should not expose substitution or direct-fluid behavior.
 This distinction matters for addon providers: ordinary pattern providers can assume non-assembler pattern inputs are
 fixed keys and fixed key types when dispatching materials. If an addon pattern can substitute inputs, use an assembler
 pattern implementation and expose it through an assembler pattern container.
+
+#### Read-Only Pattern Containers
+
+A pattern container can opt out of player edits by overriding `PatternContainer.isReadOnly()` and returning `true`:
+
+```java
+@Override
+public boolean isReadOnly() {
+    return true;
+}
+```
+
+Use it for machines whose pattern inventory is generated, computed, or otherwise not player-owned, such as a provider
+backed by an external machine's own recipe list. Such a container keeps its normal visibility, sorting, naming, and
+grouping behavior, but every terminal treats its slots as read-only:
+
+* Patterns cannot be inserted, extracted, swapped, or shift-clicked out of its slots in the pattern access terminal.
+* Quick-moving a pattern into it is refused.
+* Moving a whole region of patterns into it (`MOVE_REGION`) is refused as well.
+* Uploading an encoded pattern into it from the pattern encoding terminal is refused.
+
+All enforcement is server-side, so a modified client cannot bypass it. The flag is also sent to the client so the
+pattern access terminal disables slot interaction and omits read-only providers as quick-move targets, which keeps the
+GUI from offering actions the server would refuse.
+
+When the pattern inventory is empty, the read-only container will not display. A container that is read-only and whose
+`getTerminalPatternInventory()` holds no patterns is hidden from the pattern access terminal in every display mode,
+including `ALL`. This keeps a machine with no generated patterns out of the terminal instead of showing an empty
+provider. Instances that do have patterns are listed as usual, so this narrows visibility rather than hiding the
+provider type outright. The provider must still be discoverable as an active provider on its grid for the terminal to
+see it at all.
 
 ### Forced Start for Missing Crafting Ingredients
 

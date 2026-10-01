@@ -39,6 +39,7 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
     private long sortBy;
     private boolean canEditTerminalName;
     private boolean canModifyTerminalVisibility;
+    private boolean readOnly;
     private PatternContainerGroup group;
     private Int2ObjectMap<ItemStack> slots = new Int2ObjectOpenHashMap<>();
 
@@ -53,13 +54,15 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
 
     private PatternAccessTerminalPacket(boolean fullUpdate, long inventoryId, int inventorySize, long sortBy,
                                         boolean canEditTerminalName, boolean canModifyTerminalVisibility,
-                                        PatternContainerGroup group, Int2ObjectMap<ItemStack> slots) {
+                                        boolean readOnly, PatternContainerGroup group,
+                                        Int2ObjectMap<ItemStack> slots) {
         this.fullUpdate = fullUpdate;
         this.inventoryId = inventoryId;
         this.inventorySize = inventorySize;
         this.sortBy = sortBy;
         this.canEditTerminalName = canEditTerminalName;
         this.canModifyTerminalVisibility = canModifyTerminalVisibility;
+        this.readOnly = readOnly;
         this.group = group;
         this.slots = slots;
     }
@@ -73,14 +76,14 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
 
     public static PatternAccessTerminalPacket fullUpdate(long inventoryId, int inventorySize, long sortBy,
                                                          boolean canEditTerminalName, boolean canModifyTerminalVisibility,
-                                                         PatternContainerGroup group,
+                                                         boolean readOnly, PatternContainerGroup group,
                                                          Int2ObjectMap<ItemStack> slots) {
         return new PatternAccessTerminalPacket(true, inventoryId, inventorySize, sortBy, canEditTerminalName,
-            canModifyTerminalVisibility, group, slots);
+            canModifyTerminalVisibility, readOnly, group, slots);
     }
 
     public static PatternAccessTerminalPacket incrementalUpdate(long inventoryId, Int2ObjectMap<ItemStack> slots) {
-        return new PatternAccessTerminalPacket(false, inventoryId, 0, 0, false, false, null, slots);
+        return new PatternAccessTerminalPacket(false, inventoryId, 0, 0, false, false, false, null, slots);
     }
 
     /**
@@ -216,6 +219,7 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
             packetBuffer.writeVarLong(this.sortBy);
             packetBuffer.writeBoolean(this.canEditTerminalName);
             packetBuffer.writeBoolean(this.canModifyTerminalVisibility);
+            packetBuffer.writeBoolean(this.readOnly);
             this.group.writeToPacket(packetBuffer);
         }
 
@@ -256,6 +260,7 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
         this.sortBy = decoded.sortBy;
         this.canEditTerminalName = decoded.canEditTerminalName;
         this.canModifyTerminalVisibility = decoded.canModifyTerminalVisibility;
+        this.readOnly = decoded.readOnly;
         this.group = decoded.group;
         this.slots = decoded.slots;
     }
@@ -271,6 +276,7 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
             this.sortBy = packetBuffer.readVarLong();
             this.canEditTerminalName = packetBuffer.readBoolean();
             this.canModifyTerminalVisibility = packetBuffer.readBoolean();
+            this.readOnly = packetBuffer.readBoolean();
             this.group = PatternContainerGroup.readFromPacket(packetBuffer);
             if (this.group == null) {
                 throw new IllegalArgumentException("Pattern Access Terminal full update has no provider group");
@@ -317,7 +323,8 @@ public class PatternAccessTerminalPacket extends ClientboundPacket {
         if (minecraft.currentScreen instanceof IPatternProviderDisplay display) {
             if (packet.fullUpdate) {
                 display.postFullUpdate(packet.inventoryId, packet.sortBy, packet.canEditTerminalName,
-                    packet.canModifyTerminalVisibility, packet.group, packet.inventorySize, packet.slots);
+                    packet.canModifyTerminalVisibility, packet.readOnly, packet.group, packet.inventorySize,
+                    packet.slots);
             } else {
                 display.postIncrementalUpdate(packet.inventoryId, packet.slots);
             }

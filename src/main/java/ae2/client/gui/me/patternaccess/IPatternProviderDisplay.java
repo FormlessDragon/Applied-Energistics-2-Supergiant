@@ -45,13 +45,14 @@ public interface IPatternProviderDisplay {
      * @param sortBy server-side sort key for stable provider ordering
      * @param canEditTerminalName whether the terminal allows editing this provider name
      * @param canModifyTerminalVisibility whether the terminal allows toggling this provider visibility
+     * @param readOnly whether the provider's pattern slots reject player edits
      * @param group provider group metadata
      * @param inventorySize number of slots in the provider inventory
      * @param slots full slot payload keyed by provider slot index
      */
     void postFullUpdate(long inventoryId, long sortBy, boolean canEditTerminalName,
-                        boolean canModifyTerminalVisibility, PatternContainerGroup group, int inventorySize,
-                        Int2ObjectMap<ItemStack> slots);
+                        boolean canModifyTerminalVisibility, boolean readOnly, PatternContainerGroup group,
+                        int inventorySize, Int2ObjectMap<ItemStack> slots);
 
     /**
      * Applies changed provider slots to an existing provider inventory entry.

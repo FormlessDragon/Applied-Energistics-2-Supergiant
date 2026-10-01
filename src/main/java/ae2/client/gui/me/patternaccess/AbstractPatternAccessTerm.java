@@ -487,6 +487,10 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
     }
 
     private void handlePatternSlotClick(GuiPatternSlot slot, int mouseButton, ClickType clickType) {
+        if (slot.getMachineInv().isReadOnly()) {
+            return;
+        }
+
         InventoryAction action = null;
 
         switch (clickType) {
@@ -521,6 +525,9 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
             PatternAccessDisplaySupport.Row row = rows().get(scroll + i);
             if (row instanceof PatternAccessDisplaySupport.SlotsRow(PatternContainerEntry containerEntry, int offset,
                                                                      int count)) {
+                if (containerEntry.isReadOnly()) {
+                    continue;
+                }
                 int end = offset + count;
                 for (int slot = offset; slot < end; slot++) {
                     visiblePatternContainerIds.add(containerEntry.getServerId());
@@ -798,10 +805,11 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
 
     @Override
     public void postFullUpdate(long inventoryId, long sortBy, boolean canEditTerminalName,
-                               boolean canModifyTerminalVisibility, PatternContainerGroup group,
+                               boolean canModifyTerminalVisibility, boolean readOnly,
+                               PatternContainerGroup group,
                                int inventorySize, Int2ObjectMap<ItemStack> slots) {
         if (this.patternAccessDisplay.postFullUpdate(inventoryId, sortBy, canEditTerminalName,
-            canModifyTerminalVisibility, group, inventorySize, slots)) {
+            canModifyTerminalVisibility, readOnly, group, inventorySize, slots)) {
             this.providerLayoutDirty = true;
         }
     }

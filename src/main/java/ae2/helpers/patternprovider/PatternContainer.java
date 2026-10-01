@@ -45,5 +45,19 @@ public interface PatternContainer {
     default void setTerminalVisibility(boolean visible) {
     }
 
+    /**
+     * Whether this container's pattern slots are read-only in the pattern access and pattern encoding terminals.
+     * <p>
+     * Read-only containers reject pattern insertion, extraction, swapping, and quick-moving on the server side. The
+     * flag is also sent to clients so the pattern access terminal disables slot interaction for the provider. A
+     * container that is both read-only and has an empty terminal pattern inventory is hidden from the pattern access
+     * terminal regardless of its configured display mode.
+     *
+     * @return {@code true} if players may not modify this container's pattern slots
+     */
+    default boolean isReadOnly() {
+        return false;
+    }
+
     PatternContainerGroup getTerminalGroup();
 }
