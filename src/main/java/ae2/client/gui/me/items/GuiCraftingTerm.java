@@ -33,6 +33,7 @@ import ae2.core.localization.Tooltips;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.IBakedModel;
@@ -136,7 +137,7 @@ public class GuiCraftingTerm extends GuiMEStorage<ContainerCraftingTerm> {
                 continue;
             }
 
-            renderGhostItem(itemKey.toStack(), slot.xPos, slot.yPos);
+            renderGhostItem(itemKey.getReadOnlyStack(), slot.xPos, slot.yPos);
             renderRainbowBorder(slot.xPos - 1, slot.yPos - 1, true);
         }
     }
@@ -147,14 +148,12 @@ public class GuiCraftingTerm extends GuiMEStorage<ContainerCraftingTerm> {
      * <p>
      * The vanilla item renderer cannot be used for this: it writes a fully opaque alpha into every single vertex, so
      * the preview would look exactly like an item that is already in the slot. Its model is used directly instead, with
-     * the same GUI transform the renderer would apply and the same quad data, only with a translucent alpha.
+     * the same GUI transform the renderer would apply and the same quad data, only with a translucent alpha. The
+     * model's display transform is applied inside the pushed matrix, like the vanilla renderer does, because it is
+     * multiplied straight into the current matrix and would otherwise stay applied to everything drawn afterwards.
      */
     private void renderGhostItem(ItemStack stack, int x, int y) {
-        var model = ForgeHooksClient.handleCameraTransforms(
-            this.itemRender.getItemModelWithOverrides(stack, null, null),
-            ItemCameraTransforms.TransformType.GUI, false);
-
-        boolean lighting = GL11.glIsEnabled(GL11.GL_LIGHTING);
+        var model = this.itemRender.getItemModelWithOverrides(stack, null, null);
 
         this.mc.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
         GlStateManager.pushMatrix();
@@ -170,8 +169,11 @@ public class GuiCraftingTerm extends GuiMEStorage<ContainerCraftingTerm> {
         GlStateManager.translate(8.0F, 8.0F, 0.0F);
         GlStateManager.scale(1.0F, -1.0F, 1.0F);
         GlStateManager.scale(16.0F, 16.0F, 16.0F);
-        if (model.isGui3d()) {
-            GlStateManager.enableLighting();
+        boolean gui3d = model.isGui3d();
+        model = ForgeHooksClient.handleCameraTransforms(model, ItemCameraTransforms.TransformType.GUI, false);
+        if (gui3d) {
+            // The foreground layer runs with standard item lighting disabled, but block models are shaded by it.
+            RenderHelper.enableGUIStandardItemLighting();
         } else {
             GlStateManager.disableLighting();
         }
@@ -182,9 +184,7 @@ public class GuiCraftingTerm extends GuiMEStorage<ContainerCraftingTerm> {
         emitGhostQuads(model, stack);
 
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        if (!lighting) {
-            GlStateManager.disableLighting();
-        }
+        GlStateManager.disableLighting();
         GlStateManager.disableRescaleNormal();
         GlStateManager.disableBlend();
         GlStateManager.enableDepth();
