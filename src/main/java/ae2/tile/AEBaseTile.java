@@ -71,7 +71,6 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     private BlockOrientation lastOrientation = BlockOrientation.NORTH_UP;
     private boolean orientationInitialized = false;
     private boolean pendingVisualStateUpdate = false;
-    private boolean init = false;
 
     @Override
     public final void readFromNBT(NBTTagCompound compound) {
@@ -199,8 +198,6 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     }
 
     protected boolean readFromStream(ByteBuf data) {
-        boolean init = this.init;
-        this.init = false;
         String oldCustomName = this.customName;
         this.customName = CustomNameUtil.readNullableString(data);
         boolean changed = !Objects.equals(this.customName, oldCustomName);
@@ -221,7 +218,7 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
             return changed;
         }
         this.orientationResolved = true;
-        return !init || (changed | this.setOrientationInternal(newForward, newUp));
+        return changed | this.setOrientationInternal(newForward, newUp);
     }
 
     private boolean readUpdateData(NBTTagCompound tag, String failureMessage) {
@@ -454,6 +451,12 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     protected final void refreshBlockStateAfterReady() {
         IBlockState currentState = this.getBlockState();
         if (currentState != null && currentState.getBlock() instanceof AEBaseTileBlock<?> block) {
+            // On the client this can run before the first sync packet arrived, when the tile still carries the
+            // constructor default orientation; pushing that into the block state would visually reset the rotation.
+            if (this.world != null && this.world.isRemote && !this.orientationResolved) {
+                return;
+            }
+
             IBlockState newState = block.getTileEntityBlockState(currentState, this);
             if (currentState != newState) {
                 if (this.world != null && this.world.isRemote) {
