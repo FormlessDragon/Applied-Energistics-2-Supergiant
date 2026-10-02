@@ -31,6 +31,7 @@ import ae2.core.AEConfig;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.Tooltips;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderHelper;
@@ -138,7 +139,7 @@ public class GuiCraftingTerm extends GuiMEStorage<ContainerCraftingTerm> {
             }
 
             renderGhostItem(itemKey.getReadOnlyStack(), slot.xPos, slot.yPos);
-            renderRainbowBorder(slot.xPos - 1, slot.yPos - 1, true);
+            drawSpinner(slot.xPos + 8, slot.yPos + 8);
         }
     }
 
@@ -242,6 +243,32 @@ public class GuiCraftingTerm extends GuiMEStorage<ContainerCraftingTerm> {
                     .endVertex();
             }
         }
+    }
+
+    private void drawSpinner(int x, int y) {
+        long millis = System.currentTimeMillis();
+        float angle = (millis % 1000) / 1000f * 360f;
+
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(x, y, 0);
+        GlStateManager.rotate(angle, 0.0F, 0.0F, 1.0F);
+
+        int dots = 6;
+        int radius = 5;
+        int color = 0xFFFFFF;
+
+        for (int i = 0; i < dots; i++) {
+            int alpha = 255 - (i * (200 / dots));
+            int dotColor = (alpha << 24) | color;
+
+            double rad = Math.toRadians((360f / dots) * i);
+            int dx = (int) (Math.cos(rad) * radius);
+            int dy = (int) (Math.sin(rad) * radius);
+
+            Gui.drawRect(dx - 1, dy - 1, dx + 1, dy + 1, dotColor);
+        }
+
+        GlStateManager.popMatrix();
     }
 
     @Override
