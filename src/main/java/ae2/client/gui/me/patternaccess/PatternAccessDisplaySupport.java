@@ -114,7 +114,8 @@ final class PatternAccessDisplaySupport {
      * @return true when the update was accepted and the row list should be rebuilt
      */
     public boolean postFullUpdate(long inventoryId, long sortBy, boolean canEditTerminalName,
-                                  boolean canModifyTerminalVisibility, @Nullable PatternContainerGroup group,
+                                  boolean canModifyTerminalVisibility, boolean readOnly,
+                                  @Nullable PatternContainerGroup group,
                                   int inventorySize, Int2ObjectMap<ItemStack> slots) {
         if (group == null) {
             AELog.warn("Ignoring %s full update without a provider group for inventory id %d", this.logName,
@@ -123,7 +124,7 @@ final class PatternAccessDisplaySupport {
         }
 
         PatternContainerEntry entry = new PatternContainerEntry(inventoryId, inventorySize, sortBy,
-            canEditTerminalName, canModifyTerminalVisibility, group);
+            canEditTerminalName, canModifyTerminalVisibility, readOnly, group);
         var previous = this.byId.put(inventoryId, entry);
         if (previous != null) {
             forgetSearchText(previous);

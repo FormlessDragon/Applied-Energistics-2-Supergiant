@@ -49,6 +49,7 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
     private final long order;
     private final boolean editableTerminalName;
     private final boolean terminalVisibilityModifiable;
+    private final boolean readOnly;
     /**
      * Decoded pattern data cached per stack reference. Slots are rendered every frame and decoding constructs a full
      * pattern (NBT parse + recipe lookup), so the per-frame render paths must hit this cache instead.
@@ -86,7 +87,7 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
     }
 
     public PatternContainerEntry(long serverId, int slots, long order, boolean editableTerminalName,
-                                 boolean terminalVisibilityModifiable,
+                                 boolean terminalVisibilityModifiable, boolean readOnly,
                                  PatternContainerGroup group) {
         this.inventory = new AppEngInternalInventory(Math.clamp(slots, 0, MAX_INVENTORY_SIZE));
         this.group = group;
@@ -95,6 +96,7 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
         this.order = order;
         this.editableTerminalName = editableTerminalName;
         this.terminalVisibilityModifiable = terminalVisibilityModifiable;
+        this.readOnly = readOnly;
     }
 
     public PatternContainerGroup getGroup() {
@@ -124,6 +126,14 @@ public class PatternContainerEntry implements Comparable<PatternContainerEntry> 
 
     public boolean canModifyTerminalVisibility() {
         return this.terminalVisibilityModifiable;
+    }
+
+    /**
+     * Whether this provider's pattern slots reject player edits. Read-only providers still display their patterns but
+     * do not accept insertions, extractions, swaps, or quick-moves.
+     */
+    public boolean isReadOnly() {
+        return this.readOnly;
     }
 
     /**

@@ -12,25 +12,25 @@ AE2 自身内容的稳定引用以常量形式提供，位于 `ae2.api.ids`（`A
 
 AE2 为你的模组提供了多种扩展点。下表列出了在常规 Forge 模组初始化期间最相关的 API 类：
 
-| 类                                             | 用途                                                                                               |
-|------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| `ae2.api.stacks.AEKeyTypes`                 | 附加模组可以注册自定义存储类型，类似 `AEItemKey` 与 `AEFluidKey`。                                   |
-| `ae2.api.networking.GridServices`           | 附加模组可以在此注册自己的网络级服务。                                                               |
-| `ae2.api.movable.BlockEntityMoveStrategies` | 允许模组注册自定义策略，用于在空间存储的移入移出过程中移动方块实体。                                 |
-| `ae2.api.features.GridLinkables`            | 用于处理以及添加可绑定到特定网络的物品，例如在ME无线访问点处绑定无线终端。                           |
-| `ae2.api.features.ChargeableItems`          | 用于注册由 AE2 充能器处理的外部物品能量适配器。                                                      |
-| `ae2.api.storage.StorageCells`              | 用于处理以及添加可作为网络存储元件的物品。                                                           |
-| `ae2.api.features.Locatables`               | 用于依据唯一键发现量子桥及其他可定位对象。                                                       |
-| `ae2.api.parts.PartModels`                  | 用于注册自定义线缆总线部件所需的 JSON 方块模型。                                                     |
-| `ae2.api.features.P2PTunnelAttunement`      | 用于注册新的物品，使 P2P 隧道在右键时调谐到特定类型。                                                |
-| `ae2.api.client.StorageCellModels`          | 用于自定义存储元件插入ME驱动器或ME箱子时的模型。                                                   |
-| `ae2.api.upgrades.Upgrades`                 | 用于管理升级卡，并将其与可升级的物品、部件或方块关联。                                               |
-| `ae2.api.upgrades.UpgradeInventories`       | 用于为可升级机器与物品宿主创建升级物品栏。                                                           |
-| `ae2.api.networking.extensions.GridLogicExtensions` | 无需 Mixin 即可为受支持的 AE2 网络逻辑附加运行时行为。                                       |
-| `ae2.api.behaviors.GenericInternalInventoryAdapters` | 允许附加模组通过 Forge Capability 暴露 AE2 通用物品栏。                                      |
-| `ae2.api.crafting.cpu.ICraftingUnitRegistry` | 用于添加复用 AE2 集群逻辑的自定义合成 CPU 单元方块。                                                 |
-| `ae2.api.client.AEKeyRendering`             | 用于注册自定义键类型的客户端 GUI 渲染。                                                              |
-| `ae2.api.cellterminal.CellTerminalApi`      | 用于注册存储管理终端的扫描器与实时目标解析器。                                                       |
+| 类                                                   | 用途                                                                                           |
+|------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `ae2.api.stacks.AEKeyTypes`                          | 附加模组可以注册自定义存储类型，类似 `AEItemKey` 与 `AEFluidKey`。                             |
+| `ae2.api.networking.GridServices`                    | 附加模组可以在此注册自己的网络级服务。                                                         |
+| `ae2.api.movable.BlockEntityMoveStrategies`          | 允许模组注册自定义策略，用于在空间存储的移入移出过程中移动方块实体。                           |
+| `ae2.api.features.GridLinkables`                     | 用于处理以及添加可绑定到特定网络的物品，例如在ME无线访问点处绑定无线终端。                     |
+| `ae2.api.features.ChargeableItems`                   | 用于注册由 AE2 充能器处理的外部物品能量适配器。                                                |
+| `ae2.api.storage.StorageCells`                       | 用于处理以及添加可作为网络存储元件的物品。                                                     |
+| `ae2.api.features.Locatables`                        | 用于依据唯一键发现量子桥及其他可定位对象。                                                     |
+| `ae2.api.parts.PartModels`                           | 用于注册自定义线缆总线部件所需的 JSON 方块模型。                                               |
+| `ae2.api.features.P2PTunnelAttunement`               | 用于注册新的物品，使 P2P 隧道在右键时调谐到特定类型。                                          |
+| `ae2.api.client.StorageCellModels`                   | 用于自定义存储元件插入ME驱动器或ME箱子时的模型。                                               |
+| `ae2.api.upgrades.Upgrades`                          | 用于管理升级卡，并将其与可升级的物品、部件或方块关联。                                         |
+| `ae2.api.upgrades.UpgradeInventories`                | 用于为可升级机器与物品宿主创建升级物品栏。                                                     |
+| `ae2.api.networking.extensions.GridLogicExtensions`  | 无需 Mixin 即可为受支持的 AE2 网络逻辑附加运行时行为。                                         |
+| `ae2.api.behaviors.GenericInternalInventoryAdapters` | 允许附加模组通过 Forge Capability 暴露 AE2 通用物品栏。                                        |
+| `ae2.api.crafting.cpu.ICraftingUnitRegistry`         | 用于添加复用 AE2 集群逻辑的自定义合成 CPU 单元方块。                                           |
+| `ae2.api.client.AEKeyRendering`                      | 用于注册自定义键类型的客户端 GUI 渲染。                                                        |
+| `ae2.api.cellterminal.CellTerminalApi`               | 用于注册存储管理终端的扫描器与实时目标解析器。                                                 |
 
 一般来说，这些注册表都是同步（线程安全）的，可以在模组加载期间使用。请在受影响系统开始参与游戏之前完成注册。模组初始化之后的更改，可能使已经创建的网络、存储元件、模型、升级物品栏或充能器物品栏保留过时的假设。
 
@@ -326,6 +326,28 @@ public CraftingCpuGroup getCpuListGroup() {
 组装样板实现 `ae2.api.crafting.IAssemblerPattern`。它们是由分子装配室等组装类机器内部执行的样板，而不是被推入外部物品栏的样板。组装样板可以通过 `canSubstitute()` 与 `canSubstituteFluids()` 描述物品替换与直接使用流体。这些属性只属于组装样板。非组装样板是固定输入样板，不应暴露替换或直接流体行为。
 
 这一区分对附加模组提供方很重要：普通样板供应器可以假设非组装样板的输入是固定的键和固定的键类型。如果附加模组的样板需要替换输入，应使用组装样板实现，并通过组装样板容器暴露。
+
+#### 只读样板容器
+
+样板容器可以通过重写 `PatternContainer.isReadOnly()` 并返回 `true` 来退出玩家编辑：
+
+```java
+@Override
+public boolean isReadOnly() {
+    return true;
+}
+```
+
+它适用于样板物品栏是生成得来、计算得来，或以其他方式并非玩家所有的机器，例如样板由外部机器自身配方列表支撑的供应器。这类容器保留其常规的可见性、排序、命名与分组行为，但所有终端都会将其槽位视为只读：
+
+* 在样板管理终端中，无法向槽位插入、从槽位提取、交换样板，也无法用 Shift 点击移出样板。
+* 无法向其中快速移动样板。
+* 无法向其中移动整片区域的样板（`MOVE_REGION`）。
+* 无法从样板编码终端向其中上传编码样板。
+
+所有限制都在服务端执行，因此被修改的客户端无法绕过。该标记同时会下发到客户端，使样板管理终端禁用槽位交互、并在快速移动时跳过只读提供方，从而不会向玩家提供会被服务端拒绝的操作。
+
+样板槽为空时只读容器不会显示。一个既是只读、其 `getTerminalPatternInventory()` 又不含任何样板的容器，会在所有显示模式下从样板管理终端中隐藏，包括 `ALL`。这能让尚无生成样板的机器不出现在终端里，而不是显示一个空供应器。确实拥有样板的实例会照常列出，因此这只是收窄可见性，而不是彻底隐藏该类供应器。要让终端看到它，该供应器仍必须能在其网络上被发现为活跃提供方。
 
 ### 缺失合成原料时的强制启动
 

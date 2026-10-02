@@ -89,7 +89,7 @@ class PatternAccessTrackerTest {
             }
         };
         var directory = new PatternAccessSession.ProviderDirectoryEntry(provider, 0, 0, group, 2,
-            true, false, false, null, false, 0, 0, -1);
+            true, false, false, false, null, false, 0, 0, -1);
         var decoded = new AtomicInteger();
         IPatternDetails pattern = new IPatternDetails() {
             public AEItemKey getDefinition() {
