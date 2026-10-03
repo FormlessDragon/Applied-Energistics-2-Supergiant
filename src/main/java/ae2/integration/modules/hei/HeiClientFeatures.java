@@ -3,6 +3,7 @@ package ae2.integration.modules.hei;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.StorageCells;
+import ae2.client.ActionKey;
 import ae2.client.gui.PreviousExternalGui;
 import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.container.me.common.MEIngredientAction;
@@ -13,14 +14,10 @@ import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.HeiIngredientActionPacket;
 import mezz.jei.config.KeyBindings;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.client.event.GuiScreenEvent;
-import net.minecraftforge.client.settings.KeyConflictContext;
-import net.minecraftforge.client.settings.KeyModifier;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
-import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -32,18 +29,6 @@ import java.util.function.Consumer;
 
 @SideOnly(Side.CLIENT)
 final class HeiClientFeatures {
-    private static final KeyBinding RETRIEVE = new KeyBinding(
-        "key.ae2.hei_retrieve_ingredient",
-        KeyConflictContext.GUI,
-        KeyModifier.CONTROL,
-        -98,
-        "key.ae2.category");
-    private static final KeyBinding CRAFT = new KeyBinding(
-        "key.ae2.hei_craft_ingredient",
-        KeyConflictContext.GUI,
-        KeyModifier.ALT,
-        -98,
-        "key.ae2.category");
     private static final HeiClientFeatures INSTANCE = new HeiClientFeatures();
     private static boolean registered;
 
@@ -56,8 +41,6 @@ final class HeiClientFeatures {
         }
 
         registered = true;
-        ClientRegistry.registerKeyBinding(RETRIEVE);
-        ClientRegistry.registerKeyBinding(CRAFT);
         MinecraftForge.EVENT_BUS.register(INSTANCE);
     }
 
@@ -82,11 +65,12 @@ final class HeiClientFeatures {
         }
 
         if (Minecraft.getMinecraft().currentScreen instanceof GuiMEStorage<?>) {
-            addTooltipLine(event, ButtonToolTips.HeiAutoPin.getLocal(getKeyText(RETRIEVE)));
+            addTooltipLine(event, ButtonToolTips.HeiAutoPin.getLocal(ActionKey.HEI_RETRIEVE_INGREDIENT.getDisplayName()));
         } else {
-            addTooltipLine(event, GuiText.HeiRetrieveIngredientTooltip.getLocal(getKeyText(RETRIEVE)));
+            addTooltipLine(event,
+                GuiText.HeiRetrieveIngredientTooltip.getLocal(ActionKey.HEI_RETRIEVE_INGREDIENT.getDisplayName()));
         }
-        addTooltipLine(event, GuiText.HeiCraftIngredientTooltip.getLocal(getKeyText(CRAFT)));
+        addTooltipLine(event, GuiText.HeiCraftIngredientTooltip.getLocal(ActionKey.HEI_CRAFT_INGREDIENT.getDisplayName()));
     }
 
     private static void handleInput(int eventKey, Consumer<Boolean> cancelEvent) {
@@ -117,10 +101,10 @@ final class HeiClientFeatures {
 
     @Nullable
     private static MEIngredientAction getAction(int eventKey) {
-        if (RETRIEVE.isActiveAndMatches(eventKey)) {
+        if (ActionKey.HEI_RETRIEVE_INGREDIENT.isActiveAndMatches(eventKey)) {
             return MEIngredientAction.RETRIEVE;
         }
-        if (CRAFT.isActiveAndMatches(eventKey)) {
+        if (ActionKey.HEI_CRAFT_INGREDIENT.isActiveAndMatches(eventKey)) {
             return MEIngredientAction.CRAFT;
         }
         return null;
@@ -142,10 +126,6 @@ final class HeiClientFeatures {
 
     private static void addTooltipLine(ItemTooltipEvent event, String line) {
         event.getToolTip().add(line);
-    }
-
-    private static String getKeyText(KeyBinding keyBinding) {
-        return keyBinding.getKeyModifier().getLocalizedComboName(keyBinding.getKeyCode());
     }
 
     @SubscribeEvent

@@ -19,7 +19,9 @@ public final class ActionKeys {
 
         registered = true;
         for (ActionKey key : ActionKey.values()) {
-            ClientRegistry.registerKeyBinding(key.getBinding());
+            if (key.isAvailable()) {
+                ClientRegistry.registerKeyBinding(key.getBinding());
+            }
         }
     }
 }

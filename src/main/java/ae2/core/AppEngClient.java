@@ -22,8 +22,9 @@ import ae2.api.parts.CableRenderMode;
 import ae2.client.ClientTickHandler;
 import ae2.client.EffectType;
 import ae2.client.Hotkeys;
+import ae2.client.ActionKey;
 import ae2.client.ActionKeys;
-import ae2.client.PatternHotKey;
+import ae2.client.PatternView;
 import ae2.client.commands.ClientCommands;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
@@ -94,7 +95,6 @@ import ae2.tile.storage.TileSkyStoneTank;
 import ae2.util.MouseHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraftforge.client.event.GuiScreenEvent;
@@ -127,10 +127,6 @@ import java.util.Random;
 @SideOnly(Side.CLIENT)
 public final class AppEngClient extends AppEngServer {
 
-    private static final KeyBinding MOUSE_WHEEL_ITEM_MODIFIER = new KeyBinding(
-        "key.ae2.mouse_wheel_item_modifier", Keyboard.KEY_LSHIFT, "key.ae2.category");
-    private static final KeyBinding PART_PLACEMENT_OPPOSITE = new KeyBinding(
-        "key.ae2.part_placement_opposite", Keyboard.KEY_LCONTROL, "key.ae2.category");
     private CableRenderMode prevCableRenderMode = CableRenderMode.STANDARD;
     private boolean prevPartPlacementOppositeDown;
 
@@ -167,15 +163,13 @@ public final class AppEngClient extends AppEngServer {
         InitGuis.init();
         InitBlockColors.init();
         InitItemColors.init();
-        ClientRegistry.registerKeyBinding(MOUSE_WHEEL_ITEM_MODIFIER);
-        ClientRegistry.registerKeyBinding(PART_PLACEMENT_OPPOSITE);
         ActionKeys.init();
-        PatternHotKey.init();
         ClientCommands.register();
         MinecraftForge.EVENT_BUS.register(new RenderBlockOutlineHook());
         MinecraftForge.EVENT_BUS.register(new WirelessUniversalTerminalClientHandler());
         MinecraftForge.EVENT_BUS.register(new MeteoriteCompassBeaconRenderer());
         MinecraftForge.EVENT_BUS.register(OverlayManager.getInstance());
+        MinecraftForge.EVENT_BUS.register(PatternView.INSTANCE);
         MinecraftForge.EVENT_BUS.register(CraftingCpuHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(CraftingSupplierHighlightHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(IngredientFlowHighlightHandler.INSTANCE);
@@ -333,7 +327,7 @@ public final class AppEngClient extends AppEngServer {
         }
 
         Minecraft mc = Minecraft.getMinecraft();
-        if (mc.currentScreen != null || mc.player == null || !MOUSE_WHEEL_ITEM_MODIFIER.isKeyDown()) {
+        if (mc.currentScreen != null || mc.player == null || !ActionKey.MOUSE_WHEEL_ITEM_MODIFIER.isKeyDown()) {
             return;
         }
 
@@ -365,7 +359,7 @@ public final class AppEngClient extends AppEngServer {
             return;
         }
 
-        boolean isDown = mc.currentScreen == null && PART_PLACEMENT_OPPOSITE.isKeyDown();
+        boolean isDown = mc.currentScreen == null && ActionKey.PART_PLACEMENT_OPPOSITE.isKeyDown();
         if (isDown == this.prevPartPlacementOppositeDown) {
             return;
         }

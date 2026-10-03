@@ -4,15 +4,10 @@ import ae2.client.gui.pattern.PatternGuiHandler;
 import ae2.crafting.pattern.EncodedPatternItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.I18n;
-import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.util.text.TextComponentTranslation;
-import net.minecraftforge.client.settings.KeyConflictContext;
-import net.minecraftforge.client.settings.KeyModifier;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
-import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -21,34 +16,27 @@ import org.lwjgl.input.Keyboard;
 import java.util.List;
 
 @SideOnly(Side.CLIENT)
-public final class PatternHotKey {
+public final class PatternView {
 
-    public static final PatternHotKey INSTANCE = new PatternHotKey();
-    private static final KeyBinding VIEW_PATTERN = new KeyBinding(
-        "key.ae2.view_pattern", KeyConflictContext.GUI, KeyModifier.NONE, Keyboard.KEY_P, "key.ae2.category");
+    public static final PatternView INSTANCE = new PatternView();
 
-    private PatternHotKey() {
-    }
-
-    public static void init() {
-        ClientRegistry.registerKeyBinding(VIEW_PATTERN);
-        MinecraftForge.EVENT_BUS.register(INSTANCE);
+    private PatternView() {
     }
 
     @SubscribeEvent
     public void addPatternViewTooltip(ItemTooltipEvent event) {
         ItemStack stack = event.getItemStack();
-        if (VIEW_PATTERN.getKeyCode() == Keyboard.KEY_NONE
+        if (ActionKey.VIEW_PATTERN.isUnbound()
             || !(stack.getItem() instanceof EncodedPatternItem<?>)) {
             return;
         }
 
-        String keyName = VIEW_PATTERN.getKeyModifier().getLocalizedComboName(VIEW_PATTERN.getKeyCode());
+        String keyName = ActionKey.VIEW_PATTERN.getDisplayName();
         List<String> tooltip = event.getToolTip();
         tooltip.add(Math.min(1, tooltip.size()), TextFormatting.DARK_GRAY
             + I18n.format("pattern.tooltip", TextFormatting.GRAY + keyName + TextFormatting.DARK_GRAY));
 
-        if (VIEW_PATTERN.isActiveAndMatches(Keyboard.getEventKey())) {
+        if (ActionKey.VIEW_PATTERN.isActiveAndMatches(Keyboard.getEventKey())) {
             ItemStack pattern = stack.copy();
             Minecraft minecraft = Minecraft.getMinecraft();
             minecraft.addScheduledTask(() -> {
