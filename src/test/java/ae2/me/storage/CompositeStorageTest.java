@@ -10,12 +10,14 @@ import ae2.api.stacks.AEKeyType;
 import ae2.api.storage.MEStorageChangeListener;
 import ae2.hooks.ticking.TickHandler;
 import ae2.me.service.StorageService;
+import ae2.test.EmptyGrid;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidTank;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.items.ItemStackHandler;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -200,7 +202,7 @@ class CompositeStorageTest {
     void asynchronousExternalInvalidationReachesTheNetworkOnTheServerQueue() throws InterruptedException {
         var handler = new MonitoredHandler();
         var composite = new CompositeStorage(Map.of(AEKeyType.items(), ExternalStorageFacade.of(handler)));
-        var parent = new StorageService();
+        var parent = new StorageService(new EmptyGrid());
         parent.addGlobalStorageProvider(mounts -> mounts.mount(composite, 0));
         var key = AEItemKey.of(Items.APPLE);
         assertEquals(1, parent.getCachedInventory().get(key));
@@ -289,6 +291,7 @@ class CompositeStorageTest {
         }
 
         @Override
+        @NonNull
         public ItemStack getStackInSlot(int slot) {
             this.reads++;
             return super.getStackInSlot(slot);

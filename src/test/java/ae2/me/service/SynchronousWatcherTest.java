@@ -1,15 +1,11 @@
 package ae2.me.service;
 
 import ae2.api.networking.GridFlags;
-import ae2.api.networking.IGrid;
-import ae2.api.networking.IGridNode;
-import ae2.api.networking.IGridService;
 import ae2.api.networking.IStackWatcher;
 import ae2.api.networking.crafting.ICraftingWatcherNode;
 import ae2.api.networking.energy.IEnergyService;
 import ae2.api.networking.energy.IEnergyWatcher;
 import ae2.api.networking.energy.IEnergyWatcherNode;
-import ae2.api.networking.events.GridEvent;
 import ae2.api.networking.storage.IStorageWatcherNode;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
@@ -21,7 +17,7 @@ import ae2.hooks.ticking.TickHandler;
 import ae2.me.GridNode;
 import ae2.me.energy.EnergyThreshold;
 import ae2.me.energy.EnergyWatcher;
-import com.google.gson.stream.JsonWriter;
+import ae2.test.EmptyGrid;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.init.Items;
 import net.minecraft.util.text.ITextComponent;
@@ -33,7 +29,6 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -50,7 +45,7 @@ class SynchronousWatcherTest {
 
     @Test
     void wrongThreadStorageEventsNotifyOnServerQueueAndDetachedSourcesAreIgnored() throws InterruptedException {
-        var service = new StorageService();
+        var service = new StorageService(new EmptyGrid());
         var source = new Source();
         IStorageProvider provider = mounts -> mounts.mount(source, 0);
         service.addGlobalStorageProvider(provider);
@@ -94,7 +89,7 @@ class SynchronousWatcherTest {
 
     @Test
     void storageUnsubscriptionDuringDispatchSkipsRemainingOldRegistrations() {
-        var storage = new StorageService();
+        var storage = new StorageService(new EmptyGrid());
         var source = new Source();
         storage.addGlobalStorageProvider(mounts -> mounts.mount(source, 0));
         storage.getCachedInventory();
@@ -104,8 +99,8 @@ class SynchronousWatcherTest {
             var host = new Host();
             host.callback = () -> {
                 calls.add(key);
-                for (int j = 0; j < hosts.size(); j++) {
-                    storage.removeNode(hosts.get(j).node);
+                for (Host value : hosts) {
+                    storage.removeNode(value.node);
                 }
             };
             hosts.add(host);
@@ -121,7 +116,7 @@ class SynchronousWatcherTest {
 
     @Test
     void nestedCraftingDispatchPreservesOuterBufferAndChecksNewSubscriptions() {
-        var crafting = new CraftingService(new EmptyGrid(), new StorageService(), null);
+        var crafting = new CraftingService(new EmptyGrid(), new StorageService(new EmptyGrid()), null);
         var calls = new ArrayList<String>();
         var first = new Host();
         var second = new Host();
@@ -179,7 +174,7 @@ class SynchronousWatcherTest {
     }
 
     private static final class Host implements IStorageWatcherNode, ICraftingWatcherNode {
-        private final GridNode node = new GridNode(null, this, (owner, gridNode) -> {
+        private final GridNode node = new GridNode(null, this, (_, _) -> {
         },
             EnumSet.noneOf(GridFlags.class));
         private IStackWatcher watcher;
@@ -226,51 +221,6 @@ class SynchronousWatcherTest {
 
         public ITextComponent getDescription() {
             return new TextComponentString("test");
-        }
-    }
-
-    private static final class EmptyGrid implements IGrid {
-        public <C extends IGridService> C getService(Class<C> type) {
-            throw new UnsupportedOperationException();
-        }
-
-        public <T extends GridEvent> T postEvent(T event) {
-            return event;
-        }
-
-        public Iterable<Class<?>> getMachineClasses() {
-            return List.of();
-        }
-
-        public Iterable<IGridNode> getMachineNodes(Class<?> type) {
-            return List.of();
-        }
-
-        public <T> Set<T> getMachines(Class<T> type) {
-            return Set.of();
-        }
-
-        public <T> Set<T> getActiveMachines(Class<T> type) {
-            return Set.of();
-        }
-
-        public Iterable<IGridNode> getNodes() {
-            return List.of();
-        }
-
-        public boolean isEmpty() {
-            return true;
-        }
-
-        public IGridNode getPivot() {
-            throw new UnsupportedOperationException();
-        }
-
-        public int size() {
-            return 0;
-        }
-
-        public void export(JsonWriter writer) {
         }
     }
 }

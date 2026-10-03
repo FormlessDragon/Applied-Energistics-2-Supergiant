@@ -199,6 +199,8 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
                 ButtonToolTips.View, ButtonToolTips.StoredCraftable);
             registerApp(Icon.VIEW_MODE_CRAFTING, Settings.VIEW_MODE, ViewItems.CRAFTABLE,
                 ButtonToolTips.View, ButtonToolTips.Craftable);
+            registerApp(Icon.FLOW_TRACKING, Settings.VIEW_MODE, ViewItems.FLOWING,
+                ButtonToolTips.View, ButtonToolTips.FlowTracking);
 
             registerApp(Icon.TERMINAL_STYLE_SMALL, Settings.TERMINAL_STYLE, TerminalStyle.SMALL,
                 ButtonToolTips.TerminalStyle, ButtonToolTips.TerminalStyle_Small);
@@ -642,6 +644,20 @@ public class SettingToggleButton<T extends Enum<T>> extends IconButton {
 
     public List<T> getValidValues() {
         return List.copyOf(this.validValues);
+    }
+
+    public void setValidValues(T value, boolean valid) {
+        if (valid) {
+            if (this.buttonSetting != null && this.buttonSetting.getValues().contains(value)) {
+                this.validValues.add(value);
+            }
+            return;
+        }
+
+        this.validValues.remove(value);
+        if (this.currentValue == value && !this.validValues.isEmpty()) {
+            this.set(this.validValues.iterator().next());
+        }
     }
 
     public ButtonAppearance getAppearance(T value) {

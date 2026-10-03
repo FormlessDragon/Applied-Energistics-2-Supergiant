@@ -270,7 +270,8 @@ public enum ButtonToolTips implements LocalizationEnum {
     CellTerminalReadOnly,
     CellTerminalWriteOnly,
     CellTerminalReadWrite,
-    Write;
+    Write,
+    FlowTracking;
 
     private final String translationKey;
 

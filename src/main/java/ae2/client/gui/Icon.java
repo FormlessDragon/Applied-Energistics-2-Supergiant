@@ -322,6 +322,8 @@ public final class Icon {
     public static final Icon CELL_TERMINAL_SUBNET_VISIBILITY_DONT_SHOW = registerBuiltin(
         "cell_terminal_subnet_visibility_dont_show");
     public static final Icon EXPORT_GRID = registerBuiltin("export_grid");
+    public static final Icon FLOW_TRACKING = registerBuiltin("flow_tracking");
+    public static final Icon FLOW_TRACKING_OFF = registerBuiltin("flow_tracking_off");
 
     private final Size manualSize;
     public int width;

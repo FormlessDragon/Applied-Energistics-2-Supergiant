@@ -45,6 +45,7 @@ import ae2.core.network.ClientboundPacket;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.clientbound.GuiDataSyncPacket;
 import ae2.core.network.serverbound.GuiActionPacket;
+import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.externalstorage.GenericStackInv;
 import ae2.me.helpers.PlayerSource;
@@ -1043,6 +1044,15 @@ public abstract class AEBaseContainer extends Container {
         if (this.getPlayer() instanceof EntityPlayerMP player) {
             InitNetwork.CHANNEL.sendTo(packet, player);
         }
+    }
+
+    /**
+     * Receives the generic key that the client attached to an {@link InventoryActionPacket}.
+     * <p/>
+     * Only meaningful on the server, where it makes the key available to {@link #doAction}. Container subclasses that
+     * act on a specific key override this.
+     */
+    public void setTargetKey(@Nullable AEKey key) {
     }
 
     protected final <T> void registerClientAction(String name, Class<T> argClass, Consumer<T> handler) {

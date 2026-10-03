@@ -24,5 +24,5 @@
 package ae2.api.config;
 
 public enum ViewItems {
-    ALL, STORED, CRAFTABLE
+    ALL, STORED, CRAFTABLE, FLOWING
 }

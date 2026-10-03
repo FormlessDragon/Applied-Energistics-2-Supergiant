@@ -293,6 +293,17 @@ public class AEConfig {
         return GENERAL.requireSneakForCableBlockingPanelPlacement;
     }
 
+    public boolean isIngredientFlowTrackingEnabled() {
+        return GENERAL.enableIngredientFlowTracking;
+    }
+
+    /**
+     * The number of minutes of ingredient flow history kept per network. Never below 1.
+     */
+    public int getIngredientFlowTrackingWindowMinutes() {
+        return Math.max(1, GENERAL.ingredientFlowTrackingWindowMinutes);
+    }
+
     public boolean isEnableEffects() {
         return CLIENT.enableEffects;
     }
@@ -646,6 +657,14 @@ public class AEConfig {
         @Config.Name("requireSneakForCableBlockingPanelPlacement")
         @Config.Comment("If enabled, panel-type parts can only be placed on a cable side with an existing cable connection while sneaking.")
         public boolean requireSneakForCableBlockingPanelPlacement = true;
+
+        @Config.Name("enableIngredientFlowTracking")
+        @Config.Comment("Enable network-wide ingredient flow tracking. When disabled, no flow statistics are collected on any network and the related UI options are hidden.")
+        public boolean enableIngredientFlowTracking = true;
+
+        @Config.Name("ingredientFlowTrackingWindowMinutes")
+        @Config.Comment("Number of minutes of ingredient flow history that is kept per network. Values below 1 are treated as 1.")
+        public int ingredientFlowTrackingWindowMinutes = 2;
     }
 
     public static class Debug {

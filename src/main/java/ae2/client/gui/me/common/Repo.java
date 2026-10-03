@@ -24,6 +24,7 @@ import ae2.api.config.SortOrder;
 import ae2.api.config.ViewItems;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
+import ae2.api.util.FlowRate;
 import ae2.client.gui.me.search.RepoSearch;
 import ae2.client.gui.widgets.IScrollSource;
 import ae2.client.gui.widgets.ISortSource;
@@ -50,6 +51,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -83,6 +85,7 @@ public class Repo implements IClientRepo {
     private final ObjectArrayList<GridInventoryEntry> craftingPinnedEntries = new ObjectArrayList<>();
     private final ObjectArrayList<GridInventoryEntry> playerPinnedEntries = new ObjectArrayList<>();
     private final Map<AEKey, PinnedKeys.PinReason> pinnedReasons = new Object2ObjectOpenHashMap<>();
+    private Map<AEKey, FlowRate> flowRates = new HashMap<>();
     /**
      * Entries by item ID to speed up ingredient matching.
      */
@@ -311,6 +314,10 @@ public class Repo implements IClientRepo {
         }
 
         if (viewMode == ViewItems.STORED && entry.storedAmount() == 0) {
+            return false;
+        }
+
+        if (viewMode == ViewItems.FLOWING && !this.flowRates.containsKey(what)) {
             return false;
         }
 
@@ -679,6 +686,14 @@ public class Repo implements IClientRepo {
                 updateView(); // resort on unpause
             }
         }
+    }
+
+    public FlowRate getFlowRate(AEKey what) {
+        return this.flowRates.get(what);
+    }
+
+    public void updateFlowRates(final Map<AEKey, FlowRate> rates) {
+        this.flowRates = rates;
     }
 
     @Override

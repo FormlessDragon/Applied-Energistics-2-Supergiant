@@ -18,8 +18,10 @@
 
 package ae2.me.service;
 
+import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridServiceProvider;
+import ae2.api.networking.security.IActionSource;
 import ae2.api.networking.storage.IStorageService;
 import ae2.api.networking.storage.IStorageWatcherNode;
 import ae2.api.stacks.AEKey;
@@ -49,11 +51,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class StorageService implements IStorageService, IGridServiceProvider {
 
+    private final IGrid grid;
     private final Reference2ObjectMap<IGridNode, ProviderState> nodeProviders = new Reference2ObjectOpenHashMap<>();
     private final Reference2ObjectMap<IStorageProvider, ProviderState> globalProviders = new Reference2ObjectOpenHashMap<>();
     private final SetMultimap<AEKey, StackWatcher<IStorageWatcherNode>> interests = HashMultimap.create();
     private final InterestManager<StackWatcher<IStorageWatcherNode>> interestManager = new InterestManager<>(this.interests);
-    private final NetworkStorage storage = new NetworkStorage(this::getCachedInventory, this::invalidateCache);
+    private final NetworkStorage storage;
+
+    public StorageService(IGrid grid) {
+        this.grid = grid;
+        this.storage = new NetworkStorage(this::getCachedInventory, this::invalidateCache, this::recordIngredientFlow);
+    }
+
     private KeyCounter cachedAvailableStacks = KeyCounter.saturating();
     private KeyCounter cachedAvailableScratch = KeyCounter.saturating();
     private final Reference2ObjectMap<IGridNode, StackWatcher<IStorageWatcherNode>> watchers =
@@ -332,6 +341,17 @@ public class StorageService implements IStorageService, IGridServiceProvider {
             writer.endObject();
         }
         writer.endArray();
+    }
+
+    private void recordIngredientFlow(AEKey what, long delta, IActionSource source) {
+        if (this.grid == null) {
+            return;
+        }
+
+        var flowService = this.grid.getService(IngredientFlowService.class);
+        if (flowService != null) {
+            flowService.recordFlow(what, delta, source);
+        }
     }
 
     private class ProviderState implements IStorageMounts {
