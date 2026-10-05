@@ -152,10 +152,14 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
         InternalInventory target;
         boolean batch;
         int maxTimesToCraft;
-        if (action == InventoryAction.CRAFT_SHIFT || action == InventoryAction.CRAFT_ALL) {
+        if (action == InventoryAction.CRAFT_SHIFT) {
             target = new PlayerInternalInventory(who.inventory);
             batch = true;
             maxTimesToCraft = getMaxTimesForTarget(target, this.getStack(), getStackCraftLimit());
+        } else if (action == InventoryAction.CRAFT_ALL) {
+            target = new PlayerInternalInventory(who.inventory);
+            batch = true;
+            maxTimesToCraft = getMaxTimesForTarget(target, this.getStack(), getStackCraftLimit() * target.size());
         } else if (action == InventoryAction.CRAFT_STACK) {
             target = new CarriedItemInventory(getContainer());
             batch = true;
