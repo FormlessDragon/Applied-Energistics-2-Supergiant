@@ -1,25 +1,13 @@
 package ae2.helpers;
 
-import ae2.api.networking.IGridNode;
-import ae2.api.networking.energy.IEnergySource;
-import ae2.api.networking.security.IActionHost;
+import ae2.api.implementations.items.WirelessTerminalApi;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.storage.StorageHelper;
 import ae2.core.definitions.AEItems;
-import ae2.core.gui.locator.BaublesItemLocator;
-import ae2.core.gui.locator.GuiHostLocators;
-import ae2.core.gui.locator.InventoryItemLocator;
-import ae2.core.gui.locator.ItemGuiHostLocator;
 import ae2.core.localization.PlayerMessages;
-import ae2.integration.modules.baubles.BaublesIntegration;
-import ae2.items.tools.powered.WirelessTerminalItem;
 import ae2.items.tools.powered.WirelessTerminalMagnetMode;
-import ae2.items.tools.powered.WirelessTerminalRegistry;
 import ae2.items.tools.powered.WirelessTerminals;
-import ae2.me.helpers.ActionHostEnergySource;
 import ae2.me.helpers.PlayerSource;
-import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
@@ -34,15 +22,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
+
+import static ae2.api.implementations.items.WirelessTerminalApi.TerminalContext;
 
 public final class WirelessTerminalActions {
     private static final ExecutorService RESTOCK_CHECK_POOL;
     private static final ConcurrentMap<RestockPlanKey, PendingRestockPlan> PENDING_RESTOCKS = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap.KeySetView<RestockPlanKey, Boolean> RESTOCKS_IN_FLIGHT =
         ConcurrentHashMap.newKeySet();
-    private static final Object2ObjectMap<EntityPlayerMP, Object2ObjectMap<Object, WirelessTerminalGuiHost<?>>> HOST_CACHE =
-        new Object2ObjectOpenHashMap<>();
 
     static {
         ThreadFactory factory = runnable -> {
@@ -59,45 +46,45 @@ public final class WirelessTerminalActions {
     public static void clear() {
         PENDING_RESTOCKS.clear();
         RESTOCKS_IN_FLIGHT.clear();
-        HOST_CACHE.clear();
+        WirelessTerminalApi.clear();
     }
 
     public static void clear(UUID playerId) {
         PENDING_RESTOCKS.keySet().removeIf(key -> key.playerId.equals(playerId));
         RESTOCKS_IN_FLIGHT.removeIf(key -> key.playerId.equals(playerId));
-        HOST_CACHE.entrySet().removeIf(entry -> entry.getKey().getUniqueID().equals(playerId));
+        WirelessTerminalApi.clear(playerId);
     }
 
     public static boolean toggleRestock(EntityPlayerMP player) {
-        TerminalContext context = findUsableTerminal(player, ignored -> true);
+        TerminalContext context = WirelessTerminalApi.findUsableWirelessTermOfPlayer(player, ignored -> true);
         if (context == null) {
             return false;
         }
-        boolean enabled = !WirelessTerminals.isRestockEnabled(context.stack, context.terminal);
-        WirelessTerminals.setRestockEnabled(context.stack, context.terminal, enabled);
+        boolean enabled = !WirelessTerminals.isRestockEnabled(context.stack(), context.terminal());
+        WirelessTerminals.setRestockEnabled(context.stack(), context.terminal(), enabled);
         player.sendStatusMessage((enabled ? PlayerMessages.WirelessRestockEnabled
             : PlayerMessages.WirelessRestockDisabled).text(), true);
         return true;
     }
 
     public static boolean cycleMagnetMode(EntityPlayerMP player) {
-        TerminalContext context = findUsableTerminal(player, WirelessTerminalActions::hasMagnetCard);
+        TerminalContext context = WirelessTerminalApi.findUsableWirelessTermOfPlayer(player, WirelessTerminalActions::hasMagnetCard);
         if (context == null) {
             return false;
         }
-        WirelessTerminalMagnetMode next = WirelessTerminals.getMagnetMode(context.stack, context.terminal).next();
-        WirelessTerminals.setMagnetMode(context.stack, context.terminal, next);
+        WirelessTerminalMagnetMode next = WirelessTerminals.getMagnetMode(context.stack(), context.terminal()).next();
+        WirelessTerminals.setMagnetMode(context.stack(), context.terminal(), next);
         player.sendStatusMessage(getMagnetModeMessage(next).text(), true);
         return true;
     }
 
     public static boolean stowInventory(EntityPlayerMP player) {
-        TerminalContext context = findUsableTerminal(player, ignored -> true);
+        TerminalContext context = WirelessTerminalApi.findUsableWirelessTermOfPlayer(player, ignored -> true);
         if (context == null) {
             return false;
         }
         int slot = player.inventory.currentItem;
-        Integer terminalSlot = context.locator.getPlayerInventorySlot();
+        Integer terminalSlot = context.locator().getPlayerInventorySlot();
         if (terminalSlot != null && terminalSlot == slot) {
             return false;
         }
@@ -113,8 +100,8 @@ public final class WirelessTerminalActions {
     }
 
     public static void restock(EntityPlayerMP player) {
-        TerminalContext context = findUsableTerminal(player,
-            terminal -> WirelessTerminals.isRestockEnabled(terminal.stack, terminal.terminal));
+        TerminalContext context = WirelessTerminalApi.findUsableWirelessTermOfPlayer(player,
+            terminal -> WirelessTerminals.isRestockEnabled(terminal.stack(), terminal.terminal()));
         if (context == null) {
             return;
         }
@@ -124,7 +111,7 @@ public final class WirelessTerminalActions {
     }
 
     private static void scheduleRestockCheck(EntityPlayerMP player, TerminalContext context) {
-        RestockPlanKey planKey = new RestockPlanKey(player.getUniqueID(), createTerminalKey(context.stack));
+        RestockPlanKey planKey = new RestockPlanKey(player.getUniqueID(), createTerminalKey(context.stack()));
         if (!RESTOCKS_IN_FLIGHT.add(planKey)) {
             return;
         }
@@ -144,7 +131,7 @@ public final class WirelessTerminalActions {
     }
 
     private static void applyPendingRestocks(EntityPlayerMP player, TerminalContext context) {
-        RestockPlanKey planKey = new RestockPlanKey(player.getUniqueID(), createTerminalKey(context.stack));
+        RestockPlanKey planKey = new RestockPlanKey(player.getUniqueID(), createTerminalKey(context.stack()));
         PendingRestockPlan plan = PENDING_RESTOCKS.remove(planKey);
         if (plan == null) {
             return;
@@ -169,8 +156,8 @@ public final class WirelessTerminalActions {
             }
 
             int targetAmount = request.amount();
-            long extracted = StorageHelper.poweredExtraction(context.energySource, context.host.getInventory(),
-                key, targetAmount, new PlayerSource(player, context.actionHost));
+            long extracted = StorageHelper.poweredExtraction(context.energySource(), context.host().getInventory(),
+                key, targetAmount, new PlayerSource(player, context.actionHost()));
             if (extracted > 0) {
                 stack.grow((int) extracted);
                 player.inventory.setInventorySlotContents(slot, stack);
@@ -195,8 +182,8 @@ public final class WirelessTerminalActions {
         if (key == null) {
             return;
         }
-        TerminalContext context = findUsableTerminal(player,
-            terminal -> WirelessTerminals.isRestockEnabled(terminal.stack, terminal.terminal));
+        TerminalContext context = WirelessTerminalApi.findUsableWirelessTermOfPlayer(player,
+            terminal -> WirelessTerminals.isRestockEnabled(terminal.stack(), terminal.terminal()));
         if (context == null) {
             return;
         }
@@ -205,8 +192,8 @@ public final class WirelessTerminalActions {
         if (targetAmount <= 0) {
             return;
         }
-        long extracted = StorageHelper.poweredExtraction(context.energySource, context.host.getInventory(),
-            key, targetAmount, new PlayerSource(player, context.actionHost));
+        long extracted = StorageHelper.poweredExtraction(context.energySource(), context.host().getInventory(),
+            key, targetAmount, new PlayerSource(player, context.actionHost()));
         if (extracted <= 0) {
             return;
         }
@@ -225,13 +212,13 @@ public final class WirelessTerminalActions {
         if (key == null) {
             return ItemStack.EMPTY;
         }
-        TerminalContext context = findUsableTerminal(player, ignored -> true);
+        TerminalContext context = WirelessTerminalApi.findUsableWirelessTermOfPlayer(player, ignored -> true);
         if (context == null) {
             return ItemStack.EMPTY;
         }
 
-        long extracted = StorageHelper.poweredExtraction(context.energySource, context.host.getInventory(), key,
-            amount, new PlayerSource(player, context.actionHost));
+        long extracted = StorageHelper.poweredExtraction(context.energySource(), context.host().getInventory(), key,
+            amount, new PlayerSource(player, context.actionHost()));
         if (extracted <= 0) {
             return ItemStack.EMPTY;
         }
@@ -262,22 +249,22 @@ public final class WirelessTerminalActions {
             return false;
         }
 
-        TerminalContext context = findUsableTerminal(player, terminal -> {
+        TerminalContext context = WirelessTerminalApi.findUsableWirelessTermOfPlayer(player, terminal -> {
             if (!hasMagnetCard(terminal)) {
                 return false;
             }
-            WirelessTerminalMagnetMode mode = WirelessTerminals.getMagnetMode(terminal.stack, terminal.terminal);
+            WirelessTerminalMagnetMode mode = WirelessTerminals.getMagnetMode(terminal.stack(), terminal.terminal());
             return allowRemoteMagnet ? mode.magnet() : mode.pickupToME();
         });
         if (context == null) {
             return false;
         }
 
-        WirelessTerminalMagnetHost magnetHost = context.host.getMagnetHost();
+        WirelessTerminalMagnetHost magnetHost = context.host().getMagnetHost();
         if (!magnetHost.matchesPickup(key)) {
             return false;
         }
-        WirelessTerminalMagnetMode mode = WirelessTerminals.getMagnetMode(context.stack, context.terminal);
+        WirelessTerminalMagnetMode mode = WirelessTerminals.getMagnetMode(context.stack(), context.terminal());
         if (mode.pickupToME() && magnetHost.matchesInsert(key) && insertStack(context, itemStack)) {
             int pickedUp = entityItem.getItem().getCount() - itemStack.getCount();
             if (pickedUp > 0) {
@@ -310,14 +297,14 @@ public final class WirelessTerminalActions {
     }
 
     public static boolean isPickBlockEnabled(EntityPlayerMP player) {
-        TerminalContext context = findUsableTerminal(player,
-            terminal -> WirelessTerminals.isPickBlockEnabled(terminal.stack, terminal.terminal));
+        TerminalContext context = WirelessTerminalApi.findUsableWirelessTermOfPlayer(player,
+            terminal -> WirelessTerminals.isPickBlockEnabled(terminal.stack(), terminal.terminal()));
         return context != null;
     }
 
     public static boolean isCraftIfMissingEnabled(EntityPlayerMP player) {
-        TerminalContext context = findUsableTerminal(player,
-            terminal -> WirelessTerminals.isCraftIfMissingEnabled(terminal.stack, terminal.terminal));
+        TerminalContext context = WirelessTerminalApi.findUsableWirelessTermOfPlayer(player,
+            terminal -> WirelessTerminals.isCraftIfMissingEnabled(terminal.stack(), terminal.terminal()));
         return context != null;
     }
 
@@ -326,8 +313,8 @@ public final class WirelessTerminalActions {
         if (key == null) {
             return false;
         }
-        long inserted = StorageHelper.poweredInsert(context.energySource, context.host.getInventory(), key,
-            stack.getCount(), new PlayerSource(context.player, context.actionHost));
+        long inserted = StorageHelper.poweredInsert(context.energySource(), context.host().getInventory(), key,
+            stack.getCount(), new PlayerSource(context.player(), context.actionHost()));
         if (inserted <= 0) {
             return false;
         }
@@ -336,7 +323,7 @@ public final class WirelessTerminalActions {
     }
 
     private static boolean hasMagnetCard(TerminalContext context) {
-        return context.host.getUpgrades().isInstalled(AEItems.MAGNET_CARD.item());
+        return context.host().getUpgrades().isInstalled(AEItems.MAGNET_CARD.item());
     }
 
     private static PendingRestockPlan computePendingRestockPlan(RestockSlotSnapshot[] snapshots) {
@@ -370,77 +357,6 @@ public final class WirelessTerminalActions {
             case PICKUP_ME -> PlayerMessages.WirelessMagnetME;
             case PICKUP_ME_NO_MAGNET -> PlayerMessages.WirelessMagnetMENoMagnet;
         };
-    }
-
-    @Nullable
-    private static TerminalContext findUsableTerminal(EntityPlayerMP player, Predicate<TerminalContext> predicate) {
-        for (int slot = 0; slot < player.inventory.getSizeInventory(); slot++) {
-            TerminalContext context = getTerminal(player, GuiHostLocators.forInventorySlot(slot));
-            if (context != null && predicate.test(context)) {
-                return context;
-            }
-        }
-
-        int baubleSlots = BaublesIntegration.getSlots(player);
-        for (int slot = 0; slot < baubleSlots; slot++) {
-            TerminalContext context = getTerminal(player, GuiHostLocators.forBaubleSlot(slot));
-            if (context != null && predicate.test(context)) {
-                return context;
-            }
-        }
-        return null;
-    }
-
-    @Nullable
-    private static TerminalContext getTerminal(EntityPlayerMP player, ItemGuiHostLocator locator) {
-        ItemStack stack = locator.locateItem(player);
-        WirelessTerminalItem terminal = WirelessTerminalRegistry.ofStack(stack);
-        if (terminal == null) {
-            return null;
-        }
-
-        Object cacheKey = locator instanceof InventoryItemLocator inventoryLocator
-            ? new TerminalSlotKey(false, inventoryLocator.getItemIndex())
-            : locator instanceof BaublesItemLocator baublesLocator
-                ? new TerminalSlotKey(true, baublesLocator.getBaubleSlot())
-                : locator;
-        Object2ObjectMap<Object, WirelessTerminalGuiHost<?>> playerHosts = HOST_CACHE.get(player);
-        if (playerHosts == null) {
-            playerHosts = new Object2ObjectOpenHashMap<>();
-            HOST_CACHE.put(player, playerHosts);
-        }
-
-        WirelessTerminalGuiHost<?> host = playerHosts.get(cacheKey);
-        if (host == null || host.getItem() != stack.getItem() || host.getTerminalItem() != terminal) {
-            host = locator.locate(player, WirelessTerminalGuiHost.class);
-            if (host == null) {
-                return null;
-            }
-            playerHosts.put(cacheKey, host);
-        } else {
-            host.refreshConnectionState();
-        }
-
-        if (!host.getLinkStatus().connected()) {
-            return null;
-        }
-        IGridNode node = host.getActionableNode();
-        if (node == null || !node.isActive()) {
-            return null;
-        }
-        IEnergySource energySource = host instanceof IEnergySource source
-            ? source
-            : new ActionHostEnergySource(host);
-        return new TerminalContext(player, locator, stack, terminal, host, host, node, energySource);
-    }
-
-    private record TerminalSlotKey(boolean bauble, int slot) {
-    }
-
-    private record TerminalContext(EntityPlayerMP player, ItemGuiHostLocator locator, ItemStack stack,
-                                   WirelessTerminalItem terminal, WirelessTerminalGuiHost<?> host,
-                                   IActionHost actionHost,
-                                   IGridNode node, IEnergySource energySource) {
     }
 
     private record RestockPlanKey(UUID playerId, String terminalKey) {

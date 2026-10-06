@@ -12,6 +12,8 @@ import ae2.tile.misc.CanerMode;
 public enum GuiText implements LocalizationEnum {
     Items,
     Amount,
+    AmountsInNetwork,
+    AmountsInNetworkQuerying,
     Fluids,
     Inventory,
     Config,

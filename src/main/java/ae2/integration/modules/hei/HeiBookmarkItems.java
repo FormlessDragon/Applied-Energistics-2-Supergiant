@@ -5,6 +5,7 @@ import ae2.mixins.hei.AccessorBookmarkItem;
 import mezz.jei.bookmarks.BookmarkItem;
 import mezz.jei.bookmarks.BookmarkList;
 import mezz.jei.config.Config;
+import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -64,6 +65,18 @@ public final class HeiBookmarkItems {
             return new GenericStack(stack.what(), amount);
         }
         return stack;
+    }
+
+    /**
+     * True if the given ingredient is a HEI bookmark item that wraps an ItemStack, in which case the tooltip HEI draws
+     * for it is the one of that item stack.
+     */
+    public static boolean isItemStack(Object ingredient) {
+        if (!isBookmarkItem(ingredient)) {
+            return false;
+        }
+
+        return unwrapBookmark(ingredient) instanceof ItemStack;
     }
 
     /**

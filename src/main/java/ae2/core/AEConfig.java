@@ -277,6 +277,10 @@ public class AEConfig {
         return TOOLTIP.showHeiTooltips;
     }
 
+    public boolean isShowAmountsInNetwork() {
+        return TOOLTIP.showAmountsInNetwork;
+    }
+
     public boolean isAnnihilationPlaneSkyDustGenerationEnabled() {
         return AUTOMATION.annihilationPlaneSkyDustGeneration;
     }
@@ -818,6 +822,10 @@ public class AEConfig {
         @Config.Name("showHeiTooltips")
         @Config.Comment("Show requesting items/crafting and auto-pin in Hei tooltips.")
         public boolean showHeiTooltips = true;
+
+        @Config.Name("showIngredientNetworkAmount")
+        @Config.Comment("Show amounts of ingredients in the network in tooltips.")
+        public boolean showAmountsInNetwork = true;
     }
 
     public static class Wireless {

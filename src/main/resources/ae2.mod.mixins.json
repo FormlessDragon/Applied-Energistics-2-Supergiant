@@ -10,6 +10,7 @@
     "hei.AccessorRecipeLayout",
     "hei.MixinGuiContainerWrapper",
     "hei.MixinGuiScreenHelper",
+    "hei.MixinIngredientRenderer",
     "hei.MixinInputHandler",
     "hei.MixinInputHandlerFocus",
     "hei.MixinRecipeLayout",

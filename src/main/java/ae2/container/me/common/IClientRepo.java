@@ -18,6 +18,7 @@
 
 package ae2.container.me.common;
 
+import ae2.api.stacks.AEKey;
 import net.minecraft.item.crafting.Ingredient;
 
 import java.util.Collection;
@@ -47,4 +48,12 @@ public interface IClientRepo {
      * Find all entries that match the given ingredient.
      */
     Collection<GridInventoryEntry> getByIngredient(Ingredient ingredient);
+
+    /**
+     * Find the entry that matches the given key.
+     *
+     * @param what The key to search for.
+     * @return The matching entry, or null if not found.
+     */
+    GridInventoryEntry getByKey(AEKey what);
 }

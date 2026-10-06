@@ -767,6 +767,10 @@ public class Repo implements IClientRepo {
         }
     }
 
+    public final GridInventoryEntry getByKey(AEKey what) {
+        return this.liveEntriesByKey.get(what);
+    }
+
     public final void setUpdateViewListener(Runnable updateViewListener) {
         this.updateViewListener = updateViewListener;
     }

@@ -38,6 +38,29 @@ public final class GenericIngredientHelper {
         return null;
     }
 
+    /**
+     * True when HEI builds this ingredient's tooltip from an item stack, which means the item tooltip event already
+     * reported it and it must not be reported a second time. Plain item stacks count, and so does a HEI bookmark item
+     * wrapping one, because the tooltip HEI draws for a bookmark is the one of the ingredient it wraps.
+     */
+    public static boolean hasItemStackTooltip(@Nullable Object ingredient) {
+        return ingredient instanceof ItemStack || (HeiCompat.isHei() && HeiBookmarkItems.isItemStack(ingredient));
+    }
+
+    @Nullable
+    public static Object getHoveredIngredient() {
+        var runtime = HeiPlugin.getRuntime();
+        if (runtime == null) {
+            return null;
+        }
+
+        Object ingredient = runtime.getIngredientListOverlay().getIngredientUnderMouse();
+        if (ingredient != null) {
+            return ingredient;
+        }
+        return runtime.getBookmarkOverlay().getIngredientUnderMouse();
+    }
+
     @Nullable
     public static Object stackToIngredient(GenericStack stack) {
         if (stack == null) return null;
