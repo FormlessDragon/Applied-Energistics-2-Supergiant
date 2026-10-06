@@ -19,7 +19,6 @@ import static ae2.items.tools.powered.PortableItemCellAutoPickup.HOTKEY_ID;
 public final class Hotkeys {
 
     private static final Map<String, Hotkey> HOTKEYS = new Object2ObjectOpenHashMap<>();
-    private static final int RIGHT_MOUSE_BUTTON = -99;
 
     private Hotkeys() {
     }
@@ -27,7 +26,7 @@ public final class Hotkeys {
     private static Hotkey createHotkey(String id) {
         if (HOTKEY_ID.equals(id)) {
             return new Hotkey(id, new KeyBinding("key.ae2." + id, KeyConflictContext.IN_GAME, KeyModifier.CONTROL,
-                RIGHT_MOUSE_BUTTON, "key.ae2.category"));
+                ActionKey.MouseButton.RIGHT, "key.ae2.category"));
         }
         return new Hotkey(id, new KeyBinding("key.ae2." + id, Keyboard.KEY_NONE, "key.ae2.category"));
     }
