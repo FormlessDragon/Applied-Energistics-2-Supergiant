@@ -16,7 +16,6 @@ import ae2.core.network.clientbound.NetworkAmountResultPacket;
 import ae2.core.network.serverbound.NetworkAmountQueryPacket;
 import ae2.integration.modules.baubles.BaublesIntegration;
 import ae2.integration.modules.hei.GenericIngredientHelper;
-import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -29,6 +28,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.WeakHashMap;
 
 /**
  * Shows how much of the hovered ingredient the player's ME network stores.
@@ -46,8 +46,8 @@ public class NetworkAmount {
     private static long inventoryTerminals;
     private static long baubleTerminals;
 
-    private static final Object2LongOpenHashMap<AEKey> AMOUNTS = new Object2LongOpenHashMap<>();
-    private static final Object2LongOpenHashMap<AEKey> REFRESH_AT = new Object2LongOpenHashMap<>();
+    private static final WeakHashMap<AEKey, Long> AMOUNTS = new WeakHashMap<>();
+    private static final WeakHashMap<AEKey, Long> REFRESH_AT = new WeakHashMap<>();
 
     private static int clientTicks;
     private static int scanCountdown = SCAN_TICKS;
@@ -77,8 +77,7 @@ public class NetworkAmount {
         AMOUNTS.put(what, amount);
         // The next request is counted from the answer, so that a response slower than the refresh period does not make
         // the next frame ask again.
-        REFRESH_AT.put(what,
-            clientTicks + (amount == NetworkAmountResultPacket.NO_ANSWER ? IDLE_TICKS : REFRESH_TICKS));
+        REFRESH_AT.put(what, (long) (clientTicks + (amount == NetworkAmountResultPacket.NO_ANSWER ? IDLE_TICKS : REFRESH_TICKS)));
         if (amount == NetworkAmountResultPacket.NO_ANSWER) {
             // The terminals may have moved since they were last looked for.
             scanCountdown = 0;
@@ -127,13 +126,13 @@ public class NetworkAmount {
             return;
         }
 
-        if (clientTicks >= REFRESH_AT.getLong(what)) {
-            REFRESH_AT.put(what, clientTicks + REFRESH_TICKS);
+        if (clientTicks >= REFRESH_AT.get(what)) {
+            REFRESH_AT.put(what, (long) (clientTicks + REFRESH_TICKS));
             InitNetwork.sendToServer(new NetworkAmountQueryPacket(what, inventoryTerminals, baubleTerminals));
         }
 
         if (AMOUNTS.containsKey(what)) {
-            long amount = AMOUNTS.getLong(what);
+            long amount = AMOUNTS.get(what);
             if (amount == NetworkAmountResultPacket.NO_ANSWER) {
                 return;
             }

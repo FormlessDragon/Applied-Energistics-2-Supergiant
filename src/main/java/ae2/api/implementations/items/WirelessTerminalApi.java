@@ -30,7 +30,7 @@ import java.util.function.Supplier;
 
 @SuppressWarnings("unused")
 public final class WirelessTerminalApi {
-    private static final Object2ObjectMap<EntityPlayerMP, Object2ObjectMap<Object, WirelessTerminalGuiHost<?>>> HOST_CACHE =
+    private static final Object2ObjectMap<UUID, Object2ObjectMap<Object, WirelessTerminalGuiHost<?>>> HOST_CACHE =
         new Object2ObjectOpenHashMap<>();
 
     private WirelessTerminalApi() {
@@ -129,7 +129,7 @@ public final class WirelessTerminalApi {
     }
 
     public static void clear(UUID playerId) {
-        HOST_CACHE.entrySet().removeIf(entry -> entry.getKey().getUniqueID().equals(playerId));
+        HOST_CACHE.remove(playerId);
     }
 
     /**
@@ -177,10 +177,10 @@ public final class WirelessTerminalApi {
             : locator instanceof BaublesItemLocator baublesLocator
             ? new TerminalSlotKey(true, baublesLocator.getBaubleSlot())
             : locator;
-        Object2ObjectMap<Object, WirelessTerminalGuiHost<?>> playerHosts = HOST_CACHE.get(player);
+        Object2ObjectMap<Object, WirelessTerminalGuiHost<?>> playerHosts = HOST_CACHE.get(player.getUniqueID());
         if (playerHosts == null) {
             playerHosts = new Object2ObjectOpenHashMap<>();
-            HOST_CACHE.put(player, playerHosts);
+            HOST_CACHE.put(player.getUniqueID(), playerHosts);
         }
 
         WirelessTerminalGuiHost<?> host = playerHosts.get(cacheKey);
