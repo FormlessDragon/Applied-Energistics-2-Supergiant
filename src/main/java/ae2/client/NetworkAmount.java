@@ -126,7 +126,7 @@ public class NetworkAmount {
             return;
         }
 
-        if (clientTicks >= REFRESH_AT.get(what)) {
+        if (clientTicks >= REFRESH_AT.getOrDefault(what, 0L)) {
             REFRESH_AT.put(what, (long) (clientTicks + REFRESH_TICKS));
             InitNetwork.sendToServer(new NetworkAmountQueryPacket(what, inventoryTerminals, baubleTerminals));
         }
