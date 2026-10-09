@@ -29,7 +29,7 @@ public class AE2MixinPlugin implements IMixinConfigPlugin {
         "ae2.mixins.hei.MixinLeftAreaDispatcher");
 
     private static final boolean JEI_PRESENT = CleanroomModDiscoverer.instance().isModPresent("jei");
-    private static final boolean HEI_PRESENT = isClassPresent("mezz.jei.command.CommandTreeHEI");
+    private static final boolean HEI_PRESENT = isClassPresent("mezz.jei.gui.navigation.NavigationLayout");
 
     /**
      * Checks whether a class is on the classpath, without loading it. Mixins are applied long before mod classes may
