@@ -310,7 +310,9 @@ public class CraftingCpuLogic {
         while (it.hasNext()) {
             var task = it.next();
             if (task.getValue().value <= 0) {
-                it.remove();
+                // Keep dispatched patterns in the job after their remaining push count reaches zero. Their outputs may
+                // still be crafting in a provider, and the crafting-status supplier trace needs the pattern details to
+                // resolve that provider. Zero-valued tasks are ignored by input-demand and pending-output accounting.
                 continue;
             }
 
@@ -334,7 +336,6 @@ public class CraftingCpuLogic {
                     break taskLoop;
                 }
                 if (task.getValue().value <= 0) {
-                    it.remove();
                     continue taskLoop;
                 }
                 if (pushedPatterns == maxPatterns) {
