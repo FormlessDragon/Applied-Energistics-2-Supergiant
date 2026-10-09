@@ -31,7 +31,7 @@ public abstract class MixinLeftAreaDispatcher {
             && this.current < this.contents.size()
             && this.contents.get(this.current) instanceof BookmarkOverlay bookmarkOverlay
             && ae2$handleBookmarkDrag(bookmarkOverlay, mouseX, mouseY)) {
-            cir.setReturnValue(true);
+            cir.setReturnValue(Boolean.TRUE);
         }
     }
 

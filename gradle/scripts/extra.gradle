@@ -2,7 +2,7 @@
 // This file is automatically applied after build.gradle + dependencies.gradle is ran
 
 def minecraftVersion = '1.12.2'
-def cleanroomVersion = '0.6.10-alpha'
+def cleanroomVersion = '0.6.13-alpha'
 
 def cleanroomInstaller = configurations.maybeCreate('cleanroomInstaller')
 cleanroomInstaller.canBeConsumed = false
