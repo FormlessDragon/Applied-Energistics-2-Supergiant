@@ -22,6 +22,7 @@ import ae2.api.parts.CableRenderMode;
 import ae2.client.ClientTickHandler;
 import ae2.client.EffectType;
 import ae2.client.Hotkeys;
+import ae2.client.NetworkAmount;
 import ae2.client.ActionKey;
 import ae2.client.ActionKeys;
 import ae2.client.PatternView;
@@ -97,6 +98,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.client.event.MouseEvent;
 import net.minecraftforge.client.event.TextureStitchEvent;
@@ -181,6 +183,7 @@ public final class AppEngClient extends AppEngServer {
         MinecraftForge.EVENT_BUS.register(ProfileRender.INSTANCE);
         MinecraftForge.EVENT_BUS.register(BeamFormerBloom.INSTANCE);
         MinecraftForge.EVENT_BUS.register(MouseHelper.INSTANCE);
+        MinecraftForge.EVENT_BUS.register(NetworkAmount.INSTANCE);
         MinecraftForge.EVENT_BUS.register(new Object() {
             @SubscribeEvent(priority = EventPriority.HIGH)
             public void onMouseInput(GuiScreenEvent.MouseInputEvent.Pre event) {
@@ -302,9 +305,15 @@ public final class AppEngClient extends AppEngServer {
     }
 
     @SubscribeEvent
+    public void guiOpen(GuiOpenEvent event) {
+        NetworkAmount.clear();
+    }
+
+    @SubscribeEvent
     public void clientTick(TickEvent.ClientTickEvent event) {
         if (event.phase == TickEvent.Phase.START) {
             WirelessTerminalPickBlockHook.tick();
+            NetworkAmount.tick();
             updateCableRenderMode();
             syncPartPlacementOppositeState();
             return;
@@ -456,6 +465,7 @@ public final class AppEngClient extends AppEngServer {
         PriorityTunerHighlightHandler.INSTANCE.clear();
         PendingCraftingJobs.clearPendingJobs();
         PinnedKeys.clearPinnedKeys();
+        NetworkAmount.clear();
         Integrations.hei().clearIngredientSortRanks();
     }
 

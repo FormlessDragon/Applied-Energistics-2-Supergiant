@@ -13,6 +13,7 @@
     "hei.MixinBookmarkOverlay",
     "hei.MixinGuiContainerWrapper",
     "hei.MixinGuiScreenHelper",
+    "hei.MixinIngredientRenderer",
     "hei.MixinInputHandler",
     "hei.MixinInputHandlerFocus",
     "hei.MixinLeftAreaDispatcher",
