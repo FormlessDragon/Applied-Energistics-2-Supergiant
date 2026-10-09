@@ -17,16 +17,17 @@ import java.util.Set;
  * which side a mixin belongs to: the ones that need them are only applied on HEI, every other mixin works with either.
  */
 public class AE2MixinPlugin implements IMixinConfigPlugin {
-    /**
-     * Mixins that only work on HEI.
-     */
+
     private static final Set<String> HEI_ONLY_MIXINS = Set.of(
         "ae2.mixins.hei.AccessorBookmarkItem",
         "ae2.mixins.hei.MixinInputHandlerFocus");
 
-    /**
-     * Whether HEI rather than plain JEI is installed. It is the only one of the two that has bookmark items.
-     */
+    private static final Set<String> PLAIN_JEI_ONLY_MIXINS = Set.of(
+        "ae2.mixins.hei.AccessorBookmarkOverlay",
+        "ae2.mixins.hei.InvokerGhostIngredientDragManager",
+        "ae2.mixins.hei.MixinBookmarkOverlay",
+        "ae2.mixins.hei.MixinLeftAreaDispatcher");
+
     private static final boolean HEI_PRESENT = isClassPresent("mezz.jei.bookmarks.BookmarkItem");
 
     /**
@@ -56,6 +57,9 @@ public class AE2MixinPlugin implements IMixinConfigPlugin {
         }
         if (!Loader.isModLoaded("jei")) {
             return false;
+        }
+        if (PLAIN_JEI_ONLY_MIXINS.contains(mixinClassName)) {
+            return !HEI_PRESENT;
         }
         return !HEI_ONLY_MIXINS.contains(mixinClassName) || HEI_PRESENT;
     }

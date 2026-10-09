@@ -7,11 +7,15 @@
   "target": "@env(MOD)",
   "refmap": "ae2.refmap.json",
   "client": [
+    "hei.AccessorBookmarkOverlay",
     "hei.AccessorRecipeLayout",
+    "hei.InvokerGhostIngredientDragManager",
+    "hei.MixinBookmarkOverlay",
     "hei.MixinGuiContainerWrapper",
     "hei.MixinGuiScreenHelper",
     "hei.MixinInputHandler",
     "hei.MixinInputHandlerFocus",
+    "hei.MixinLeftAreaDispatcher",
     "hei.MixinRecipeLayout",
     "hei.MixinRecipesGui"
   ],
