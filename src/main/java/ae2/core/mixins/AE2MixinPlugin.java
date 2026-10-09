@@ -1,6 +1,6 @@
 package ae2.core.mixins;
 
-import net.minecraftforge.fml.common.Loader;
+import com.cleanroommc.discovery.CleanroomModDiscoverer;
 import org.jetbrains.annotations.Nullable;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
@@ -28,7 +28,8 @@ public class AE2MixinPlugin implements IMixinConfigPlugin {
         "ae2.mixins.hei.MixinBookmarkOverlay",
         "ae2.mixins.hei.MixinLeftAreaDispatcher");
 
-    private static final boolean HEI_PRESENT = isClassPresent("mezz.jei.bookmarks.BookmarkItem");
+    private static final boolean JEI_PRESENT = CleanroomModDiscoverer.instance().isModPresent("jei");
+    private static final boolean HEI_PRESENT = isClassPresent("mezz.jei.command.CommandTreeHEI");
 
     /**
      * Checks whether a class is on the classpath, without loading it. Mixins are applied long before mod classes may
@@ -55,7 +56,7 @@ public class AE2MixinPlugin implements IMixinConfigPlugin {
         if (!mixinClassName.startsWith("ae2.mixins.hei.")) {
             return true;
         }
-        if (!Loader.isModLoaded("jei")) {
+        if (!JEI_PRESENT) {
             return false;
         }
         if (PLAIN_JEI_ONLY_MIXINS.contains(mixinClassName)) {
