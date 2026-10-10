@@ -92,10 +92,9 @@ public class SwitchGuisPacket extends ServerboundPacket {
     public static boolean openSubGui(EntityPlayer player, GuiHostLocator locator, GuiIds.GuiKey guiKey,
                                      @Nullable Container returnToContainerOverride,
                                      boolean capturePreviousExternalGui) {
-        if (player.getClass() != EntityPlayerMP.class) {
+        if (!(player instanceof EntityPlayerMP serverPlayer)) {
             return false;
         }
-        EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
 
         Class<?> hostType = getHostType(guiKey);
         if (hostType == null) {
