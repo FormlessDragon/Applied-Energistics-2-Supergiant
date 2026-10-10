@@ -1,6 +1,6 @@
 package ae2.core.mixins;
 
-import net.minecraftforge.fml.common.Loader;
+import com.cleanroommc.discovery.CleanroomModDiscoverer;
 import org.jetbrains.annotations.Nullable;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
@@ -28,7 +28,7 @@ public class AE2MixinPlugin implements IMixinConfigPlugin {
         "ae2.mixins.hei.MixinBookmarkOverlay",
         "ae2.mixins.hei.MixinLeftAreaDispatcher");
 
-    private final boolean JEI_PRESENT = Loader.isModLoaded("jei");
+    private final boolean JEI_PRESENT = CleanroomModDiscoverer.instance().isModPresent("jei");
     private final boolean HEI_PRESENT = isClassPresent("mezz.jei.gui.navigation.NavigationLayout");
 
     /**
