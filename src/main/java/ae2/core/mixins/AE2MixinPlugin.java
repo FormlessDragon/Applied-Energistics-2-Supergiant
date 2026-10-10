@@ -1,13 +1,17 @@
 package ae2.core.mixins;
 
+import ae2.core.AELog;
 import com.cleanroommc.discovery.CleanroomModDiscoverer;
 import org.jetbrains.annotations.Nullable;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.jar.JarFile;
 
 /**
  * Decides which mixins are applied.
@@ -29,19 +33,19 @@ public class AE2MixinPlugin implements IMixinConfigPlugin {
         "ae2.mixins.hei.MixinLeftAreaDispatcher");
 
     private final boolean JEI_PRESENT = CleanroomModDiscoverer.instance().isModPresent("jei");
-    private final boolean HEI_PRESENT = isClassPresent("mezz.jei.gui.navigation.NavigationLayout");
+    private final boolean HEI_PRESENT = isClassPresent("jei", "mezz.jei.gui.navigation.NavigationLayout");
 
-    /**
-     * Checks whether a class is on the classpath, without loading it. Mixins are applied long before mod classes may
-     * be touched, so a lookup of the class file is all that can be done here.
-     */
-    public boolean isClassPresent(String className) {
-        try {
-            Class.forName(className, false, this.getClass().getClassLoader());
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
+    public boolean isClassPresent(String modid, String className) {
+        for (File src : CleanroomModDiscoverer.instance().modSources(modid)) {
+            try (JarFile jar = new JarFile(src)) {
+                if (jar.getEntry(className.replace(".", "/") + ".class") != null) {
+                    return true;
+                }
+            } catch (IOException ignored) {
+                return false;
+            }
         }
+        return false;
     }
 
     @Override
