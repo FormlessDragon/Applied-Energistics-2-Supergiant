@@ -96,10 +96,16 @@ public final class GuiOpener {
     public static boolean openWirelessTerminalGui(EntityPlayer player, WirelessTerminalDefinition definition,
                                                   ItemGuiHostLocator locator, boolean returnedFromSubScreen) {
         Integer slot = locator.getPlayerInventorySlot();
+        int terminalIndex = WirelessTerminalRegistry.indexOf(definition);
         if (slot == null) {
+            if (canOpenFromBaubles(GuiIds.GuiKey.WIRELESS_TERMINAL_DYNAMIC) && locator instanceof BaublesItemLocator baublesLocator) {
+                player.openGui(AppEngBase.instance(), GuiIds.getGuiId(GuiIds.GuiKey.WIRELESS_TERMINAL_DYNAMIC, returnedFromSubScreen), player.world,
+                    encodeBaublesLocator(baublesLocator), terminalIndex, 0);
+                return true;
+            }
             return false;
         }
-        int terminalIndex = WirelessTerminalRegistry.indexOf(definition);
+
         player.openGui(AppEngBase.instance(),
             GuiIds.getGuiId(GuiIds.GuiKey.WIRELESS_TERMINAL_DYNAMIC, returnedFromSubScreen),
             player.world, slot, terminalIndex, 0);
@@ -109,7 +115,8 @@ public final class GuiOpener {
     private static boolean canOpenFromBaubles(GuiIds.GuiKey key) {
         return key == GuiIds.GuiKey.PATTERN_MODIFIER
             || key == GuiIds.GuiKey.PORTABLE_ITEM_CELL
-            || key == GuiIds.GuiKey.PORTABLE_FLUID_CELL;
+            || key == GuiIds.GuiKey.PORTABLE_FLUID_CELL
+            || key == GuiIds.GuiKey.WIRELESS_TERMINAL_DYNAMIC;
     }
 
     private static int encodeBaublesLocator(BaublesItemLocator locator) {

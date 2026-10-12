@@ -1483,8 +1483,8 @@ public class AEGuiHandler implements IGuiHandler {
     }
 
     private ItemGuiHostLocator getInventoryOrBaublesLocator(int x, int y, int z) {
-        if (x < 0 && y == 0 && z == 0) {
-            return GuiHostLocators.forBaubleSlot(-x - 1);
+        if (x < 0 && y >= 0 && z == 0) {
+            return GuiHostLocators.forBaubleSlot(- x - 1);
         }
         return GuiHostLocators.forInventorySlot(x);
     }
@@ -1496,7 +1496,7 @@ public class AEGuiHandler implements IGuiHandler {
             return null;
         }
 
-        ItemGuiHostLocator locator = GuiHostLocators.forInventorySlot(slot);
+        ItemGuiHostLocator locator = getInventoryOrBaublesLocator(slot, terminalIndex, 0);
         ItemGuiHost<?> host = createItemGuiHost(player, locator, definition);
         if (!(host instanceof WirelessTerminalGuiHost<?> wirelessHost)) {
             return null;
