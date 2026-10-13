@@ -872,6 +872,47 @@ reported, because the server sends these updates only to the requesting player, 
 dedicated server. Exceptions thrown by a listener are logged and swallowed so job tracking cannot be broken by a
 faulty add-on.
 
+### Pattern Recipe Transfer Event
+
+`ae2.api.client.PatternRecipeTransferEvent` is posted on the Forge event bus once a recipe transfer into a pattern
+encoding terminal has been resolved into the slots that are about to be written. It is posted on the client, after AE2
+resolved the recipe and before any packet is sent to the server, so a listener can still change what is transferred.
+
+`getRecipeCategoryUid()` and `getRecipeCategoryTitle()` describe the recipe type the transfer came from. The UID is the
+HEI/JEI recipe category id, the title is resolved on the client and therefore already localized, and it is `null` when
+the recipe category is unknown.
+
+`getInputSlots()` and `getOutputSlots()` expose the ingredients that will be written. Each
+`ae2.api.client.PatternRecipeTransferSlot` can be read and changed: `setStack(...)` replaces the ingredient of that
+slot, while `setStack(null)` or `clear()` leaves it empty. The key of the written stack is always added to the slot's
+candidate list, which is what keeps the recipe type attached to the encoded pattern. For a processing transfer the
+slot index is the index of the encoded input or output slot, and empty slots are dropped and packed before writing.
+For a crafting transfer `getInputSlots()` always has nine entries whose index is the 3x3 grid position,
+`getOutputSlots()` is empty, and changing an ingredient makes AE2 fall back to a normal recipe lookup if the grid no
+longer matches the transferred recipe.
+
+```java
+@SubscribeEvent
+public void onPatternRecipeTransfer(PatternRecipeTransferEvent event) {
+    if (!"my_mod.my_category".equals(event.getRecipeCategoryUid())) {
+        return;
+    }
+
+    for (PatternRecipeTransferSlot slot : event.getInputSlots()) {
+        if (slot.getStack() != null && slot.getStack().what().equals(MY_KEY)) {
+            slot.setStack(new GenericStack(REPLACEMENT, slot.getStack().amount()));
+        }
+    }
+}
+```
+
+A listener aborts the whole transfer with `event.setCanceled(true)`; AE2 then writes no slot, does not change the
+terminal mode, and sends no packet. The event never fires on a dedicated server. Exceptions thrown by a listener are
+logged and swallowed so a faulty add-on cannot break the transfer, and a cancellation requested before the exception
+is still honored. The candidate list of a slot can be changed through `getCandidates()`; oversized candidate sets are
+validated by the server, and AE2 drops the recipe type rather than failing the transfer when the payload would exceed
+the network limit.
+
 ## Cell Terminal Integration
 
 The Cell Terminal discovers storage targets, storage buses, and subnets through pluggable scanners. Addons register

@@ -63,6 +63,7 @@ import net.minecraft.nbt.JsonToNBT;
 import net.minecraft.nbt.NBTException;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -127,7 +128,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
 
     private static final Container DUMMY_CONTAINER = new Container() {
         @Override
-        public boolean canInteractWith(EntityPlayer playerIn) {
+        public boolean canInteractWith(@NotNull EntityPlayer playerIn) {
             return false;
         }
     };
@@ -608,11 +609,11 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         return false;
     }
 
-    private ItemStack resolveCraftingRecipe() {
+    private void resolveCraftingRecipe() {
         this.deferredRecipeLookup.clear();
         if (this.mode != EncodingMode.CRAFTING) {
             clearCraftingRecipeState();
-            return ItemStack.EMPTY;
+            return;
         }
 
         ItemStack[] ingredients = new ItemStack[CRAFTING_GRID_SLOTS];
@@ -629,7 +630,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
 
         if (invalidIngredient || !hasIngredient) {
             clearCraftingRecipeState();
-            return ItemStack.EMPTY;
+            return;
         }
 
         boolean ingredientsChanged = !areCraftingIngredientsEqual(ingredients);
@@ -663,10 +664,8 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
 
         if (this.currentRecipe == null) {
             setCraftingOutput(ItemStack.EMPTY);
-            return ItemStack.EMPTY;
         }
 
-        return this.craftOutputSlot.getStack();
     }
 
     private void markCraftingRecipeDirty() {
@@ -1801,9 +1800,32 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
             if (recipeTypeUid == null || recipeTypeUid.isEmpty()) {
                 return;
             }
+            if (!fitsHeiProcessingRecipePayload(recipeTypeUid, inputCandidateKeyTags)) {
+                AELog.warn("HEI processing recipe type %s was not sent because the candidate payload is too large",
+                    recipeTypeUid);
+                return;
+            }
             sendClientAction(ACTION_SET_HEI_PROCESSING_RECIPE,
                 new HeiProcessingRecipeRequest(recipeTypeUid, inputCandidateKeyTags));
         }
+    }
+
+    private static boolean fitsHeiProcessingRecipePayload(String recipeTypeUid,
+                                                          @Nullable List<List<String>> inputCandidateKeyTags) {
+        long estimate = 128L + 2L * recipeTypeUid.length();
+        if (inputCandidateKeyTags != null) {
+            for (List<String> candidates : inputCandidateKeyTags) {
+                if (candidates == null) {
+                    continue;
+                }
+                for (String candidate : candidates) {
+                    if (candidate != null) {
+                        estimate += 4L + 2L * candidate.length();
+                    }
+                }
+            }
+        }
+        return estimate <= MAX_SET_HEI_PROCESSING_RECIPE_PAYLOAD_LENGTH;
     }
 
     public void setHeiCraftingRecipe(@Nullable ResourceLocation recipeId) {

@@ -606,6 +606,31 @@ public void onCraftingJobState(CraftingJobStateEvent event) {
 
 该事件在 AE2 执行自身处理（例如完成提示 toast）之前发布，因此无论玩家是否携带无线终端，监听方都能收到通知。由于服务端只会把这些更新发送给发起请求的玩家，事件仅上报本地玩家所拥有的任务，并且永远不会在专用服务器上触发。监听方抛出的异常会被记录并吞掉，以免有缺陷的附加模组破坏任务跟踪。
 
+### 配方转移事件
+
+当向样板编码终端的配方转移已被解析成将要写入的槽位之后，`ae2.api.client.PatternRecipeTransferEvent` 会发布到 Forge 事件总线。事件在客户端发布，位于 AE2 解析完配方之后、任何数据包发往服务端之前，因此监听方仍能改写本次转移的内容。
+
+`getRecipeCategoryUid()` 与 `getRecipeCategoryTitle()` 描述配方类型：UID 是 HEI/JEI 的配方分类 id，标题在客户端解析、已经是本地化文本，分类未知时为 `null`。
+
+`getInputSlots()` 与 `getOutputSlots()` 暴露将要写入的 ingredient。每个 `ae2.api.client.PatternRecipeTransferSlot` 都可读写：`setStack(...)` 替换该槽的 ingredient，`setStack(null)` 或 `clear()` 将其留空；写入 stack 的 key 总会并入该槽的候选列表，这正是配方类型得以保留的原因。处理样板转移时，槽位下标就是编码后的输入/输出槽下标，空槽在写入前会被丢弃并打包；合成样板转移时 `getInputSlots()` 恒为 9 项、下标即 3×3 合成格位置，`getOutputSlots()` 为空，改写 ingredient 后若格子与服务端配方不再匹配，AE2 会回落到正常配方查找。
+
+```java
+@SubscribeEvent
+public void onPatternRecipeTransfer(PatternRecipeTransferEvent event) {
+    if (!"my_mod.my_category".equals(event.getRecipeCategoryUid())) {
+        return;
+    }
+
+    for (PatternRecipeTransferSlot slot : event.getInputSlots()) {
+        if (slot.getStack() != null && slot.getStack().what().equals(MY_KEY)) {
+            slot.setStack(new GenericStack(REPLACEMENT, slot.getStack().amount()));
+        }
+    }
+}
+```
+
+监听方可以用 `event.setCanceled(true)` 放弃整次转移：AE2 不写任何槽位、不切换终端模式、不发任何数据包。该事件永远不会在专用服务器上触发。监听方抛出的异常会被记录并吞掉，不会破坏转移；异常之前设置的取消状态依然生效。槽位的候选列表可以通过 `getCandidates()` 增删；过大的候选集会交由服务端校验，若载荷超出网络上限，AE2 会丢弃配方类型而不是让转移失败。
+
 ## 存储管理终端集成
 
 存储管理终端通过可插拔的扫描器发现存储目标、存储总线和子网。附加模组在通用初始化阶段通过 `ae2.api.cellterminal.CellTerminalApi` 注册自己的扫描器与目标解析器：
