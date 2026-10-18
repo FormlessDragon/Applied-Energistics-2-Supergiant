@@ -67,12 +67,12 @@ class CraftingDispatchBudgetTest {
         side.set(FMLCommonHandler.instance(), previousSide);
     }
 
-    private static Cpu cpu(int size, int count) throws Exception {
+    private static Cpu cpu(int size, int count) {
         var cluster = new CraftingCPUCluster(BlockPos.ORIGIN, BlockPos.ORIGIN);
         return cpu(cluster.craftingLogic, size, count);
     }
 
-    private static Cpu cpu(CraftingCpuLogic logic, int size, int count) throws Exception {
+    private static Cpu cpu(CraftingCpuLogic logic, int size, int count) {
         var cluster = logic.cluster;
         var link = new CraftingLink(CraftingCpuHelper.generateLinkData(UUID.randomUUID(), true, false), cluster);
         var times = new Object2LongOpenHashMap<IPatternDetails>();
@@ -98,7 +98,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void nonPositiveBudgetDoesNotCallGettersOrMutate() throws Exception {
+    void nonPositiveBudgetDoesNotCallGettersOrMutate() {
         var cpu = cpu(3, 1);
         var energy = new Energy();
         for (int budget : new int[]{Integer.MIN_VALUE, -1, 0}) {
@@ -114,7 +114,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void completedTasksRespectBudgetAndKeepSupplierTrace() throws Exception {
+    void completedTasksRespectBudgetAndKeepSupplierTrace() {
         var cpu = cpu(5, 1);
         var energy = new Energy();
         var provider = new Provider(false);
@@ -131,7 +131,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void fixedSeedMergeAndSinglePushesConserveInputsOutputsAndEnergy() throws Exception {
+    void fixedSeedMergeAndSinglePushesConserveInputsOutputsAndEnergy() {
         var random = new Random(141006L);
         for (int scenario = 0; scenario < 64; scenario++) {
             int size = random.nextInt(1, 10);
@@ -151,7 +151,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void cursorGivesEveryPendingTaskATurn() throws Exception {
+    void cursorGivesEveryPendingTaskATurn() {
         var cpu = cpu(4, 20);
         var energy = new Energy();
         var provider = new Provider(false);
@@ -161,7 +161,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void busyRejectedAndEnergyLimitedProvidersDoNotLoseInputs() throws Exception {
+    void busyRejectedAndEnergyLimitedProvidersDoNotLoseInputs() {
         var cpu = cpu(2, 4);
         var energy = new Energy();
         var busy = new Provider(true);
@@ -181,7 +181,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void providerCannotExpandTheRequestedMergeBudget() throws Exception {
+    void providerCannotExpandTheRequestedMergeBudget() {
         var cpu = cpu(2, 50);
         var provider = new Provider(true);
         provider.limit = Integer.MAX_VALUE;
@@ -190,7 +190,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void emptyTaskTableDoesNotEnterSchedulingBudget() throws Exception {
+    void emptyTaskTableDoesNotEnterSchedulingBudget() {
         var cpu = cpu(1, 1);
         cpu.job.tasks.clear();
         var energy = new Energy();
@@ -203,7 +203,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void recursiveDispatchIsDeferredAndGuardClearsAfterGetterFailure() throws Exception {
+    void recursiveDispatchIsDeferredAndGuardClearsAfterGetterFailure() {
         var cpu = cpu(2, 3);
         var energy = new Energy();
         var provider = new Provider(false);
@@ -224,7 +224,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void cancellationDuringGetterDoesNotSubmitAndNewJobResetsCursor() throws Exception {
+    void cancellationDuringGetterDoesNotSubmitAndNewJobResetsCursor() {
         var cpu = cpu(3, 2);
         var energy = new Energy();
         var provider = new Provider(false);
@@ -239,7 +239,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void acceptedWorkIsReturnedEvenWhenProviderReplacesJob() throws Exception {
+    void acceptedWorkIsReturnedEvenWhenProviderReplacesJob() {
         var cpu = cpu(3, 2);
         var provider = new Provider(false);
         var energy = new Energy();
@@ -252,7 +252,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void simulationReentryCannotPublishWorkFromTheReplacedJob() throws Exception {
+    void simulationReentryCannotPublishWorkFromTheReplacedJob() {
         for (int replacementOnSimulation = 1; replacementOnSimulation <= 2; replacementOnSimulation++) {
             var cpu = cpu(1, 3);
             var provider = new Provider(false);
@@ -313,7 +313,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void remainingBytesUsesExactProductBeforeDivision() throws Exception {
+    void remainingBytesUsesExactProductBeforeDivision() {
         var cpu = cpu(1, 1);
         var random = new Random(550014L);
         for (int i = 0; i < 128; i++) {
@@ -332,7 +332,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void providerCallbackCompletionStopsBeforeInputsAreTakenOrPatternsPushed() throws Exception {
+    void providerCallbackCompletionStopsBeforeInputsAreTakenOrPatternsPushed() {
         for (boolean merge : new boolean[]{false, true}) {
             var cpu = cpu(3, 2);
             var energy = new Energy();
@@ -347,7 +347,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void pendingOutputsUseOneTaskTraversalUntilTaskProgressChanges() throws Exception {
+    void pendingOutputsUseOneTaskTraversalUntilTaskProgressChanges() {
         var cpu = cpu(2, 2);
         Pattern.outputCalls = 0;
         assertEquals(4, cpu.logic.getPendingOutputs(carrot));
@@ -360,7 +360,7 @@ class CraftingDispatchBudgetTest {
     }
 
     @Test
-    void blockedProviderAttemptsAreBoundedAndFairCursorContinuesAcrossTicks() throws Exception {
+    void blockedProviderAttemptsAreBoundedAndFairCursorContinuesAcrossTicks() {
         var cpu = cpu(100, 1);
         var provider = new Provider(false);
         provider.busy = true;
@@ -386,12 +386,12 @@ class CraftingDispatchBudgetTest {
         final IEnergyService service = (IEnergyService) Proxy.newProxyInstance(IEnergyService.class.getClassLoader(),
             new Class<?>[]{IEnergyService.class}, (p, m, a) -> {
                 if (m.getName().equals("extractAEPower")) {
-                    if (a[1] == Actionable.SIMULATE) onSimulate.run();
-                    double result = Math.min((double) a[0], available);
+                    if (a[1] == Actionable.SIMULATE) this.onSimulate.run();
+                    double result = Math.min((double) a[0], this.available);
                     if (a[1] == Actionable.MODULATE) {
-                        spent += result;
-                        available -= result;
-                        onModulate.run();
+                        this.spent += result;
+                        this.available -= result;
+                        this.onModulate.run();
                     }
                     return result;
                 }

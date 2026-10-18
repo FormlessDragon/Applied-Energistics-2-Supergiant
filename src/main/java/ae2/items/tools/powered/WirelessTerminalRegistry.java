@@ -14,6 +14,7 @@ public final class WirelessTerminalRegistry {
     private static final Map<String, WirelessTerminalDefinition> BY_ID = new Object2ObjectLinkedOpenHashMap<>();
     private static final Map<WirelessTerminalItem, WirelessTerminalDefinition> BY_ITEM = new Reference2ObjectLinkedOpenHashMap<>();
     private static List<WirelessTerminalDefinition> frozenDefinitions = List.of();
+    private static List<WirelessTerminalItem> frozenItems = List.of();
     private static boolean frozen;
 
     private WirelessTerminalRegistry() {
@@ -33,6 +34,7 @@ public final class WirelessTerminalRegistry {
 
     public static synchronized void freeze() {
         frozenDefinitions = List.copyOf(BY_ID.values());
+        frozenItems = frozenDefinitions.stream().map(WirelessTerminalDefinition::item).toList();
         frozen = true;
     }
 
@@ -41,11 +43,12 @@ public final class WirelessTerminalRegistry {
     }
 
     public static synchronized Collection<WirelessTerminalItem> all() {
-        return BY_ID.values().stream().map(WirelessTerminalDefinition::item).toList();
+        return frozen ? frozenItems : BY_ID.values().stream().map(WirelessTerminalDefinition::item).toList();
     }
 
     public static synchronized int indexOf(WirelessTerminalDefinition definition) {
-        int index = allDefinitions().stream().toList().indexOf(definition);
+        Collection<WirelessTerminalDefinition> definitions = allDefinitions();
+        int index = definitions instanceof List<?> list ? list.indexOf(definition) : -1;
         if (index < 0) {
             throw new IllegalArgumentException("Wireless terminal is not registered: " + definition.id());
         }

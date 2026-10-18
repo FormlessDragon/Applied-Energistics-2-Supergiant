@@ -37,19 +37,6 @@ public record CraftingStatus(boolean fullStatus, long elapsedTime, long remainin
     public static final CraftingStatus EMPTY = new CraftingStatus(true, 0, 0, 0, Collections.emptyList(), false, 0,
         null);
 
-    public CraftingStatus(boolean fullStatus, long elapsedTime, long remainingItemCount, long startItemCount,
-                          List<CraftingStatusEntry> entries, boolean suspended, int priority,
-                          @Nullable GenericStack finalOutput) {
-        this.fullStatus = fullStatus;
-        this.elapsedTime = elapsedTime;
-        this.remainingItemCount = remainingItemCount;
-        this.startItemCount = startItemCount;
-        this.entries = List.copyOf(entries);
-        this.suspended = suspended;
-        this.priority = priority;
-        this.finalOutput = finalOutput;
-    }
-
     public static CraftingStatus read(PacketBuffer buffer) {
         boolean fullStatus = buffer.readBoolean();
         long elapsedTime = buffer.readVarLong();

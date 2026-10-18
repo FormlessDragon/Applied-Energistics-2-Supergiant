@@ -29,11 +29,12 @@ public abstract class HandlerStrategy<C, S> {
 
         @Override
         public long insert(IItemHandler handler, AEKey what, long amount, Actionable mode) {
-            if (what instanceof AEItemKey itemKey) {
-                var stack = itemKey.toStack(Ints.saturatedCast(amount));
+            if (what instanceof AEItemKey itemKey && amount > 0) {
+                int requested = Ints.saturatedCast(amount);
+                var stack = itemKey.toStack(requested);
 
                 var remainder = ItemHandlerHelper.insertItem(handler, stack, mode.isSimulate());
-                return amount - remainder.getCount();
+                return requested - remainder.getCount();
             }
 
             return 0;

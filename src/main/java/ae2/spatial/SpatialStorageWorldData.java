@@ -27,6 +27,8 @@ import net.minecraft.world.storage.WorldSavedData;
 import net.minecraftforge.common.util.Constants.NBT;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class SpatialStorageWorldData extends WorldSavedData {
@@ -38,6 +40,7 @@ public class SpatialStorageWorldData extends WorldSavedData {
     private static final String TAG_PLOTS = "plots";
 
     private final Int2ObjectOpenHashMap<SpatialStoragePlot> plots = new Int2ObjectOpenHashMap<>();
+    private List<SpatialStoragePlot> plotsSnapshot;
 
     public SpatialStorageWorldData(String name) {
         super(name);
@@ -48,7 +51,10 @@ public class SpatialStorageWorldData extends WorldSavedData {
     }
 
     public List<SpatialStoragePlot> getPlots() {
-        return List.copyOf(plots.values());
+        if (plotsSnapshot == null) {
+            plotsSnapshot = List.copyOf(plots.values());
+        }
+        return plotsSnapshot;
     }
 
     public SpatialStoragePlot allocatePlot(BlockPos size, int owner) {
@@ -60,12 +66,15 @@ public class SpatialStorageWorldData extends WorldSavedData {
         }
         SpatialStoragePlot plot = new SpatialStoragePlot(nextId, size, owner);
         plots.put(nextId, plot);
+        plotsSnapshot = null;
         markDirty();
         return plot;
     }
 
     public void removePlot(int plotId) {
-        plots.remove(plotId);
+        if (plots.remove(plotId) != null) {
+            plotsSnapshot = null;
+        }
         markDirty();
     }
 
@@ -80,11 +89,13 @@ public class SpatialStorageWorldData extends WorldSavedData {
     void copyFrom(SpatialStorageWorldData other) {
         this.plots.clear();
         this.plots.putAll(other.plots);
+        plotsSnapshot = null;
     }
 
     @Override
     public void readFromNBT(NBTTagCompound nbt) {
         this.plots.clear();
+        plotsSnapshot = null;
         int version = nbt.getInteger(TAG_FORMAT);
         if (version != 0 && version != CURRENT_FORMAT) {
             throw new IllegalStateException("Invalid AE2 spatial info version: " + version);

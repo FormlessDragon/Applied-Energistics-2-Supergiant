@@ -20,6 +20,7 @@ import net.minecraft.world.gen.structure.StructureBoundingBox;
 import net.minecraft.world.storage.MapStorage;
 import net.minecraft.world.storage.WorldSavedData;
 import net.minecraftforge.common.util.Constants.NBT;
+import org.jspecify.annotations.NonNull;
 
 import java.io.File;
 import java.util.BitSet;
@@ -60,6 +61,7 @@ public class MeteoritesWorldData extends WorldSavedData {
     private final Long2ObjectLinkedOpenHashMap<BitSet> completedMeteoriteChunks = new Long2ObjectLinkedOpenHashMap<>();
     private final Object2ObjectOpenHashMap<String, LegacySpawnDataFileSignature> legacySpawnDataFailedFiles =
         new Object2ObjectOpenHashMap<>();
+    private boolean loadFailed;
     private boolean legacySpawnDataChecked;
     private String legacySpawnDataSignature;
 
@@ -169,10 +171,12 @@ public class MeteoritesWorldData extends WorldSavedData {
     private static BitSet readCompletedChunks(NBTTagCompound tag) {
         byte[] chunks = tag.getByteArray("chunks");
         if (chunks.length > MAX_COMPLETED_BITMAP_BYTES) {
-            return new BitSet(COMPLETED_BITMAP_LENGTH);
+            throw new IllegalArgumentException("Meteorite completion bitmap exceeds the supported size");
         }
         BitSet completedChunks = BitSet.valueOf(chunks);
-        completedChunks.clear(COMPLETED_BITMAP_LENGTH, completedChunks.length());
+        if (completedChunks.length() > COMPLETED_BITMAP_LENGTH) {
+            completedChunks.clear(COMPLETED_BITMAP_LENGTH, completedChunks.length());
+        }
         return completedChunks;
     }
 
@@ -203,10 +207,12 @@ public class MeteoritesWorldData extends WorldSavedData {
     }
 
     public boolean hasGenerated(int chunkX, int chunkZ) {
+        requireValid();
         return generatedChunks.containsKey(packChunk(chunkX, chunkZ));
     }
 
     public boolean markGenerated(int chunkX, int chunkZ) {
+        requireValid();
         long key = packChunk(chunkX, chunkZ);
         if (!generatedChunks.containsKey(key)) {
             generatedChunks.put(key, true);
@@ -440,6 +446,10 @@ public class MeteoritesWorldData extends WorldSavedData {
 
     @Override
     public void readFromNBT(NBTTagCompound nbt) {
+        loadFailed = true;
+        if (nbt.hasKey("completed") && !(nbt.getTag("completed") instanceof NBTTagList)) {
+            throw new IllegalArgumentException("Meteorite completion data is not a list");
+        }
         meteorites.clear();
         meteoritesByCompassRegion.clear();
         meteoritesByCompletionRegion.clear();
@@ -515,10 +525,18 @@ public class MeteoritesWorldData extends WorldSavedData {
                 legacySpawnDataFailedFiles.put(signature.name(), signature);
             }
         }
+        loadFailed = false;
+    }
+
+    private void requireValid() {
+        if (loadFailed) {
+            throw new IllegalStateException("Meteorite data failed to load; refusing to publish or overwrite it");
+        }
     }
 
     @Override
-    public NBTTagCompound writeToNBT(NBTTagCompound compound) {
+    public @NonNull NBTTagCompound writeToNBT(NBTTagCompound compound) {
+        requireValid();
         compound.setBoolean(TAG_LEGACY_SPAWN_DATA_CHECKED, legacySpawnDataChecked);
         if (legacySpawnDataSignature != null) {
             compound.setString(TAG_LEGACY_SPAWN_DATA_SIGNATURE, legacySpawnDataSignature);

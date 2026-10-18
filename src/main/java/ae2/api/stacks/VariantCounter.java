@@ -3,11 +3,13 @@ package ae2.api.stacks;
 import ae2.api.config.FuzzyMode;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMaps;
-import it.unimi.dsi.fastutil.objects.Object2LongSortedMap;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
+import java.util.AbstractCollection;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 /**
  * Tallies a negative or positive amount for sub-variants of a {@link AEKey}.
@@ -160,8 +162,63 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
 
         @Override
         public Collection<Object2LongMap.Entry<AEKey>> findFuzzy(AEKey key, FuzzyMode fuzzy) {
-            // The cast is necessary because the subMap in the call is not an instance of AEKey2LongMap.AVLTreeMap!
-            return FuzzySearch.findFuzzy((Object2LongSortedMap<AEKey>) records, key, fuzzy).object2LongEntrySet();
+            // The comparator's range bounds only order by damage. Filter the selected entries with the public fuzzy
+            // contract as a final step so equal damage and hash-collision keys cannot be lost at a range boundary.
+            return new AbstractCollection<>() {
+                @Override
+                public int size() {
+                    int result = 0;
+                    for (var entry : records.object2LongEntrySet()) {
+                        if (entry.getKey().fuzzyEquals(key, fuzzy)) {
+                            result++;
+                        }
+                    }
+                    return result;
+                }
+
+                @Override
+                public @NonNull Iterator<Object2LongMap.Entry<AEKey>> iterator() {
+                    var source = Object2LongMaps.fastIterator(records);
+                    return new Iterator<>() {
+                        private Object2LongMap.Entry<AEKey> next;
+                        private Object2LongMap.Entry<AEKey> current;
+
+                        @Override
+                        public boolean hasNext() {
+                            if (next != null) {
+                                return true;
+                            }
+                            while (source.hasNext()) {
+                                var candidate = source.next();
+                                if (candidate.getKey().fuzzyEquals(key, fuzzy)) {
+                                    next = candidate;
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }
+
+                        @Override
+                        public Object2LongMap.Entry<AEKey> next() {
+                            if (!hasNext()) {
+                                throw new NoSuchElementException();
+                            }
+                            current = next;
+                            next = null;
+                            return current;
+                        }
+
+                        @Override
+                        public void remove() {
+                            if (current == null) {
+                                throw new IllegalStateException();
+                            }
+                            source.remove();
+                            current = null;
+                        }
+                    };
+                }
+            };
         }
 
         @Override

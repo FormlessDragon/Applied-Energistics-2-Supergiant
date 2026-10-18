@@ -27,6 +27,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.storage.MapStorage;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -50,7 +51,8 @@ public final class PlayerRegistryInternal extends AESavedData implements IPlayer
     @Nullable
     private MinecraftServer server;
 
-    private int nextPlayerId = 0;
+    private long nextPlayerId;
+    private boolean loadFailed;
 
     public PlayerRegistryInternal() {
         this(NAME);
@@ -67,9 +69,13 @@ public final class PlayerRegistryInternal extends AESavedData implements IPlayer
         }
 
         MapStorage storage = overworld.getMapStorage();
-        PlayerRegistryInternal result = (PlayerRegistryInternal) storage.getOrLoadData(PlayerRegistryInternal.class,
+        PlayerRegistryInternal result = (PlayerRegistryInternal) Objects.requireNonNull(storage).getOrLoadData(PlayerRegistryInternal.class,
             PlayerRegistryInternal.NAME);
         if (result == null) {
+            var source = overworld.getSaveHandler().getMapFileFromName(NAME);
+            if (source != null && source.exists()) {
+                throw new IllegalStateException("Existing player ID data could not be loaded: " + source);
+            }
             result = new PlayerRegistryInternal(PlayerRegistryInternal.NAME);
             storage.setData(PlayerRegistryInternal.NAME, result);
         }
@@ -93,21 +99,26 @@ public final class PlayerRegistryInternal extends AESavedData implements IPlayer
     @Nullable
     @Override
     public UUID getProfileId(int playerId) {
+        requireValid();
         return this.mapping.inverse().get(playerId);
     }
 
     @Override
     public int getPlayerId(UUID profileId) {
+        requireValid();
         Objects.requireNonNull(profileId, "profileId");
 
         Integer playerId = mapping.get(profileId);
 
         if (playerId == null) {
-            playerId = this.nextPlayerId++;
+            if (nextPlayerId > Integer.MAX_VALUE) {
+                throw new IllegalStateException("ME player ID space is exhausted");
+            }
+            var currentServer = Objects.requireNonNull(this.server, "server");
+            playerId = (int) this.nextPlayerId++;
             this.mapping.put(profileId, playerId);
             markDirty();
 
-            var currentServer = Objects.requireNonNull(this.server, "server");
             var player = currentServer.getPlayerList().getPlayerByUUID(profileId);
             var name = player != null ? player.getGameProfile().getName() : "[UNKNOWN]";
             AELog.info("Assigning ME player id %s to Minecraft profile %s (%s)", playerId, profileId, name);
@@ -118,32 +129,49 @@ public final class PlayerRegistryInternal extends AESavedData implements IPlayer
 
     @Override
     public void readFromNBT(NBTTagCompound nbt) {
-        this.mapping.clear();
+        loadFailed = true;
+        if (!nbt.hasKey(TAG_PLAYER_IDS, 11) || !nbt.hasKey(TAG_PROFILE_IDS, 11)) {
+            throw new IllegalStateException("Player ID mapping is missing its arrays");
+        }
 
         int[] playerIds = nbt.getIntArray(TAG_PLAYER_IDS);
         int[] profileIdParts = nbt.getIntArray(TAG_PROFILE_IDS);
 
-        if (playerIds.length * 4 != profileIdParts.length) {
+        if ((long) playerIds.length * 4 != profileIdParts.length) {
             throw new IllegalStateException("Player ID mapping is corrupted. " + playerIds.length + " player IDs vs. "
                 + profileIdParts.length + " profile ID parts (latter must be 4 * the former)");
         }
 
+        BiMap<UUID, Integer> decoded = HashBiMap.create();
         int highestPlayerId = -1;
         for (int i = 0; i < playerIds.length; i++) {
             int playerId = playerIds[i];
             UUID profileId = new UUID(unpackLong(profileIdParts, i * 4), unpackLong(profileIdParts, i * 4 + 2));
+            if (playerId < 0 || decoded.containsKey(profileId) || decoded.containsValue(playerId)) {
+                throw new IllegalStateException("Player ID mapping has a negative or duplicate identity");
+            }
             highestPlayerId = Math.max(playerId, highestPlayerId);
-            this.mapping.put(profileId, playerId);
+            decoded.put(profileId, playerId);
             AELog.debug("AE player ID %s is assigned to profile ID %s", playerId, profileId);
         }
-        this.nextPlayerId = highestPlayerId + 1;
+        this.mapping.clear();
+        this.mapping.putAll(decoded);
+        this.nextPlayerId = (long) highestPlayerId + 1;
+        loadFailed = false;
+    }
+
+    private void requireValid() {
+        if (loadFailed) {
+            throw new IllegalStateException("Player ID mapping failed to load; restore the source data before use");
+        }
     }
 
     @Override
-    public NBTTagCompound writeToNBT(NBTTagCompound compound) {
+    public @NonNull NBTTagCompound writeToNBT(@NonNull NBTTagCompound compound) {
+        requireValid();
         int index = 0;
         int[] playerIds = new int[mapping.size()];
-        int[] profileIdParts = new int[mapping.size() * 4];
+        int[] profileIdParts = new int[Math.multiplyExact(mapping.size(), 4)];
         for (var entry : mapping.entrySet()) {
             packLong(profileIdParts, index * 4, entry.getKey().getMostSignificantBits());
             packLong(profileIdParts, index * 4 + 2, entry.getKey().getLeastSignificantBits());

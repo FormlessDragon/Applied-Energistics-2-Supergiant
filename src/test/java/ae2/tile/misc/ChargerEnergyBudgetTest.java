@@ -81,11 +81,11 @@ class ChargerEnergyBudgetTest {
         final IEnergyService energy = (IEnergyService) Proxy.newProxyInstance(IEnergyService.class.getClassLoader(),
             new Class<?>[]{IEnergyService.class}, (p, m, a) -> {
                 if (m.getName().equals("extractAEPower")) {
-                    double amount = Math.min((double) a[0], available);
-                    if (firstRequested < 0) firstRequested = (double) a[0];
+                    double amount = Math.min((double) a[0], this.available);
+                    if (this.firstRequested < 0) this.firstRequested = (double) a[0];
                     if (a[1] == Actionable.MODULATE) {
-                        extracted += amount;
-                        available -= amount;
+                        this.extracted += amount;
+                        this.available -= amount;
                     }
                     return amount;
                 }

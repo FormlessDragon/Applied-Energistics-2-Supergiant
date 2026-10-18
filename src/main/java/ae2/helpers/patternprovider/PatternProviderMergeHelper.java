@@ -59,7 +59,7 @@ final class PatternProviderMergeHelper {
         int low = 1;
         int high = 1;
         while (high < maxMultiplier) {
-            int next = Math.min(maxMultiplier, high * 2);
+            int next = (int) Math.min(maxMultiplier, (long) high * 2);
             if (!acceptsAllFully(target, inputHolder, next, insertionMode)) {
                 break;
             }
@@ -70,7 +70,7 @@ final class PatternProviderMergeHelper {
             return high;
         }
 
-        int upper = Math.min(maxMultiplier, high * 2);
+        int upper = (int) Math.min(maxMultiplier, (long) high * 2);
         while (low + 1 < upper) {
             int mid = low + (upper - low) / 2;
             if (acceptsAllFully(target, inputHolder, mid, insertionMode)) {
@@ -84,9 +84,19 @@ final class PatternProviderMergeHelper {
 
     static boolean acceptsAllFully(PatternProviderTarget target, KeyCounter[] inputHolder, int multiplier,
                                    PatternProviderInsertionMode insertionMode) {
+        if (multiplier <= 0) {
+            return false;
+        }
         for (KeyCounter inputList : inputHolder) {
             for (Object2LongMap.Entry<AEKey> input : inputList) {
-                long amount = input.getLongValue() * multiplier;
+                long inputAmount = input.getLongValue();
+                if (inputAmount < 0 || inputAmount > Long.MAX_VALUE / multiplier) {
+                    return false;
+                }
+                if (inputAmount == 0) {
+                    continue;
+                }
+                long amount = inputAmount * multiplier;
                 long inserted = target.insert(input.getKey(), amount, Actionable.SIMULATE, insertionMode);
                 if (inserted < amount) {
                     return false;

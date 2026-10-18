@@ -14,6 +14,7 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -33,35 +34,72 @@ final class PlayerPinStorage {
     private static final String TAG_KEY = "key";
     private static final String TAG_KIND = "kind";
 
+    // Client-thread owned. A failed/partial read must never become a writable empty baseline.
+    private static File loadedFile;
+    private static boolean loadedWritable;
+
     private PlayerPinStorage() {
     }
 
     static Data load() {
-        File file = getFile();
-        if (!file.isFile()) {
-            return new Data(0, List.of());
-        }
+        return load(getFile());
+    }
 
+    static Data load(File file) {
+        loadedFile = file.getAbsoluteFile();
+        loadedWritable = false;
+        if (!file.exists()) {
+            loadedWritable = true;
+            return Data.empty();
+        }
         try {
             NBTTagCompound root = CompressedStreamTools.read(file);
             if (root == null) {
-                return Data.empty();
+                throw new IOException("Player pin file has no root tag");
             }
-
-            return loadFromTag(root);
+            Data data = loadFromTag(root);
+            loadedWritable = data.writable();
+            if (!loadedWritable) {
+                AELog.warn("AE2 player pins from %s are read-only after recovery: %s", file, data.diagnostics());
+            }
+            return data;
         } catch (IOException | RuntimeException e) {
-            AELog.warn("Failed to load AE2 player pins from %s: %s", file, e);
-            return Data.empty();
+            AELog.warn("Failed to load AE2 player pins from %s; preserving the file: %s", file, e);
+            return new Data(0, List.of(), false, List.of(e.toString()));
         }
     }
 
     static Data loadFromTag(NBTTagCompound root) {
+        int version = root.getInteger(TAG_VERSION);
+        if (root.hasKey(TAG_VERSION) && (!root.hasKey(TAG_VERSION, Constants.NBT.TAG_INT)
+            || version < 0 || version > VERSION)) {
+            return new Data(0, List.of(), false, List.of("Unsupported player pin version: " + version));
+        }
+        ObjectArrayList<String> diagnostics = new ObjectArrayList<>();
         int rows = Math.clamp(root.getInteger(TAG_ROWS), 0, PinnedKeys.MAX_PLAYER_PIN_ROWS);
-        ObjectArrayList<PinSlot> slots = root.hasKey(TAG_SLOTS, Constants.NBT.TAG_LIST)
-            ? loadSlots(root.getTagList(TAG_SLOTS, Constants.NBT.TAG_COMPOUND))
-            : migrateLegacyKeys(root.getTagList(TAG_KEYS, Constants.NBT.TAG_COMPOUND));
+        if (root.hasKey(TAG_ROWS) && (!root.hasKey(TAG_ROWS, Constants.NBT.TAG_INT)
+            || root.getInteger(TAG_ROWS) != rows)) {
+            diagnostics.add("Invalid player pin row count");
+        }
+        ObjectArrayList<PinSlot> slots;
+        if (root.hasKey(TAG_SLOTS)) {
+            if (!root.hasKey(TAG_SLOTS, Constants.NBT.TAG_LIST)) {
+                return new Data(rows, List.of(), false, List.of("Player pin slots are not a list"));
+            }
+            NBTTagList list = (NBTTagList) root.getTag(TAG_SLOTS);
+            if (list.tagCount() > 0 && list.getTagType() != Constants.NBT.TAG_COMPOUND) {
+                return new Data(rows, List.of(), false, List.of("Player pin slots are not compounds"));
+            }
+            slots = loadSlots(list, diagnostics);
+        } else if (version == VERSION) {
+            return new Data(rows, List.of(), false, List.of("Player pin slots are missing"));
+        } else if (root.hasKey(TAG_KEYS, Constants.NBT.TAG_LIST)) {
+            slots = migrateLegacyKeys(root.getTagList(TAG_KEYS, Constants.NBT.TAG_COMPOUND));
+        } else {
+            return new Data(rows, List.of(), false, List.of("Player pin records are missing"));
+        }
         rows = Math.max(rows, getRequiredRows(slots));
-        return new Data(rows, slots);
+        return new Data(rows, Collections.unmodifiableList(slots), diagnostics.isEmpty(), Collections.unmodifiableList(diagnostics));
     }
 
     static NBTTagCompound saveToTag(int rows, List<PinSlot> slots) {
@@ -87,7 +125,13 @@ final class PlayerPinStorage {
     }
 
     static void save(int rows, List<PinSlot> slots) {
-        File file = getFile();
+        save(getFile(), rows, slots);
+    }
+
+    static void save(File file, int rows, List<PinSlot> slots) {
+        if (!file.getAbsoluteFile().equals(loadedFile) || !loadedWritable) {
+            return;
+        }
         File parent = file.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
             AELog.warn("Failed to create AE2 client data directory %s", parent);
@@ -103,23 +147,36 @@ final class PlayerPinStorage {
         }
     }
 
-    private static ObjectArrayList<PinSlot> loadSlots(NBTTagList list) {
+    private static ObjectArrayList<PinSlot> loadSlots(NBTTagList list, List<String> diagnostics) {
         int maxSlots = PinnedKeys.MAX_PLAYER_PIN_ROWS * PinnedKeys.MAX_PINNED;
         ObjectArrayList<PinSlot> slots = new ObjectArrayList<>(Math.min(list.tagCount(), maxSlots));
         for (int i = 0; i < list.tagCount(); i++) {
-            NBTTagCompound slotTag = list.getCompoundTagAt(i);
-            int slotIndex = slotTag.getInteger(TAG_SLOT_INDEX);
-            if (slotIndex < 0 || slotIndex >= maxSlots) {
-                throw new IllegalArgumentException("Invalid player pin slot index: " + slotIndex);
-            }
+            try {
+                NBTTagCompound slotTag = list.getCompoundTagAt(i);
+                if (!slotTag.hasKey(TAG_SLOT_INDEX, Constants.NBT.TAG_INT)
+                    || !slotTag.hasKey(TAG_KEY, Constants.NBT.TAG_COMPOUND)
+                    || !slotTag.hasKey(TAG_KIND, Constants.NBT.TAG_STRING)) {
+                    throw new IllegalArgumentException("Player pin slot is missing required fields");
+                }
+                int slotIndex = slotTag.getInteger(TAG_SLOT_INDEX);
+                if (slotIndex < 0 || slotIndex >= maxSlots) {
+                    throw new IllegalArgumentException("Invalid player pin slot index: " + slotIndex);
+                }
 
-            AEKey key = AEKey.fromTagGeneric(slotTag.getCompoundTag(TAG_KEY));
-            if (key == null) {
-                throw new IllegalArgumentException("Player pin slot is missing its key");
-            }
+                AEKey key = AEKey.fromTagGeneric(slotTag.getCompoundTag(TAG_KEY));
+                if (key == null) {
+                    throw new IllegalArgumentException("Player pin slot is missing its key");
+                }
 
-            PinnedKeys.PinKind kind = PinnedKeys.PinKind.valueOf(slotTag.getString(TAG_KIND));
-            addUniqueSlot(slots, new PinSlot(slotIndex, key, kind));
+                PinnedKeys.PinKind kind = PinnedKeys.PinKind.valueOf(slotTag.getString(TAG_KIND));
+                addUniqueSlot(slots, new PinSlot(slotIndex, key, kind));
+            } catch (RuntimeException e) {
+                // First valid occurrence wins; the original file retains all rejected/unknown records.
+                if (diagnostics.size() < 8) {
+                    String message = String.valueOf(e.getMessage());
+                    diagnostics.add("slot record " + i + ": " + message.substring(0, Math.min(256, message.length())));
+                }
+            }
         }
         slots.sort(PinSlot.SLOT_INDEX_COMPARATOR);
         return slots;
@@ -142,7 +199,7 @@ final class PlayerPinStorage {
             throw new IllegalArgumentException("Duplicate player pin slot index: " + next.slotIndex());
         }
         if (findByKey(slots, next.key()) != null) {
-            throw new IllegalArgumentException("Duplicate player pin key: " + next.key());
+            throw new IllegalArgumentException("Duplicate player pin key at slot: " + next.slotIndex());
         }
         slots.add(next);
     }
@@ -201,9 +258,9 @@ final class PlayerPinStorage {
         return sanitized.replaceAll("_+", "_");
     }
 
-    record Data(int rows, List<PinSlot> slots) {
+    record Data(int rows, List<PinSlot> slots, boolean writable, List<String> diagnostics) {
         static Data empty() {
-            return new Data(0, List.of());
+            return new Data(0, List.of(), true, List.of());
         }
     }
 

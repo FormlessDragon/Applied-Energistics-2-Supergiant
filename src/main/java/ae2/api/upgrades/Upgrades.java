@@ -30,6 +30,8 @@ import java.util.Set;
 public final class Upgrades {
     private static final Reference2ObjectMap<Item, List<Association>> ASSOCIATIONS = new Reference2ObjectOpenHashMap<>();
     private static final Reference2ObjectMap<IUpgradeableItem, Set<Item>> SUPPORTED_ITEM_UPGRADES = new Reference2ObjectOpenHashMap<>();
+    private static final Map<IUpgradeableItem, Set<Item>> SUPPORTED_ITEM_UPGRADES_VIEW =
+        Collections.unmodifiableMap(SUPPORTED_ITEM_UPGRADES);
     private static final Reference2ObjectMap<Item, List<ITextComponent>> UPGRADE_CARD_TOOLTIP_LINES = new Reference2ObjectOpenHashMap<>();
     private static final Reference2ObjectMap<Item, Object2IntMap<ResourceLocation>> ADDITIONAL_SLOTS =
         new Reference2ObjectOpenHashMap<>();
@@ -126,7 +128,7 @@ public final class Upgrades {
 
     @SuppressWarnings("unused")
     public static synchronized Map<IUpgradeableItem, Set<Item>> getUpgradableItems() {
-        return Map.copyOf(SUPPORTED_ITEM_UPGRADES);
+        return SUPPORTED_ITEM_UPGRADES_VIEW;
     }
 
     public static int getEnergyCardMultiplier(IUpgradeInventory upgrades) {

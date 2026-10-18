@@ -87,7 +87,7 @@ public final class PatternProviderUploadService {
                 recipeTypes.add(recipeTypeUid);
             }
         }
-        return List.copyOf(recipeTypes);
+        return Collections.unmodifiableList(new ObjectArrayList<>(recipeTypes));
     }
 
     /** Rebuilds persisted mappings from every currently selectable provider in the active directory. */
@@ -228,7 +228,7 @@ public final class PatternProviderUploadService {
         ILinkStatus linkStatus = host.getLinkStatus();
         if (!linkStatus.connected()) {
             if (linkStatus.statusDescription() != null) {
-                player.sendStatusMessage(linkStatus.statusDescription(), false);
+                player.sendStatusMessage(Objects.requireNonNull(linkStatus.statusDescription()), false);
             }
             return ProcessingPatternUploadPreparation.failure(ProcessingPatternUploadResult.NO_PROVIDER_TARGET);
         }

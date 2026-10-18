@@ -148,19 +148,25 @@ public class TileCharger extends AENetworkedPoweredTile implements IGridTickable
                 double chargeRate = powerStorage != null
                     ? powerStorage.getChargeRate(stack) : adapter.getChargeRate(stack);
                 if (Double.isFinite(currentPower) && Double.isFinite(maxPower) && Double.isFinite(chargeRate)
-                    && currentPower >= 0.0D && maxPower > currentPower && chargeRate > 0.0D) {
-                    chargeRate *= ticksSinceLastCall;
-                    double extractedAmount = this.extractAEPower(chargeRate, Actionable.MODULATE,
+                    && currentPower >= 0.0D && maxPower > currentPower && chargeRate > 0.0D
+                    && ticksSinceLastCall > 0) {
+                    double missingCharge = maxPower - currentPower;
+                    double requestedAmount = chargeRate >= missingCharge / ticksSinceLastCall
+                        ? missingCharge : chargeRate * ticksSinceLastCall;
+                    if (!Double.isFinite(requestedAmount) || requestedAmount <= 0.0D) {
+                        return;
+                    }
+                    double extractedAmount = this.extractAEPower(requestedAmount, Actionable.MODULATE,
                         PowerMultiplier.CONFIG);
 
-                    double missingChargeRate = chargeRate - extractedAmount;
-                    double missingAEPower = maxPower - currentPower;
-                    double toExtract = Math.min(missingChargeRate, missingAEPower);
+                    extractedAmount = Math.clamp(extractedAmount, 0.0D, requestedAmount);
+                    double missingAEPower = requestedAmount - extractedAmount;
 
                     var grid = this.getMainNode().getGrid();
-                    if (grid != null && toExtract > 0.0D) {
-                        extractedAmount += grid.getEnergyService().extractAEPower(toExtract, Actionable.MODULATE,
-                            PowerMultiplier.ONE);
+                    if (grid != null && missingAEPower > 0.0D) {
+                        double networkExtracted = grid.getEnergyService().extractAEPower(missingAEPower,
+                            Actionable.MODULATE, PowerMultiplier.ONE);
+                        extractedAmount += Math.clamp(networkExtracted, 0.0D, missingAEPower);
                     }
 
                     if (extractedAmount > 0.0D) {

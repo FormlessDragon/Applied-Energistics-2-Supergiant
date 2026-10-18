@@ -27,6 +27,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraftforge.common.capabilities.Capability;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,6 +37,11 @@ import java.util.function.Predicate;
  * Internal methods that complement {@link P2PTunnelAttunement} and which are not part of the public API.
  */
 public final class P2PTunnelAttunementInternal {
+
+    private static final Map<String, Item> TAG_TUNNELS_VIEW =
+        Collections.unmodifiableMap(P2PTunnelAttunement.tagTunnels);
+    private static final List<Item> MANAGEABLE_TUNNELS_VIEW =
+        Collections.unmodifiableList(P2PTunnelAttunement.manageableTunnels);
 
     private P2PTunnelAttunementInternal() {
     }
@@ -67,11 +73,11 @@ public final class P2PTunnelAttunementInternal {
     }
 
     public static Map<String, Item> getTagTunnels() {
-        return Map.copyOf(P2PTunnelAttunement.tagTunnels);
+        return TAG_TUNNELS_VIEW;
     }
 
     public static List<Item> getManageableTunnels() {
-        return List.copyOf(P2PTunnelAttunement.manageableTunnels);
+        return MANAGEABLE_TUNNELS_VIEW;
     }
 
     public static boolean supportsMultipleInputs(Item tunnelItem) {

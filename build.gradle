@@ -285,6 +285,18 @@ configurations.named('testRuntimeOnly').configure {
     extendsFrom(configurations.runtimeOnly)
 }
 
+// Cleanroom's mapped classes use newer libraries than the vanilla runtime metadata declares.
+// Resolve the test runtime against the same library versions used to compile those classes.
+configurations.named('testRuntimeClasspath').configure {
+    shouldResolveConsistentlyWith(configurations.compileClasspath)
+}
+
+dependencies {
+    if (propertyBool('enable_lwjglx')) {
+        testRuntimeOnly 'com.cleanroommc:lwjglx:1.0.0'
+    }
+}
+
 if (!propertyBool('enable_shadow')) {
     shadowJar.enabled = false
 }
@@ -411,6 +423,13 @@ test {
     javaLauncher.set(javaToolchains.launcherFor {
         languageVersion = JavaLanguageVersion.of(25)
     })
+    // Compile-only mod APIs are required when tests load classes that implement
+    // optional integrations. Keep them scoped to the test process; they are not
+    // runtime dependencies of the produced mod.
+    classpath += sourceSets.main.compileClasspath.filter {
+        def name = it.name.toLowerCase(Locale.ROOT)
+        name.contains('cofh') || name.contains('enderio') || name.contains('ender-core')
+    }
     if (propertyBool('show_testing_output')) {
         testLogging {
             showStandardStreams = true

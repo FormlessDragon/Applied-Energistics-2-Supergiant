@@ -10,6 +10,7 @@ import net.minecraft.nbt.NBTTagList;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.IntConsumer;
@@ -109,7 +110,7 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
                 }
             }
         }
-        return List.copyOf(result);
+        return Collections.unmodifiableList(result);
     }
 
     private boolean isValidSlot(int slot) {

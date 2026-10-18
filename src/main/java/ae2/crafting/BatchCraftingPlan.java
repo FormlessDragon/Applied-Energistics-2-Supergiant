@@ -32,6 +32,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -132,7 +133,7 @@ public final class BatchCraftingPlan implements ICraftingPlan, TemporaryProvider
         for (var subPlan : this.subPlans) {
             targets.add(subPlan.finalOutput());
         }
-        return List.copyOf(targets);
+        return Collections.unmodifiableList(targets);
     }
 
     @Override
@@ -216,7 +217,7 @@ public final class BatchCraftingPlan implements ICraftingPlan, TemporaryProvider
     private LiteCraftTreeNode buildRoot(List<LiteCraftTreeNode> subTrees) {
         List<LiteCraftTreeProc> inputs = subTrees.isEmpty()
             ? List.of()
-            : List.of(new LiteCraftTreeProc(List.copyOf(subTrees), List.of(), Map.of()));
+            : List.of(new LiteCraftTreeProc(Collections.unmodifiableList(subTrees), List.of(), Map.of()));
         return new LiteCraftTreeNode(null, this.finalOutput, inputs, this.missingItems.get(this.finalOutput.what()));
     }
 }

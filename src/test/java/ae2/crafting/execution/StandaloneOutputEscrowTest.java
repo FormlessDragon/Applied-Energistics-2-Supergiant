@@ -31,6 +31,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -136,7 +137,7 @@ class StandaloneOutputEscrowTest {
         var saved = new NBTTagCompound();
         cpu.writeToNBT(saved);
         assertTrue(saved.hasKey("unknownStandaloneOutput", 10));
-        assertEquals(carrot, GenericStack.readTag(saved.getCompoundTag("unknownStandaloneOutput")).what());
+        assertEquals(carrot, Objects.requireNonNull(GenericStack.readTag(saved.getCompoundTag("unknownStandaloneOutput"))).what());
     }
 
     private static final class TestCluster extends CraftingCPUCluster {
@@ -167,9 +168,9 @@ class StandaloneOutputEscrowTest {
         final MEStorageMonitor storage = (MEStorageMonitor) Proxy.newProxyInstance(MEStorageMonitor.class.getClassLoader(),
             new Class<?>[]{MEStorageMonitor.class}, (p, m, a) -> {
                 if (m.getName().equals("insert")) {
-                    calls++;
-                    if (throwing) throw new IllegalStateException("receipt unknown");
-                    return Math.min(accepted, (long) a[1]);
+                    this.calls++;
+                    if (this.throwing) throw new IllegalStateException("receipt unknown");
+                    return Math.min(this.accepted, (long) a[1]);
                 }
                 if (m.getName().equals("getDescription")) return null;
                 return 0L;

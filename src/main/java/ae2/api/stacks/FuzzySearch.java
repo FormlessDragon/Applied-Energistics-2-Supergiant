@@ -144,7 +144,15 @@ final class FuzzySearch {
             // damage values to be predictable, while still having to satisfy the
             // complete order requirements of the sorted map
             // (We hope there won't be hash collisions... the probability is very low anyway)
-            return Integer.compare(stackA.hashCode(), stackB.hashCode());
+            int hashOrder = Integer.compare(stackA.hashCode(), stackB.hashCode());
+            if (hashOrder != 0) {
+                return hashOrder;
+            }
+            int tagOrder = stackA.toTag().toString().compareTo(stackB.toTag().toString());
+            if (tagOrder != 0) {
+                return tagOrder;
+            }
+            return Integer.compare(System.identityHashCode(stackA), System.identityHashCode(stackB));
         }
     }
 }

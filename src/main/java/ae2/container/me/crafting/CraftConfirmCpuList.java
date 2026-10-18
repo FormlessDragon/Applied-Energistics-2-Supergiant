@@ -19,10 +19,6 @@ public record CraftConfirmCpuList(List<Entry> cpus) implements PacketWritable {
     private static final int MAX_CPU_LIST_ENTRIES = 1024;
     private static final int MIN_CPU_LIST_ENTRY_BYTES = 19;
 
-    public CraftConfirmCpuList {
-        cpus = List.copyOf(cpus);
-    }
-
     @SuppressWarnings("unused")
     public CraftConfirmCpuList(ByteBuf data) {
         PacketBuffer buffer = new PacketBuffer(data);
@@ -36,7 +32,7 @@ public record CraftConfirmCpuList(List<Entry> cpus) implements PacketWritable {
         for (int i = 0; i < count; i++) {
             readCpus.add(Entry.readFromPacket(buffer));
         }
-        this(readCpus);
+        this(Collections.unmodifiableList(readCpus));
     }
 
     public static CraftConfirmCpuList fromRecords(List<CraftingCPURecord> records, int selectedCpuSerial,
@@ -55,7 +51,7 @@ public record CraftConfirmCpuList(List<Entry> cpus) implements PacketWritable {
                 record.getSerial() == selectedCpuSerial,
                 mergeablePredicate.test(record.getCpu())));
         }
-        return new CraftConfirmCpuList(entries);
+        return new CraftConfirmCpuList(Collections.unmodifiableList(entries));
     }
 
     public CraftConfirmCpuList withSelectedCpu(int serial) {
@@ -80,7 +76,7 @@ public record CraftConfirmCpuList(List<Entry> cpus) implements PacketWritable {
                 entries.add(entry);
             }
         }
-        return changed ? new CraftConfirmCpuList(entries) : this;
+        return changed ? new CraftConfirmCpuList(Collections.unmodifiableList(entries)) : this;
     }
 
     @Override

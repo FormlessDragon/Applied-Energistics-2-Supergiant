@@ -335,10 +335,10 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
                 group != null ? group.memberOrdinal() : 0));
         }
         entries.sort(CPU_COMPARATOR);
-        return new CraftingCpuList(ContiguousGrouping.groupContiguously(
+        return new CraftingCpuList(Collections.unmodifiableList(ContiguousGrouping.groupContiguously(
             entries,
             CraftingCpuListEntry::groupId,
-            CraftingCpuListEntry::groupMemberOrdinal));
+            CraftingCpuListEntry::groupMemberOrdinal)));
     }
 
     /**
@@ -510,7 +510,7 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         }
 
         if (changed) {
-            this.cpuList = new CraftingCpuList(updatedCpus);
+            this.cpuList = new CraftingCpuList(Collections.unmodifiableList(updatedCpus));
             if (selectedUpdatedMode != null) {
                 this.schedulingMode = selectedUpdatedMode;
             }
@@ -533,7 +533,7 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
         }
 
         if (changed) {
-            this.cpuList = new CraftingCpuList(updatedCpus);
+            this.cpuList = new CraftingCpuList(Collections.unmodifiableList(updatedCpus));
             if (selectedCpuSerial == serial) {
                 this.schedulingMode = mode;
             }
@@ -581,10 +581,6 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
     }
 
     public record CraftingCpuList(List<CraftingCpuListEntry> cpus) implements PacketWritable {
-        public CraftingCpuList {
-            cpus = List.copyOf(cpus);
-        }
-
         @SuppressWarnings("unused")
         public CraftingCpuList(ByteBuf data) {
             PacketBuffer buffer = new PacketBuffer(data);
@@ -597,7 +593,7 @@ public class ContainerCraftingStatus extends ContainerCraftingCPU implements ISu
             for (int i = 0; i < count; i++) {
                 readCpus.add(CraftingCpuListEntry.readFromPacket(buffer));
             }
-            this(readCpus);
+            this(Collections.unmodifiableList(readCpus));
         }
 
         @Override

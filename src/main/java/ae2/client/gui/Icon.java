@@ -26,12 +26,15 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 public final class Icon {
     private static final Map<ResourceLocation, Icon> icons = new Object2ObjectLinkedOpenHashMap<>();
+    private static List<Icon> registeredIconsSnapshot;
     private static long registryVersion;
 
     public static final Icon REDSTONE_LOW = registerBuiltin("redstone_low");
@@ -390,12 +393,16 @@ public final class Icon {
 
         Icon icon = new Icon(id, texture, width, height, manualSize);
         icons.put(id, icon);
+        registeredIconsSnapshot = null;
         registryVersion++;
         return icon;
     }
 
     public static synchronized List<Icon> getRegisteredIcons() {
-        return List.copyOf(icons.values());
+        if (registeredIconsSnapshot == null) {
+            registeredIconsSnapshot = List.copyOf(icons.values());
+        }
+        return registeredIconsSnapshot;
     }
 
     public static synchronized Icon byId(ResourceLocation id) {

@@ -37,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -86,12 +87,12 @@ class CraftingSubmissionPublicationTest {
         var result = fixture.submit();
         assertTrue(result.successful());
         assertSame(fixture.crafting.links.getLast(), result.link());
-        assertEquals(fixture.logic.getLastLink().getCraftingID(), result.link().getCraftingID());
+        assertEquals(Objects.requireNonNull(fixture.logic.getLastLink()).getCraftingID(), Objects.requireNonNull(result.link()).getCraftingID());
         assertTrue(fixture.logic.hasJob());
         assertEquals(1, fixture.extracts);
         assertEquals(1, fixture.outputReads);
         assertEquals(1, fixture.cluster.saves);
-        result.link().cancel();
+        Objects.requireNonNull(result.link()).cancel();
         assertTrue(fixture.logic.getLastLink().isCanceled());
     }
 
@@ -191,7 +192,7 @@ class CraftingSubmissionPublicationTest {
         fixture.cluster.onDisplay = fixture.logic::cancel;
         var result = fixture.submit();
         assertTrue(result.successful());
-        assertTrue(result.link().isCanceled());
+        assertTrue(Objects.requireNonNull(result.link()).isCanceled());
         assertFalse(fixture.logic.hasJob());
         assertEquals(5, fixture.returned);
         assertTrue(fixture.logic.getInventory().list.isEmpty());
@@ -255,7 +256,7 @@ class CraftingSubmissionPublicationTest {
         assertArrayEquals(new int[]{4, 4}, calls);
         fixture.logic.cancel();
         assertFalse(fixture.logic.hasJob());
-        assertTrue(receipt.link().isCanceled());
+        assertTrue(Objects.requireNonNull(receipt.link()).isCanceled());
         assertEquals(6, fixture.returned);
         assertTrue(fixture.logic.getInventory().list.isEmpty());
         assertTrue(calls[0] > 4);
@@ -392,10 +393,10 @@ class CraftingSubmissionPublicationTest {
         var cpuLink = fixture.logic.getLastLink();
         fixture.onTerminal = () -> {
             assertFalse(fixture.logic.hasJob());
-            assertTrue(cpuLink.isCanceled());
-            assertTrue(receipt.link().isCanceled());
+            assertTrue(Objects.requireNonNull(cpuLink).isCanceled());
+            assertTrue(Objects.requireNonNull(receipt.link()).isCanceled());
             fixture.logic.cancel();
-            receipt.link().cancel();
+            Objects.requireNonNull(receipt.link()).cancel();
             assertEquals(CraftingSubmitErrorCode.CPU_BUSY, fixture.submit().errorCode());
             assertEquals(CraftingSubmitErrorCode.CPU_BUSY, fixture.logic.tryMergeJob(
                 fixture.grid, fixture.plan, IActionSource.empty()).errorCode());
@@ -422,23 +423,23 @@ class CraftingSubmissionPublicationTest {
         var cpuLink = fixture.logic.getLastLink();
         fixture.onTerminal = () -> {
             assertFalse(fixture.logic.hasJob());
-            assertTrue(cpuLink.isDone());
-            assertTrue(receipt.link().isDone());
+            assertTrue(Objects.requireNonNull(cpuLink).isDone());
+            assertTrue(Objects.requireNonNull(receipt.link()).isDone());
             fixture.logic.cancel();
-            receipt.link().cancel();
+            Objects.requireNonNull(receipt.link()).cancel();
             throw new IllegalStateException("completion notification unavailable");
         };
         assertEquals(1, fixture.logic.insert(carrot, 1, Actionable.MODULATE));
         assertEquals(1, fixture.delivered);
         assertEquals(5, fixture.returned);
         assertEquals(1, fixture.terminalCalls);
-        assertTrue(receipt.link().isDone());
-        assertFalse(receipt.link().isCanceled());
-        assertTrue(cpuLink.isDone());
+        assertTrue(Objects.requireNonNull(receipt.link()).isDone());
+        assertFalse(Objects.requireNonNull(receipt.link()).isCanceled());
+        assertTrue(Objects.requireNonNull(cpuLink).isDone());
         assertNull(fixture.cluster.output);
         assertFalse(fixture.logic.hasJob());
         ((CraftingLink) cpuLink).markDone();
-        receipt.link().cancel();
+        Objects.requireNonNull(receipt.link()).cancel();
         assertEquals(1, fixture.terminalCalls);
     }
 
@@ -452,7 +453,7 @@ class CraftingSubmissionPublicationTest {
         fixture.cluster.failSave = true;
         assertDoesNotThrow(fixture.logic::cancel);
         assertFalse(fixture.logic.hasJob());
-        assertTrue(receipt.link().isCanceled());
+        assertTrue(Objects.requireNonNull(receipt.link()).isCanceled());
         assertEquals(5, fixture.returned);
         assertTrue(fixture.logic.getInventory().list.isEmpty());
         int attempts = fixture.cluster.saves;
@@ -515,7 +516,7 @@ class CraftingSubmissionPublicationTest {
         fixture.cluster.failLevel = true;
         assertDoesNotThrow(fixture.logic::cancel);
         assertFalse(fixture.logic.hasJob());
-        assertTrue(receipt.link().isCanceled());
+        assertTrue(Objects.requireNonNull(receipt.link()).isCanceled());
         assertEquals(5, fixture.returned);
         assertNull(fixture.cluster.output);
     }
@@ -530,8 +531,8 @@ class CraftingSubmissionPublicationTest {
         };
         assertThrows(OutOfMemoryError.class, fixture.logic::cancel);
         assertFalse(fixture.logic.hasJob());
-        assertTrue(cpuLink.isCanceled());
-        assertTrue(receipt.link().isCanceled());
+        assertTrue(Objects.requireNonNull(cpuLink).isCanceled());
+        assertTrue(Objects.requireNonNull(receipt.link()).isCanceled());
         assertEquals(5, fixture.logic.getInventory().list.get(carrot));
         assertEquals(0, fixture.returned);
         fixture.onTerminal = null;
@@ -594,14 +595,14 @@ class CraftingSubmissionPublicationTest {
         var fixture = new Fixture();
         var receipt = fixture.submit();
         var cpuLink = (CraftingLink) fixture.logic.getLastLink();
-        cpuLink.markDone();
+        Objects.requireNonNull(cpuLink).markDone();
         assertEquals(1, fixture.terminalCalls);
         fixture.logic.cancel();
         assertFalse(fixture.logic.hasJob());
         assertTrue(cpuLink.isDone());
-        assertTrue(receipt.link().isDone());
+        assertTrue(Objects.requireNonNull(receipt.link()).isDone());
         assertFalse(cpuLink.isCanceled());
-        assertFalse(receipt.link().isCanceled());
+        assertFalse(Objects.requireNonNull(receipt.link()).isCanceled());
         assertEquals(1, fixture.terminalCalls);
         assertEquals(5, fixture.returned);
     }
@@ -619,12 +620,12 @@ class CraftingSubmissionPublicationTest {
             (_, method, args) -> switch (method.getName()) {
                 case "getRequestedJobs" -> ImmutableSet.of();
                 case "jobStateChange" -> {
-                    terminalCalls++;
-                    if (onTerminal != null) onTerminal.run();
+                    this.terminalCalls++;
+                    if (this.onTerminal != null) this.onTerminal.run();
                     yield null;
                 }
                 case "insertCraftedItems" -> {
-                    delivered += (long) args[2];
+                    this.delivered += (long) args[2];
                     yield (long) args[2];
                 }
                 default -> null;

@@ -396,7 +396,7 @@ class MultiCraftingTrackerOwnershipTest {
             var fixture = new Fixture();
             fixture.handle(1);
             fixture.next.complete(plan());
-            fixture.onSubmit = suspend ? () -> fixture.tracker.suspendCalculations()
+            fixture.onSubmit = suspend ? fixture.tracker::suspendCalculations
                 : fixture.tracker::cancelCalculations;
             assertTrue(fixture.handle(1));
             assertEquals(1, fixture.tracker.getRequestedJobs().size());
@@ -716,7 +716,7 @@ class MultiCraftingTrackerOwnershipTest {
     void suspensionDuringBeginCancelsFutureAfterReturn() {
         var fixture = new Fixture();
         var future = fixture.next;
-        fixture.onStart = () -> fixture.tracker.suspendCalculations();
+        fixture.onStart = fixture.tracker::suspendCalculations;
         fixture.handle(1);
         assertTrue(future.isCancelled());
         assertFalse(fixture.tracker.isBusy(0));
@@ -906,8 +906,8 @@ class MultiCraftingTrackerOwnershipTest {
             ICraftingRequester.class.getClassLoader(), new Class<?>[]{ICraftingRequester.class},
             (p, m, a) -> {
                 if (m.getName().equals("getActionableNode")) {
-                    ownerReads++;
-                    if (onOwnerRead != null) onOwnerRead.run();
+                    this.ownerReads++;
+                    if (this.onOwnerRead != null) this.onOwnerRead.run();
                 }
                 return m.getName().equals("getRequestedJobs") ? ImmutableSet.of() : null;
             });

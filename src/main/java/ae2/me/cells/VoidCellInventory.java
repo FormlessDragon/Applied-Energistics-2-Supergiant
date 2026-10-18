@@ -44,6 +44,7 @@ public class VoidCellInventory implements StorageCell, CondenserLogicHost {
     private final ObjectList<ListenerRegistration> listeners = new ObjectArrayList<>();
     private AEKey2LongMap storedAmounts;
     private double voidEnergy;
+    private long conversionBatchId;
     private boolean persisted = true;
     private boolean dispatchingListeners;
     private boolean listUpdateRequired;
@@ -264,11 +265,30 @@ public class VoidCellInventory implements StorageCell, CondenserLogicHost {
     }
 
     @Override
-    public void addCondenserOutput(AEItemKey output, long amount) {
-        long added = addStoredAmount(output, amount);
-        if (added > 0) {
-            postChange(output, added);
+    public final OutputCommit commitCondenserOutput(AEItemKey output, long amount, double powerPerOutput) {
+        var target = getCellItems();
+        long batchId = Math.incrementExact(conversionBatchId);
+        conversionBatchId = batchId;
+        if (powerPerOutput != mode.requiredPower || !output.equals(CondenserLogic.getOutputKey(mode)) || amount <= 0 || !Double.isFinite(powerPerOutput) || powerPerOutput <= 0
+            || !Double.isFinite(voidEnergy) || voidEnergy < powerPerOutput) {
+            return new OutputCommit(output, this, target, batchId, 0, Math.max(0, amount), 0);
         }
+        long affordable = voidEnergy >= Long.MAX_VALUE * powerPerOutput
+            ? Long.MAX_VALUE : (long) (voidEnergy / powerPerOutput);
+        // Native map mutation and debit have no listener/save-provider call between them.
+        long current = target.getLong(output);
+        long added = Math.min(Math.min(amount, affordable), Long.MAX_VALUE - current);
+        if (added > 0) {
+            target.put(output, current + added);
+        }
+        voidEnergy = Math.max(0, voidEnergy - added * powerPerOutput);
+        persisted = false;
+        return new OutputCommit(output, this, target, batchId, added, amount - added, 0);
+    }
+
+    @Override
+    public void notifyCondenserOutput(AEItemKey output, long amount) {
+        postChange(output, amount);
     }
 
     @Override
@@ -323,15 +343,17 @@ public class VoidCellInventory implements StorageCell, CondenserLogicHost {
                 if (!registration.active) {
                     continue;
                 }
-                if (!registration.listener.isValid(registration.verificationToken)) {
-                    registration.active = false;
-                    continue;
-                }
                 this.currentListener = registration;
                 try {
+                    if (!registration.listener.isValid(registration.verificationToken)) {
+                        registration.active = false;
+                        continue;
+                    }
                     registration.listener.onStackChange(what, delta);
+                } catch (RuntimeException failure) {
+                    registration.active = false;
+                    AELog.warn(failure, "Disabling void cell listener after a committed content change");
                 } finally {
-                    this.currentListener = null;
                 }
                 if (this.listUpdateRequired) {
                     break;
@@ -360,13 +382,16 @@ public class VoidCellInventory implements StorageCell, CondenserLogicHost {
                     if (!registration.active) {
                         continue;
                     }
-                    if (!registration.listener.isValid(registration.verificationToken)) {
-                        registration.active = false;
-                        continue;
-                    }
                     this.currentListener = registration;
                     try {
+                        if (!registration.listener.isValid(registration.verificationToken)) {
+                            registration.active = false;
+                            continue;
+                        }
                         registration.listener.onListUpdate();
+                    } catch (RuntimeException failure) {
+                        registration.active = false;
+                        AELog.warn(failure, "Disabling void cell listener after a committed list refresh");
                     } finally {
                         this.currentListener = null;
                     }

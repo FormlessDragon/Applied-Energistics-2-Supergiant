@@ -100,7 +100,6 @@ public class AppEngInternalInventory extends BaseInternalInventory {
         if (stack.getCount() <= toExtract) {
             if (!simulate) {
                 setItemDirect(slot, ItemStack.EMPTY);
-                notifyContentsChanged(slot);
                 return stack;
             } else {
                 return stack.copy();
@@ -121,9 +120,23 @@ public class AppEngInternalInventory extends BaseInternalInventory {
     protected void onContentsChanged(int slot) {
         if (this.host != null && this.eventsEnabled() && !this.notifyingChanges) {
             this.notifyingChanges = true;
-            this.host.onChangeInventory(this, slot);
-            this.host.saveChangedInventory(this);
-            this.notifyingChanges = false;
+            try {
+                try {
+                    this.host.onChangeInventory(this, slot);
+                } catch (RuntimeException failure) {
+                    try {
+                        this.host.saveChangedInventory(this);
+                    } catch (RuntimeException saveFailure) {
+                        if (saveFailure != failure) {
+                            failure.addSuppressed(saveFailure);
+                        }
+                    }
+                    throw failure;
+                }
+                this.host.saveChangedInventory(this);
+            } finally {
+                this.notifyingChanges = false;
+            }
         }
     }
 

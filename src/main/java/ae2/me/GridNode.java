@@ -57,6 +57,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -71,6 +73,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
     protected final IGridNodeListener<?> listener;
     protected final Reference2ObjectLinkedOpenHashMap<GridNode, GridConnection> connections =
         new Reference2ObjectLinkedOpenHashMap<>(2);
+    private List<IGridConnection> connectionSnapshot;
     private final ObjectList<GridConnection> pathConnections = new ObjectArrayList<>();
     private boolean pathConnectionsDirty = true;
     private final WorldServer level;
@@ -170,6 +173,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
         var other = (GridNode) gridConnection.getOtherSide(this);
         Preconditions.checkState(!connections.containsKey(other), "Nodes are already connected");
         connections.put(other, (GridConnection) gridConnection);
+        connectionSnapshot = null;
         invalidatePathConnections();
         if (gridConnection.isInWorld()) {
             callListener(IGridNodeListener::onInWorldConnectionChanged);
@@ -185,6 +189,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
         var other = (GridNode) gridConnection.getOtherSide(this);
         Preconditions.checkState(connections.get(other) == gridConnection, "Connection is not attached to this node");
         connections.remove(other);
+        connectionSnapshot = null;
         GridConnection.topologyChanged();
         invalidatePathConnections();
     }
@@ -377,7 +382,10 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
 
     @Override
     public List<IGridConnection> getConnections() {
-        return List.copyOf(this.connections.values());
+        if (connectionSnapshot == null) {
+            connectionSnapshot = List.copyOf(this.connections.values());
+        }
+        return connectionSnapshot;
     }
 
     public boolean hasNoConnections() {
