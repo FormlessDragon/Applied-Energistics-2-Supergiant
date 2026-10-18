@@ -380,7 +380,8 @@ public class TileDrive extends AENetworkedInvTile implements IChestOrDrive, IPri
         }
 
         for (int i = 0; i < CELL_COUNT; i++) {
-            Item item = getCellItem(i);
+            ItemStack stack = inv.peekStackInSlot(i);
+            Item item = stack.isEmpty() ? null : stack.getItem();
             if (clientCellItems[i] != item) {
                 clientCellItems[i] = item;
                 changed = true;

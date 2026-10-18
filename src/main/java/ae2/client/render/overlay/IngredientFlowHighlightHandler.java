@@ -17,7 +17,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.lwjgl.opengl.GL11;
 
 import java.util.List;
-import java.util.Map;
 
 public class IngredientFlowHighlightHandler {
 
@@ -35,7 +34,7 @@ public class IngredientFlowHighlightHandler {
     private static final float HIGHLIGHT_ALPHA = 0.95F;
 
     private final ObjectArrayList<OverlayHighlightLocation> currentDimensionLocations = new ObjectArrayList<>();
-    private final Map<OverlayHighlightLocation, Long> highlightedNetTotals = new Object2LongOpenHashMap<>();
+    private final Object2LongOpenHashMap<OverlayHighlightLocation> highlightedNetTotals = new Object2LongOpenHashMap<>();
     private long expiresAt;
     private int highlightedDimension = Integer.MIN_VALUE;
 

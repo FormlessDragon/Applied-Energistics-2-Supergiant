@@ -11,6 +11,7 @@ import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -260,7 +261,7 @@ public class GraphBuilder {
         for (var entry : inputs.object2LongEntrySet()) {
             result.add(new MaterialClosure.Input(entry.getKey(), entry.getLongValue()));
         }
-        return List.copyOf(result);
+        return Collections.unmodifiableList(result);
     }
 
     /**

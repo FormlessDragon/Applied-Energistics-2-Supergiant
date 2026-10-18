@@ -36,6 +36,7 @@ import ae2.me.service.CraftingService;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
@@ -67,8 +68,7 @@ public class CraftingTreeProcess {
     private final List<GenericStack> outputs;
     // Use linked hashmap to ensure deterministic ordering of subcrafts
     private final Object2LongLinkedOpenHashMap<CraftingTreeNode> nodes = new Object2LongLinkedOpenHashMap<>();
-    private final Object2LongLinkedOpenHashMap<CraftingTreeNode> treeInputDisplayAmounts =
-        new Object2LongLinkedOpenHashMap<>();
+    private final Object2LongOpenHashMap<CraftingTreeNode> treeInputDisplayAmounts = new Object2LongOpenHashMap<>();
     boolean possible = true;
     private boolean containerItems;
     private Preview reusablePreview;
@@ -470,8 +470,7 @@ public class CraftingTreeProcess {
         long extractedDelta = inv.getRequiredExtractAmount(key) - requiredExtractBefore;
         long missingDelta = this.job.getMissingItems().get(key) - missingBefore;
         long delta = Math.max(0, extractedDelta) + Math.max(0, missingDelta);
-        long previous = this.treeInputDisplayAmounts.getLong(node);
-        this.treeInputDisplayAmounts.put(node, previous + delta);
+        this.treeInputDisplayAmounts.addTo(node, delta);
     }
 
     public boolean hasTreeInputDisplayAmount(CraftingTreeNode node) {

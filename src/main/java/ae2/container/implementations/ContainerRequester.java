@@ -52,7 +52,7 @@ public class ContainerRequester extends AbstractContainerRequester {
 
     @Override
     protected void sendFullUpdate(@Nullable IGrid grid) {
-        sendPacketToClient(RequesterSyncPacket.clearAll());
+        sendRequesterPacket(RequesterSyncPacket.clearAll());
         syncRequestTrackerFull(this.requestTracker);
         this.sentFullUpdate = true;
     }

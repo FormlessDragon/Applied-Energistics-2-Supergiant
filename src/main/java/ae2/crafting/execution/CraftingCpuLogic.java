@@ -34,6 +34,7 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.core.AELog;
+import ae2.core.definitions.AEItems;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.clientbound.CraftingJobStatusPacket;
 import ae2.crafting.BatchCraftingPlan;
@@ -49,15 +50,19 @@ import ae2.me.service.CraftingService;
 import com.google.common.base.Preconditions;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.ref.WeakReference;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -69,13 +74,27 @@ import java.util.function.Function;
  */
 public class CraftingCpuLogic {
     private static final String NBT_PENDING_STANDALONE_OUTPUT = "pendingStandaloneOutput";
+    private static final String NBT_UNKNOWN_STANDALONE_OUTPUT = "unknownStandaloneOutput";
+    private static final String NBT_UNKNOWN_REQUESTER_OUTPUT = "unknownRequesterOutput";
+    private static final String NBT_INVENTORY_RETURN = "inventoryReturn";
+    private static final String NBT_READ_FAILURE = "cpuReadFailure";
+    private static final String[] SAVED_KEYS = {"inventory", "job", NBT_PENDING_STANDALONE_OUTPUT,
+        NBT_UNKNOWN_STANDALONE_OUTPUT, NBT_UNKNOWN_REQUESTER_OUTPUT, NBT_INVENTORY_RETURN, NBT_READ_FAILURE};
 
     final CraftingCPUCluster cluster;
     /**
      * Used crafting operations over the last 3 ticks.
      */
     private final int[] usedOps = new int[3];
-    private final Set<Consumer<AEKey>> listeners = new ReferenceOpenHashSet<>();
+    private final Reference2ObjectOpenHashMap<Consumer<AEKey>, ChangeListenerRegistration> listeners =
+        new Reference2ObjectOpenHashMap<>();
+    /**
+     * Inventory.
+     */
+    private final ListCraftingInventory inventory = new ListCraftingInventory(what -> {
+        this.inventoryRevision++;
+        this.postChange(what);
+    });
     /**
      * Current job.
      */
@@ -85,12 +104,43 @@ public class CraftingCpuLogic {
      */
     private boolean cantStoreItems = false;
     private long pendingStandaloneOutput = 0;
-    private boolean returningStandaloneOutput = false;
-    private long lastModifiedOnTick = TickHandler.instance().getCurrentTick();
+    @Nullable
+    private ChangeListenerRegistration[] listenerSnapshot;
     /**
-     * Inventory.
+     * Output whose external insertion threw after an unknown amount may have been accepted.
      */
-    private final ListCraftingInventory inventory = new ListCraftingInventory(CraftingCpuLogic.this::postChange);
+    @Nullable
+    private AEKey unknownStandaloneOutputKey;
+    private boolean returningStandaloneOutput = false;
+    @Nullable
+    private AEKey unknownRequesterOutputKey;
+    private boolean executingCrafting;
+    private boolean tickingCrafting;
+    private boolean submitting;
+    private boolean finishingJob;
+    private boolean returningItems;
+    private boolean readingState;
+    private boolean restoreLinkPending;
+    private long inventoryRevision;
+    @Nullable
+    private NBTBase savedReadFailure;
+    @Nullable
+    private NBTTagCompound quarantinedImage;
+    private long inventoryGeneration;
+    @Nullable
+    private InventoryReturn inventoryReturn;
+    @Nullable
+    private NBTBase savedInventoryReturn;
+    private boolean submissionSavePending;
+    private boolean submissionSaveFailureLogged;
+    private int confirmedDispatchPatterns;
+    private long taskRevision;
+    @Nullable
+    private ExecutingCraftingJob pendingOutputSnapshotJob;
+    private long pendingOutputSnapshotRevision = Long.MIN_VALUE;
+    private long lastModifiedOnTick = TickHandler.instance().getCurrentTick();
+    @Nullable
+    private KeyCounter pendingOutputSnapshot;
 
     public CraftingCpuLogic(CraftingCPUCluster cluster) {
         this.cluster = cluster;
@@ -136,67 +186,39 @@ public class CraftingCpuLogic {
         return trySubmitJob(grid, plan, src, requester, CraftingJobOptions.DEFAULT);
     }
 
-    public ICraftingSubmitResult trySubmitJob(IGrid grid, ICraftingPlan plan, IActionSource src,
-                                              @Nullable ICraftingRequester requester, CraftingJobOptions options) {
-        // Already have a job.
-        if (this.job != null)
-            return CraftingSubmitResult.CPU_BUSY;
-        // Check that the node is active.
-        if (!cluster.isActive())
-            return CraftingSubmitResult.CPU_OFFLINE;
-        // Check bytes.
-        if (cluster.getAvailableStorage() < plan.bytes())
-            return CraftingSubmitResult.CPU_TOO_SMALL;
-
-        if (!inventory.list.isEmpty())
-            AELog.warn("Crafting CPU inventory is not empty yet a job was submitted.");
-
-        // Extract everything available now; unresolved missing ingredients will be captured by the CPU later.
-        var remainingMissingItems = CraftingCpuHelper.extractInitialItems(plan, grid, inventory, src);
-
-        // Set CPU link and job.
-        var playerId = src.player()
-                          .map(p -> p instanceof EntityPlayerMP serverPlayer ? IPlayerRegistry.getPlayerId(serverPlayer) : null)
-                          .orElse(null);
-        var craftId = UUID.randomUUID();
-        var linkCpu = new CraftingLink(CraftingCpuHelper.generateLinkData(craftId, requester == null, false), cluster);
-        this.job = new ExecutingCraftingJob(plan, this::postChange, linkCpu, playerId, remainingMissingItems, options);
-        cluster.updateOutput(plan.finalOutput());
-        cluster.markDirty();
-
-        // TODO: post monitor difference?
-
-        notifyJobOwner(job, CraftingJobStatusPacket.Status.STARTED, false, trackedKeys(plan));
-
-        // Non-standalone jobs need another link for the requester, and both links need to be submitted to the cache.
-        if (requester != null) {
-            var linkReq = new CraftingLink(CraftingCpuHelper.generateLinkData(craftId, false, true), requester);
-
-            var craftingService = (CraftingService) grid.getCraftingService();
-            craftingService.addLink(linkCpu);
-            craftingService.addLink(linkReq);
-
-            return CraftingSubmitResult.successful(linkReq);
-        } else {
-            return CraftingSubmitResult.successful(null);
+    private static void collectInventoryKeys(Set<AEKey> keys, KeyCounter inventory) {
+        for (var entry : inventory) {
+            keys.add(entry.getKey());
         }
     }
 
-    public boolean canMergeJob(ICraftingPlan plan) {
-        if (this.job == null || this.job.suspended || plan.simulation()) {
-            return false;
+    private static void collectJobKeys(Set<AEKey> keys, @Nullable ExecutingCraftingJob job) {
+        if (job == null) return;
+        collectInventoryKeys(keys, job.waitingFor.list);
+        collectInventoryKeys(keys, job.pseudoInventory.list);
+        for (var details : job.tasks.keySet()) {
+            try {
+                for (var output : details.getOutputs()) keys.add(output.what());
+            } catch (RuntimeException failure) {
+                AELog.error(failure, "Failed to resolve a restored CPU notification key");
+            }
         }
-        if (!this.job.finalOutput.what().equals(plan.finalOutput().what())) {
-            return false;
-        }
-        if (this.job.hasPlaceholderFinalOutput() != hasPlaceholderFinalOutput(plan)) {
-            // A job whose output is only pretended must never merge with a real job for the same item, or the other way
-            // around: the pretended production would satisfy a real demand without anything being crafted.
-            return false;
-        }
+    }
 
-        long mergedBytes = LongMath.saturatedAdd(this.job.estimateRemainingPlanBytes(), plan.bytes());
-        return cluster.getAvailableStorage() >= mergedBytes;
+    private static boolean sameResources(KeyCounter first, KeyCounter second) {
+        for (var entry : first) if (second.get(entry.getKey()) != entry.getLongValue()) return false;
+        for (var entry : second) if (first.get(entry.getKey()) != entry.getLongValue()) return false;
+        return true;
+    }
+
+    static NBTTagList savedList(NBTTagCompound data, String key) {
+        requireTag(data, key, Constants.NBT.TAG_LIST);
+        var list = data.getTagList(key, Constants.NBT.TAG_COMPOUND);
+        if (data.getTag(key) instanceof NBTTagList original && original.tagCount() > 0
+            && original.getTagType() != Constants.NBT.TAG_COMPOUND) {
+            throw new IllegalArgumentException("Saved CPU list must contain compounds: " + key);
+        }
+        return list;
     }
 
     /**
@@ -215,66 +237,51 @@ public class CraftingCpuLogic {
         return false;
     }
 
+    static KeyCounter savedResources(NBTTagCompound data, String key) {
+        var prepared = new KeyCounter();
+        for (var stack : GenericStack.readList(savedList(data, key))) {
+            if (stack != null) {
+                if (stack.amount() < 0 || stack.amount() > Long.MAX_VALUE - prepared.get(stack.what())) {
+                    throw new IllegalArgumentException("Unrepresentable saved CPU resource count: " + key);
+                }
+                if (stack.amount() > 0) prepared.add(stack.what(), stack.amount());
+            }
+        }
+        return prepared;
+    }
+
+    private static void requireTag(NBTTagCompound data, String key, int type) {
+        if (data.hasKey(key) && !data.hasKey(key, type)) {
+            throw new IllegalArgumentException("Wrong saved CPU tag type: " + key);
+        }
+    }
+
+    private static boolean sameSavedState(NBTTagCompound first, NBTTagCompound second) {
+        for (var key : SAVED_KEYS) if (!Objects.equals(first.getTag(key), second.getTag(key))) return false;
+        return true;
+    }
+
+    /**
+     * The items a started job makes the terminal pin in its own row on top of the item list and show as in progress.
+     * <p>
+     * A batch order of the crafting terminal orders the materials the transferred recipe was missing, so those are the
+     * items it crafts. Its reported output is only a placeholder, nothing is crafted into it, so tracking that instead
+     * would leave the materials looking finished and drop them from the terminal.
+     */
+    private static List<AEKey> trackedKeys(ICraftingPlan plan) {
+        if (plan instanceof BatchCraftingPlan batchPlan) {
+            var targets = batchPlan.batchTargets();
+            var keys = new ObjectArrayList<AEKey>(targets.size());
+            for (var target : targets) {
+                keys.add(target.what());
+            }
+            return keys;
+        }
+        return List.of();
+    }
+
     public ICraftingSubmitResult tryMergeJob(IGrid grid, ICraftingPlan plan, IActionSource src) {
         return tryMergeJob(grid, plan, src, 0);
-    }
-
-    public ICraftingSubmitResult tryMergeJob(IGrid grid, ICraftingPlan plan, IActionSource src, int priority) {
-        if (!canMergeJob(plan)) {
-            return CraftingSubmitResult.CPU_BUSY;
-        }
-
-        var remainingMissingItems = CraftingCpuHelper.extractInitialItems(plan, grid, inventory, src);
-        this.job.merge(plan, remainingMissingItems, priority);
-        cluster.updateOutput(new GenericStack(this.job.finalOutput.what(), this.job.remainingAmount));
-        cluster.markDirty();
-        postChange(this.job.finalOutput.what());
-        return CraftingSubmitResult.successful(null);
-    }
-
-    public void tickCraftingLogic(IEnergyService eg, CraftingService cc) {
-        // Don't tick if we're not active.
-        if (!cluster.isActive())
-            return;
-        cantStoreItems = false;
-        // If we don't have a job, just try to dump our items.
-        if (this.job == null) {
-            this.storeItems();
-            if (!this.inventory.list.isEmpty()) {
-                cantStoreItems = true;
-            }
-            return;
-        }
-        // Check if the job was cancelled.
-        if (job.link.isCanceled()) {
-            cancel();
-            return;
-        }
-
-        returnStandaloneOutputToNetwork();
-
-        // Don't schedule more work while suspended
-        if (job.suspended) {
-            return;
-        }
-
-        var remainingOperations = cluster.getCoProcessors() + 1 - (this.usedOps[0] + this.usedOps[1] + this.usedOps[2]);
-        final var started = remainingOperations;
-
-        if (remainingOperations > 0) {
-            do {
-                var pushedPatterns = executeCrafting(remainingOperations, cc, eg, cluster.getLevel());
-
-                if (pushedPatterns > 0) {
-                    remainingOperations -= pushedPatterns;
-                } else {
-                    break;
-                }
-            } while (remainingOperations > 0);
-        }
-        this.usedOps[2] = this.usedOps[1];
-        this.usedOps[1] = this.usedOps[0];
-        this.usedOps[0] = started - remainingOperations;
     }
 
     /**
@@ -297,133 +304,114 @@ public class CraftingCpuLogic {
         return craftingService.getProviders(details);
     }
 
-    int executeCraftingWithProviderLookup(int maxPatterns, IEnergyService energyService, World level,
-                                          Function<IPatternDetails, Iterable<ICraftingProvider>> providersForPattern) {
-        var job = this.job;
-        if (job == null)
-            return 0;
-
-        var pushedPatterns = 0;
-
-        var it = job.tasks.entrySet().iterator();
-        taskLoop:
-        while (it.hasNext()) {
-            var task = it.next();
-            if (task.getValue().value <= 0) {
-                // Keep dispatched patterns in the job after their remaining push count reaches zero. Their outputs may
-                // still be crafting in a provider, and the crafting-status supplier trace needs the pattern details to
-                // resolve that provider. Zero-valued tasks are ignored by input-demand and pending-output accounting.
-                continue;
-            }
-
-            var details = task.getKey();
-            var finalOutputPseudoPattern = isFinalOutputPseudoPattern(job, details);
-            // Try to push to each provider.
-            for (var provider : providersForPattern.apply(details)) {
-                if (provider.isBusy()) {
-                    continue;
-                }
-
-                boolean mergePush = provider.canMergePatternPush(details);
-                int pushedMultiplier = tryPushPatternToProvider(job, provider, details, finalOutputPseudoPattern,
-                    energyService, level, task, maxPatterns - pushedPatterns, mergePush);
-                if (pushedMultiplier <= 0) {
-                    continue;
-                }
-
-                pushedPatterns += pushedMultiplier;
-                if (job != this.job) {
-                    break taskLoop;
-                }
-                if (task.getValue().value <= 0) {
-                    continue taskLoop;
-                }
-                if (pushedPatterns == maxPatterns) {
-                    break taskLoop;
-                }
-                continue taskLoop;
-            }
+    public ICraftingSubmitResult trySubmitJob(IGrid grid, ICraftingPlan plan, IActionSource src,
+                                              @Nullable ICraftingRequester requester, CraftingJobOptions options) {
+        if (this.submitting || this.finishingJob || this.returningItems || this.readingState
+            || this.hasUnconfirmedInventory()) {
+            return CraftingSubmitResult.CPU_BUSY;
         }
-
-        return pushedPatterns;
+        this.submitting = true;
+        try {
+            return submitOwnedJob(grid, plan, src, requester, options);
+        } finally {
+            this.submitting = false;
+        }
     }
 
-    private int tryPushPatternToProvider(ExecutingCraftingJob job, ICraftingProvider provider, IPatternDetails details,
-                                         boolean finalOutputPseudoPattern, IEnergyService energyService, World level,
-                                         Map.Entry<IPatternDetails, ExecutingCraftingJob.TaskProgress> task,
-                                         int remainingPatternBudget, boolean mergePush) {
-        if (!mergePush) {
-            return tryPushPattern(job, provider, details, finalOutputPseudoPattern, energyService, level, task, 1);
-        }
+    private ICraftingSubmitResult submitOwnedJob(IGrid grid, ICraftingPlan plan, IActionSource src,
+                                                 @Nullable ICraftingRequester requester, CraftingJobOptions options) {
+        // Already have a job.
+        if (this.job != null)
+            return CraftingSubmitResult.CPU_BUSY;
+        // Check that the node is active.
+        if (!cluster.isActive())
+            return CraftingSubmitResult.CPU_OFFLINE;
+        // Check bytes.
+        if (cluster.getAvailableStorage() < plan.bytes())
+            return CraftingSubmitResult.CPU_TOO_SMALL;
 
-        int maxMultiplier = (int) Math.min(task.getValue().value, remainingPatternBudget);
-        maxMultiplier = provider.getMaxPatternPushMultiplier(details, maxMultiplier);
-        ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
-            ? new RealInputTrackingInventoryView(inventory)
-            : inventory;
-        maxMultiplier = CraftingCpuHelper.getMaxExtractablePatternMultiplier(details, taskInventory, level,
-            maxMultiplier);
-        if (maxMultiplier <= 0) {
-            return 0;
-        }
+        if (!inventory.list.isEmpty())
+            AELog.warn("Crafting CPU inventory is not empty yet a job was submitted.");
 
-        maxMultiplier = getMaxEnergyAffordableMultiplier(
-            CraftingCpuHelper.calculatePatternPower(details, 1),
-            energyService,
-            maxMultiplier);
-        if (maxMultiplier <= 0) {
-            return 0;
-        }
+        var playerId = src.player()
+                          .map(p -> p instanceof EntityPlayerMP serverPlayer ? IPlayerRegistry.getPlayerId(serverPlayer) : null)
+                          .orElse(null);
+        var craftId = UUID.randomUUID();
+        var linkCpu = new CraftingLink(CraftingCpuHelper.generateLinkData(craftId, requester == null, false), cluster);
+        var linkReq = requester == null ? null
+            : new CraftingLink(CraftingCpuHelper.generateLinkData(craftId, false, true), requester);
+        var craftingService = requester == null ? null : (CraftingService) grid.getCraftingService();
+        var tracked = playerId == null ? List.<AEKey>of() : trackedKeys(plan);
 
-        return tryPushPattern(job, provider, details, finalOutputPseudoPattern, energyService, level, task,
-            maxMultiplier);
+        // Resolve plan metadata and providers before taking ownership of any network inputs.
+        var committed = new ExecutingCraftingJob(plan, this::postChange, linkCpu, playerId, options);
+
+        // Extract everything available now; unresolved missing ingredients will be captured by the CPU later.
+        var remainingMissingItems = CraftingCpuHelper.extractInitialItems(plan, grid, inventory, src);
+        committed.addMissingItems(remainingMissingItems);
+        this.job = committed;
+        invalidatePendingOutputSnapshot();
+        this.submissionSavePending = true;
+
+        // Establish both ends before display, save, or player notifications can call back into the requester.
+        if (craftingService != null) {
+            craftingService.addLink(linkCpu);
+            craftingService.addLink(linkReq);
+        }
+        var receipt = CraftingSubmitResult.successful(linkReq);
+
+        try {
+            cluster.updateOutput(committed.finalOutput);
+        } catch (RuntimeException failure) {
+            AELog.error(failure, "Failed to update the display of a committed crafting submission");
+        }
+        this.saveCommittedSubmission();
+
+        // TODO: post monitor difference?
+
+        if (this.job == committed) {
+            try {
+                notifyJobOwner(committed, CraftingJobStatusPacket.Status.STARTED, false, tracked);
+            } catch (RuntimeException failure) {
+                AELog.error(failure, "Failed to notify the owner of a committed crafting submission");
+            }
+        }
+        return receipt;
     }
 
-    private int tryPushPattern(ExecutingCraftingJob job, ICraftingProvider provider, IPatternDetails details,
-                               boolean finalOutputPseudoPattern, IEnergyService energyService, World level,
-                               Map.Entry<IPatternDetails, ExecutingCraftingJob.TaskProgress> task,
-                               int multiplier) {
-        if (multiplier <= 0) {
-            return 0;
+    private void saveCommittedSubmission() {
+        if (!this.submissionSavePending) {
+            return;
+        }
+        this.submissionSavePending = false;
+        try {
+            this.cluster.markDirty();
+            this.submissionSaveFailureLogged = false;
+        } catch (RuntimeException failure) {
+            this.submissionSavePending = true;
+            if (!this.submissionSaveFailureLogged) {
+                this.submissionSaveFailureLogged = true;
+                AELog.error(failure, "Failed to save a committed crafting submission; retrying the save notification");
+            }
+        }
+    }
+
+    public boolean canMergeJob(ICraftingPlan plan) {
+        if (this.readingState || this.job == null || this.job.suspended || this.job.link.isDone()
+            || this.job.link.isCanceled() || this.hasUnconfirmedInventory() || plan.simulation()) {
+            return false;
+        }
+        if (!this.job.finalOutput.what().equals(plan.finalOutput().what())) {
+            return false;
+        }
+        if (this.job.hasPlaceholderFinalOutput() != hasPlaceholderFinalOutput(plan)) {
+            // A job whose output is only pretended must never merge with a real job for the same item, or the other way
+            // around: the pretended production would satisfy a real demand without anything being crafted.
+            return false;
         }
 
-        if (!canAttemptMultiplier(CraftingCpuHelper.calculatePatternPower(details, 1), energyService, multiplier)) {
-            return 0;
-        }
-        var expectedOutputs = new KeyCounter();
-        var expectedContainerItems = new KeyCounter();
-        ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
-            ? new RealInputTrackingInventoryView(inventory)
-            : inventory;
-        @Nullable
-        var craftingContainer = CraftingCpuHelper.extractPatternInputs(details, taskInventory, level,
-            expectedOutputs, expectedContainerItems, multiplier);
-        if (craftingContainer == null) {
-            return 0;
-        }
-
-        var patternPower = CraftingCpuHelper.calculatePatternPower(craftingContainer);
-        if (energyService.extractAEPower(patternPower, Actionable.SIMULATE,
-            PowerMultiplier.CONFIG) < patternPower - 0.01) {
-            CraftingCpuHelper.reinjectPatternInputs(taskInventory, craftingContainer);
-            return 0;
-        }
-
-        if (!provider.pushPattern(details, craftingContainer, multiplier)) {
-            CraftingCpuHelper.reinjectPatternInputs(taskInventory, craftingContainer);
-            return 0;
-        }
-
-        energyService.extractAEPower(patternPower, Actionable.MODULATE, PowerMultiplier.CONFIG);
-        recordPushedPattern(job, details, taskInventory, expectedOutputs, expectedContainerItems);
-
-        cluster.markDirty();
-
-        task.getValue().value -= multiplier;
-        if (finalOutputPseudoPattern) {
-            completePseudoOutputs(job, expectedOutputs);
-        }
-        return multiplier;
+        long mergedBytes = LongMath.saturatedAdd(this.job.estimateRemainingPlanBytes(), plan.bytes());
+        return cluster.getAvailableStorage() >= mergedBytes;
     }
 
     private boolean canAttemptMultiplier(double singlePatternPower, IEnergyService energyService, int multiplier) {
@@ -506,6 +494,283 @@ public class CraftingCpuLogic {
         }
     }
 
+    public ICraftingSubmitResult tryMergeJob(IGrid grid, ICraftingPlan plan, IActionSource src, int priority) {
+        if (this.submitting || this.finishingJob || this.returningItems || this.readingState || !canMergeJob(plan)) {
+            return CraftingSubmitResult.CPU_BUSY;
+        }
+
+        var remainingMissingItems = CraftingCpuHelper.extractInitialItems(plan, grid, inventory, src);
+        this.job.merge(plan, remainingMissingItems, priority);
+        invalidatePendingOutputSnapshot();
+        cluster.updateOutput(new GenericStack(this.job.finalOutput.what(), this.job.remainingAmount));
+        cluster.markDirty();
+        postChange(this.job.finalOutput.what());
+        return CraftingSubmitResult.successful(null);
+    }
+
+    public void tickCraftingLogic(IEnergyService eg, CraftingService cc) {
+        if (this.executingCrafting || this.tickingCrafting || this.submitting || this.finishingJob || this.returningItems
+            || this.readingState) {
+            return;
+        }
+        this.tickingCrafting = true;
+        try {
+            tickOwnedCraftingLogic(eg, cc);
+        } finally {
+            this.tickingCrafting = false;
+        }
+    }
+
+    private void tickOwnedCraftingLogic(IEnergyService eg, CraftingService cc) {
+        this.saveCommittedSubmission();
+        if (this.hasUnconfirmedInventory()) {
+            this.cantStoreItems = true;
+            return;
+        }
+        // Don't tick if we're not active.
+        if (!cluster.isActive())
+            return;
+        cantStoreItems = false;
+        // If we don't have a job, just try to dump our items.
+        if (this.job == null) {
+            this.storeItems();
+            if (!this.inventory.list.isEmpty()) {
+                cantStoreItems = true;
+            }
+            return;
+        }
+        boolean completed = job.link.isDone();
+        if (completed || job.link.isCanceled()) {
+            finishJob(completed);
+            return;
+        }
+
+        var tickJob = this.job;
+        returnStandaloneOutputToNetwork();
+
+        // A callback can replace, cancel, or complete the job while returning output.
+        if (!isDispatchJobCurrent(tickJob)) {
+            return;
+        }
+        retryPendingRequesterOutput(tickJob);
+        if (!isDispatchJobCurrent(tickJob) || tickJob.pendingRequesterOutput > 0 || tickJob.requesterOutputUnknown) {
+            return;
+        }
+
+        var remainingOperations = cluster.getCoProcessors() + 1 - (this.usedOps[0] + this.usedOps[1] + this.usedOps[2]);
+        int completedThisTick = 0;
+        try {
+            if (remainingOperations > 0) {
+                do {
+                    int pushedPatterns = 0;
+                    this.confirmedDispatchPatterns = 0;
+                    try {
+                        pushedPatterns = executeCrafting(remainingOperations, cc, eg, cluster.getLevel());
+                    } finally {
+                        // Also retain confirmed work when a later callback throws before executeCrafting returns.
+                        completedThisTick += Math.max(pushedPatterns, this.confirmedDispatchPatterns);
+                    }
+                    if (pushedPatterns <= 0 || !isDispatchJobCurrent(tickJob)) {
+                        break;
+                    }
+                    remainingOperations -= pushedPatterns;
+                } while (remainingOperations > 0);
+            }
+        } finally {
+            this.usedOps[2] = this.usedOps[1];
+            this.usedOps[1] = this.usedOps[0];
+            this.usedOps[0] = completedThisTick;
+        }
+    }
+
+    int executeCraftingWithProviderLookup(int maxPatterns, IEnergyService energyService, World level,
+                                          Function<IPatternDetails, Iterable<ICraftingProvider>> providersForPattern) {
+        var job = this.job;
+        if (this.executingCrafting || this.readingState || this.hasUnconfirmedInventory())
+            return 0;
+        this.confirmedDispatchPatterns = 0;
+        if (job == null || maxPatterns <= 0 || !isDispatchJobCurrent(job))
+            return 0;
+
+        this.executingCrafting = true;
+        try {
+            return dispatchCrafting(job, maxPatterns, energyService, level, providersForPattern);
+        } finally {
+            this.executingCrafting = false;
+        }
+    }
+
+    private int dispatchCrafting(ExecutingCraftingJob job, int maxPatterns, IEnergyService energyService, World level,
+                                 Function<IPatternDetails, Iterable<ICraftingProvider>> providersForPattern) {
+        var pushedPatterns = 0;
+        int taskCount = job.tasks.size();
+        if (taskCount != job.schedulingTaskCount) {
+            job.schedulingCursor = 0;
+            job.schedulingTaskCount = taskCount;
+        }
+        if (taskCount == 0) {
+            job.schedulingCursor = 0;
+            return 0;
+        }
+        int taskVisitBudget = (int) Math.clamp((long) maxPatterns * 4, 1L, taskCount);
+        int providerAttemptBudget = (int) Math.clamp((long) maxPatterns * 8, 1L, Integer.MAX_VALUE);
+        int providerAttempts = 0;
+        var it = job.tasks.entrySet().iterator();
+        for (int skipped = 0; skipped < job.schedulingCursor && it.hasNext(); skipped++) {
+            it.next();
+        }
+        taskLoop:
+        for (int visited = 0; visited < taskVisitBudget && pushedPatterns < maxPatterns; visited++) {
+            if (!it.hasNext()) {
+                it = job.tasks.entrySet().iterator();
+            }
+            var task = it.next();
+            job.schedulingCursor = (job.schedulingCursor + 1) % taskCount;
+            var progress = task.getValue();
+            if (progress.value <= 0) {
+                // Keep dispatched patterns in the job after their remaining push count reaches zero. Their outputs may
+                // still be crafting in a provider, and the crafting-status supplier trace needs the pattern details to
+                // resolve that provider. Zero-valued tasks are ignored by input-demand and pending-output accounting.
+                continue;
+            }
+
+            var details = task.getKey();
+            var finalOutputPseudoPattern = isFinalOutputPseudoPattern(job, details);
+            // Try to push to each provider.
+            for (var provider : providersForPattern.apply(details)) {
+                if (providerAttempts >= providerAttemptBudget) {
+                    break taskLoop;
+                }
+                providerAttempts++;
+                if (!isDispatchJobCurrent(job) || job.tasks.size() != taskCount) {
+                    break taskLoop;
+                }
+                boolean busy = provider.isBusy();
+                if (!isDispatchJobCurrent(job) || job.tasks.size() != taskCount) {
+                    break taskLoop;
+                }
+                if (busy) {
+                    continue;
+                }
+
+                boolean mergePush = provider.canMergePatternPush(details);
+                if (!isDispatchJobCurrent(job) || job.tasks.size() != taskCount) {
+                    break taskLoop;
+                }
+                int pushedMultiplier = tryPushPatternToProvider(job, provider, details, finalOutputPseudoPattern,
+                    energyService, level, progress, maxPatterns - pushedPatterns, mergePush);
+                // Account for confirmed work before observing cancellation or a replacement job.
+                pushedPatterns += pushedMultiplier;
+                if (!isDispatchJobCurrent(job) || job.tasks.size() != taskCount) {
+                    break taskLoop;
+                }
+                if (pushedMultiplier <= 0) {
+                    continue;
+                }
+                if (pushedPatterns >= maxPatterns) {
+                    break taskLoop;
+                }
+                continue taskLoop;
+            }
+        }
+
+        return pushedPatterns;
+    }
+
+    private int tryPushPatternToProvider(ExecutingCraftingJob job, ICraftingProvider provider, IPatternDetails details,
+                                         boolean finalOutputPseudoPattern, IEnergyService energyService, World level,
+                                         ExecutingCraftingJob.TaskProgress progress,
+                                         int remainingPatternBudget, boolean mergePush) {
+        if (remainingPatternBudget <= 0) {
+            return 0;
+        }
+        if (!mergePush) {
+            return tryPushPattern(job, provider, details, finalOutputPseudoPattern, energyService, level, progress, 1);
+        }
+
+        int maxMultiplier = (int) Math.min(progress.value, remainingPatternBudget);
+        int providerLimit = provider.getMaxPatternPushMultiplier(details, maxMultiplier);
+        if (!isDispatchJobCurrent(job)) {
+            return 0;
+        }
+        maxMultiplier = Math.clamp(providerLimit, 0, maxMultiplier);
+        ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
+            ? new RealInputTrackingInventoryView(inventory)
+            : inventory;
+        maxMultiplier = CraftingCpuHelper.getMaxExtractablePatternMultiplier(details, taskInventory, level,
+            maxMultiplier);
+        if (maxMultiplier <= 0) {
+            return 0;
+        }
+
+        maxMultiplier = getMaxEnergyAffordableMultiplier(
+            CraftingCpuHelper.calculatePatternPower(details, 1),
+            energyService,
+            maxMultiplier);
+        if (maxMultiplier <= 0) {
+            return 0;
+        }
+
+        return tryPushPattern(job, provider, details, finalOutputPseudoPattern, energyService, level, progress,
+            maxMultiplier);
+    }
+
+    private int tryPushPattern(ExecutingCraftingJob job, ICraftingProvider provider, IPatternDetails details,
+                               boolean finalOutputPseudoPattern, IEnergyService energyService, World level,
+                               ExecutingCraftingJob.TaskProgress progress,
+                               int multiplier) {
+        if (multiplier <= 0 || !isDispatchJobCurrent(job)) {
+            return 0;
+        }
+
+        if (!canAttemptMultiplier(CraftingCpuHelper.calculatePatternPower(details, 1), energyService, multiplier)
+            || !isDispatchJobCurrent(job)) {
+            return 0;
+        }
+        var expectedOutputs = new KeyCounter();
+        var expectedContainerItems = new KeyCounter();
+        ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
+            ? new RealInputTrackingInventoryView(inventory)
+            : inventory;
+        @Nullable
+        var craftingContainer = CraftingCpuHelper.extractPatternInputs(details, taskInventory, level,
+            expectedOutputs, expectedContainerItems, multiplier);
+        if (craftingContainer == null) {
+            return 0;
+        }
+
+        var patternPower = CraftingCpuHelper.calculatePatternPower(craftingContainer);
+        if (!isDispatchJobCurrent(job)
+            || energyService.extractAEPower(patternPower, Actionable.SIMULATE,
+            PowerMultiplier.CONFIG) < patternPower - 0.01
+            || !isDispatchJobCurrent(job)) {
+            CraftingCpuHelper.reinjectPatternInputs(taskInventory, craftingContainer);
+            return 0;
+        }
+
+        if (!provider.pushPattern(details, craftingContainer, multiplier)) {
+            CraftingCpuHelper.reinjectPatternInputs(taskInventory, craftingContainer);
+            return 0;
+        }
+
+        this.confirmedDispatchPatterns += multiplier;
+        energyService.extractAEPower(patternPower, Actionable.MODULATE, PowerMultiplier.CONFIG);
+        recordPushedPattern(job, details, taskInventory, expectedOutputs, expectedContainerItems);
+
+        cluster.markDirty();
+
+        progress.value -= multiplier;
+        invalidatePendingOutputSnapshot();
+        if (finalOutputPseudoPattern) {
+            completePseudoOutputs(job, expectedOutputs);
+        }
+        return multiplier;
+    }
+
+    private boolean isDispatchJobCurrent(ExecutingCraftingJob job) {
+        return this.job == job && !job.link.isCanceled() && !job.link.isDone() && !job.suspended;
+    }
+
     /**
      * Called by the CraftingService with an Integer.MAX_VALUE priority to inject items that are being waited for.
      *
@@ -514,7 +779,9 @@ public class CraftingCpuLogic {
     public long insert(AEKey what, long amount, Actionable type) {
         // also stop accepting items when the job is complete, i.e. to prevent re-insertion when pushing out
         // items during storeItems
-        if (returningStandaloneOutput || what == null || job == null)
+        if (returningStandaloneOutput || this.readingState || what == null || job == null || this.hasUnconfirmedInventory())
+            return 0;
+        if (job.link.isDone() || job.link.isCanceled())
             return 0;
 
         // Only accept items we are waiting for.
@@ -536,6 +803,7 @@ public class CraftingCpuLogic {
 
         long inserted = amount;
         if (what.matches(job.finalOutput)) {
+            long confirmedDelivery = 0;
             long intermediateAmount = Math.min(amount, job.remainingIntermediateFinalOutput);
             if (intermediateAmount > 0) {
                 if (type == Actionable.MODULATE) {
@@ -555,29 +823,23 @@ public class CraftingCpuLogic {
                     inventory.insert(what, amount, Actionable.MODULATE);
                     pendingStandaloneOutput = LongMath.saturatedAdd(pendingStandaloneOutput, amount);
                 }
+                confirmedDelivery = amount;
             } else {
-                // Final output is special: it goes directly into the requester.
-                job.link.insert(what, amount, type);
+                // Final output is special: the requester receipt is authoritative. Unaccepted output remains CPU-owned.
+                if (type == Actionable.SIMULATE) {
+                    job.link.insert(what, amount, type);
+                } else {
+                    confirmedDelivery = deliverRequesterOutput(job, what, amount, true);
+                }
             }
-
-            // Note: we ignore any remainder from the requester, since we already marked the items as done and might
-            // even finish the job.
-
-            // This means that the job can be marked as finished even if some items were not actually inserted.
-            // In some cases, repeated failed inserts of a fraction of the final output might prevent some recipes from
-            // being pushed.
-            // TODO: Look into fixing this, perhaps we could use the network monitor to check how much was really
-            // TODO: inserted into the network.
-            // TODO: Another solution is to wait until all recipes have been pushed before cancelling the job.
 
             if (type == Actionable.MODULATE) {
                 // Update count and displayed CPU stack, and finish the job if possible.
                 postChange(what);
-                job.remainingAmount = Math.max(0, job.remainingAmount - amount);
+                job.remainingAmount = Math.max(0, job.remainingAmount - confirmedDelivery);
 
-                if (job.remainingAmount <= 0) {
+                if (job.remainingAmount <= 0 && job.pendingRequesterOutput == 0 && !job.requesterOutputUnknown) {
                     finishJob(true);
-                    cluster.updateOutput(null);
                 } else {
                     cluster.updateOutput(new GenericStack(job.finalOutput.what(), job.remainingAmount));
                 }
@@ -591,44 +853,124 @@ public class CraftingCpuLogic {
         return inserted;
     }
 
+    private long deliverRequesterOutput(ExecutingCraftingJob target, AEKey what, long amount,
+                                        boolean addRemainderToPending) {
+        long accepted;
+        try {
+            accepted = target.link.insert(what, amount, Actionable.MODULATE);
+            if (accepted < 0 || accepted > amount) {
+                throw new IllegalStateException("Invalid requester receipt: " + accepted);
+            }
+        } catch (RuntimeException failure) {
+            target.requesterOutputUnknown = true;
+            target.suspended = true;
+            if (addRemainderToPending) {
+                inventory.insert(what, amount, Actionable.MODULATE);
+            }
+            AELog.warn(failure, "Crafting requester output receipt is unknown; retry is disabled");
+            return 0;
+        }
+
+        long remainder = amount - accepted;
+        if (remainder > 0 && addRemainderToPending) {
+            inventory.insert(what, remainder, Actionable.MODULATE);
+            target.pendingRequesterOutput = LongMath.saturatedAdd(target.pendingRequesterOutput, remainder);
+        }
+        return accepted;
+    }
+
+    private void retryPendingRequesterOutput(ExecutingCraftingJob target) {
+        if (target.link.isStandalone() || target.pendingRequesterOutput <= 0 || target.requesterOutputUnknown) {
+            return;
+        }
+        AEKey what = target.finalOutput.what();
+        long amount = Math.min(target.pendingRequesterOutput,
+            inventory.extract(what, target.pendingRequesterOutput, Actionable.SIMULATE));
+        if (amount <= 0) return;
+        long accepted = deliverRequesterOutput(target, what, amount, false);
+        if (accepted > 0) {
+            inventory.extract(what, accepted, Actionable.MODULATE);
+            target.pendingRequesterOutput = Math.max(0, target.pendingRequesterOutput - accepted);
+            target.remainingAmount = Math.max(0, target.remainingAmount - accepted);
+        }
+        if (target.remainingAmount <= 0 && target.pendingRequesterOutput == 0 && !target.requesterOutputUnknown
+            && this.job == target) {
+            finishJob(true);
+        }
+    }
+
     /**
      * Finish the current job.
      *
      * @param success True if the job is complete, false if it was cancelled.
      */
     private void finishJob(boolean success) {
-        if (success) {
-            job.link.markDone();
-        } else {
-            job.link.cancel();
+        var finished = this.job;
+        if (finished == null || this.finishingJob) {
+            return;
         }
-
-        // TODO: log
-
-        // Clear waitingFor list and post all the relevant changes.
-        job.waitingFor.clear();
-        job.pseudoInventory.clear();
-        // Notify opened menus of cancelled scheduled tasks.
-        for (var entry : job.tasks.entrySet()) {
-            for (var output : entry.getKey().getOutputs()) {
-                postChange(output.what());
-            }
-        }
-
-        var status = success ? CraftingJobStatusPacket.Status.FINISHED : CraftingJobStatusPacket.Status.CANCELLED;
-        notifyJobOwner(job, status, success && job.subscribed);
-
-        // Finish job.
+        boolean completed = finished.link.isDone() || (success && !finished.link.isCanceled());
+        this.finishingJob = true;
         this.job = null;
-        this.pendingStandaloneOutput = 0;
+        invalidatePendingOutputSnapshot();
+        this.submissionSavePending = true;
+        if (finished.requesterOutputUnknown) {
+            this.unknownRequesterOutputKey = finished.finalOutput.what();
+        }
+        if (this.unknownStandaloneOutputKey == null) {
+            this.pendingStandaloneOutput = 0;
+        }
 
-        // Store all remaining items.
-        this.storeItems();
+        try {
+            if (completed) {
+                finished.link.markDone();
+            } else {
+                finished.link.cancel();
+            }
+
+            // Menus already observe no job. Notify its keys without clearing detached, non-resource counters.
+            for (var entry : finished.waitingFor.list) {
+                postChange(entry.getKey());
+            }
+            for (var entry : finished.pseudoInventory.list) {
+                postChange(entry.getKey());
+            }
+            for (var details : finished.tasks.keySet()) {
+                try {
+                    for (var output : details.getOutputs()) {
+                        postChange(output.what());
+                    }
+                } catch (RuntimeException failure) {
+                    AELog.error(failure, "Failed to notify scheduled outputs of a terminal crafting job");
+                }
+            }
+
+            var status = completed ? CraftingJobStatusPacket.Status.FINISHED : CraftingJobStatusPacket.Status.CANCELLED;
+            try {
+                notifyJobOwner(finished, status, completed && finished.subscribed);
+            } catch (RuntimeException failure) {
+                AELog.error(failure, "Failed to notify the owner of a terminal crafting job");
+            }
+            if (this.job == null) {
+                try {
+                    cluster.updateOutput(null);
+                } catch (RuntimeException failure) {
+                    AELog.error(failure, "Failed to clear the display of a terminal crafting job");
+                }
+            }
+            this.saveCommittedSubmission();
+            if (this.job == null) {
+                this.storeItems();
+            }
+        } finally {
+            this.finishingJob = false;
+        }
     }
 
     private void returnStandaloneOutputToNetwork() {
         var currentJob = this.job;
-        if (currentJob == null || !currentJob.link.isStandalone() || pendingStandaloneOutput <= 0) {
+        if (currentJob == null || !currentJob.link.isStandalone() || pendingStandaloneOutput <= 0
+            || unknownStandaloneOutputKey != null) {
             return;
         }
 
@@ -640,8 +982,8 @@ public class CraftingCpuLogic {
         var what = currentJob.finalOutput.what();
         long amount = Math.min(pendingStandaloneOutput,
             inventory.extract(what, pendingStandaloneOutput, Actionable.SIMULATE));
-        pendingStandaloneOutput = 0;
         if (amount <= 0) {
+            pendingStandaloneOutput = 0;
             cluster.markDirty();
             return;
         }
@@ -651,12 +993,22 @@ public class CraftingCpuLogic {
         try {
             inserted = grid.getStorageService().getInventory().insert(
                 what, amount, Actionable.MODULATE, cluster.getSrc());
+            if (inserted < 0 || inserted > amount) {
+                throw new IllegalStateException("Invalid standalone output receipt: " + inserted);
+            }
+        } catch (RuntimeException failure) {
+            // The external inventory may have committed before throwing. Keep the local escrow and stop retries.
+            unknownStandaloneOutputKey = what;
+            cluster.markDirty();
+            AELog.warn(failure, "Standalone crafting output has an unknown external receipt; retry is disabled");
+            return;
         } finally {
             returningStandaloneOutput = false;
         }
 
         if (inserted > 0) {
             inventory.extract(what, inserted, Actionable.MODULATE);
+            pendingStandaloneOutput = Math.max(0, pendingStandaloneOutput - inserted);
         }
         cluster.markDirty();
     }
@@ -665,13 +1017,8 @@ public class CraftingCpuLogic {
      * Cancel the current job.
      */
     public void cancel() {
-        // No job to cancel :P
-        if (job == null)
+        if (job == null || this.finishingJob || this.readingState)
             return;
-
-        // Clear displayed stack.
-        cluster.updateOutput(null);
-
         finishJob(false);
     }
 
@@ -679,34 +1026,78 @@ public class CraftingCpuLogic {
      * Tries to dump all locally stored items back into the storage network.
      */
     public void storeItems() {
-        Preconditions.checkState(job == null, "CPU should not have a job to prevent re-insertion when dumping items");
-        // Short-circuit if there is nothing to do.
-        if (this.inventory.list.isEmpty())
+        if (this.returningItems || this.readingState || this.hasUnconfirmedInventory()) {
             return;
-
-        var g = cluster.getGrid();
-        if (g == null)
-            return;
-
-        var storage = g.getStorageService().getInventory();
-
-        for (var entry : this.inventory.list) {
-            this.postChange(entry.getKey());
-            var inserted = storage.insert(entry.getKey(), entry.getLongValue(),
-                Actionable.MODULATE, cluster.getSrc());
-
-            // The network was unable to receive all of the items, i.e. no or not enough storage space left
-            entry.setValue(entry.getLongValue() - inserted);
         }
-        this.inventory.list.removeZeros();
-
-        cluster.markDirty();
-    }
-
-    private void postChange(AEKey what) {
-        lastModifiedOnTick = TickHandler.instance().getCurrentTick();
-        for (var listener : listeners) {
-            listener.accept(what);
+        Preconditions.checkState(job == null, "CPU should not have a job to prevent re-insertion when dumping items");
+        if (this.inventory.list.isEmpty() || this.cluster.isDestroyed())
+            return;
+        this.returningItems = true;
+        try {
+            var grid = cluster.getGrid();
+            if (grid == null) {
+                return;
+            }
+            var storage = grid.getStorageService().getInventory();
+            var source = cluster.getSrc();
+            var keys = new ObjectArrayList<AEKey>();
+            for (var entry : this.inventory.list) {
+                keys.add(entry.getKey());
+            }
+            InventoryReturn transfer = null;
+            for (var what : keys) {
+                if (this.job != null || this.cluster.isDestroyed() || cluster.getGrid() != grid) {
+                    break;
+                }
+                long amount = this.inventory.list.get(what);
+                if (amount == 0) {
+                    this.inventory.list.remove(what);
+                    this.submissionSavePending = true;
+                    continue;
+                }
+                if (amount <= 0 || this.isInventoryUnconfirmed(what)) {
+                    continue;
+                }
+                if (transfer == null) {
+                    transfer = new InventoryReturn(grid, this.inventoryGeneration,
+                        cluster.getBoundsMin().toLong(), cluster.getBoundsMax().toLong());
+                }
+                transfer.sequence++;
+                transfer.what = what;
+                transfer.amount = amount;
+                this.inventoryReturn = transfer;
+                this.submissionSavePending = true;
+                try {
+                    long inserted = storage.insert(what, amount, Actionable.MODULATE, source);
+                    if (inserted < 0 || inserted > amount) {
+                        throw new IllegalStateException("Invalid CPU inventory return receipt: " + inserted);
+                    }
+                    long current = this.inventory.list.get(what);
+                    if (this.cluster.isDestroyed() || transfer.generation != this.inventoryGeneration
+                        || transfer.grid.get() != grid
+                        || current < inserted) {
+                        throw new IllegalStateException("CPU inventory ownership changed during return");
+                    }
+                    if (inserted > 0) {
+                        if (current == inserted) {
+                            this.inventory.list.remove(what);
+                        } else {
+                            this.inventory.list.remove(what, inserted);
+                        }
+                    }
+                    this.inventoryReturn = null;
+                } catch (RuntimeException failure) {
+                    this.cantStoreItems = true;
+                    AELog.error(failure, "CPU inventory return is unconfirmed; automatic retry stopped: "
+                        + transfer.batchId + "/" + transfer.sequence);
+                    this.saveCommittedSubmission();
+                    return;
+                }
+                this.postChange(what);
+            }
+            this.saveCommittedSubmission();
+        } finally {
+            this.returningItems = false;
         }
     }
 
@@ -731,27 +1122,262 @@ public class CraftingCpuLogic {
         }
     }
 
-    public void readFromNBT(NBTTagCompound data) {
-        this.inventory.readFromNBT(data.getTagList("inventory", Constants.NBT.TAG_COMPOUND));
-        this.pendingStandaloneOutput = Math.max(0, data.getLong(NBT_PENDING_STANDALONE_OUTPUT));
-        if (data.hasKey("job", Constants.NBT.TAG_COMPOUND)) {
-            this.job = new ExecutingCraftingJob(data.getCompoundTag("job"), this::postChange, this);
-            if (this.job.finalOutput == null) {
-                finishJob(false);
-            } else {
-                cluster.updateOutput(new GenericStack(job.finalOutput.what(), job.remainingAmount));
+    /**
+     * An in-flight or unresolved receipt aliases inventory; it never authorizes another resource transfer.
+     */
+    public boolean hasUnconfirmedInventoryReturn() {
+        return this.inventoryReturn != null || this.savedInventoryReturn != null;
+    }
+
+    public boolean hasUnconfirmedInventory() {
+        return this.hasUnconfirmedInventoryReturn() || this.unknownStandaloneOutputKey != null
+            || this.unknownRequesterOutputKey != null || (this.job != null && this.job.requesterOutputUnknown)
+            || this.savedReadFailure != null || this.quarantinedImage != null || this.restoreLinkPending;
+    }
+
+    public boolean isInventoryUnconfirmed(AEKey what) {
+        return this.savedInventoryReturn != null || this.savedReadFailure != null || this.quarantinedImage != null
+            || this.restoreLinkPending
+            || (this.inventoryReturn != null && what.equals(this.inventoryReturn.what))
+            || (this.job != null && this.job.requesterOutputUnknown && what.equals(this.job.finalOutput.what()))
+            || what.equals(this.unknownStandaloneOutputKey) || what.equals(this.unknownRequesterOutputKey);
+    }
+
+    /**
+     * Diagnostic only, using the existing non-redeemable missing-content item.
+     */
+    public ItemStack getInventoryRecoveryItem() {
+        if (!this.hasUnconfirmedInventory()) {
+            return ItemStack.EMPTY;
+        }
+        var state = new NBTTagCompound();
+        this.writeToNBT(state);
+        var tag = new NBTTagCompound();
+        tag.setInteger("cpu_inventory_recovery_schema", 1);
+        tag.setTag("cpu_inventory_recovery", state);
+        tag.setString("missing_content_error", "Crafting CPU inventory receipt is unconfirmed; diagnostic only");
+        var recovery = AEItems.MISSING_CONTENT.stack();
+        recovery.setTagCompound(tag);
+        return recovery;
+    }
+
+    private void postChange(AEKey what) {
+        if (!this.readingState) {
+            this.notifyChange(what);
+        }
+    }
+
+    private void notifyChange(AEKey what) {
+        lastModifiedOnTick = TickHandler.instance().getCurrentTick();
+        if (this.listeners.isEmpty()) {
+            return;
+        }
+        var snapshot = this.listenerSnapshot;
+        if (snapshot == null) {
+            snapshot = this.listeners.values().toArray(ChangeListenerRegistration[]::new);
+            this.listenerSnapshot = snapshot;
+        }
+        for (var registration : snapshot) {
+            if (!registration.active) {
+                continue;
             }
-        } else {
-            cluster.updateOutput(null);
+            try {
+                registration.listener.accept(what);
+                registration.failureLogged = false;
+            } catch (RuntimeException failure) {
+                if (!registration.failureLogged) {
+                    registration.failureLogged = true;
+                    AELog.error(failure, "Failed to notify a crafting CPU change listener");
+                }
+            }
+        }
+    }
+
+    public void readFromNBT(NBTTagCompound data) {
+        if (this.readingState || this.returningItems || this.submitting || this.finishingJob
+            || this.executingCrafting || this.tickingCrafting) {
+            throw new IllegalStateException("Cannot replace CPU state during an owned operation");
+        }
+        this.readingState = true;
+        try {
+            this.restoreOwnedState(data);
+        } catch (RuntimeException failure) {
+            if (this.savedReadFailure == null && this.quarantinedImage == null) {
+                var original = new NBTTagCompound();
+                original.setInteger("schema", 1);
+                original.setString("phase", this.restoreLinkPending ? "link-publication" : "decode");
+                original.setString("error", failure.toString());
+                original.setTag("source", data.copy());
+                this.savedReadFailure = original;
+            }
+            this.submissionSavePending = true;
+            AELog.error(failure, "CPU state restoration failed; source retained and automatic work stopped");
+            throw failure;
+        } finally {
+            this.readingState = false;
+        }
+    }
+
+    private void restoreOwnedState(NBTTagCompound data) {
+        if (data.hasKey(NBT_READ_FAILURE)) {
+            if (this.job != null || !this.inventory.list.isEmpty() || this.hasUnconfirmedInventory()) {
+                var current = new NBTTagCompound();
+                this.writeToNBT(current);
+                if (!sameSavedState(current, data)) {
+                    throw new IllegalStateException("Cannot replace quarantined CPU state");
+                }
+            } else {
+                // Quarantined images are opaque; do not repeatedly decode and nest a failed source on every restart.
+                this.quarantinedImage = data.copy();
+                this.savedReadFailure = data.getTag(NBT_READ_FAILURE).copy();
+                this.inventoryGeneration++;
+                this.lastModifiedOnTick = TickHandler.instance().getCurrentTick();
+            }
+            return;
+        }
+        if (this.savedReadFailure != null || this.quarantinedImage != null || this.restoreLinkPending) {
+            throw new IllegalStateException("Cannot discard a failed CPU restore image");
+        }
+
+        long revision = this.inventoryRevision;
+        var grid = this.cluster.getGrid();
+        var preparedInventory = savedResources(data, "inventory");
+        requireTag(data, "job", Constants.NBT.TAG_COMPOUND);
+        requireTag(data, NBT_UNKNOWN_STANDALONE_OUTPUT, Constants.NBT.TAG_COMPOUND);
+        requireTag(data, NBT_UNKNOWN_REQUESTER_OUTPUT, Constants.NBT.TAG_COMPOUND);
+        requireTag(data, NBT_PENDING_STANDALONE_OUTPUT, Constants.NBT.TAG_ANY_NUMERIC);
+        long pending = Math.max(0, data.getLong(NBT_PENDING_STANDALONE_OUTPUT));
+        var standalone = GenericStack.readTag(data.getCompoundTag(NBT_UNKNOWN_STANDALONE_OUTPUT));
+        var requester = GenericStack.readTag(data.getCompoundTag(NBT_UNKNOWN_REQUESTER_OUTPUT));
+        NBTBase incomingReturn = data.hasKey(NBT_INVENTORY_RETURN) ? data.getTag(NBT_INVENTORY_RETURN).copy() : null;
+        NBTBase currentReturn = this.inventoryReturn != null ? this.inventoryReturn.writeToNBT() : this.savedInventoryReturn;
+        boolean sameInventory = sameResources(this.inventory.list, preparedInventory);
+        if (currentReturn != null && !currentReturn.equals(incomingReturn)) {
+            throw new IllegalStateException("Cannot replace an unconfirmed CPU inventory return");
+        }
+        if ((!this.inventory.list.isEmpty() && !sameInventory)
+            || (this.hasUnconfirmedInventory() && (!sameInventory || pending != this.pendingStandaloneOutput
+            || !Objects.equals(this.unknownStandaloneOutputKey, standalone == null ? null : standalone.what())
+            || !Objects.equals(this.unknownRequesterOutputKey, requester == null ? null : requester.what())))) {
+            throw new IllegalStateException("Cannot overwrite CPU-owned inventory during restoration");
+        }
+        if (this.job != null && !this.job.link.isDone() && !this.job.link.isCanceled()) {
+            if (!data.hasKey("job") || !this.job.writeToNBT().equals(data.getCompoundTag("job")) || !sameInventory) {
+                throw new IllegalStateException("Cannot replace a live CPU crafting job");
+            }
+            if (!Objects.equals(currentReturn, incomingReturn) || pending != this.pendingStandaloneOutput
+                || !Objects.equals(this.unknownStandaloneOutputKey, standalone == null ? null : standalone.what())
+                || !Objects.equals(this.unknownRequesterOutputKey, requester == null ? null : requester.what())) {
+                throw new IllegalStateException("Cannot replace live CPU custody metadata");
+            }
+            return;
+        }
+
+        var preparedJob = data.hasKey("job")
+            ? new ExecutingCraftingJob(data.getCompoundTag("job"), this::postChange, this) : null;
+        var service = preparedJob == null || grid == null ? null : (CraftingService) grid.getCraftingService();
+        Set<AEKey> changes = null;
+        if (!this.listeners.isEmpty()) {
+            changes = new ObjectOpenHashSet<>();
+            collectInventoryKeys(changes, this.inventory.list);
+            collectInventoryKeys(changes, preparedInventory);
+            collectJobKeys(changes, this.job);
+            collectJobKeys(changes, preparedJob);
+        }
+        if (this.inventoryRevision != revision || this.cluster.getGrid() != grid || this.cluster.isDestroyed()) {
+            throw new IllegalStateException("CPU ownership changed while decoding saved state");
+        }
+
+        // All parsing and callbacks above precede this callback-free publication of the complete owned state.
+        this.inventory.list.moveFrom(preparedInventory);
+        this.inventoryRevision++;
+        this.inventoryGeneration++;
+        this.job = preparedJob;
+        invalidatePendingOutputSnapshot();
+        this.pendingStandaloneOutput = pending;
+        this.unknownStandaloneOutputKey = standalone == null ? null : standalone.what();
+        this.unknownRequesterOutputKey = requester == null ? null : requester.what();
+        this.savedInventoryReturn = incomingReturn;
+        this.inventoryReturn = null;
+        this.lastModifiedOnTick = TickHandler.instance().getCurrentTick();
+
+        if (preparedJob != null && service != null) {
+            this.restoreLinkPending = true;
+            service.addLink(preparedJob.link);
+            this.restoreLinkPending = false;
+        }
+        if (changes != null) {
+            for (var key : changes) {
+                this.notifyChange(key);
+            }
+        }
+        try {
+            cluster.updateOutput(preparedJob == null ? null
+                : new GenericStack(preparedJob.finalOutput.what(), preparedJob.remainingAmount));
+        } catch (RuntimeException failure) {
+            AELog.error(failure, "Failed to display restored CPU state");
         }
     }
 
     public void writeToNBT(NBTTagCompound data) {
+        if (this.quarantinedImage != null) {
+            for (var key : SAVED_KEYS) {
+                if (this.quarantinedImage.hasKey(key)) data.setTag(key, this.quarantinedImage.getTag(key).copy());
+                else data.removeTag(key);
+            }
+            return;
+        }
         data.setTag("inventory", this.inventory.writeToNBT());
+        if (this.inventoryReturn != null) {
+            data.setTag(NBT_INVENTORY_RETURN, this.inventoryReturn.writeToNBT());
+        } else if (this.savedInventoryReturn != null) {
+            data.setTag(NBT_INVENTORY_RETURN, this.savedInventoryReturn.copy());
+        } else {
+            data.removeTag(NBT_INVENTORY_RETURN);
+        }
         data.setLong(NBT_PENDING_STANDALONE_OUTPUT, pendingStandaloneOutput);
+        if (unknownStandaloneOutputKey != null) {
+            data.setTag(NBT_UNKNOWN_STANDALONE_OUTPUT,
+                GenericStack.writeTag(new GenericStack(unknownStandaloneOutputKey,
+                    inventory.list.get(unknownStandaloneOutputKey))));
+        } else {
+            data.removeTag(NBT_UNKNOWN_STANDALONE_OUTPUT);
+        }
+        if (unknownRequesterOutputKey != null) {
+            data.setTag(NBT_UNKNOWN_REQUESTER_OUTPUT,
+                GenericStack.writeTag(new GenericStack(unknownRequesterOutputKey,
+                    inventory.list.get(unknownRequesterOutputKey))));
+        } else {
+            data.removeTag(NBT_UNKNOWN_REQUESTER_OUTPUT);
+        }
         if (this.job != null) {
             data.setTag("job", this.job.writeToNBT());
+        } else {
+            data.removeTag("job");
         }
+        if (this.savedReadFailure != null) {
+            data.setTag(NBT_READ_FAILURE, this.savedReadFailure.copy());
+        } else if (this.restoreLinkPending) {
+            var pending = new NBTTagCompound();
+            pending.setInteger("schema", 1);
+            pending.setString("phase", "link-publication");
+            data.setTag(NBT_READ_FAILURE, pending);
+        } else {
+            data.removeTag(NBT_READ_FAILURE);
+        }
+    }
+
+    /**
+     * Register a listener that will receive stacks when either the stored items, await items or pending outputs change.
+     * This is only used by the container. Make sure to remove it by calling {@link #removeListener}.
+     * Registrations use listener identity. Removal revokes callbacks that have not started, and a new registration
+     * starts with the next notification. Ordinary listener failures do not interrupt inventory changes or other listeners.
+     */
+    public void addListener(Consumer<AEKey> listener) {
+        this.listeners.computeIfAbsent(Objects.requireNonNull(listener), _ -> {
+            this.listenerSnapshot = null;
+            return new ChangeListenerRegistration(listener);
+        });
     }
 
     @Nullable
@@ -766,16 +1392,37 @@ public class CraftingCpuLogic {
         return this.inventory;
     }
 
-    /**
-     * Register a listener that will receive stacks when either the stored items, await items or pending outputs change.
-     * This is only used by the container. Make sure to remove it by calling {@link #removeListener}.
-     */
-    public void addListener(Consumer<AEKey> listener) {
-        listeners.add(listener);
+    public void removeListener(Consumer<AEKey> listener) {
+        var registration = this.listeners.remove(listener);
+        if (registration != null) {
+            registration.active = false;
+            this.listenerSnapshot = null;
+        }
     }
 
-    public void removeListener(Consumer<AEKey> listener) {
-        listeners.remove(listener);
+    public long getPendingOutputs(AEKey template) {
+        var currentJob = this.job;
+        if (currentJob == null) {
+            return 0;
+        }
+        if (this.pendingOutputSnapshotJob != currentJob
+            || this.pendingOutputSnapshotRevision != this.taskRevision
+            || this.pendingOutputSnapshot == null) {
+            var snapshot = KeyCounter.saturating(currentJob.tasks.size());
+            for (var task : currentJob.tasks.entrySet()) {
+                long value = task.getValue().value;
+                if (value <= 0) {
+                    continue;
+                }
+                for (var output : task.getKey().getOutputs()) {
+                    snapshot.add(output.what(), LongMath.saturatedMultiply(output.amount(), value));
+                }
+            }
+            this.pendingOutputSnapshotJob = currentJob;
+            this.pendingOutputSnapshotRevision = this.taskRevision;
+            this.pendingOutputSnapshot = snapshot;
+        }
+        return this.pendingOutputSnapshot.get(template);
     }
 
     public long getStored(AEKey template) {
@@ -801,19 +1448,40 @@ public class CraftingCpuLogic {
         }
     }
 
-    public long getPendingOutputs(AEKey template) {
-        long count = 0;
-        if (this.job != null) {
-            for (var t : job.tasks.entrySet()) {
-                for (var output : t.getKey().getOutputs()) {
-                    if (template.matches(output)) {
-                        count = LongMath.saturatedAdd(count,
-                            LongMath.saturatedMultiply(output.amount(), t.getValue().value));
-                    }
-                }
-            }
+    private void invalidatePendingOutputSnapshot() {
+        this.taskRevision++;
+        this.pendingOutputSnapshot = null;
+        this.pendingOutputSnapshotJob = null;
+    }
+
+    private static final class InventoryReturn {
+        private final UUID batchId = UUID.randomUUID();
+        private final WeakReference<IGrid> grid;
+        private final long generation;
+        private final long sourceMin;
+        private final long sourceMax;
+        private long sequence;
+        private AEKey what;
+        private long amount;
+
+        private InventoryReturn(IGrid grid, long generation, long sourceMin, long sourceMax) {
+            this.grid = new WeakReference<>(grid);
+            this.generation = generation;
+            this.sourceMin = sourceMin;
+            this.sourceMax = sourceMax;
         }
-        return count;
+
+        private NBTTagCompound writeToNBT() {
+            var tag = new NBTTagCompound();
+            tag.setInteger("schema", 1);
+            tag.setUniqueId("batchId", this.batchId);
+            tag.setLong("sequence", this.sequence);
+            tag.setLong("sourceGeneration", this.generation);
+            tag.setLong("sourceMin", this.sourceMin);
+            tag.setLong("sourceMax", this.sourceMax);
+            tag.setTag("requested", GenericStack.writeTag(new GenericStack(this.what, this.amount)));
+            return tag;
+        }
     }
 
     public List<CraftingSupplierLocation> findSupplierLocations(IGrid grid, AEKey target) {
@@ -875,22 +1543,14 @@ public class CraftingCpuLogic {
         notifyJobOwner(job, status, showFinishedToast, List.of());
     }
 
-    /**
-     * The items a started job makes the terminal pin in its own row on top of the item list and show as in progress.
-     * <p>
-     * A batch order of the crafting terminal orders the materials the transferred recipe was missing, so those are the
-     * items it crafts. Its reported output is only a placeholder, nothing is crafted into it, so tracking that instead
-     * would leave the materials looking finished and drop them from the terminal.
-     */
-    private static List<AEKey> trackedKeys(ICraftingPlan plan) {
-        if (plan instanceof BatchCraftingPlan batchPlan) {
-            var keys = new ObjectArrayList<AEKey>(batchPlan.batchTargets().size());
-            for (var target : batchPlan.batchTargets()) {
-                keys.add(target.what());
-            }
-            return keys;
+    private static final class ChangeListenerRegistration {
+        private final Consumer<AEKey> listener;
+        private boolean active = true;
+        private boolean failureLogged;
+
+        private ChangeListenerRegistration(Consumer<AEKey> listener) {
+            this.listener = listener;
         }
-        return List.of();
     }
 
     private void notifyJobOwner(ExecutingCraftingJob job, CraftingJobStatusPacket.Status status,
@@ -948,7 +1608,6 @@ public class CraftingCpuLogic {
             job.remainingAmount -= completedAmount;
             if (job.remainingAmount <= 0) {
                 finishJob(true);
-                cluster.updateOutput(null);
                 return;
             }
             cluster.updateOutput(new GenericStack(job.finalOutput.what(), job.remainingAmount));

@@ -25,7 +25,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.util.text.ITextComponent;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.awt.Rectangle;
 import java.util.Collections;
@@ -74,7 +74,7 @@ public class AECheckbox extends GuiButton implements ITooltip {
     }
 
     @Override
-    public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
+    public boolean mousePressed(@NotNull Minecraft minecraft, int mouseX, int mouseY) {
         boolean pressed = super.mousePressed(minecraft, mouseX, mouseY);
         this.focused = pressed;
         return pressed;
@@ -109,7 +109,7 @@ public class AECheckbox extends GuiButton implements ITooltip {
     }
 
     @Override
-    public @NonNull List<ITextComponent> getTooltipMessage() {
+    public @NotNull List<ITextComponent> getTooltipMessage() {
         return this.tooltipMessage;
     }
 
@@ -128,7 +128,7 @@ public class AECheckbox extends GuiButton implements ITooltip {
     }
 
     @Override
-    public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
+    public void drawButton(@NotNull Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
         if (!this.visible) {
             return;
         }

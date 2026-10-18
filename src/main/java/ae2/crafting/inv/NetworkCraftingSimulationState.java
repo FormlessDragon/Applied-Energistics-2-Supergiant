@@ -64,7 +64,7 @@ public class NetworkCraftingSimulationState extends CraftingSimulationState {
     }
 
     private static KeyCounter fullSnapshot(KeyCounter cachedInventory) {
-        var result = KeyCounter.saturating(cachedInventory.size());
+        var result = KeyCounter.saturating();
         for (var entry : cachedInventory) {
             if (entry.getLongValue() > 0) {
                 result.add(entry.getKey(), entry.getLongValue());

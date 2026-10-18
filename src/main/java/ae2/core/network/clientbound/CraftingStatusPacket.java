@@ -1,24 +1,27 @@
 package ae2.core.network.clientbound;
 
-import ae2.client.gui.me.crafting.GuiCraftingCPU;
+import ae2.container.implementations.ContainerCraftingCPU;
 import ae2.container.me.crafting.CraftingStatus;
 import ae2.core.network.ClientboundPacket;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.network.PacketBuffer;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
 public class CraftingStatusPacket extends ClientboundPacket {
     private int containerId;
+    private long cpuEpoch;
+    private long statusRevision;
     private CraftingStatus status;
 
     public CraftingStatusPacket() {
     }
 
-    public CraftingStatusPacket(int containerId, CraftingStatus status) {
+    public CraftingStatusPacket(int containerId, long cpuEpoch, long statusRevision, CraftingStatus status) {
         this.containerId = containerId;
+        this.cpuEpoch = cpuEpoch;
+        this.statusRevision = statusRevision;
         this.status = status;
     }
 
@@ -27,9 +30,13 @@ public class CraftingStatusPacket extends ClientboundPacket {
         try {
             var data = new PacketBuffer(buf);
             this.containerId = data.readInt();
+            this.cpuEpoch = data.readVarLong();
+            this.statusRevision = data.readVarLong();
             this.status = CraftingStatus.read(data);
         } catch (RuntimeException e) {
             this.containerId = -1;
+            this.cpuEpoch = 0;
+            this.statusRevision = 0;
             this.status = CraftingStatus.EMPTY;
             buf.skipBytes(buf.readableBytes());
         }
@@ -39,6 +46,8 @@ public class CraftingStatusPacket extends ClientboundPacket {
     protected void write(ByteBuf buf) {
         var data = new PacketBuffer(buf);
         data.writeInt(containerId);
+        data.writeVarLong(cpuEpoch);
+        data.writeVarLong(statusRevision);
         status.write(data);
     }
 
@@ -50,9 +59,8 @@ public class CraftingStatusPacket extends ClientboundPacket {
             return;
         }
 
-        GuiScreen screen = minecraft.currentScreen;
-        if (screen instanceof GuiCraftingCPU<?> cpuScreen) {
-            cpuScreen.postUpdate(status);
+        if (minecraft.player.openContainer instanceof ContainerCraftingCPU cpuContainer) {
+            cpuContainer.acceptClientStatus(cpuEpoch, statusRevision, status);
         }
     }
 }

@@ -121,6 +121,10 @@ public record GenericStack(AEKey what, long amount) {
         return GenericStackListCodec.encode(stacks);
     }
 
+    public static NBTTagList writeList(GenericStack[] stacks) {
+        return GenericStackListCodec.encode(stacks);
+    }
+
     public static List<@Nullable GenericStack> readList(NBTTagList tag) {
         return GenericStackListCodec.decode(tag);
     }

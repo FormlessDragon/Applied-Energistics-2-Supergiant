@@ -32,9 +32,10 @@ import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.MEStorage;
 import ae2.api.storage.StorageHelper;
+import ae2.container.ContainerConstants;
+import ae2.container.crafting.LastCraftingRecipeTracker;
 import ae2.container.interfaces.ICraftingGridContainer;
 import ae2.container.me.items.ContainerCraftingTerm;
-import ae2.container.crafting.LastCraftingRecipeTracker;
 import ae2.helpers.InventoryAction;
 import ae2.items.storage.ViewCellItem;
 import ae2.util.Platform;
@@ -45,7 +46,6 @@ import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
-import net.minecraft.inventory.Container;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.CraftingManager;
@@ -55,6 +55,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.fml.common.FMLCommonHandler;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -65,12 +66,6 @@ import java.util.List;
 public class CraftingTermSlot extends AppEngCraftingSlot {
     private static final int GRID_SIZE = 9;
 
-    private static final Container DUMMY_CONTAINER = new Container() {
-        @Override
-        public boolean canInteractWith(EntityPlayer playerIn) {
-            return false;
-        }
-    };
 
     private final InternalInventory craftInv;
     private final InternalInventory pattern;
@@ -92,7 +87,7 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
     }
 
     private static InventoryCrafting createRecipeInput(List<ItemStack> stacks) {
-        InventoryCrafting recipeInput = new InventoryCrafting(DUMMY_CONTAINER, 3, 3);
+        InventoryCrafting recipeInput = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, 3, 3);
         for (int slot = 0; slot < stacks.size(); slot++) {
             recipeInput.setInventorySlotContents(slot, stacks.get(slot));
         }
@@ -140,7 +135,7 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
     }
 
     @Override
-    public ItemStack onTake(EntityPlayer player, ItemStack stack) {
+    public @NotNull ItemStack onTake(EntityPlayer player, ItemStack stack) {
         return stack;
     }
 

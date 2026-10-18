@@ -60,6 +60,7 @@ public class MEP2PTunnelPart extends P2PTunnelPart<MEP2PTunnelPart> implements I
         .setInWorldNode(true)
         .setFlags(GridFlags.DENSE_CAPACITY, GridFlags.CANNOT_CARRY_COMPRESSED);
     private ConnectionUpdate pendingUpdate = ConnectionUpdate.NONE;
+    private boolean updateQueued;
 
     public MEP2PTunnelPart(IPartItem<?> partItem) {
         super(partItem);
@@ -106,6 +107,8 @@ public class MEP2PTunnelPart extends P2PTunnelPart<MEP2PTunnelPart> implements I
     @Override
     public void removeFromWorld() {
         super.removeFromWorld();
+        this.updateQueued = false;
+        this.pendingUpdate = ConnectionUpdate.NONE;
         this.outerNode.destroy();
     }
 
@@ -142,63 +145,77 @@ public class MEP2PTunnelPart extends P2PTunnelPart<MEP2PTunnelPart> implements I
     @Override
     public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
         this.pendingUpdate = node.isOnline() ? ConnectionUpdate.CONNECT : ConnectionUpdate.DISCONNECT;
-        TickHandler.instance().addCallable(getLevel(), this::updateConnections);
+        queueConnectionUpdate();
         return TickRateModulation.SLEEP;
     }
 
-    private void updateConnections() {
-        ConnectionUpdate operation = this.pendingUpdate;
-        this.pendingUpdate = ConnectionUpdate.NONE;
-
-        IGridNode mainNode = getMainNode().getNode();
-        Object mainGrid = mainNode != null ? mainNode.grid() : null;
-
-        if (isOutput()) {
-            operation = ConnectionUpdate.DISCONNECT;
-        } else if (mainGrid == null) {
-            operation = ConnectionUpdate.DISCONNECT;
+    private void queueConnectionUpdate() {
+        if (this.updateQueued) {
+            return;
         }
+        this.updateQueued = TickHandler.instance().tryAddCallable(getLevel(), this::updateConnections);
+    }
 
-        if (operation == ConnectionUpdate.DISCONNECT) {
-            var removed = new ObjectArrayList<>(this.connections.values());
-            this.connections.clear();
-            GridHelper.destroyConnections(removed);
-        } else if (operation == ConnectionUpdate.CONNECT) {
-            List<MEP2PTunnelPart> outputs = getOutputs();
-            ReferenceSet<MEP2PTunnelPart> outputSet = new ReferenceOpenHashSet<>(outputs.size());
-            outputSet.addAll(outputs);
-            Iterator<Map.Entry<MEP2PTunnelPart, IGridConnection>> it = this.connections.entrySet()
-                                                                                       .iterator();
-            var removed = new ObjectArrayList<IGridConnection>();
-            while (it.hasNext()) {
-                Map.Entry<MEP2PTunnelPart, IGridConnection> entry = it.next();
-                MEP2PTunnelPart output = entry.getKey();
-                IGridConnection connection = entry.getValue();
-                if (output.getMainNode().getGrid() != mainGrid
-                    || !output.getMainNode().isOnline()
-                    || !outputSet.contains(output)) {
-                    removed.add(connection);
-                    it.remove();
-                }
+    private void updateConnections() {
+        try {
+            ConnectionUpdate operation = this.pendingUpdate;
+            this.pendingUpdate = ConnectionUpdate.NONE;
+
+            IGridNode mainNode = getMainNode().getNode();
+            Object mainGrid = mainNode != null ? mainNode.grid() : null;
+
+            if (isOutput()) {
+                operation = ConnectionUpdate.DISCONNECT;
+            } else if (mainGrid == null) {
+                operation = ConnectionUpdate.DISCONNECT;
             }
 
-            GridHelper.destroyConnections(removed);
-
-            if (!getMainNode().isOnline() || getMainNode().getGrid() != mainGrid || isOutput()) {
-                return;
-            }
-            outputs = getOutputs();
-            for (int i = 0; i < outputs.size(); i++) {
-                MEP2PTunnelPart output = outputs.get(i);
-                if (!output.getMainNode().isOnline() || output.getMainNode().getGrid() != mainGrid
-                    || getExternalFacingNode() == null || output.getExternalFacingNode() == null
-                    || this.connections.containsKey(output)) {
-                    continue;
+            if (operation == ConnectionUpdate.DISCONNECT) {
+                var removed = new ObjectArrayList<>(this.connections.values());
+                this.connections.clear();
+                GridHelper.destroyConnections(removed);
+            } else if (operation == ConnectionUpdate.CONNECT) {
+                List<MEP2PTunnelPart> outputs = getOutputs();
+                ReferenceSet<MEP2PTunnelPart> outputSet = new ReferenceOpenHashSet<>(outputs.size());
+                outputSet.addAll(outputs);
+                Iterator<Map.Entry<MEP2PTunnelPart, IGridConnection>> it = this.connections.entrySet()
+                                                                                           .iterator();
+                var removed = new ObjectArrayList<IGridConnection>();
+                while (it.hasNext()) {
+                    Map.Entry<MEP2PTunnelPart, IGridConnection> entry = it.next();
+                    MEP2PTunnelPart output = entry.getKey();
+                    IGridConnection connection = entry.getValue();
+                    if (output.getMainNode().getGrid() != mainGrid
+                        || !output.getMainNode().isOnline()
+                        || !outputSet.contains(output)) {
+                        removed.add(connection);
+                        it.remove();
+                    }
                 }
 
-                IGridConnection connection = GridHelper.createConnection(getExternalFacingNode(),
-                    output.getExternalFacingNode());
-                this.connections.put(output, connection);
+                GridHelper.destroyConnections(removed);
+
+                if (!getMainNode().isOnline() || getMainNode().getGrid() != mainGrid || isOutput()) {
+                    return;
+                }
+                outputs = getOutputs();
+                for (int i = 0; i < outputs.size(); i++) {
+                    MEP2PTunnelPart output = outputs.get(i);
+                    if (!output.getMainNode().isOnline() || output.getMainNode().getGrid() != mainGrid
+                        || getExternalFacingNode() == null || output.getExternalFacingNode() == null
+                        || this.connections.containsKey(output)) {
+                        continue;
+                    }
+
+                    IGridConnection connection = GridHelper.createConnection(getExternalFacingNode(),
+                        output.getExternalFacingNode());
+                    this.connections.put(output, connection);
+                }
+            }
+        } finally {
+            this.updateQueued = false;
+            if (this.pendingUpdate != ConnectionUpdate.NONE && this.getLevel() != null) {
+                queueConnectionUpdate();
             }
         }
     }

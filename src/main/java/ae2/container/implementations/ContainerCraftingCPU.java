@@ -33,6 +33,8 @@ import ae2.container.AEBaseContainer;
 import ae2.container.guisync.GuiSync;
 import ae2.container.me.common.IncrementalUpdateHelper;
 import ae2.container.me.crafting.CraftingStatus;
+import ae2.container.me.crafting.CraftingStatusEntry;
+import ae2.core.AELog;
 import ae2.core.localization.PlayerMessages;
 import ae2.core.network.clientbound.CraftingStatusPacket;
 import ae2.core.network.clientbound.CraftingSupplierLocationsPacket;
@@ -42,10 +44,13 @@ import ae2.hooks.ticking.TickHandler;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
 import ae2.tile.crafting.ICraftingCPUTileEntity;
 import ae2.util.NullConfigManager;
+import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -56,6 +61,8 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
     private static final String ACTION_CANCEL_CRAFTING = "cancelCrafting";
     private static final String ACTION_TOGGLE_SCHEDULING = "toggleScheduling";
     private static final String ACTION_SET_TASK_PRIORITY = "setTaskPriority";
+    private static final String ACTION_REQUEST_STATUS = "requestStatus";
+    private static final int MAX_PENDING_STATUS_ENTRIES = 4096;
 
     private final IncrementalUpdateHelper incrementalUpdateHelper = new IncrementalUpdateHelper();
     @Nullable
@@ -72,6 +79,23 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
     private boolean cachedSuspend;
     private int cachedPriority;
     private long nextSupplierTraceTick;
+    private long cpuEpoch;
+    private long statusRevision;
+    private long clientCpuEpoch = Long.MIN_VALUE;
+    private long clientStatusRevision = -1;
+    private boolean clientHasStatusBase;
+    private boolean clientStatusRecoveryRequested;
+    @Nullable
+    private Long2ObjectMap<CraftingStatusEntry> clientStatusEntries;
+    private boolean clientStatusModelInitialized;
+    private boolean clientStatusDirty;
+    private long clientElapsedTime;
+    private long clientRemainingItemCount;
+    private long clientStartItemCount;
+    private boolean clientSuspended;
+    private int clientPriority;
+    @Nullable
+    private GenericStack clientFinalOutput;
 
     public ContainerCraftingCPU(InventoryPlayer ip, ICraftingCPUTileEntity host) {
         this(ip, (Object) host);
@@ -94,6 +118,7 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
         registerClientAction(ACTION_CANCEL_CRAFTING, this::cancelCrafting);
         registerClientAction(ACTION_TOGGLE_SCHEDULING, this::toggleScheduling);
         registerClientAction(ACTION_SET_TASK_PRIORITY, Integer.class, this::setTaskPriority);
+        registerClientAction(ACTION_REQUEST_STATUS, this::requestStatus);
     }
 
     @Nullable
@@ -116,6 +141,9 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
             return;
         }
 
+        this.cpuEpoch++;
+        this.statusRevision = 0;
+
         if (this.cpu != null) {
             this.cpu.craftingLogic.removeListener(cpuChangeListener);
         }
@@ -136,8 +164,161 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
             cluster.craftingLogic.addListener(cpuChangeListener);
         } else {
             this.cpu = null;
-            sendPacketToClient(new CraftingStatusPacket(windowId, CraftingStatus.EMPTY));
+            sendStatus(CraftingStatus.EMPTY);
         }
+    }
+
+    private void requestStatus() {
+        if (isClientSide()) {
+            if (!this.clientStatusRecoveryRequested) {
+                this.clientStatusRecoveryRequested = true;
+                sendClientAction(ACTION_REQUEST_STATUS);
+            }
+            return;
+        }
+
+        if (this.cpu == null) {
+            sendStatus(CraftingStatus.EMPTY);
+            return;
+        }
+
+        prepareFullStatus();
+        this.cachedSuspend = false;
+        this.cachedPriority = 0;
+    }
+
+    private void prepareFullStatus() {
+        this.incrementalUpdateHelper.reset();
+        if (this.cpu == null) {
+            return;
+        }
+
+        KeyCounter allItems = new KeyCounter();
+        this.cpu.craftingLogic.getAllItems(allItems);
+        for (Object2LongMap.Entry<AEKey> entry : allItems) {
+            this.incrementalUpdateHelper.addChange(entry.getKey());
+        }
+    }
+
+    private boolean sendStatus(CraftingStatus status) {
+        this.statusRevision++;
+        try {
+            sendPacketToClient(new CraftingStatusPacket(windowId, this.cpuEpoch, this.statusRevision, status));
+            return true;
+        } catch (RuntimeException e) {
+            AELog.warn("Failed to send crafting CPU status; scheduling a full status retry", e);
+            return false;
+        }
+    }
+
+    public void acceptClientStatus(long epoch, long revision, CraftingStatus status) {
+        if (revision <= 0 || epoch <= 0) {
+            return;
+        }
+        if (epoch < this.clientCpuEpoch || epoch == this.clientCpuEpoch && revision <= this.clientStatusRevision) {
+            return;
+        }
+        if (epoch > this.clientCpuEpoch) {
+            if (!status.fullStatus()) {
+                requestStatus();
+                return;
+            }
+            this.clientCpuEpoch = epoch;
+            this.clientStatusRevision = 0;
+            this.clientHasStatusBase = false;
+            resetClientStatusModel();
+            this.clientStatusRecoveryRequested = false;
+        }
+        if (!status.fullStatus() && !this.clientHasStatusBase) {
+            requestStatus();
+            return;
+        }
+
+        this.clientStatusRevision = revision;
+        if (!applyClientStatus(status)) {
+            resetClientStatusModel();
+            this.clientHasStatusBase = false;
+            requestStatus();
+            return;
+        }
+        this.clientHasStatusBase = true;
+        if (status.fullStatus()) {
+            this.clientStatusRecoveryRequested = false;
+        }
+    }
+
+    private boolean applyClientStatus(CraftingStatus status) {
+        Long2ObjectMap<CraftingStatusEntry> entries = getClientStatusEntries();
+        if (status.fullStatus()) {
+            entries.clear();
+            this.clientStatusModelInitialized = true;
+        } else if (!this.clientStatusModelInitialized) {
+            return false;
+        }
+
+        for (CraftingStatusEntry entry : status.entries()) {
+            if (entry.isDeleted()) {
+                entries.remove(entry.serial());
+                continue;
+            }
+
+            CraftingStatusEntry existingEntry = entries.get(entry.serial());
+            if (existingEntry != null) {
+                entries.put(entry.serial(), new CraftingStatusEntry(
+                    existingEntry.serial(),
+                    existingEntry.what(),
+                    entry.storedAmount(),
+                    entry.activeAmount(),
+                    entry.pendingAmount()));
+            } else if (entry.what() != null) {
+                entries.put(entry.serial(), entry);
+            }
+
+            if (entries.size() > MAX_PENDING_STATUS_ENTRIES) {
+                return false;
+            }
+        }
+
+        this.clientElapsedTime = status.elapsedTime();
+        this.clientRemainingItemCount = status.remainingItemCount();
+        this.clientStartItemCount = status.startItemCount();
+        this.clientSuspended = status.suspended();
+        this.clientPriority = status.priority();
+        this.clientFinalOutput = status.finalOutput();
+        this.clientStatusDirty = true;
+        return true;
+    }
+
+    private void resetClientStatusModel() {
+        if (this.clientStatusEntries != null) {
+            this.clientStatusEntries.clear();
+        }
+        this.clientStatusModelInitialized = false;
+        this.clientStatusDirty = false;
+    }
+
+    private Long2ObjectMap<CraftingStatusEntry> getClientStatusEntries() {
+        if (this.clientStatusEntries == null) {
+            this.clientStatusEntries = new Long2ObjectLinkedOpenHashMap<>();
+        }
+        return this.clientStatusEntries;
+    }
+
+    @Nullable
+    public CraftingStatus consumeClientStatus() {
+        if (!this.clientStatusDirty || !this.clientStatusModelInitialized) {
+            return null;
+        }
+        this.clientStatusDirty = false;
+        return new CraftingStatus(
+            true,
+            this.clientElapsedTime,
+            this.clientRemainingItemCount,
+            this.clientStartItemCount,
+            List.copyOf(getClientStatusEntries().values()),
+            this.clientSuspended,
+            this.clientPriority,
+            this.clientFinalOutput);
     }
 
     public void cancelCrafting() {
@@ -175,7 +356,7 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
     }
 
     @Override
-    public void onContainerClosed(EntityPlayer player) {
+    public void onContainerClosed(@NotNull EntityPlayer player) {
         super.onContainerClosed(player);
         if (this.cpu != null) {
             this.cpu.craftingLogic.removeListener(cpuChangeListener);
@@ -192,11 +373,13 @@ public class ContainerCraftingCPU extends AEBaseContainer implements IConfigurab
                 || this.cachedSuspend != this.cpu.craftingLogic.isJobSuspended()
                 || this.cachedPriority != this.cpu.craftingLogic.getJobPriority()) {
                 CraftingStatus status = CraftingStatus.create(this.incrementalUpdateHelper, this.cpu.craftingLogic);
-                this.incrementalUpdateHelper.commitChanges();
-                this.cachedSuspend = status.suspended();
-                this.cachedPriority = status.priority();
-
-                sendPacketToClient(new CraftingStatusPacket(windowId, status));
+                if (sendStatus(status)) {
+                    this.incrementalUpdateHelper.commitChanges();
+                    this.cachedSuspend = status.suspended();
+                    this.cachedPriority = status.priority();
+                } else {
+                    prepareFullStatus();
+                }
             }
         }
 

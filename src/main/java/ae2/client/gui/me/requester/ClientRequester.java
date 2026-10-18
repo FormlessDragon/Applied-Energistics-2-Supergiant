@@ -5,6 +5,8 @@ import ae2.tile.crafting.requester.RequestList;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Locale;
+
 public final class ClientRequester implements Comparable<ClientRequester> {
     public static final int MAX_REQUEST_COUNT = 64;
 
@@ -41,7 +43,7 @@ public final class ClientRequester implements Comparable<ClientRequester> {
     }
 
     public String getSearchName() {
-        return getDisplayName().getFormattedText().toLowerCase();
+        return getDisplayName().getFormattedText().toLowerCase(Locale.ROOT);
     }
 
     public RequestList getRequests() {

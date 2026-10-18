@@ -667,7 +667,9 @@ public enum GuiText implements LocalizationEnum {
     CantFitInsideStorageCell,
     CraftTree,
     FlowRateFull,
-    FlowRateShort;
+    FlowRateShort,
+    RequesterStatusUnconfirmed("requester.status.unconfirmed"),
+    RequesterStatusUnconfirmedDesc("requester.status.unconfirmed.desc");
 
     private final String translationKey;
 
@@ -687,6 +689,7 @@ public enum GuiText implements LocalizationEnum {
             case CPU -> RequesterStatusCpu;
             case CRAFTING -> RequesterStatusCrafting;
             case EXPORTING -> RequesterStatusExporting;
+            case UNCONFIRMED -> RequesterStatusUnconfirmed;
         };
     }
 
@@ -698,6 +701,7 @@ public enum GuiText implements LocalizationEnum {
             case CPU -> RequesterStatusCpuDesc;
             case CRAFTING -> RequesterStatusCraftingDesc;
             case EXPORTING -> RequesterStatusExportingDesc;
+            case UNCONFIRMED -> RequesterStatusUnconfirmedDesc;
         };
     }
 

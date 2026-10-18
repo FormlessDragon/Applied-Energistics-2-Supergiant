@@ -18,6 +18,8 @@
 
 package ae2.helpers;
 
+import ae2.api.networking.IGrid;
+import ae2.api.networking.IGridNode;
 import ae2.api.networking.crafting.CalculationStrategy;
 import ae2.api.networking.crafting.ICraftingForceStartRequester;
 import ae2.api.networking.crafting.ICraftingLink;
@@ -27,16 +29,22 @@ import ae2.api.networking.crafting.ICraftingService;
 import ae2.api.networking.crafting.ICraftingSimulationRequester;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.GenericStack;
 import ae2.api.storage.StorageHelper;
+import ae2.core.AELog;
 import ae2.crafting.graph.MaterialClosure;
 import ae2.hooks.ticking.TickHandler;
 import ae2.me.service.CraftingService;
 import com.google.common.collect.ImmutableSet;
+import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -47,6 +55,16 @@ public class MultiCraftingTracker {
 
     private final int size;
     private final ICraftingRequester owner;
+    private final CalculationContext[] calculations;
+    private final Submission[] submissions;
+    private final boolean[] handling;
+    private final boolean[] cancelRequested;
+    private final boolean[] cancelingLinks;
+    private int submissionCount;
+    private int cancelDepth;
+    private boolean suspended;
+    private long lifecycleGeneration;
+    private long calculationGeneration;
 
     private Future<ICraftingPlan>[] jobs = null;
     private ICraftingLink[] links = null;
@@ -58,14 +76,90 @@ public class MultiCraftingTracker {
     public MultiCraftingTracker(ICraftingRequester owner, int size) {
         this.owner = owner;
         this.size = size;
+        this.calculations = new CalculationContext[size];
+        this.submissions = new Submission[size];
+        this.handling = new boolean[size];
+        this.cancelRequested = new boolean[size];
+        this.cancelingLinks = new boolean[size];
     }
 
     public void readFromNBT(NBTTagCompound extra) {
-        for (int x = 0; x < this.size; x++) {
-            final NBTTagCompound link = extra.getCompoundTag("links-" + x);
-            if (!link.isEmpty()) {
-                this.setLink(x, StorageHelper.loadCraftingLink(link, this.owner));
+        this.readConfiguration(() -> {
+            long generation = this.calculationGeneration;
+            var originalLinks = this.links;
+            var loaded = new ICraftingLink[this.size];
+            var loadedCancellation = new boolean[this.size];
+            var retainedCancellation = new boolean[this.size];
+            var pending = new Submission[this.size];
+            boolean hasLinks = false;
+            for (int x = 0; x < this.size; x++) {
+                final NBTTagCompound link = extra.getCompoundTag("links-" + x);
+                if (!link.isEmpty()) {
+                    if (link.hasKey("trackerCancelRequested") && !link.hasKey("trackerCancelRequested", 1)) {
+                        throw new IllegalStateException("Invalid crafting cancellation flag");
+                    }
+                    var restored = StorageHelper.loadCraftingLink(link, this.owner);
+                    if (!restored.isCanceled() && !restored.isDone()) {
+                        loaded[x] = restored;
+                        loadedCancellation[x] = link.getBoolean("trackerCancelRequested");
+                        hasLinks = true;
+                    }
+                }
+                var canceling = this.getLink(x);
+                if (canceling != null && this.cancelRequested[x]) {
+                    if (!link.isEmpty() && (!link.hasUniqueId("craftId")
+                        || !Objects.requireNonNull(link.getUniqueId("craftId")).equals(canceling.getCraftingID()))) {
+                        throw new IllegalStateException("Cannot replace a crafting link with unconfirmed cancellation");
+                    }
+                    loaded[x] = canceling;
+                    loadedCancellation[x] = true;
+                    retainedCancellation[x] = true;
+                    hasLinks = true;
+                }
+                String pendingKey = "unconfirmed-submission-" + x;
+                if (extra.hasKey(pendingKey)) {
+                    pending[x] = new Submission(extra.getTag(pendingKey), this.owner);
+                    if (pending[x].terminal) {
+                        pending[x] = null;
+                    }
+                }
+                var current = this.submissions[x];
+                if (current != null) {
+                    if (pending[x] != null && !current.sameSubmission(pending[x])) {
+                        throw new IllegalStateException("Cannot replace an unconfirmed crafting submission");
+                    }
+                    pending[x] = current;
+                }
             }
+            if (generation != this.calculationGeneration || this.links != originalLinks) {
+                throw new IllegalStateException("Crafting ownership changed during link restoration");
+            }
+            for (int x = 0; x < this.size; x++) {
+                if (retainedCancellation[x] && (this.getLink(x) != loaded[x] || !this.cancelRequested[x])) {
+                    throw new IllegalStateException("Crafting cancellation settled during link restoration");
+                }
+            }
+            this.links = hasLinks ? loaded : null;
+            System.arraycopy(loadedCancellation, 0, this.cancelRequested, 0, this.size);
+            for (int x = 0; x < this.size; x++) {
+                if (this.submissions[x] != null) {
+                    this.submissions[x].revoked = true;
+                }
+                this.setSubmission(x, pending[x]);
+            }
+        });
+    }
+
+    /**
+     * Run a host configuration read with planning disabled, without changing lifecycle suspension.
+     */
+    public void readConfiguration(Runnable reader) {
+        this.cancelDepth++;
+        try {
+            this.cancelCalculations();
+            reader.run();
+        } finally {
+            this.cancelDepth--;
         }
     }
 
@@ -73,16 +167,52 @@ public class MultiCraftingTracker {
         for (int x = 0; x < this.size; x++) {
             final ICraftingLink link = this.getLink(x);
             if (link != null) {
+                boolean cancellationPending = this.cancelRequested[x];
                 final NBTTagCompound serializedLink = new NBTTagCompound();
                 link.writeToNBT(serializedLink);
+                if (cancellationPending || this.getLink(x) != link || this.cancelRequested[x]) {
+                    serializedLink.setBoolean("trackerCancelRequested", true);
+                }
                 extra.setTag("links-" + x, serializedLink);
+            } else {
+                extra.removeTag("links-" + x);
+            }
+            var submission = this.submissions[x];
+            if (submission == null) {
+                extra.removeTag("unconfirmed-submission-" + x);
+            } else {
+                extra.setTag("unconfirmed-submission-" + x, submission.writeToNBT());
             }
         }
     }
 
     public boolean handleCrafting(int x, AEKey what, long amount, World level, ICraftingService cg,
                                   IActionSource mySrc) {
-        if (x < 0 || x >= this.size || what == null || amount <= 0 || level == null || cg == null || mySrc == null) {
+        if (x < 0 || x >= this.size || this.suspended || this.cancelDepth > 0 || this.handling[x]
+            || this.submissions[x] != null) {
+            return false;
+        }
+        this.handling[x] = true;
+        try {
+            return this.handleCalculation(x, what, amount, level, cg, mySrc);
+        } finally {
+            this.handling[x] = false;
+        }
+    }
+
+    private boolean handleCalculation(int x, AEKey what, long amount, World level, ICraftingService cg,
+                                      IActionSource mySrc) {
+        long generation = this.calculationGeneration;
+        var context = this.calculations[x];
+        boolean matches = context == null || context.matches(what, amount, level, cg, mySrc, this.owner);
+        if (generation != this.calculationGeneration || this.suspended || this.calculations[x] != context) {
+            return false;
+        }
+        if (!matches) {
+            this.cancelCalculation(x);
+            this.clearRetry(x);
+        }
+        if (what == null || amount <= 0 || level == null || cg == null || mySrc == null) {
             return false;
         }
 
@@ -99,71 +229,195 @@ public class MultiCraftingTracker {
             try {
                 ICraftingPlan job = null;
                 if (craftingJob.isDone()) {
+                    if (!this.ownsCalculation(x, craftingJob)) {
+                        return false;
+                    }
                     job = craftingJob.get();
+                }
+
+                if (!this.ownsCalculation(x, craftingJob)) {
+                    return false;
                 }
 
                 if (job != null) {
                     boolean forceStart = this.owner instanceof ICraftingForceStartRequester forceRequester
                         && forceRequester.canForceStartCrafting(job);
-                    var result = cg.submitJob(job, this.owner, null, false, mySrc, forceStart);
-                    this.setJob(x, null);
-
-                    if (result.successful()) {
-                        this.clearRetry(x);
-                        this.setLink(x, result.link());
-                        return true;
+                    var submission = new Submission(what, amount, this.calculationGeneration,
+                        this.lifecycleGeneration);
+                    if (!this.ownsCalculation(x, craftingJob)) {
+                        return false;
                     }
-                    this.markFailure(x, what, amount);
-                } else if (craftingJob.isDone()) {
+                    this.setSubmission(x, submission);
+                    this.setJob(x, null);
+                    return this.submitCalculation(x, submission, job, cg, mySrc, forceStart);
+                } else if (craftingJob.isDone() && this.ownsCalculation(x, craftingJob)) {
                     this.setJob(x, null);
                     this.markFailure(x, what, amount);
                 }
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
-                this.setJob(x, null);
+                if (this.getJob(x) == craftingJob) {
+                    this.setJob(x, null);
+                }
                 return false;
             } catch (ExecutionException | RuntimeException ignored) {
-                this.markFailure(x, what, amount);
-                this.setJob(x, null);
+                if (this.getJob(x) == craftingJob) {
+                    this.markFailure(x, what, amount);
+                    this.setJob(x, null);
+                }
             }
         } else if (this.getLink(x) == null) {
-            var check = materialClosureCheck(cg, what, amount);
-            if (check != null && check.guaranteedMissing()) {
-                // The structure proves the request can only report missing items: settle without a calculation.
-                this.markFailure(x, what, amount);
-            } else {
-                this.setJob(x, cg.beginCraftingCalculation(level,
-                    new CardSimulationRequester(mySrc, cg, check == null ? null : check.subset()), what, amount,
-                    CalculationStrategy.REPORT_MISSING_ITEMS));
+            var node = this.owner.getActionableNode();
+            var started = new CalculationContext(what, amount, level, cg, mySrc, node,
+                node == null ? null : node.grid());
+            if (generation != this.calculationGeneration || this.suspended || this.cancelDepth > 0) {
+                return false;
+            }
+            this.calculations[x] = started;
+            Future<ICraftingPlan> future = null;
+            try {
+                var check = materialClosureCheck(cg, what, amount);
+                if (!this.ownsContext(x, started)) {
+                    return false;
+                }
+                if (check != null && check.guaranteedMissing()) {
+                    // The structure proves the request can only report missing items.
+                    this.markFailure(x, what, amount);
+                    this.calculations[x] = null;
+                } else {
+                    future = cg.beginCraftingCalculation(level,
+                        new CardSimulationRequester(mySrc, cg, check == null ? null : check.subset()), what, amount,
+                        CalculationStrategy.REPORT_MISSING_ITEMS);
+                    if (this.ownsContext(x, started)) {
+                        this.setJob(x, future);
+                        future = null;
+                    }
+                }
+            } finally {
+                if (future != null) {
+                    this.cancelFuture(future);
+                }
+                if (this.calculations[x] == started && this.getJob(x) == null) {
+                    this.calculations[x] = null;
+                }
             }
         }
         return false;
     }
 
     public ImmutableSet<ICraftingLink> getRequestedJobs() {
-        if (this.links == null) {
-            return ImmutableSet.of();
+        if (this.submissionCount == 0) {
+            return this.links == null ? ImmutableSet.of()
+                : ImmutableSet.copyOf(new NonNullArrayIterator<>(this.links));
         }
+        ImmutableSet.Builder<ICraftingLink> result = null;
+        for (int x = 0; x < this.size; x++) {
+            var link = this.getLink(x);
+            if (link != null) {
+                if (result == null) {
+                    result = ImmutableSet.builder();
+                }
+                result.add(link);
+            }
+            var submission = this.submissions[x];
+            if (submission != null && submission.link != null) {
+                if (result == null) {
+                    result = ImmutableSet.builder();
+                }
+                result.add(submission.link);
+            }
+        }
+        return result == null ? ImmutableSet.of() : result.build();
+    }
 
-        return ImmutableSet.copyOf(new NonNullArrayIterator<>(this.links));
+    private boolean submitCalculation(int slot, Submission submission, ICraftingPlan plan, ICraftingService crafting,
+                                      IActionSource source, boolean forceStart) {
+        long generation = this.calculationGeneration;
+        try {
+            var result = crafting.submitJob(plan, this.owner, null, false, source, forceStart);
+            // Own a returned link before any further receipt callback can invalidate the request.
+            submission.link = result.link();
+            boolean successful = result.successful();
+            if (submission.terminal) {
+                this.setSubmission(slot, null);
+                return successful;
+            }
+            if (!successful && submission.link == null) {
+                this.setSubmission(slot, null);
+                if (generation == this.calculationGeneration && !submission.revoked) {
+                    this.markFailure(slot, submission.key, submission.amount);
+                }
+                return false;
+            }
+            if (submission.link == null) {
+                AELog.warn("Successful crafting submission returned no requester link; automatic retry stopped");
+                return false;
+            }
+            if (!successful || submission.revoked) {
+                submission.revoked = true;
+                this.cancelSubmission(slot, submission);
+                if (!successful && this.submissions[slot] == null && generation == this.calculationGeneration) {
+                    this.markFailure(slot, submission.key, submission.amount);
+                }
+                return successful;
+            }
+            this.setSubmission(slot, null);
+            this.clearRetry(slot);
+            this.setLink(slot, submission.link);
+            return true;
+        } catch (RuntimeException failure) {
+            AELog.error(failure, "Crafting submission outcome is unconfirmed; automatic retry stopped");
+            return false;
+        } finally {
+            submission.inFlight = false;
+        }
+    }
+
+    private void cancelSubmission(int slot, Submission submission) {
+        if (submission.link == null || submission.canceling) {
+            return;
+        }
+        submission.canceling = true;
+        this.cancelDepth++;
+        try {
+            submission.link.cancel();
+            if ((submission.terminal || submission.link.isCanceled() || submission.link.isDone())
+                && this.submissions[slot] == submission) {
+                this.setSubmission(slot, null);
+            }
+        } catch (RuntimeException failure) {
+            AELog.error(failure, "Crafting cancellation is unconfirmed; retaining the returned link");
+        } finally {
+            this.cancelDepth--;
+            submission.canceling = false;
+        }
     }
 
     public void jobStateChange(ICraftingLink link) {
-        if (this.links != null) {
-            for (int x = 0; x < this.links.length; x++) {
-                if (this.links[x] == link) {
-                    this.setLink(x, null);
-                    this.clearRetry(x);
-                    return;
+        for (int x = 0; x < this.size; x++) {
+            if (this.getLink(x) == link) {
+                this.setLink(x, null);
+                this.clearRetry(x);
+                return;
+            }
+            var submission = this.submissions[x];
+            if (submission != null && submission.link == link) {
+                submission.terminal = true;
+                if (!submission.inFlight && !submission.canceling) {
+                    this.setSubmission(x, null);
                 }
+                return;
             }
         }
     }
 
-    int getSlot(ICraftingLink link) {
+    /**
+     * The confirmed production slot, or -1 for a foreign or unconfirmed link.
+     */
+    public int getSlot(ICraftingLink link) {
         if (this.links != null) {
             for (int x = 0; x < this.links.length; x++) {
-                if (this.links[x] == link) {
+                if (this.links[x] == link && !this.cancelRequested[x]) {
                     return x;
                 }
             }
@@ -173,31 +427,248 @@ public class MultiCraftingTracker {
     }
 
     void cancel() {
-        if (this.links != null) {
-            for (ICraftingLink link : this.links) {
-                if (link != null) {
-                    link.cancel();
+        this.calculationGeneration++;
+        var oldLinks = this.links;
+        var oldJobs = this.jobs;
+        var oldSubmissions = this.submissionCount == 0 ? null : this.submissions.clone();
+        if (oldSubmissions != null) {
+            for (var submission : oldSubmissions) {
+                if (submission != null) {
+                    submission.revoked = true;
                 }
             }
-
-            this.links = null;
         }
-
-        if (this.jobs != null) {
-            for (Future<ICraftingPlan> job : this.jobs) {
-                if (job != null) {
-                    job.cancel(true);
+        if (oldLinks != null) {
+            for (int x = 0; x < oldLinks.length; x++) {
+                if (oldLinks[x] != null) {
+                    this.cancelRequested[x] = true;
                 }
             }
-
-            this.jobs = null;
         }
-
+        this.jobs = null;
+        Arrays.fill(this.calculations, null);
         this.clearRetries();
+        this.cancelDepth++;
+        try {
+            if (oldLinks != null) {
+                for (int x = 0; x < oldLinks.length; x++) {
+                    var link = oldLinks[x];
+                    if (link != null && this.getLink(x) == link) {
+                        this.cancelConfirmedLink(x, link);
+                    }
+                }
+            }
+            if (oldJobs != null) {
+                for (Future<ICraftingPlan> job : oldJobs) {
+                    if (job != null) {
+                        this.cancelFuture(job);
+                    }
+                }
+            }
+            if (oldSubmissions != null) {
+                for (int x = 0; x < oldSubmissions.length; x++) {
+                    var submission = oldSubmissions[x];
+                    if (submission != null && !submission.inFlight) {
+                        this.cancelSubmission(x, submission);
+                    }
+                }
+            }
+        } finally {
+            this.cancelDepth--;
+        }
+    }
+
+    private void cancelConfirmedLink(int slot, ICraftingLink link) {
+        if (this.cancelingLinks[slot]) {
+            return;
+        }
+        this.cancelingLinks[slot] = true;
+        try {
+            link.cancel();
+            if (this.getLink(slot) != link) {
+                return;
+            }
+            boolean terminal = link.isCanceled();
+            if (this.getLink(slot) != link) {
+                return;
+            }
+            if (!terminal) {
+                terminal = link.isDone();
+            }
+            if (terminal && this.getLink(slot) == link) {
+                this.setLink(slot, null);
+            }
+        } catch (RuntimeException failure) {
+            AELog.error(failure, "Crafting link cancellation is unconfirmed; retaining ownership");
+        } finally {
+            this.cancelingLinks[slot] = false;
+        }
+    }
+
+    /**
+     * Revoke unsubmitted calculations after configuration or source changes, retaining production links.
+     */
+    public void cancelCalculations() {
+        this.calculationGeneration++;
+        var oldJobs = this.jobs;
+        this.jobs = null;
+        Arrays.fill(this.calculations, null);
+        this.clearRetries();
+        this.cancelDepth++;
+        try {
+            if (oldJobs != null) {
+                for (var job : oldJobs) {
+                    if (job != null) {
+                        this.cancelFuture(job);
+                    }
+                }
+            }
+        } finally {
+            this.cancelDepth--;
+        }
+    }
+
+    /**
+     * Close admission before destroying the host node; submitted links remain owned for save/reload.
+     */
+    public long suspendCalculations() {
+        this.suspended = true;
+        long generation = ++this.lifecycleGeneration;
+        this.cancelCalculations();
+        return generation;
+    }
+
+    /**
+     * Reopen only if no newer lifecycle close occurred during node initialization.
+     */
+    public void resumeCalculations(long generation) {
+        if (generation == this.lifecycleGeneration) {
+            this.suspended = false;
+        }
     }
 
     boolean isBusy(int slot) {
-        return this.getLink(slot) != null || this.getJob(slot) != null;
+        return this.submissions[slot] != null || this.getLink(slot) != null || this.getJob(slot) != null;
+    }
+
+    private void setSubmission(int slot, @Nullable Submission submission) {
+        if (this.submissions[slot] == null && submission != null) {
+            this.submissionCount++;
+        } else if (this.submissions[slot] != null && submission == null) {
+            this.submissionCount--;
+        }
+        this.submissions[slot] = submission;
+    }
+
+    private boolean ownsContext(int slot, CalculationContext context) {
+        return !this.suspended && this.calculations[slot] == context && this.cancelDepth == 0
+            && context.isCurrent(this.owner)
+            && !this.suspended && this.cancelDepth == 0 && this.calculations[slot] == context;
+    }
+
+    private boolean ownsCalculation(int slot, Future<ICraftingPlan> job) {
+        var context = this.calculations[slot];
+        if (this.getJob(slot) != job || context == null) {
+            return false;
+        }
+        if (!this.ownsContext(slot, context)) {
+            if (this.getJob(slot) == job && this.calculations[slot] == context) {
+                this.cancelCalculation(slot);
+            }
+            return false;
+        }
+        return true;
+    }
+
+    private void cancelCalculation(int slot) {
+        var job = this.getJob(slot);
+        this.setJob(slot, null);
+        if (job != null) {
+            this.cancelFuture(job);
+        }
+    }
+
+    private void cancelFuture(Future<ICraftingPlan> job) {
+        this.cancelDepth++;
+        try {
+            job.cancel(true);
+        } catch (RuntimeException failure) {
+            AELog.error(failure, "Failed to cancel tracked crafting calculation");
+        } finally {
+            this.cancelDepth--;
+        }
+    }
+
+    private void setLink(int slot, ICraftingLink link) {
+        if (this.links == null) {
+            this.links = new ICraftingLink[this.size];
+        }
+
+        this.links[slot] = link;
+        this.cancelRequested[slot] = false;
+        var published = this.links;
+        boolean hasStuff = false;
+        for (int x = 0; x < published.length; x++) {
+            if (this.links != published) {
+                return;
+            }
+            final ICraftingLink current = published[x];
+            if (current != null) {
+                boolean terminal = false;
+                try {
+                    terminal = current.isCanceled();
+                    if (this.links != published || published[x] != current) {
+                        return;
+                    }
+                    if (!terminal) {
+                        terminal = current.isDone();
+                    }
+                } catch (RuntimeException failure) {
+                    // A committed link remains owned when an extension cannot report its state.
+                    AELog.error(failure, "Failed to inspect tracked crafting link");
+                }
+                if (this.links != published || published[x] != current) {
+                    return;
+                }
+                if (terminal) {
+                    published[x] = null;
+                    this.cancelRequested[x] = false;
+                } else {
+                    hasStuff = true;
+                }
+            }
+        }
+
+        // Callbacks can change earlier slots in the same array as well.
+        if (!hasStuff && this.links == published
+            && Arrays.stream(published).allMatch(Objects::isNull)) {
+            this.links = null;
+        }
+    }
+
+    private void setJob(int slot, Future<ICraftingPlan> job) {
+        if (job == null) {
+            this.calculations[slot] = null;
+        }
+        if (this.jobs == null) {
+            @SuppressWarnings("unchecked")
+            Future<ICraftingPlan>[] jobs = (Future<ICraftingPlan>[]) new Future<?>[this.size];
+            this.jobs = jobs;
+        }
+
+        this.jobs[slot] = job;
+
+        boolean hasStuff = false;
+        for (Future<ICraftingPlan> current : this.jobs) {
+            if (current != null) {
+                hasStuff = true;
+                break;
+            }
+        }
+
+        if (!hasStuff) {
+            this.jobs = null;
+        }
     }
 
     private @Nullable ICraftingLink getLink(int slot) {
@@ -208,25 +679,73 @@ public class MultiCraftingTracker {
         return this.links[slot];
     }
 
-    private void setLink(int slot, ICraftingLink link) {
-        if (this.links == null) {
-            this.links = new ICraftingLink[this.size];
+    private static final class Submission {
+        private final NBTBase original;
+        @Nullable
+        private final AEKey key;
+        private final long amount;
+        @Nullable
+        private ICraftingLink link;
+        private boolean revoked;
+        private boolean inFlight;
+        private boolean canceling;
+        private boolean terminal;
+
+        Submission(@Nullable AEKey key, long amount, long sourceGeneration, long lifecycleGeneration) {
+            this.key = key;
+            this.amount = amount;
+            var tag = new NBTTagCompound();
+            tag.setInteger("schema", 1);
+            tag.setUniqueId("submissionId", UUID.randomUUID());
+            tag.setLong("sourceGeneration", sourceGeneration);
+            tag.setLong("lifecycleGeneration", lifecycleGeneration);
+            tag.setTag("request", GenericStack.writeTag(new GenericStack(key, amount)));
+            this.original = tag;
+            this.inFlight = true;
         }
 
-        this.links[slot] = link;
-
-        boolean hasStuff = false;
-        for (int x = 0; x < this.links.length; x++) {
-            final ICraftingLink current = this.links[x];
-            if (current == null || current.isCanceled() || current.isDone()) {
-                this.links[x] = null;
-            } else {
-                hasStuff = true;
+        Submission(NBTBase original, ICraftingRequester owner) {
+            this.original = original.copy();
+            this.key = null;
+            this.amount = 0;
+            if (original instanceof NBTTagCompound tag && tag.getInteger("schema") == 1) {
+                this.revoked = tag.getBoolean("revoked");
+                if (tag.hasKey("link", 10)) {
+                    try {
+                        this.link = StorageHelper.loadCraftingLink(tag.getCompoundTag("link"), owner);
+                        this.terminal = this.link.isCanceled() || this.link.isDone();
+                    } catch (RuntimeException failure) {
+                        AELog.error(failure, "Retaining unreadable unconfirmed crafting submission");
+                    }
+                }
             }
         }
 
-        if (!hasStuff) {
-            this.links = null;
+        boolean sameSubmission(Submission other) {
+            if (this.original.equals(other.original)) {
+                return true;
+            }
+            return this.original instanceof NBTTagCompound first && other.original instanceof NBTTagCompound second
+                && first.getInteger("schema") == 1 && second.getInteger("schema") == 1
+                && first.hasUniqueId("submissionId") && second.hasUniqueId("submissionId")
+                && Objects.requireNonNull(first.getUniqueId("submissionId")).equals(second.getUniqueId("submissionId"))
+                && first.getLong("sourceGeneration") == second.getLong("sourceGeneration")
+                && first.getLong("lifecycleGeneration") == second.getLong("lifecycleGeneration")
+                && first.getCompoundTag("request").equals(second.getCompoundTag("request"))
+                && Objects.equals(first.getTag("link"), second.getTag("link"));
+        }
+
+        NBTBase writeToNBT() {
+            var result = this.original.copy();
+            if (result instanceof NBTTagCompound tag && tag.getInteger("schema") == 1) {
+                tag.setBoolean("revoked", this.revoked);
+                if (this.link != null) {
+                    var linkTag = new NBTTagCompound();
+                    this.link.writeToNBT(linkTag);
+                    tag.setTag("link", linkTag);
+                }
+            }
+            return result;
         }
     }
 
@@ -294,25 +813,16 @@ public class MultiCraftingTracker {
         return this.jobs[slot];
     }
 
-    private void setJob(int slot, Future<ICraftingPlan> job) {
-        if (this.jobs == null) {
-            @SuppressWarnings("unchecked")
-            Future<ICraftingPlan>[] jobs = (Future<ICraftingPlan>[]) new Future<?>[this.size];
-            this.jobs = jobs;
+    private record CalculationContext(AEKey key, long amount, World world, ICraftingService crafting,
+                                      IActionSource source, @Nullable IGridNode node, @Nullable IGrid grid) {
+        boolean matches(AEKey key, long amount, World world, ICraftingService crafting, IActionSource source,
+                        ICraftingRequester owner) {
+            return this.key.equals(key) && this.amount == amount && this.world == world
+                && this.crafting == crafting && this.source == source && this.isCurrent(owner);
         }
 
-        this.jobs[slot] = job;
-
-        boolean hasStuff = false;
-        for (Future<ICraftingPlan> current : this.jobs) {
-            if (current != null) {
-                hasStuff = true;
-                break;
-            }
-        }
-
-        if (!hasStuff) {
-            this.jobs = null;
+        boolean isCurrent(ICraftingRequester owner) {
+            return this.node == owner.getActionableNode() && (this.node == null || this.grid == this.node.grid());
         }
     }
 

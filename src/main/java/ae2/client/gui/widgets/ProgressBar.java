@@ -25,7 +25,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.awt.Rectangle;
 import java.util.Collections;
@@ -57,7 +57,7 @@ public class ProgressBar extends GuiButton implements ITooltip {
     }
 
     @Override
-    public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
+    public void drawButton(@NotNull Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
         if (!this.visible) {
             return;
         }
@@ -96,7 +96,7 @@ public class ProgressBar extends GuiButton implements ITooltip {
     }
 
     @Override
-    public @NonNull List<ITextComponent> getTooltipMessage() {
+    public @NotNull List<ITextComponent> getTooltipMessage() {
         if (this.fullMsg != null) {
             return Collections.singletonList(this.fullMsg);
         }

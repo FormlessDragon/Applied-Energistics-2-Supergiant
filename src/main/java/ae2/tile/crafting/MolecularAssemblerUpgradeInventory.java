@@ -78,7 +78,11 @@ final class MolecularAssemblerUpgradeInventory extends AppEngInternalInventory i
             }
             int maxInstalled = getMaxInstalled(stack.getItem());
             if (maxInstalled > 0) {
-                this.installed.merge(stack.getItem(), 1, (a, b) -> Math.min(maxInstalled, a + b));
+                Item upgrade = stack.getItem();
+                int count = this.installed.getInt(upgrade);
+                if (count < maxInstalled) {
+                    this.installed.put(upgrade, count + 1);
+                }
             }
         }
     }

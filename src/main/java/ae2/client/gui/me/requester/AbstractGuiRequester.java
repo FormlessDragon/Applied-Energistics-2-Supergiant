@@ -67,6 +67,8 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
     private final ResourceLocation texture;
     private final ObjectArrayList<RequestRowWidget> requestWidgets = new ObjectArrayList<>();
 
+    private boolean listRefreshPending;
+    private long acceptedSyncGeneration;
     protected boolean refreshList;
     protected int rowAmount = MIN_ROW_COUNT;
 
@@ -96,9 +98,30 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
     }
 
     @Override
+    public final boolean acceptSyncIdentity(int windowId, long sourceGeneration) {
+        if (windowId != this.container.windowId || sourceGeneration <= 0
+            || sourceGeneration < this.acceptedSyncGeneration) {
+            return false;
+        }
+        if (sourceGeneration != this.acceptedSyncGeneration) {
+            this.acceptedSyncGeneration = sourceGeneration;
+            clearData();
+            scheduleListRefresh();
+        }
+        return true;
+    }
+
+    @Override
     public final void postClearAll() {
         clearData();
-        refreshList();
+        scheduleListRefresh();
+    }
+
+    @Override
+    public final void postRemoveRequester(long requesterId) {
+        if (removeRequester(requesterId)) {
+            scheduleListRefresh();
+        }
     }
 
     @Override
@@ -110,7 +133,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
             readRequest(requester, i, rows.get(i));
         }
         afterFullUpdate(requesterId, requesterName, sortValue, requestCount);
-        refreshList();
+        scheduleListRefresh();
     }
 
     @Override
@@ -126,7 +149,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
             }
         }
         afterIncrementalUpdate(requesterId);
-        refreshList();
+        scheduleListRefresh();
     }
 
     @Override
@@ -153,6 +176,10 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
     @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
+        if (this.listRefreshPending) {
+            this.listRefreshPending = false;
+            refreshList();
+        }
         updateVisibleRows();
     }
 
@@ -201,9 +228,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
             }
 
             Object lineElement = this.lines.get(scrollLevel + i);
-            if (lineElement instanceof Request request) {
-                requestWidgets.get(i).setRequester(request);
-            } else if (lineElement instanceof String text) {
+            if (lineElement instanceof String text) {
                 int rows = getByName(text).size();
                 if (rows > 1) {
                     text = String.format("%s (%s)", text, rows);
@@ -361,7 +386,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
                                    int requestCount) {
     }
 
-    protected void afterIncrementalUpdate(@SuppressWarnings("unused") long requesterId) {
+    protected void afterIncrementalUpdate(long requesterId) {
     }
 
     protected void clearData() {
@@ -376,7 +401,13 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
 
     protected abstract @Nullable ClientRequester findById(long requesterId);
 
+    protected abstract boolean removeRequester(long requesterId);
+
     protected abstract Rectangle getFooterBounds();
+
+    private void scheduleListRefresh() {
+        this.listRefreshPending = true;
+    }
 
     private void updateVisibleRows() {
         int scrollLevel = this.scrollbar.getCurrentScroll();

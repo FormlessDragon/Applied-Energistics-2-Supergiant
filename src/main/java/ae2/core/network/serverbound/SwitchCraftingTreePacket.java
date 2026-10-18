@@ -47,12 +47,18 @@ public class SwitchCraftingTreePacket extends ServerboundPacket {
             return;
         }
 
+        var job = craftingTree.getJob();
+        var source = craftingTree.getCalculationGrid();
+        var order = craftingTree.getPendingFillsOrder();
+        if (job == null || source == null) {
+            return;
+        }
         if (!SwitchGuisPacket.openSubGui(player, locator, GuiIds.GuiKey.CRAFT_CONFIRM)) {
             return;
         }
 
         if (player.openContainer instanceof ContainerCraftConfirm confirm) {
-            confirm.setJob(craftingTree.getJob());
+            confirm.setJob(job, source, order);
             confirm.detectAndSendChanges();
         }
     }
@@ -66,6 +72,11 @@ public class SwitchCraftingTreePacket extends ServerboundPacket {
         if (!(result instanceof CraftingPlanDisplaySource displaySource)) {
             return;
         }
+        var source = confirm.getResultGrid();
+        var order = confirm.getPendingFillsOrder();
+        if (source == null || confirm.getResult() != result) {
+            return;
+        }
 
         player.openGui(AppEngBase.instance(), GuiIds.GuiKey.CRAFTING_TREE.getGuiId(), player.world,
             (int) player.posX, (int) player.posY, (int) player.posZ);
@@ -74,7 +85,7 @@ public class SwitchCraftingTreePacket extends ServerboundPacket {
         }
 
         FutureTask<ICraftingPlan> fakeFuture = new FutureTask<>(() -> result);
-        craftingTree.setJob(fakeFuture);
+        craftingTree.setJob(fakeFuture, source, order);
         fakeFuture.run();
         int windowId = craftingTree.windowId;
         int requestId = CraftingTreeDataPacket.nextRequestId();

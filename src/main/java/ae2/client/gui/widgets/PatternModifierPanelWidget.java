@@ -16,7 +16,7 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.awt.Rectangle;
 import java.util.List;
@@ -240,7 +240,7 @@ public final class PatternModifierPanelWidget implements ICompositeWidget {
         }
 
         @Override
-        public @NonNull List<ITextComponent> getTooltipMessage() {
+        public @NotNull List<ITextComponent> getTooltipMessage() {
             return List.of(
                 new TextComponentString(AEItems.PATTERN_MODIFIER.stack(1).getDisplayName()),
                 PatternModifierPanelWidget.this.expanded

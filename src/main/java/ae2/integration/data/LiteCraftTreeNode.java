@@ -7,12 +7,11 @@ import ae2.api.stacks.KeyCounter;
 import ae2.crafting.CraftingTreeNode;
 import ae2.crafting.CraftingTreeProcess;
 import io.netty.buffer.ByteBuf;
-import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import net.minecraft.network.PacketBuffer;
-
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
+import net.minecraft.network.PacketBuffer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -288,10 +287,8 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
     }
 
     public static final class PatternTimesAllocator {
-        private final Object2LongLinkedOpenHashMap<IPatternDetails> remainingTimes =
-            new Object2LongLinkedOpenHashMap<>();
-        private final Object2LongLinkedOpenHashMap<AEKey> remainingSelfReturningInputs =
-            new Object2LongLinkedOpenHashMap<>();
+        private final Object2LongOpenHashMap<IPatternDetails> remainingTimes = new Object2LongOpenHashMap<>();
+        private final Object2LongOpenHashMap<AEKey> remainingSelfReturningInputs = new Object2LongOpenHashMap<>();
 
         private PatternTimesAllocator(Object2LongMap<IPatternDetails> patternTimes) {
             remainingTimes.defaultReturnValue(0);
@@ -325,7 +322,7 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
 
             long remaining = remainingTimes.getLong(details);
             long allocated = Math.min(requestTimes, remaining);
-            remainingTimes.put(details, remaining - allocated);
+            remainingTimes.addTo(details, -allocated);
             return allocated;
         }
 
@@ -341,7 +338,7 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
 
             long remaining = remainingSelfReturningInputs.getLong(key);
             long allocated = Math.min(amount, remaining);
-            remainingSelfReturningInputs.put(key, remaining - allocated);
+            remainingSelfReturningInputs.addTo(key, -allocated);
             return allocated;
         }
     }

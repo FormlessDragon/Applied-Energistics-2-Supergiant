@@ -19,13 +19,13 @@
 package ae2.spatial;
 
 import ae2.core.AELog;
-import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.storage.WorldSavedData;
 import net.minecraftforge.common.util.Constants.NBT;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -48,7 +48,7 @@ public class SpatialStorageWorldData extends WorldSavedData {
     }
 
     public List<SpatialStoragePlot> getPlots() {
-        return ImmutableList.copyOf(plots.values());
+        return List.copyOf(plots.values());
     }
 
     public SpatialStoragePlot allocatePlot(BlockPos size, int owner) {
@@ -105,7 +105,7 @@ public class SpatialStorageWorldData extends WorldSavedData {
     }
 
     @Override
-    public NBTTagCompound writeToNBT(NBTTagCompound compound) {
+    public @NotNull NBTTagCompound writeToNBT(NBTTagCompound compound) {
         compound.setInteger(TAG_FORMAT, CURRENT_FORMAT);
         NBTTagList plotTags = new NBTTagList();
         for (SpatialStoragePlot plot : this.plots.values()) {

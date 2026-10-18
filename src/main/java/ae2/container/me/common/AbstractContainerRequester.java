@@ -10,18 +10,17 @@ import ae2.core.network.clientbound.RequesterSyncPacket;
 import ae2.helpers.InventoryAction;
 import ae2.tile.crafting.TileRequester;
 import ae2.tile.crafting.requester.Request;
-import ae2.tile.crafting.requester.RequestList;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 public abstract class AbstractContainerRequester extends AEBaseContainer {
     public static final int REQUEST_SLOT_COUNT = 64;
@@ -29,10 +28,31 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
     public static final int REQUEST_SLOT_FIRST_Y = 21;
     public static final int REQUEST_SLOT_SPACING = 19;
     private final List<RequestSlot> requestSlots = new ArrayList<>(REQUEST_SLOT_COUNT);
+    private static final AtomicLong NEXT_SYNC_GENERATION = new AtomicLong(1);
+    private long syncGeneration = NEXT_SYNC_GENERATION.getAndIncrement();
+    private Consumer<RequesterSyncPacket> requesterPacketSender = createRequesterPacketSender();
     private long idSerial = Long.MIN_VALUE;
 
     protected AbstractContainerRequester(InventoryPlayer playerInventory, Object host) {
         super(playerInventory, host);
+    }
+
+    protected final long getSyncGeneration() {
+        return this.syncGeneration;
+    }
+
+    protected final void advanceSyncSource() {
+        this.syncGeneration = NEXT_SYNC_GENERATION.getAndIncrement();
+        this.requesterPacketSender = createRequesterPacketSender();
+    }
+
+    private Consumer<RequesterSyncPacket> createRequesterPacketSender() {
+        long generation = this.syncGeneration;
+        return packet -> sendPacketToClient(packet.withIdentity(this.windowId, generation));
+    }
+
+    protected final void sendRequesterPacket(RequesterSyncPacket packet) {
+        this.requesterPacketSender.accept(packet);
     }
 
     protected final void addRequestSlots() {
@@ -196,36 +216,11 @@ public abstract class AbstractContainerRequester extends AEBaseContainer {
     protected abstract void sendPartialUpdate();
 
     protected final void syncRequestTrackerFull(RequesterServerView tracker) {
-        RequestList server = tracker.getServer();
-        RequestList client = tracker.getClient();
-        var rows = new Int2ObjectOpenHashMap<NBTTagCompound>(server.size());
-        for (int i = 0; i < server.size(); i++) {
-            NBTTagCompound serverData = server.get(i).writeToNBT();
-            rows.put(i, serverData);
-            client.get(i).readFromNBT(serverData);
-        }
-
-        sendPacketToClient(RequesterSyncPacket.fullUpdate(tracker.getId(), tracker.getName(), tracker.getSortBy(),
-            server.size(), rows));
+        tracker.synchronize(true, this.requesterPacketSender);
     }
 
     protected final void syncRequestTrackerPartial(RequesterServerView tracker) {
-        RequestList server = tracker.getServer();
-        RequestList client = tracker.getClient();
-        var rows = new Int2ObjectOpenHashMap<NBTTagCompound>();
-        for (int i = 0; i < server.size(); i++) {
-            Request serverRequest = server.get(i);
-            Request clientRequest = client.get(i);
-            NBTTagCompound serverData = serverRequest.writeToNBT();
-            if (!serverData.equals(clientRequest.writeToNBT())) {
-                rows.put(i, serverData);
-                clientRequest.readFromNBT(serverData);
-            }
-        }
-
-        if (!rows.isEmpty()) {
-            sendPacketToClient(RequesterSyncPacket.incrementalUpdate(tracker.getId(), rows));
-        }
+        tracker.synchronize(false, this.requesterPacketSender);
     }
 
     @Nullable

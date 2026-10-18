@@ -15,6 +15,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.stats.StatList;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -155,7 +156,10 @@ public final class WirelessTerminalActions {
                 continue;
             }
 
-            int targetAmount = request.amount();
+            int targetAmount = request.currentAmount(stack, key);
+            if (targetAmount <= 0) {
+                continue;
+            }
             long extracted = StorageHelper.poweredExtraction(context.energySource(), context.host().getInventory(),
                 key, targetAmount, new PlayerSource(player, context.actionHost()));
             if (extracted > 0) {
@@ -268,7 +272,7 @@ public final class WirelessTerminalActions {
         if (mode.pickupToME() && magnetHost.matchesInsert(key) && insertStack(context, itemStack)) {
             int pickedUp = entityItem.getItem().getCount() - itemStack.getCount();
             if (pickedUp > 0) {
-                player.addStat(StatList.getObjectsPickedUpStats(key.getItem()), pickedUp);
+                player.addStat(Objects.requireNonNull(StatList.getObjectsPickedUpStats(key.getItem())), pickedUp);
                 player.onItemPickup(entityItem, pickedUp);
             }
             entityItem.setItem(itemStack);
@@ -338,7 +342,7 @@ public final class WirelessTerminalActions {
                 continue;
             }
 
-            requests[snapshot.slot()] = new RestockRequest(snapshot.itemId(), snapshot.damage(), snapshot.tag(), amount);
+            requests[snapshot.slot()] = new RestockRequest(snapshot.itemId(), snapshot.damage(), snapshot.tag());
         }
         return new PendingRestockPlan(requests);
     }
@@ -369,7 +373,11 @@ public final class WirelessTerminalActions {
         }
     }
 
-    private record RestockRequest(String itemId, int damage, @Nullable NBTTagCompound tag, int amount) {
+    record RestockRequest(String itemId, int damage, @Nullable NBTTagCompound tag) {
+        int currentAmount(ItemStack stack, AEItemKey key) {
+            return matches(stack, key) ? WirelessTerminalRestockLogic.getRestockAmount(stack, key) : 0;
+        }
+
         private boolean matches(ItemStack stack, AEItemKey key) {
             String registryName = key.getItem().getRegistryName() != null ? key.getItem().getRegistryName().toString() : "";
             if (!this.itemId.equals(registryName)) {
@@ -382,7 +390,7 @@ public final class WirelessTerminalActions {
             if (this.tag == null && !stack.hasTagCompound()) {
                 return true;
             }
-            return this.tag != null && stack.hasTagCompound() && this.tag.equals(stack.getTagCompound());
+            return this.tag != null && stack.hasTagCompound() && this.tag.equals(Objects.requireNonNull(stack.getTagCompound()));
         }
     }
 

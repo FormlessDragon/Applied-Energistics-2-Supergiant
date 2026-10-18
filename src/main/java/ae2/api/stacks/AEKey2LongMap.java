@@ -1,6 +1,7 @@
 package ae2.api.stacks;
 
 import it.unimi.dsi.fastutil.objects.Object2LongAVLTreeMap;
+import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 
@@ -10,6 +11,7 @@ import java.util.Comparator;
  * Custom extension to expose the increment function in a polymorphic way. We don't want to use
  * {@link Object2LongMap#mergeLong} because the fastutil maps don't override the naive implementation.
  */
+@SuppressWarnings("CloneableClassInSecureContext")
 public interface AEKey2LongMap extends Object2LongMap<AEKey> {
     /**
      * Adds an increment to Value currently associated with a key.
@@ -20,12 +22,14 @@ public interface AEKey2LongMap extends Object2LongMap<AEKey> {
     @SuppressWarnings("UnusedReturnValue")
     long addTo(AEKey k, long incr);
 
-    @SuppressWarnings("CloneableClassInSecureContext")
     final class OpenHashMap extends Object2LongOpenHashMap<AEKey> implements AEKey2LongMap {
 
     }
 
-    @SuppressWarnings("CloneableClassInSecureContext")
+    final class LinkdOpenHashMap extends Object2LongLinkedOpenHashMap<AEKey> implements AEKey2LongMap {
+
+    }
+
     final class AVLTreeMap extends Object2LongAVLTreeMap<AEKey> implements AEKey2LongMap {
         public AVLTreeMap(Comparator<? super AEKey> c) {
             super(c);

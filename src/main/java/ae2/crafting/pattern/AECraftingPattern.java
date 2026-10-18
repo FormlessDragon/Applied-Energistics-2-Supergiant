@@ -9,13 +9,12 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKeyType;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.container.ContainerConstants;
 import ae2.core.localization.GuiText;
 import ae2.crafting.CraftingEventSimulation;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.util.ITooltipFlag;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
-import net.minecraft.inventory.Container;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemBucket;
 import net.minecraft.item.ItemStack;
@@ -158,12 +157,7 @@ public class AECraftingPattern implements IAssemblerPattern {
     }
 
     private static InventoryCrafting createCraftingInventory(int width, int height) {
-        return new InventoryCrafting(new Container() {
-            @Override
-            public boolean canInteractWith(EntityPlayer playerIn) {
-                return false;
-            }
-        }, width, height);
+        return new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, width, height);
     }
 
     public static List<GenericStack> getCraftingInputs(List<ItemStack> stacks) {
@@ -346,7 +340,7 @@ public class AECraftingPattern implements IAssemblerPattern {
 
         var testOutput = recipe.getCraftingResult(testFrame);
         try {
-            testOutput = CraftingEventSimulation.processCraftingResult(testOutput, testFrame, level);
+            CraftingEventSimulation.processCraftingResult(testOutput, testFrame, level);
         } catch (RuntimeException e) {
             return false;
         }
@@ -393,43 +387,67 @@ public class AECraftingPattern implements IAssemblerPattern {
             return ItemStack.EMPTY;
         }
 
-        if (canSubstitute && recipe.isDynamic()) {
-            var adjustedInput = copyCraftingInventory(input);
-            for (int i = 0; i < sparseInputs.size(); i++) {
-                ItemStack item = adjustedInput.getStackInSlot(i);
-                var stack = GenericStack.unwrapItemStack(item);
-                if (stack != null) {
-                    var validFluid = getValidFluid(i);
-                    if (validFluid != null && validFluid.equals(stack)) {
-                        adjustedInput.setInventorySlotContents(i,
-                            ((AEItemKey) sparseInputs.get(i).what()).toStack());
-                    }
-                }
-            }
-            var result = recipe.getCraftingResult(adjustedInput);
-            try {
-                return CraftingEventSimulation.processCraftingResult(result, adjustedInput, level);
-            } catch (RuntimeException e) {
-                return ItemStack.EMPTY;
-            }
+        var adjustedInput = copyCraftingInventory(input);
+        normalizeFluidInputs(adjustedInput);
+        if (!canSubstitute && !matchesFixedPatternInputs(input)) {
+            return ItemStack.EMPTY;
+        }
+        if (!recipe.matches(adjustedInput, level)) {
+            return ItemStack.EMPTY;
         }
 
-        for (int i = 0; i < sparseInputs.size(); i++) {
-            ItemStack item = input.getStackInSlot(i);
-            var stack = GenericStack.unwrapItemStack(item);
-            if (stack != null) {
-                var validFluid = getValidFluid(i);
-                if (validFluid != null && validFluid.equals(stack)) {
-                    continue;
-                }
-            }
+        var result = recipe.getCraftingResult(adjustedInput);
+        try {
+            CraftingEventSimulation.processCraftingResult(result, adjustedInput, level);
+        } catch (RuntimeException e) {
+            return ItemStack.EMPTY;
+        }
 
-            if (!isItemValid(i, AEItemKey.of(item), level)) {
-                return ItemStack.EMPTY;
-            }
+        if (canSubstitute && recipe.isDynamic()) {
+            return result;
+        }
+        if (result.isEmpty() || !ItemStack.areItemStacksEqual(output, result)) {
+            return ItemStack.EMPTY;
         }
 
         return output.copy();
+    }
+
+    private void normalizeFluidInputs(InventoryCrafting input) {
+        if (!canSubstituteFluids) {
+            return;
+        }
+
+        for (int i = 0; i < input.getSizeInventory(); i++) {
+            var validFluid = getValidFluid(i);
+            if (validFluid == null) {
+                continue;
+            }
+
+            var stack = GenericStack.unwrapItemStack(input.getStackInSlot(i));
+            if (validFluid.equals(stack)) {
+                input.setInventorySlotContents(i, ((AEItemKey) sparseInputs.get(i).what()).toStack());
+            }
+        }
+    }
+
+    private boolean matchesFixedPatternInputs(InventoryCrafting input) {
+        for (int i = 0; i < sparseInputs.size(); i++) {
+            var item = input.getStackInSlot(i);
+            var stack = GenericStack.unwrapItemStack(item);
+            var validFluid = getValidFluid(i);
+            if (validFluid != null && validFluid.equals(stack)) {
+                continue;
+            }
+
+            var key = AEItemKey.of(item);
+            var expected = sparseInputs.get(i);
+            if ((expected == null) != (key == null)
+                || expected != null && !expected.what().equals(key)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override

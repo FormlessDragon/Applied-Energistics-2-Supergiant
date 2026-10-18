@@ -88,6 +88,7 @@ import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
 import net.minecraftforge.fluids.capability.FluidTankProperties;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.fluids.capability.IFluidTankProperties;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class TileMEChest extends AENetworkedPoweredTile
@@ -619,7 +620,7 @@ public class TileMEChest extends AENetworkedPoweredTile
     }
 
     @Override
-    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.ME_STORAGE && this.getMEStorage(facing) != null) {
             return true;
         }
@@ -631,7 +632,7 @@ public class TileMEChest extends AENetworkedPoweredTile
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.ME_STORAGE) {
             return (T) this.getMEStorage(facing);
         }

@@ -9,6 +9,8 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.IntConsumer;
 
@@ -23,6 +25,7 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
     private final KeyCounter[] pendingInsertion;
     private final KeyCounter[] known;
     private final @Nullable AEKey[] watchedKeys;
+    private final ExportObservation[] exportObservations;
     private final IntConsumer stackChangeListener;
     private @Nullable IStackWatcher stackWatcher;
 
@@ -32,6 +35,7 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
         this.pendingInsertion = new KeyCounter[size];
         this.known = new KeyCounter[size];
         this.watchedKeys = new AEKey[size];
+        this.exportObservations = new ExportObservation[size];
         this.stackChangeListener = stackChangeListener;
         for (int i = 0; i < size; i++) {
             this.total[i] = new KeyCounter();
@@ -74,11 +78,38 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
         return first + second;
     }
 
-    public void addPending(int slot, AEKey key, long amount) {
+    public long addPending(int slot, AEKey key, long amount) {
         if (!isValidSlot(slot) || key == null || amount <= 0) {
-            return;
+            return 0;
         }
-        buffered[slot].add(key, amount);
+        long accepted = this.getAcceptableAmount(slot, key, amount);
+        if (accepted > 0) {
+            buffered[slot].add(key, accepted);
+        }
+        return accepted;
+    }
+
+    public long getAcceptableAmount(int slot, AEKey key, long amount) {
+        if (!isValidSlot(slot) || key == null || amount <= 0) {
+            return 0;
+        }
+        AEKey held = this.getBufferedKey(slot);
+        if (held != null && !held.equals(key)) {
+            return 0;
+        }
+        return Math.min(amount, Long.MAX_VALUE - this.getBufferedAmount(slot, key));
+    }
+
+    public List<GenericStack> getBufferedStacks(int slot) {
+        var result = new ArrayList<GenericStack>();
+        if (isValidSlot(slot)) {
+            for (var entry : buffered[slot]) {
+                if (entry.getLongValue() > 0) {
+                    result.add(new GenericStack(entry.getKey(), entry.getLongValue()));
+                }
+            }
+        }
+        return List.copyOf(result);
     }
 
     private boolean isValidSlot(int slot) {
@@ -126,6 +157,11 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
         }
         known[slot].set(key, Math.max(0, amount));
         pendingInsertion[slot].remove(key);
+        for (var observation = this.exportObservations[slot]; observation != null; observation = observation.previous) {
+            if (observation.key.equals(key)) {
+                observation.observed = true;
+            }
+        }
     }
 
     public void watch(int slot, @Nullable AEKey key) {
@@ -186,6 +222,10 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
     }
 
     public void markExported(int slot, AEKey key, long amount) {
+        this.markExported(slot, key, amount, false);
+    }
+
+    void markExported(int slot, AEKey key, long amount, boolean observed) {
         if (!isValidSlot(slot) || key == null) {
             return;
         }
@@ -196,21 +236,62 @@ public final class RequesterStorageTracker implements IStorageWatcherNode {
 
         buffered[slot].remove(key, exported);
         buffered[slot].removeZeros();
-        pendingInsertion[slot].add(key, exported);
+        if (!observed) {
+            pendingInsertion[slot].add(key, exported);
+        }
         total[slot].remove(key, exported);
         total[slot].removeZeros();
+    }
+
+    ExportObservation observeExport(int slot, AEKey key) {
+        var observation = new ExportObservation(slot, key, this.exportObservations[slot]);
+        this.exportObservations[slot] = observation;
+        return observation;
     }
 
     public void clear(int slot) {
         if (!isValidSlot(slot)) {
             return;
         }
-        total[slot].clear();
         buffered[slot].clear();
+        this.clearConfiguration(slot);
+    }
+
+    /**
+     * Clear request bookkeeping while retaining resources already accepted from a CPU.
+     */
+    public void clearConfiguration(int slot) {
+        if (!isValidSlot(slot)) {
+            return;
+        }
+        total[slot].clear();
         pendingInsertion[slot].clear();
         known[slot].clear();
         watchedKeys[slot] = null;
         resetWatcher();
+    }
+
+    final class ExportObservation implements AutoCloseable {
+        private final int slot;
+        private final AEKey key;
+        private ExportObservation previous;
+        private boolean observed;
+
+        private ExportObservation(int slot, AEKey key, ExportObservation previous) {
+            this.slot = slot;
+            this.key = key;
+            this.previous = previous;
+        }
+
+        boolean observed() {
+            return this.observed;
+        }
+
+        @Override
+        public void close() {
+            exportObservations[this.slot] = this.previous;
+            this.previous = null;
+        }
     }
 
     public NBTTagCompound writeToNBT() {

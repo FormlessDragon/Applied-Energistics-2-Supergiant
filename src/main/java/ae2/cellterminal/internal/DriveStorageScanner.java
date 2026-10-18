@@ -7,7 +7,7 @@ import ae2.core.AppEng;
 import ae2.tile.storage.TileDrive;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.util.ResourceLocation;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 import java.util.List;
@@ -21,7 +21,7 @@ public final class DriveStorageScanner implements CellTerminalScanner.Storage {
     }
 
     @Override
-    public @NonNull List<? extends CellTerminalStorageTarget> scan(IGrid grid) {
+    public @NotNull List<? extends CellTerminalStorageTarget> scan(IGrid grid) {
         var machines = grid.getMachines(TileDrive.class);
         var result = new ObjectArrayList<CellTerminalStorageTarget>(machines.size());
         for (var drive : machines) {

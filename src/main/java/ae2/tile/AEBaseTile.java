@@ -47,8 +47,8 @@ import net.minecraft.util.ITickable;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraftforge.common.capabilities.Capability;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
 
 import java.util.List;
 import java.util.Objects;
@@ -73,7 +73,7 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     private boolean pendingVisualStateUpdate = false;
 
     @Override
-    public final void readFromNBT(NBTTagCompound compound) {
+    public final void readFromNBT(@NotNull NBTTagCompound compound) {
         super.readFromNBT(compound);
 
         boolean changed = this.readUpdateData(compound, "Failed to read #upd payload");
@@ -86,7 +86,7 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     }
 
     @Override
-    public final NBTTagCompound writeToNBT(NBTTagCompound compound) {
+    public final @NotNull NBTTagCompound writeToNBT(@NotNull NBTTagCompound compound) {
         super.writeToNBT(compound);
         this.saveAdditional(compound);
         return compound;
@@ -136,7 +136,7 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     }
 
     @Override
-    public NBTTagCompound getUpdateTag() {
+    public @NotNull NBTTagCompound getUpdateTag() {
         NBTTagCompound data = super.getUpdateTag();
         this.writeUpdatePayload(data, "Failed to write update tag");
         return data;
@@ -176,7 +176,7 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     }
 
     @Override
-    public void onDataPacket(NetworkManager net, SPacketUpdateTileEntity pkt) {
+    public void onDataPacket(@NotNull NetworkManager net, SPacketUpdateTileEntity pkt) {
         NBTTagCompound tag = pkt.getNbtCompound();
         if (this.readUpdateData(tag, "Failed to handle update packet")) {
             this.queueVisualStateUpdate();
@@ -260,7 +260,7 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     }
 
     @Override
-    public boolean shouldRefresh(World world, BlockPos pos, IBlockState oldState, IBlockState newState) {
+    public boolean shouldRefresh(@NotNull World world, @NotNull BlockPos pos, IBlockState oldState, IBlockState newState) {
         return newState.getBlock() != oldState.getBlock();
     }
 
@@ -342,7 +342,7 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
     }
 
     @Override
-    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, @Nullable EnumFacing facing) {
         return capability != AECapabilities.GENERIC_INTERNAL_INV
             && GenericInternalInventoryAdapters.hasAdapter(capability)
             && this.getGenericInternalInventoryForAdapter(facing) != null
@@ -351,7 +351,7 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
 
     @Nullable
     @Override
-    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability != AECapabilities.GENERIC_INTERNAL_INV) {
             GenericInternalInventory genericInv = this.getGenericInternalInventoryForAdapter(facing);
             if (genericInv == null) {
@@ -473,8 +473,11 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
         if (this.world != null) {
             if (!this.markDirtyQueued) {
                 this.markDirtyQueued = true;
-                this.markDirty();
-                this.markDirtyQueued = false;
+                try {
+                    this.markDirty();
+                } finally {
+                    this.markDirtyQueued = false;
+                }
             }
         }
     }

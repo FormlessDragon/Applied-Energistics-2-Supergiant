@@ -65,8 +65,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.awt.Rectangle;
@@ -1241,7 +1241,7 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
         }
 
         @Override
-        public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
+        public boolean mousePressed(@NotNull Minecraft minecraft, int mouseX, int mouseY) {
             if (super.mousePressed(minecraft, mouseX, mouseY)) {
                 boolean editable = isEditable(this.entry);
                 boolean visibilityModifiable = canToggleVisibility();
@@ -1268,7 +1268,7 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
         }
 
         @Override
-        public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
+        public void drawButton(@NotNull Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
             if (!this.visible) {
                 return;
             }
@@ -1296,7 +1296,7 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
         }
 
         @Override
-        public @NonNull List<ITextComponent> getTooltipMessage() {
+        public @NotNull List<ITextComponent> getTooltipMessage() {
             boolean editable = isEditable(this.entry);
             boolean visibilityModifiable = canToggleVisibility();
             int lineCount = 1;

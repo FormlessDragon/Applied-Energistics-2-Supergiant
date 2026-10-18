@@ -423,8 +423,9 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
             this.simulationClosures.clear();
         }
 
+        final long craftingSessionEpoch = TickHandler.instance().getCraftingSessionEpoch();
         final CraftingCalculation job = new CraftingCalculation(world, this.grid, simRequester,
-            new GenericStack(what, amount), strategy, this.craftingMemoCache);
+            new GenericStack(what, amount), strategy, this.craftingMemoCache, craftingSessionEpoch);
 
         return CRAFTING_POOL.submit(job::run);
     }

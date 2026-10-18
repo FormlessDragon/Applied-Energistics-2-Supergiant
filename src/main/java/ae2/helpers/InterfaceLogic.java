@@ -160,6 +160,10 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
     }
 
     public void readFromNBT(NBTTagCompound tag) {
+        this.craftingTracker.readConfiguration(() -> this.readConfigurationTag(tag));
+    }
+
+    private void readConfigurationTag(NBTTagCompound tag) {
         this.craftingTracker.readFromNBT(tag);
         this.upgrades.readFromNBT(tag, "upgrades");
         this.config.readFromChildTag(tag, "config");
@@ -214,6 +218,7 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
     }
 
     public void gridChanged() {
+        this.craftingTracker.cancelCalculations();
         IGrid grid = mainNode.getGrid();
         this.networkStorage = grid != null ? grid.getStorageService().getInventory() : NullInventory.of();
         this.neighborsActive = this.mainNode.isActive();
@@ -276,6 +281,9 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
     @Override
     public long insertCraftedItems(ICraftingLink link, AEKey what, long amount, Actionable mode) {
         int slot = this.craftingTracker.getSlot(link);
+        if (slot < 0) {
+            return 0;
+        }
         return this.storage.insert(slot, what, amount, mode);
     }
 
@@ -427,12 +435,24 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
         this.craftingTracker.cancel();
     }
 
+    public long suspendCraftingCalculations() {
+        return this.craftingTracker.suspendCalculations();
+    }
+
+    public void resumeCraftingCalculations(long generation) {
+        this.craftingTracker.resumeCalculations(generation);
+    }
+
     private void onConfigChanged() {
+        this.craftingTracker.cancelCalculations();
         this.host.saveChanges();
         this.updatePlan();
     }
 
     private void onUpgradesChanged() {
+        if (this.craftingTracker != null) {
+            this.craftingTracker.cancelCalculations();
+        }
         this.host.saveChanges();
 
         if (!upgrades.isInstalled(AEItems.CRAFTING_CARD.item())) {
@@ -452,6 +472,9 @@ public class InterfaceLogic implements ICraftingForceStartRequester, IUpgradeabl
     }
 
     private void onConfigRowChanged() {
+        if (this.craftingTracker != null) {
+            this.craftingTracker.cancelCalculations();
+        }
         this.host.saveChanges();
         this.readConfig();
     }

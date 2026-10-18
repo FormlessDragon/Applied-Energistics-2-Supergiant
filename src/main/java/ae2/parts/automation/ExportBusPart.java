@@ -22,6 +22,7 @@ import ae2.api.behaviors.StackExportStrategy;
 import ae2.api.behaviors.StackTransferContext;
 import ae2.api.config.Actionable;
 import ae2.api.config.SchedulingMode;
+import ae2.api.config.Setting;
 import ae2.api.config.Settings;
 import ae2.api.config.YesNo;
 import ae2.api.networking.IGrid;
@@ -36,6 +37,7 @@ import ae2.api.parts.IPartCollisionHelper;
 import ae2.api.parts.IPartItem;
 import ae2.api.parts.IPartModel;
 import ae2.api.stacks.AEKey;
+import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigManagerBuilder;
 import ae2.container.GuiIds;
 import ae2.core.AppEng;
@@ -107,7 +109,24 @@ public class ExportBusPart extends IOBusPart implements ICraftingForceStartReque
     }
 
     @Override
+    protected void onConfigOrUpgradesChanged() {
+        if (this.craftingTracker != null) {
+            this.craftingTracker.cancelCalculations();
+        }
+    }
+
+    @Override
+    protected void onSettingChanged(IConfigManager manager, Setting<?> setting) {
+        this.onConfigOrUpgradesChanged();
+        super.onSettingChanged(manager, setting);
+    }
+
+    @Override
     public void readFromNBT(NBTTagCompound extra) {
+        this.craftingTracker.readConfiguration(() -> this.readConfigurationTag(extra));
+    }
+
+    private void readConfigurationTag(NBTTagCompound extra) {
         super.readFromNBT(extra);
         this.craftingTracker.readFromNBT(extra);
         this.nextSlot = extra.getInteger("nextSlot");
@@ -218,6 +237,9 @@ public class ExportBusPart extends IOBusPart implements ICraftingForceStartReque
 
     @Override
     public long insertCraftedItems(ICraftingLink link, AEKey what, long amount, Actionable mode) {
+        if (this.craftingTracker.getSlot(link) < 0) {
+            return 0;
+        }
         var grid = getMainNode().getGrid();
         if (grid != null && getMainNode().isActive()) {
             return getExportStrategy().push(what, amount, mode);
@@ -244,6 +266,19 @@ public class ExportBusPart extends IOBusPart implements ICraftingForceStartReque
     @Override
     public ImmutableSet<ICraftingLink> getRequestedJobs() {
         return this.craftingTracker.getRequestedJobs();
+    }
+
+    @Override
+    public void removeFromWorld() {
+        this.craftingTracker.suspendCalculations();
+        super.removeFromWorld();
+    }
+
+    @Override
+    public void addToWorld() {
+        long generation = this.craftingTracker.suspendCalculations();
+        super.addToWorld();
+        this.craftingTracker.resumeCalculations(generation);
     }
 
     @Override

@@ -8,13 +8,14 @@ public enum RequestStatus {
     PLANNING,
     CRAFTING,
     EXPORTING,
-    CPU;
+    CPU,
+    UNCONFIRMED;
 
     public RequestStatus translateToClient() {
         return this == REQUESTING || this == PLANNING ? IDLE : this;
     }
 
     public boolean locksRequest() {
-        return this == CRAFTING || this == EXPORTING;
+        return this == CRAFTING || this == EXPORTING || this == UNCONFIRMED;
     }
 }

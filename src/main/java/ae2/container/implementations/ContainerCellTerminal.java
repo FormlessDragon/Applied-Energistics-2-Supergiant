@@ -63,7 +63,6 @@ import ae2.core.network.clientbound.CellTerminalSyncPacket;
 import ae2.core.network.serverbound.GuiActionPacket;
 import ae2.helpers.WirelessTerminalGuiHost;
 import ae2.util.Platform;
-import it.unimi.dsi.fastutil.objects.Reference2IntMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -2720,7 +2719,7 @@ public class ContainerCellTerminal extends AEBaseContainer implements IKeyTypeSe
             return false;
         }
 
-        Reference2IntMap<Item> installed = new Reference2IntOpenHashMap<>();
+        Reference2IntOpenHashMap<Item> installed = new Reference2IntOpenHashMap<>();
         for (int slot = 0; slot < upgrades.size(); slot++) {
             ItemStack stack = upgrades.get(slot);
             if (stack == null) {
@@ -2738,7 +2737,7 @@ public class ContainerCellTerminal extends AEBaseContainer implements IKeyTypeSe
             if (maxInstalled <= 0) {
                 return false;
             }
-            int count = installed.merge(item, 1, Integer::sum);
+            int count = installed.addTo(item, 1) + 1;
             if (count > maxInstalled) {
                 return false;
             }

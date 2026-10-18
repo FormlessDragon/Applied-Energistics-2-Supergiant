@@ -32,6 +32,16 @@ public class AppEngCellInventory extends AppEngInternalInventory {
         return super.getStackInSlot(slot);
     }
 
+    /**
+     * Reads the cell slot without persisting the mounted cell first.
+     *
+     * <p>This is intended for owner-local visual snapshots that only need the slot's item identity. Public inventory
+     * reads continue to use {@link #getStackInSlot(int)} and retain its persistence contract.</p>
+     */
+    public ItemStack peekStackInSlot(int slot) {
+        return super.getStackInSlot(slot);
+    }
+
     @Override
     public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
         persist(slot);

@@ -3,7 +3,6 @@ package ae2.integration.modules.hei;
 import ae2.api.config.CondenserOutput;
 import ae2.core.localization.Tooltips;
 import com.google.common.base.Splitter;
-import com.google.common.collect.ImmutableList;
 import mezz.jei.api.gui.IDrawable;
 import mezz.jei.api.ingredients.IIngredients;
 import mezz.jei.api.ingredients.VanillaTypes;
@@ -11,6 +10,7 @@ import mezz.jei.api.recipe.IRecipeWrapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.client.config.HoverChecker;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Collections;
@@ -28,7 +28,7 @@ class CondenserOutputWrapper implements IRecipeWrapper {
                            IDrawable buttonIcon) {
         this.condenserOutput = condenserOutput;
         this.outputItem = outputItem;
-        this.viableComponents = ImmutableList.copyOf(viableComponents);
+        this.viableComponents = List.copyOf(viableComponents);
         this.buttonIcon = buttonIcon;
         this.buttonHoverChecker = new HoverChecker(87, 103, 35, 51, 0);
     }
@@ -45,7 +45,7 @@ class CondenserOutputWrapper implements IRecipeWrapper {
     }
 
     @Override
-    public List<String> getTooltipStrings(int mouseX, int mouseY) {
+    public @NotNull List<String> getTooltipStrings(int mouseX, int mouseY) {
         if (!this.buttonHoverChecker.checkHover(mouseX, mouseY)) {
             return Collections.emptyList();
         }

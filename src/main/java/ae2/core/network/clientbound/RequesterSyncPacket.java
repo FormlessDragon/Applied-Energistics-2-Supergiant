@@ -21,8 +21,12 @@ public class RequesterSyncPacket extends ClientboundPacket {
     private static final int MAX_ROW_COUNT = 64;
     private static final int MIN_ROW_BYTES = 2;
 
+    private int windowId = -1;
+    private long sourceGeneration;
+    private boolean valid = true;
     private boolean clearAll;
     private boolean fullUpdate;
+    private boolean removeRequester;
     private long requesterId;
     private int requestCount;
     private long sortValue;
@@ -48,6 +52,29 @@ public class RequesterSyncPacket extends ClientboundPacket {
         return packet;
     }
 
+    public static RequesterSyncPacket clearAll(int windowId, long sourceGeneration) {
+        return clearAll().withIdentity(windowId, sourceGeneration);
+    }
+
+    public static RequesterSyncPacket removeRequester(long requesterId) {
+        var packet = new RequesterSyncPacket();
+        packet.removeRequester = true;
+        packet.requesterId = requesterId;
+        return packet;
+    }
+
+    public static RequesterSyncPacket fullUpdate(int windowId, long sourceGeneration, long requesterId,
+                                                 ITextComponent requesterName, long sortValue, int requestCount,
+                                                 Int2ObjectMap<NBTTagCompound> rows) {
+        return fullUpdate(requesterId, requesterName, sortValue, requestCount, rows)
+            .withIdentity(windowId, sourceGeneration);
+    }
+
+    public static RequesterSyncPacket incrementalUpdate(int windowId, long sourceGeneration, long requesterId,
+                                                        Int2ObjectMap<NBTTagCompound> rows) {
+        return incrementalUpdate(requesterId, rows).withIdentity(windowId, sourceGeneration);
+    }
+
     public static RequesterSyncPacket fullUpdate(long requesterId, ITextComponent requesterName, long sortValue,
                                                  int requestCount, Int2ObjectMap<NBTTagCompound> rows) {
         return new RequesterSyncPacket(true, requesterId, requesterName, sortValue, requestCount, rows);
@@ -55,6 +82,22 @@ public class RequesterSyncPacket extends ClientboundPacket {
 
     public static RequesterSyncPacket incrementalUpdate(long requesterId, Int2ObjectMap<NBTTagCompound> rows) {
         return new RequesterSyncPacket(false, requesterId, null, 0, 0, rows);
+    }
+
+    public boolean isRemoval() {
+        return this.removeRequester;
+    }
+
+    /**
+     * Attaches the creating container's identity before the packet is submitted to the network.
+     */
+    public RequesterSyncPacket withIdentity(int windowId, long sourceGeneration) {
+        if (windowId < 0 || sourceGeneration <= 0) {
+            throw new IllegalArgumentException("Invalid requester sync identity");
+        }
+        this.windowId = windowId;
+        this.sourceGeneration = sourceGeneration;
+        return this;
     }
 
     private static Int2ObjectMap<NBTTagCompound> copyRows(Int2ObjectMap<NBTTagCompound> rows) {
@@ -104,6 +147,11 @@ public class RequesterSyncPacket extends ClientboundPacket {
 
     private void readChecked(ByteBuf buf) throws IOException {
         var packetBuffer = new PacketBuffer(buf);
+        this.windowId = packetBuffer.readVarInt();
+        this.sourceGeneration = packetBuffer.readVarLong();
+        if (this.windowId < 0 || this.sourceGeneration <= 0) {
+            throw new IllegalArgumentException("Invalid requester sync identity");
+        }
         this.clearAll = packetBuffer.readBoolean();
         if (this.clearAll) {
             resetToClearAll();
@@ -111,6 +159,10 @@ public class RequesterSyncPacket extends ClientboundPacket {
         }
 
         this.requesterId = packetBuffer.readVarLong();
+        this.removeRequester = packetBuffer.readBoolean();
+        if (this.removeRequester) {
+            return;
+        }
         this.fullUpdate = packetBuffer.readBoolean();
         if (this.fullUpdate) {
             this.requestCount = packetBuffer.readVarInt();
@@ -142,6 +194,7 @@ public class RequesterSyncPacket extends ClientboundPacket {
     private void resetToClearAll() {
         this.clearAll = true;
         this.fullUpdate = false;
+        this.removeRequester = false;
         this.requesterId = 0;
         this.requestCount = 0;
         this.sortValue = 0;
@@ -150,6 +203,8 @@ public class RequesterSyncPacket extends ClientboundPacket {
     }
 
     private void discard(ByteBuf buf) {
+        this.valid = false;
+        this.removeRequester = false;
         this.clearAll = false;
         this.fullUpdate = false;
         this.requesterId = 0;
@@ -163,12 +218,18 @@ public class RequesterSyncPacket extends ClientboundPacket {
     @Override
     protected void write(ByteBuf buf) {
         var packetBuffer = new PacketBuffer(buf);
+        packetBuffer.writeVarInt(this.windowId);
+        packetBuffer.writeVarLong(this.sourceGeneration);
         packetBuffer.writeBoolean(this.clearAll);
         if (this.clearAll) {
             return;
         }
 
         packetBuffer.writeVarLong(this.requesterId);
+        packetBuffer.writeBoolean(this.removeRequester);
+        if (this.removeRequester) {
+            return;
+        }
         packetBuffer.writeBoolean(this.fullUpdate);
         if (this.fullUpdate) {
             packetBuffer.writeVarInt(this.requestCount);
@@ -186,9 +247,12 @@ public class RequesterSyncPacket extends ClientboundPacket {
     @Override
     @SideOnly(Side.CLIENT)
     public void handleClient(Minecraft minecraft) {
-        if (minecraft.currentScreen instanceof RequesterDisplay display) {
+        if (this.valid && minecraft.currentScreen instanceof RequesterDisplay display
+            && display.acceptSyncIdentity(this.windowId, this.sourceGeneration)) {
             if (this.clearAll) {
                 display.postClearAll();
+            } else if (this.removeRequester) {
+                display.postRemoveRequester(this.requesterId);
             } else if (this.fullUpdate) {
                 display.postFullUpdate(this.requesterId, this.requesterName, this.sortValue, this.requestCount,
                     this.rows);

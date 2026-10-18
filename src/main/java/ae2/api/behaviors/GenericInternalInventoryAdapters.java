@@ -34,18 +34,18 @@ public final class GenericInternalInventoryAdapters {
         }
     }
 
-    public static synchronized boolean hasAdapter(Capability<?> capability) {
+    public static boolean hasAdapter(Capability<?> capability) {
         return adapters.getMap().containsKey(capability);
     }
 
     @Nullable
     @SuppressWarnings("unchecked")
-    public static synchronized <T> T getCapability(GenericInternalInventory inv, Capability<T> capability) {
+    public static <T> T getCapability(GenericInternalInventory inv, Capability<T> capability) {
         var adapter = (Function<GenericInternalInventory, T>) adapters.getMap().get(capability);
         return adapter == null ? null : adapter.apply(inv);
     }
 
-    public static synchronized Map<Capability<?>, Function<GenericInternalInventory, ?>> getAdapters() {
+    public static Map<Capability<?>, Function<GenericInternalInventory, ?>> getAdapters() {
         return adapters.getMap();
     }
 }

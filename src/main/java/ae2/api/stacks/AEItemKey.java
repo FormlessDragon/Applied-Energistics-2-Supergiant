@@ -119,9 +119,13 @@ public final class AEItemKey extends AEKey {
     }
 
     public boolean matches(ItemStack stack) {
+        if (stack.isEmpty() || stack.getItem() != this.stack.getItem()
+            || stack.getItemDamage() != this.stack.getItemDamage()) {
+            return false;
+        }
         var compare = stack.copy();
         compare.setCount(1);
-        return !stack.isEmpty() && ItemStack.areItemStacksEqual(this.stack, compare);
+        return ItemStack.areItemStacksEqual(this.stack, compare);
     }
 
     public boolean matches(Ingredient ingredient) {

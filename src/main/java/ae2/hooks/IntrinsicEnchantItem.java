@@ -8,6 +8,6 @@ import net.minecraft.item.ItemStack;
  */
 public interface IntrinsicEnchantItem {
 
-    int getIntrinsicEnchantLevel(ItemStack stack, Enchantment enchantment);
+    Integer getIntrinsicEnchantLevel(ItemStack stack, Enchantment enchantment);
 
 }

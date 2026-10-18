@@ -12,7 +12,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraftforge.fml.common.Optional;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 @Optional.Interface(iface = "crazypants.enderio.api.tool.ITool", modid = "enderio")
 @Optional.Interface(iface = "cofh.api.item.IToolHammer", modid = "cofhcore")
@@ -44,17 +44,17 @@ public class QuartzWrenchItem extends AEBaseItem implements IToolHammer, IAEWren
     }
 
     @Override
-    public boolean canUse(@NonNull EnumHand enumHand, @NonNull EntityPlayer entityPlayer, @NonNull BlockPos blockPos) {
+    public boolean canUse(@NotNull EnumHand enumHand, @NotNull EntityPlayer entityPlayer, @NotNull BlockPos blockPos) {
         return true;
     }
 
     @Override
-    public void used(@NonNull EnumHand enumHand, @NonNull EntityPlayer entityPlayer, @NonNull BlockPos blockPos) {
+    public void used(@NotNull EnumHand enumHand, @NotNull EntityPlayer entityPlayer, @NotNull BlockPos blockPos) {
 
     }
 
     @Override
-    public boolean shouldHideFacades(@NonNull ItemStack itemStack, @NonNull EntityPlayer entityPlayer) {
+    public boolean shouldHideFacades(@NotNull ItemStack itemStack, @NotNull EntityPlayer entityPlayer) {
         ConduitDisplayMode curMode = ConduitDisplayMode.getDisplayMode(itemStack);
         return curMode != ConduitDisplayMode.NONE && curMode != ConduitDisplayMode.NEUTRAL;
     }

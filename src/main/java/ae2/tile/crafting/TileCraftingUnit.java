@@ -287,6 +287,9 @@ public class TileCraftingUnit extends AENetworkedTile
         var inv = this.cluster.craftingLogic.getInventory();
 
         if (this.world == null) {
+            if (this.cluster.craftingLogic.hasUnconfirmedInventory()) {
+                return;
+            }
             inv.clear();
             this.cluster.destroy();
             return;
@@ -312,7 +315,14 @@ public class TileCraftingUnit extends AENetworkedTile
             throw new IllegalStateException(this.cluster + " does not contain any kind of blocks, which were destroyed.");
         }
 
+        var recovery = this.cluster.craftingLogic.getInventoryRecoveryItem();
+        if (!recovery.isEmpty()) {
+            Platform.spawnDrops(this.world, this.pos, Collections.singletonList(recovery));
+        }
         for (var entry : inv.list) {
+            if (this.cluster.craftingLogic.isInventoryUnconfirmed(entry.getKey())) {
+                continue;
+            }
             var position = places.get(this.world.rand.nextInt(places.size()));
             var stacks = new ObjectArrayList<ItemStack>();
             entry.getKey().addDrops(entry.getLongValue(), stacks, this.world, position);

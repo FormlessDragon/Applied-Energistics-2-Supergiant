@@ -20,7 +20,19 @@ package ae2.api.util;
 
 import ae2.api.config.Setting;
 
+import java.util.Set;
+
 @FunctionalInterface
 public interface IConfigManagerListener {
     void onSettingChanged(IConfigManager manager, Setting<?> setting);
+
+    /**
+     * Called after a grouped configuration load. The default preserves the historical per-setting callback contract;
+     * owners that only need one aggregate invalidation can override it.
+     */
+    default void onSettingsChanged(IConfigManager manager, Set<Setting<?>> settings) {
+        for (var setting : settings) {
+            onSettingChanged(manager, setting);
+        }
+    }
 }

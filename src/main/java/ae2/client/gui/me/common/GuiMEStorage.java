@@ -35,10 +35,9 @@ import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.AEKeyFilter;
 import ae2.api.storage.ILinkStatus;
-import ae2.api.util.FlowRate;
 import ae2.api.util.IConfigManager;
-import ae2.client.Point;
 import ae2.client.ActionKey;
+import ae2.client.Point;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
 import ae2.client.gui.me.items.WirelessUniversalTerminalSelectorWindow;
@@ -55,8 +54,8 @@ import ae2.client.gui.widgets.PortableCellPickupFilterButton;
 import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.SettingToggleButton;
 import ae2.client.gui.widgets.TabButton;
-import ae2.client.gui.widgets.ToolboxPanel;
 import ae2.client.gui.widgets.ToggleButton;
+import ae2.client.gui.widgets.ToolboxPanel;
 import ae2.client.gui.widgets.UpgradesPanel;
 import ae2.client.gui.widgets.ViewCellsPanel;
 import ae2.container.GuiIds;
@@ -70,8 +69,8 @@ import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import ae2.core.network.InitNetwork;
-import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.core.network.serverbound.ConfigValueServerPacket;
+import ae2.core.network.serverbound.InventoryActionPacket;
 import ae2.core.network.serverbound.SwitchGuisPacket;
 import ae2.helpers.InventoryAction;
 import ae2.helpers.WirelessTerminalGuiHost;
@@ -86,11 +85,12 @@ import ae2.items.tools.powered.WirelessUniversalTerminalItem;
 import ae2.text.TextComponentItemStack;
 import ae2.util.Platform;
 import ae2.util.prioritylist.IPartitionList;
+import it.unimi.dsi.fastutil.longs.LongLongPair;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import mezz.jei.api.gui.IGhostIngredientHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiTextField;
@@ -108,8 +108,8 @@ import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.fml.common.Optional;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
@@ -327,12 +327,29 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         syncButtons();
         syncViewCellFilter();
         this.repo.setEnabled(canInteractWithRepo());
+        if (!this.container.flowTrackingActive) {
+            this.repo.clearFlowRates();
+        }
         this.needsViewUpdate = true;
     }
 
-    public void updateFlowRates(final Map<AEKey, FlowRate> rates) {
-        this.repo.updateFlowRates(rates);
-        this.needsViewUpdate = true;
+    public void updateFlowRates(int windowId, long sourceGeneration, boolean trackingActive,
+                                final Map<AEKey, LongLongPair> rates) {
+        updateFlowRates(windowId, sourceGeneration, trackingActive, 0, 0, 1, true, rates);
+    }
+
+    public void updateFlowRates(int windowId, long sourceGeneration, boolean trackingActive, long snapshotId,
+                                int pageIndex, int pageCount, boolean complete, final Map<AEKey, LongLongPair> rates) {
+        if (windowId >= 0 && this.container.windowId != windowId) {
+            return;
+        }
+
+        boolean changed = trackingActive
+            ? this.repo.updateFlowRates(sourceGeneration, snapshotId, pageIndex, pageCount, complete, rates)
+            : this.repo.clearFlowRates(sourceGeneration, snapshotId);
+        if (changed) {
+            this.needsViewUpdate = true;
+        }
     }
 
     private void syncButtons() {
@@ -1495,7 +1512,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         }
 
         @Override
-        public @NonNull List<ITextComponent> getTooltipMessage() {
+        public @NotNull List<ITextComponent> getTooltipMessage() {
             StringJoiner joiner = new StringJoiner(", ");
             for (AEKeyType keyType : container.getClientKeyTypeSelection().enabledSet()) {
                 joiner.add(keyType.getDescription().getUnformattedComponentText());

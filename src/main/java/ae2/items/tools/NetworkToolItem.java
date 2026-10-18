@@ -67,8 +67,8 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -153,7 +153,7 @@ public class NetworkToolItem extends AEBaseItem implements IGuiItem, IStackToolt
     }
 
     @Override
-    public ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, EnumHand hand) {
+    public @NotNull ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, @NotNull EnumHand hand) {
         var held = player.getHeldItem(hand);
         if (!world.isRemote) {
             GuiOpener.openItemGui(player, GuiIds.GuiKey.NETWORK_TOOL, GuiHostLocators.forHand(player, hand));
@@ -163,8 +163,8 @@ public class NetworkToolItem extends AEBaseItem implements IGuiItem, IStackToolt
     }
 
     @Override
-    public EnumActionResult onItemUseFirst(EntityPlayer player, World world, BlockPos pos, EnumFacing side, float hitX,
-                                           float hitY, float hitZ, EnumHand hand) {
+    public @NotNull EnumActionResult onItemUseFirst(EntityPlayer player, @NotNull World world, @NotNull BlockPos pos, @NotNull EnumFacing side, float hitX,
+                                                    float hitY, float hitZ, @NotNull EnumHand hand) {
         if (player.isSneaking()) {
             return EnumActionResult.PASS;
         }
@@ -290,17 +290,17 @@ public class NetworkToolItem extends AEBaseItem implements IGuiItem, IStackToolt
     }
 
     @Override
-    public boolean canUse(@NonNull EnumHand enumHand, @NonNull EntityPlayer entityPlayer, @NonNull BlockPos blockPos) {
+    public boolean canUse(@NotNull EnumHand enumHand, @NotNull EntityPlayer entityPlayer, @NotNull BlockPos blockPos) {
         return true;
     }
 
     @Override
-    public void used(@NonNull EnumHand enumHand, @NonNull EntityPlayer entityPlayer, @NonNull BlockPos blockPos) {
+    public void used(@NotNull EnumHand enumHand, @NotNull EntityPlayer entityPlayer, @NotNull BlockPos blockPos) {
 
     }
 
     @Override
-    public boolean shouldHideFacades(@NonNull ItemStack itemStack, @NonNull EntityPlayer entityPlayer) {
+    public boolean shouldHideFacades(@NotNull ItemStack itemStack, @NotNull EntityPlayer entityPlayer) {
         ConduitDisplayMode curMode = ConduitDisplayMode.getDisplayMode(itemStack);
         return curMode != ConduitDisplayMode.NONE && curMode != ConduitDisplayMode.NEUTRAL;
     }

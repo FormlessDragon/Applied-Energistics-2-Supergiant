@@ -4,9 +4,7 @@ import ae2.api.crafting.IPatternDetails;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.stacks.AEKey;
 import ae2.crafting.execution.CraftingSupplierLocation;
-import com.google.common.math.LongMath;
-import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMaps;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -81,7 +79,7 @@ public record CraftingGraphDisplaySnapshot(AEKey rootWhat, long requestedAmount,
         private final CraftingGraph graph;
         private final ObjectArrayList<CraftingGraphNode> orderedNodes = new ObjectArrayList<>();
         private final Reference2IntMap<CraftingGraphNode> indexes = new Reference2IntOpenHashMap<>();
-        private final Reference2ObjectMap<CraftingGraphNode, Object2LongMap<AEKey>> remainingOutput =
+        private final Reference2ObjectMap<CraftingGraphNode, Object2LongOpenHashMap<AEKey>> remainingOutput =
             new Reference2ObjectOpenHashMap<>();
         private final ReferenceOpenHashSet<CraftingGraphNode> executed = new ReferenceOpenHashSet<>();
         private final Reference2ObjectMap<CraftingGraphNode, LocalDisplayFragment> localDisplays =
@@ -138,8 +136,13 @@ public record CraftingGraphDisplaySnapshot(AEKey rootWhat, long requestedAmount,
         void recordOutput(CraftingGraphNode node, AEKey key, long amount) {
             if (amount > 0) {
                 var outputs = remainingOutput.computeIfAbsent(node,
-                    ignored -> new Object2LongLinkedOpenHashMap<>());
-                outputs.put(key, LongMath.saturatedAdd(outputs.getLong(key), amount));
+                    ignored -> new Object2LongOpenHashMap<>());
+                long current = outputs.getLong(key);
+                if (current >= Long.MAX_VALUE - amount) {
+                    outputs.put(key, Long.MAX_VALUE);
+                } else {
+                    outputs.addTo(key, amount);
+                }
             }
         }
 
@@ -201,7 +204,7 @@ public record CraftingGraphDisplaySnapshot(AEKey rootWhat, long requestedAmount,
                 outputs.removeLong(key);
                 if (outputs.isEmpty()) remainingOutput.remove(producer);
             } else {
-                outputs.put(key, available - allocated);
+                outputs.addTo(key, -allocated);
             }
             return allocated;
         }

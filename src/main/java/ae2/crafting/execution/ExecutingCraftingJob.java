@@ -21,7 +21,6 @@ package ae2.crafting.execution;
 import ae2.api.config.Actionable;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.PatternDetailsHelper;
-import ae2.api.networking.IGrid;
 import ae2.api.networking.crafting.CraftingJobOptions;
 import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.networking.crafting.ICraftingProvider;
@@ -30,11 +29,10 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.crafting.CraftingLink;
-import ae2.crafting.TemporaryPseudoCraftingProvider;
 import ae2.crafting.TemporaryProviderCarrier;
+import ae2.crafting.TemporaryPseudoCraftingProvider;
 import ae2.crafting.inv.ListCraftingInventory;
 import ae2.helpers.patternprovider.PseudoPatternDetails;
-import ae2.me.service.CraftingService;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -43,6 +41,7 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 
@@ -54,6 +53,8 @@ public class ExecutingCraftingJob {
     private static final String NBT_PSEUDO_INVENTORY = "pseudoInventory";
     private static final String NBT_TIME_TRACKER = "timeTracker";
     private static final String NBT_REMAINING_AMOUNT = "remainingAmount";
+    private static final String NBT_PENDING_REQUESTER_OUTPUT = "pendingRequesterOutput";
+    private static final String NBT_REQUESTER_OUTPUT_UNKNOWN = "requesterOutputUnknown";
     private static final String NBT_REMAINING_INTERMEDIATE_FINAL_OUTPUT = "remainingIntermediateFinalOutput";
     private static final String NBT_PLAN_BYTES = "planBytes";
     private static final String NBT_TOTAL_FINAL_OUTPUT_AMOUNT = "totalFinalOutputAmount";
@@ -69,14 +70,18 @@ public class ExecutingCraftingJob {
     final ListCraftingInventory waitingFor;
     final ListCraftingInventory pseudoInventory;
     final Map<IPatternDetails, TaskProgress> tasks = new Object2ObjectOpenHashMap<>();
+    @Nullable
+    final Integer playerId;
+    // Owner-thread scheduling state only; a new or restored job starts at the beginning.
+    int schedulingCursor;
     final Map<AEItemKey, TemporaryPseudoCraftingProvider> temporaryProviders = new Object2ObjectOpenHashMap<>();
     final ElapsedTimeTracker timeTracker;
     GenericStack finalOutput;
-    @Nullable
-    final
-    Integer playerId;
+    int schedulingTaskCount;
     long totalFinalOutputAmount;
     long remainingAmount;
+    long pendingRequesterOutput;
+    boolean requesterOutputUnknown;
     long remainingIntermediateFinalOutput;
     long planBytes;
     boolean suspended;
@@ -85,6 +90,12 @@ public class ExecutingCraftingJob {
 
     ExecutingCraftingJob(ICraftingPlan plan, CraftingDifferenceListener postCraftingDifference, CraftingLink link,
                          @Nullable Integer playerId, KeyCounter remainingMissingItems, CraftingJobOptions options) {
+        this(plan, postCraftingDifference, link, playerId, options);
+        addMissingItems(remainingMissingItems);
+    }
+
+    ExecutingCraftingJob(ICraftingPlan plan, CraftingDifferenceListener postCraftingDifference, CraftingLink link,
+                         @Nullable Integer playerId, CraftingJobOptions options) {
         this.finalOutput = plan.finalOutput();
         this.totalFinalOutputAmount = this.finalOutput.amount();
         this.remainingAmount = this.finalOutput.amount();
@@ -97,10 +108,6 @@ public class ExecutingCraftingJob {
         // Fill waiting for and tasks
         this.timeTracker = new ElapsedTimeTracker();
         for (var entry : plan.emittedItems()) {
-            waitingFor.insert(entry.getKey(), entry.getLongValue(), Actionable.MODULATE);
-            timeTracker.addMaxItems(entry.getLongValue(), entry.getKey().getType());
-        }
-        for (var entry : remainingMissingItems) {
             waitingFor.insert(entry.getKey(), entry.getLongValue(), Actionable.MODULATE);
             timeTracker.addMaxItems(entry.getLongValue(), entry.getKey().getType());
         }
@@ -121,24 +128,24 @@ public class ExecutingCraftingJob {
     ExecutingCraftingJob(NBTTagCompound data,
                          CraftingDifferenceListener postCraftingDifference, CraftingCpuLogic cpu) {
         this.link = new CraftingLink(data.getCompoundTag(NBT_LINK), cpu.cluster);
-        IGrid grid = cpu.cluster.getGrid();
-        if (grid != null) {
-            ((CraftingService) grid.getCraftingService()).addLink(link);
-        }
-
         this.finalOutput = GenericStack.readTag(data.getCompoundTag(NBT_FINAL_OUTPUT));
+        if (this.finalOutput == null) {
+            throw new IllegalArgumentException("Saved crafting job has no final output");
+        }
         this.totalFinalOutputAmount = data.hasKey(NBT_TOTAL_FINAL_OUTPUT_AMOUNT, Constants.NBT.TAG_LONG)
             ? data.getLong(NBT_TOTAL_FINAL_OUTPUT_AMOUNT)
             : GenericStack.getStackSizeOrZero(this.finalOutput);
         this.remainingAmount = data.getLong(NBT_REMAINING_AMOUNT);
+        this.pendingRequesterOutput = Math.max(0, data.getLong(NBT_PENDING_REQUESTER_OUTPUT));
+        this.requesterOutputUnknown = data.getBoolean(NBT_REQUESTER_OUTPUT_UNKNOWN);
         this.remainingIntermediateFinalOutput = data.getLong(NBT_REMAINING_INTERMEDIATE_FINAL_OUTPUT);
         this.planBytes = data.hasKey(NBT_PLAN_BYTES, Constants.NBT.TAG_LONG)
             ? data.getLong(NBT_PLAN_BYTES)
             : 0;
         this.waitingFor = new ListCraftingInventory(postCraftingDifference::onCraftingDifference);
-        this.waitingFor.readFromNBT(data.getTagList(NBT_WAITING_FOR, Constants.NBT.TAG_COMPOUND));
+        this.waitingFor.list.moveFrom(CraftingCpuLogic.savedResources(data, NBT_WAITING_FOR));
         this.pseudoInventory = new ListCraftingInventory(postCraftingDifference::onCraftingDifference);
-        this.pseudoInventory.readFromNBT(data.getTagList(NBT_PSEUDO_INVENTORY, Constants.NBT.TAG_COMPOUND));
+        this.pseudoInventory.list.moveFrom(CraftingCpuLogic.savedResources(data, NBT_PSEUDO_INVENTORY));
         this.timeTracker = new ElapsedTimeTracker(data.getCompoundTag(NBT_TIME_TRACKER));
         if (data.hasKey(NBT_PLAYER_ID, Constants.NBT.TAG_INT)) {
             this.playerId = data.getInteger(NBT_PLAYER_ID);
@@ -146,36 +153,42 @@ public class ExecutingCraftingJob {
             this.playerId = null;
         }
 
-        NBTTagList tasksTag = data.getTagList(NBT_TASKS, Constants.NBT.TAG_COMPOUND);
+        NBTTagList tasksTag = CraftingCpuLogic.savedList(data, NBT_TASKS);
         for (int i = 0; i < tasksTag.tagCount(); ++i) {
             final NBTTagCompound item = tasksTag.getCompoundTagAt(i);
             var pattern = AEItemKey.fromTag(item);
             var details = pattern != null ? PatternDetailsHelper.decodePattern(pattern, cpu.cluster.getLevel()) : null;
-            if (details != null) {
-                if (item.getBoolean(NBT_TASK_PSEUDO)) {
-                    details = PseudoPatternDetails.wrap(details);
-                }
-                final TaskProgress tp = new TaskProgress();
-                tp.value = item.getLong(NBT_CRAFTING_PROGRESS);
-                this.tasks.put(details, tp);
+            if (details == null) {
+                throw new IllegalArgumentException("Unavailable saved crafting pattern at task " + i);
             }
+            if (item.getBoolean(NBT_TASK_PSEUDO)) {
+                details = PseudoPatternDetails.wrap(details);
+            }
+            final TaskProgress tp = new TaskProgress();
+            tp.value = item.getLong(NBT_CRAFTING_PROGRESS);
+            this.tasks.put(details, tp);
         }
-        NBTTagList temporaryPatternsTag = data.getTagList(NBT_TEMPORARY_PATTERNS, Constants.NBT.TAG_COMPOUND);
+        NBTTagList temporaryPatternsTag = CraftingCpuLogic.savedList(data, NBT_TEMPORARY_PATTERNS);
         for (int i = 0; i < temporaryPatternsTag.tagCount(); i++) {
             var item = temporaryPatternsTag.getCompoundTagAt(i);
             var pattern = AEItemKey.fromTag(item);
             var details = pattern != null ? PatternDetailsHelper.decodePattern(pattern, cpu.cluster.getLevel()) : null;
-            if (details != null) {
-                var pseudoDetails = PseudoPatternDetails.wrap(details);
-                this.temporaryProviders.put(PseudoPatternDetails.unwrap(pseudoDetails).getDefinition(),
-                    new TemporaryPseudoCraftingProvider(pseudoDetails));
+            if (details == null) {
+                throw new IllegalArgumentException("Unavailable saved temporary crafting pattern at " + i);
             }
+            var pseudoDetails = PseudoPatternDetails.wrap(details);
+            this.temporaryProviders.put(PseudoPatternDetails.unwrap(pseudoDetails).getDefinition(),
+                new TemporaryPseudoCraftingProvider(pseudoDetails));
         }
 
         this.suspended = data.getBoolean(NBT_SUSPENDED);
         this.priority = data.getInteger(NBT_PRIORITY);
         // Older jobs were governed only by the client-wide notification preference, so preserve that behavior.
         this.subscribed = !data.hasKey(NBT_SUBSCRIBED, Constants.NBT.TAG_BYTE) || data.getBoolean(NBT_SUBSCRIBED);
+    }
+
+    void addMissingItems(KeyCounter remainingMissingItems) {
+        addWaitingFor(remainingMissingItems);
     }
 
     NBTTagCompound writeToNBT() {
@@ -207,6 +220,8 @@ public class ExecutingCraftingJob {
         data.setTag(NBT_TEMPORARY_PATTERNS, temporaryPatterns);
 
         data.setLong(NBT_REMAINING_AMOUNT, remainingAmount);
+        data.setLong(NBT_PENDING_REQUESTER_OUTPUT, pendingRequesterOutput);
+        data.setBoolean(NBT_REQUESTER_OUTPUT_UNKNOWN, requesterOutputUnknown);
         data.setLong(NBT_REMAINING_INTERMEDIATE_FINAL_OUTPUT, remainingIntermediateFinalOutput);
         data.setLong(NBT_PLAN_BYTES, planBytes);
         data.setLong(NBT_TOTAL_FINAL_OUTPUT_AMOUNT, totalFinalOutputAmount);
@@ -294,13 +309,25 @@ public class ExecutingCraftingJob {
     }
 
     long estimateRemainingPlanBytes() {
+        if (this.planBytes <= 0) {
+            return 0;
+        }
         if (this.totalFinalOutputAmount <= 0) {
             return this.planBytes;
         }
 
-        long remainingFinalOutputBytes = LongMath.saturatedMultiply(this.planBytes, this.remainingAmount)
-            / this.totalFinalOutputAmount;
-        return Math.max(remainingFinalOutputBytes, this.planBytes > 0 ? 1 : 0);
+        long remaining = Math.clamp(this.remainingAmount, 0, this.totalFinalOutputAmount);
+        if (remaining == this.totalFinalOutputAmount) {
+            return this.planBytes;
+        }
+        long remainingFinalOutputBytes;
+        if (remaining <= Long.MAX_VALUE / this.planBytes) {
+            remainingFinalOutputBytes = this.planBytes * remaining / this.totalFinalOutputAmount;
+        } else {
+            remainingFinalOutputBytes = BigInteger.valueOf(this.planBytes).multiply(BigInteger.valueOf(remaining))
+                                                  .divide(BigInteger.valueOf(this.totalFinalOutputAmount)).longValueExact();
+        }
+        return Math.max(remainingFinalOutputBytes, 1);
     }
 
     @FunctionalInterface

@@ -1,6 +1,7 @@
 package ae2.container.slot;
 
 import ae2.api.inventories.InternalInventory;
+import ae2.container.ContainerConstants;
 import ae2.util.inv.AppEngInternalInventory;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
@@ -12,15 +13,10 @@ import net.minecraft.util.NonNullList;
 import net.minecraft.world.World;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.fml.common.FMLCommonHandler;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class AppEngCraftingSlot extends AppEngSlot {
-    private static final Container DUMMY_CONTAINER = new Container() {
-        @Override
-        public boolean canInteractWith(EntityPlayer playerIn) {
-            return false;
-        }
-    };
 
     private final InternalInventory craftingGrid;
     private final EntityPlayer player;
@@ -44,7 +40,7 @@ public class AppEngCraftingSlot extends AppEngSlot {
     }
 
     @Override
-    protected void onCrafting(ItemStack stack, int amount) {
+    protected void onCrafting(@NotNull ItemStack stack, int amount) {
         this.amountCrafted += amount;
         this.onCrafting(stack);
     }
@@ -56,7 +52,7 @@ public class AppEngCraftingSlot extends AppEngSlot {
     }
 
     @Override
-    public ItemStack onTake(EntityPlayer playerIn, ItemStack stack) {
+    public @NotNull ItemStack onTake(@NotNull EntityPlayer playerIn, @NotNull ItemStack stack) {
         this.onCrafting(stack);
         stack.getItem().onCreated(stack, playerIn.world, playerIn);
 
@@ -99,7 +95,7 @@ public class AppEngCraftingSlot extends AppEngSlot {
     }
 
     @Override
-    public ItemStack decrStackSize(int amount) {
+    public @NotNull ItemStack decrStackSize(int amount) {
         if (this.getHasStack()) {
             this.amountCrafted += Math.min(amount, this.getStack().getCount());
         }
@@ -121,6 +117,6 @@ public class AppEngCraftingSlot extends AppEngSlot {
     }
 
     private Container getCraftingContainer() {
-        return getContainer() != null ? getContainer() : DUMMY_CONTAINER;
+        return getContainer() != null ? getContainer() : ContainerConstants.EMPTY_CONTAINER;
     }
 }

@@ -106,7 +106,7 @@ public record CraftingPlanSummary(long usedBytes, boolean simulation, List<Craft
             }
         }
 
-        List<CraftingPlanSummaryEntry> entries = new ObjectArrayList<>();
+        List<CraftingPlanSummaryEntry> entries = new ObjectArrayList<>(plan.size());
         var cachedInventory = grid.getStorageService().getCachedInventory();
         var finalOutput = job.finalOutput().what();
         for (var out : plan.entrySet()) {

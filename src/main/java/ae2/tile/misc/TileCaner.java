@@ -42,6 +42,7 @@ import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.items.CapabilityItemHandler;
 import net.minecraftforge.items.IItemHandler;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
@@ -520,7 +521,7 @@ public class TileCaner extends AENetworkedPoweredTile
     }
 
     @Override
-    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, @Nullable EnumFacing facing) {
         return capability == AECapabilities.GENERIC_INTERNAL_INV
             || capability == AECapabilities.CRAFTING_MACHINE
             || capability == AECapabilities.PATTERN_PROVIDER_BATCH_TARGET
@@ -530,7 +531,7 @@ public class TileCaner extends AENetworkedPoweredTile
 
     @Override
     @SuppressWarnings("unchecked")
-    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.GENERIC_INTERNAL_INV) {
             return (T) this.stuff;
         }

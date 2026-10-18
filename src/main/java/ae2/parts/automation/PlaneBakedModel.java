@@ -20,7 +20,6 @@ package ae2.parts.automation;
 
 import ae2.api.parts.IPartBakedModel;
 import ae2.client.render.cablebus.CubeBuilder;
-import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -33,6 +32,7 @@ import net.minecraft.client.renderer.block.model.ItemOverrideList;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.util.EnumFacing;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
@@ -65,12 +65,12 @@ public class PlaneBakedModel implements IBakedModel, IPartBakedModel {
             int maxY = permutation.isUp() ? 16 : 15;
 
             builder.addCube(minX, minY, 0, maxX, maxY, 1);
-            this.quads.put(permutation, ImmutableList.copyOf(quads));
+            this.quads.put(permutation, List.copyOf(quads));
         }
     }
 
     @Override
-    public List<BakedQuad> getQuads(@Nullable IBlockState state, @Nullable EnumFacing side, long rand) {
+    public @NotNull List<BakedQuad> getQuads(@Nullable IBlockState state, @Nullable EnumFacing side, long rand) {
         if (side == null) {
             return this.quads.get(DEFAULT_PERMUTATION);
         }
@@ -101,17 +101,17 @@ public class PlaneBakedModel implements IBakedModel, IPartBakedModel {
     }
 
     @Override
-    public TextureAtlasSprite getParticleTexture() {
+    public @NotNull TextureAtlasSprite getParticleTexture() {
         return this.frontTexture;
     }
 
     @Override
-    public ItemCameraTransforms getItemCameraTransforms() {
+    public @NotNull ItemCameraTransforms getItemCameraTransforms() {
         return ItemCameraTransforms.DEFAULT;
     }
 
     @Override
-    public ItemOverrideList getOverrides() {
+    public @NotNull ItemOverrideList getOverrides() {
         return ItemOverrideList.NONE;
     }
 }

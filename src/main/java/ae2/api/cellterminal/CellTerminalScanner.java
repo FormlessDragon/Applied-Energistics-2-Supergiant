@@ -3,7 +3,6 @@ package ae2.api.cellterminal;
 import ae2.api.networking.IGrid;
 import net.minecraft.util.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
-import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
@@ -40,7 +39,7 @@ public sealed interface CellTerminalScanner permits
      */
     non-sealed interface Storage extends CellTerminalScanner {
         @Override
-        @NonNull
+        @NotNull
         List<? extends CellTerminalStorageTarget> scan(IGrid grid);
     }
 
@@ -49,7 +48,7 @@ public sealed interface CellTerminalScanner permits
      */
     non-sealed interface Bus extends CellTerminalScanner {
         @Override
-        @NonNull
+        @NotNull
         List<? extends CellTerminalBusTarget> scan(IGrid grid);
     }
 
@@ -58,7 +57,7 @@ public sealed interface CellTerminalScanner permits
      */
     non-sealed interface Subnet extends CellTerminalScanner {
         @Override
-        @NonNull
+        @NotNull
         List<? extends CellTerminalSubnetTarget> scan(IGrid grid);
     }
 }

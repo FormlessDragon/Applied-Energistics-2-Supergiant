@@ -504,6 +504,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> implements
         }
 
         this.filteredPlan = plan;
+        this.table.clearSnapshotCache();
         this.visibleEntries.clear();
         this.visibleEntries.ensureCapacity(plan.entries().size());
         for (CraftingPlanSummaryEntry entry : plan.entries()) {

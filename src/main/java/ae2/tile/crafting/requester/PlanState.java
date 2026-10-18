@@ -1,17 +1,29 @@
 package ae2.tile.crafting.requester;
 
-import ae2.api.networking.crafting.CraftingSubmitErrorCode;
-import ae2.api.networking.crafting.ICraftingLink;
 import ae2.api.networking.crafting.ICraftingPlan;
-import ae2.api.networking.crafting.ICraftingSubmitResult;
-import ae2.api.networking.crafting.UnsuitableCpus;
 import ae2.api.networking.ticking.TickRateModulation;
+import ae2.core.AELog;
 import ae2.tile.crafting.TileRequester;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-public record PlanState(Future<ICraftingPlan> future) implements StatusState {
+public record PlanState(Future<ICraftingPlan> future, @Nullable TileRequester.CalculationSource source)
+    implements StatusState {
+    /**
+     * Unbound external callers retain entry-time validation; internal planning always supplies its original source.
+     */
+    public PlanState(Future<ICraftingPlan> future) {
+        this(future, null);
+    }
+
+    @Override
+    public void cancel() {
+        this.future.cancel(true);
+    }
+
     private static boolean isNoPatternPlan(ICraftingPlan plan) {
         return !plan.missingItems().isEmpty() && plan.patternTimes().isEmpty() && plan.emittedItems().isEmpty();
     }
@@ -26,75 +38,53 @@ public record PlanState(Future<ICraftingPlan> future) implements StatusState {
         return this.future.isDone() && !this.future.isCancelled() ? TickRateModulation.URGENT : TickRateModulation.SLOWER;
     }
 
-    private static boolean isCpuTooSmall(ICraftingSubmitResult result) {
-        if (result.errorCode() == CraftingSubmitErrorCode.CPU_TOO_SMALL) {
-            return true;
-        }
-        if (result.errorCode() == CraftingSubmitErrorCode.NO_SUITABLE_CPU_FOUND
-            && result.errorDetail() instanceof UnsuitableCpus unsuitableCpus) {
-            return unsuitableCpus.tooSmall() > 0;
-        }
-        return false;
-    }
-
-    private static boolean isCpuError(ICraftingSubmitResult result) {
-        return result.errorCode() == CraftingSubmitErrorCode.NO_CPU_FOUND
-            || result.errorCode() == CraftingSubmitErrorCode.NO_SUITABLE_CPU_FOUND
-            || result.errorCode() == CraftingSubmitErrorCode.CPU_BUSY
-            || result.errorCode() == CraftingSubmitErrorCode.CPU_OFFLINE;
-    }
-
     @Override
     public StatusState handle(TileRequester host, int slot) {
+        var owner = this.source == null ? host.captureCalculationSource(slot) : this.source;
+        if (!host.isCalculationSourceCurrent(owner)) {
+            try {
+                this.cancel();
+            } catch (RuntimeException failure) {
+                AELog.error(failure, "Failed to cancel requester calculation from an expired source");
+            }
+            return IDLE;
+        }
         if (!this.future.isDone()) {
             return this;
         }
-        if (this.future.isCancelled()) {
+        if (this.future.isCancelled() || !host.isCalculationSourceCurrent(owner)) {
             return IDLE;
         }
 
         try {
             ICraftingPlan plan = this.future.get();
-            if (plan == null) {
+            if (plan == null || !host.isCalculationSourceCurrent(owner)) {
                 return IDLE;
             }
 
-            if (isNoPatternPlan(plan)) {
+            boolean noPattern = isNoPatternPlan(plan);
+            if (!host.isCalculationSourceCurrent(owner)) {
+                return IDLE;
+            }
+            if (noPattern) {
                 return host.disableRequestForNoPattern(slot);
             }
 
-            if (!host.getRequests().get(slot).isForceStart() && !plan.missingItems().isEmpty()) {
+            boolean missing = !host.getRequests().get(slot).isForceStart() && !plan.missingItems().isEmpty();
+            var output = plan.finalOutput();
+            if (!host.isCalculationSourceCurrent(owner)) {
+                return IDLE;
+            }
+            if (missing) {
                 host.markMissingRetry(slot);
                 return BlockedState.missing();
             }
 
-            ICraftingSubmitResult result = host.submitPlan(plan, slot);
-            ICraftingLink link = result.link();
-            if (result.successful() && link != null) {
-                host.getStorageTracker().setTotalAmount(slot, plan.finalOutput().what(), plan.finalOutput().amount());
-                return new LinkState(link);
-            }
-
-            if (isCpuTooSmall(result)) {
-                host.markCpuTooSmallRetry(slot);
-                return BlockedState.cpu();
-            }
-            if (isCpuError(result)) {
-                return BlockedState.cpu();
-            }
-            if (result.errorCode() == CraftingSubmitErrorCode.NO_CRAFTING_PATTERN) {
-                return host.disableRequestForNoPattern(slot);
-            }
-            if (result.errorCode() == CraftingSubmitErrorCode.MISSING_INGREDIENT
-                || result.errorCode() == CraftingSubmitErrorCode.INCOMPLETE_PLAN) {
-                host.markMissingRetry(slot);
-                return BlockedState.missing();
-            }
-            return IDLE;
+            return host.submitPlan(plan, slot, owner, output);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return IDLE;
-        } catch (ExecutionException ignored) {
+        } catch (ExecutionException | CancellationException ignored) {
             return IDLE;
         }
     }

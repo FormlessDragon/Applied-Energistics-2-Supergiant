@@ -54,6 +54,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.World;
 import net.minecraftforge.common.capabilities.Capability;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -152,7 +153,7 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
     }
 
     @Override
-    public AxisAlignedBB getRenderBoundingBox() {
+    public @NotNull AxisAlignedBB getRenderBoundingBox() {
         if (this.cachedRenderBoundingBox != null) {
             return this.cachedRenderBoundingBox;
         }
@@ -395,7 +396,7 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
     }
 
     @Override
-    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.IN_WORLD_GRID_NODE_HOST) {
             return true;
         }
@@ -407,7 +408,7 @@ public class TileCableBus extends AEBaseTile implements IPartHost, IInWorldGridN
 
     @Nullable
     @Override
-    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.IN_WORLD_GRID_NODE_HOST) {
             return AECapabilities.IN_WORLD_GRID_NODE_HOST.cast(this);
         }

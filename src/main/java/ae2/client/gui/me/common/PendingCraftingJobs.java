@@ -9,7 +9,6 @@ import ae2.core.AELog;
 import ae2.core.network.clientbound.CraftingJobStatusPacket;
 import ae2.items.tools.powered.WirelessTerminals;
 import ae2.util.SearchInventoryEvent;
-import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
@@ -31,7 +30,7 @@ import java.util.UUID;
 @SideOnly(Side.CLIENT)
 public final class PendingCraftingJobs {
     private static final Map<UUID, PendingJob> jobs = new Object2ObjectOpenHashMap<>();
-    private static final Object2IntMap<AEKey> pendingJobCounts = new Object2IntOpenHashMap<>();
+    private static final Object2IntOpenHashMap<AEKey> pendingJobCounts = new Object2IntOpenHashMap<>();
 
     private PendingCraftingJobs() {
     }
@@ -69,7 +68,7 @@ public final class PendingCraftingJobs {
                     var tracked = trackedKeys.isEmpty() ? List.of(what) : List.copyOf(trackedKeys);
                     jobs.put(id, new PendingJob(id, what, requestedAmount, remainingAmount, tracked));
                     for (var trackedKey : tracked) {
-                        pendingJobCounts.put(trackedKey, pendingJobCounts.getInt(trackedKey) + 1);
+                        pendingJobCounts.addTo(trackedKey, 1);
                     }
                 }
             }
@@ -116,10 +115,7 @@ public final class PendingCraftingJobs {
         }
 
         for (var trackedKey : removed.trackedKeys()) {
-            int count = pendingJobCounts.getInt(trackedKey) - 1;
-            if (count > 0) {
-                pendingJobCounts.put(trackedKey, count);
-            } else {
+            if (pendingJobCounts.addTo(trackedKey, -1) <= 1) {
                 pendingJobCounts.removeInt(trackedKey);
             }
         }

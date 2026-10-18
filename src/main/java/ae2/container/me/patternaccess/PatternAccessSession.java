@@ -102,6 +102,7 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
         this.playerHandAccess = playerHandAccess;
         this.patternDecoder = PatternDetailsHelper::decodePattern;
         this.ownerContainer = ownerContainer;
+        this.providerIdentityOrdinals.defaultReturnValue(-1);
     }
 
     public void updateProviderVisibility() {
@@ -563,10 +564,11 @@ public final class PatternAccessSession<C extends AEBaseContainer & IPatternAcce
     }
 
     private long getOrCreateProviderIdentityOrdinal(PatternContainer container) {
-        if (this.providerIdentityOrdinals.containsKey(container)) {
-            return this.providerIdentityOrdinals.getLong(container);
+        long ordinal = this.providerIdentityOrdinals.getLong(container);
+        if (ordinal >= 0) {
+            return ordinal;
         }
-        long ordinal = this.nextProviderIdentityOrdinal;
+        ordinal = this.nextProviderIdentityOrdinal;
         this.nextProviderIdentityOrdinal = Math.incrementExact(this.nextProviderIdentityOrdinal);
         this.providerIdentityOrdinals.put(container, ordinal);
         return ordinal;

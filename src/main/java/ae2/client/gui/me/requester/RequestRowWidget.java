@@ -1,5 +1,6 @@
 package ae2.client.gui.me.requester;
 
+import ae2.api.stacks.AEKey;
 import ae2.client.Point;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
@@ -14,8 +15,10 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextFormatting;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 public final class RequestRowWidget {
 
@@ -41,6 +44,7 @@ public final class RequestRowWidget {
     private Request request;
     private long requesterId;
     private int requestIndex;
+    private @Nullable AEKey lastKey;
     private boolean visible = true;
     private int offsetX = Integer.MIN_VALUE;
     private int offsetY = Integer.MIN_VALUE;
@@ -80,6 +84,10 @@ public final class RequestRowWidget {
     }
 
     public void updateFromRequest(Request request) {
+        if (!Objects.equals(this.lastKey, request.getKey())) {
+            clearFocus();
+        }
+
         this.request = request;
 
         var status = this.request.getClientStatus();
@@ -104,9 +112,17 @@ public final class RequestRowWidget {
         }
         this.enableBtn.setState(request.isEnabled());
         this.forceStartBtn.setState(request.isForceStart());
+        this.lastKey = request.getKey();
     }
 
     public void setRequester(Request request) {
+        boolean rebound = this.request != request
+            || this.requesterId != request.getRequesterId()
+            || this.requestIndex != request.getIndex();
+        if (rebound) {
+            clearFocus();
+        }
+
         this.requesterId = request.getRequesterId();
         this.requestIndex = request.getIndex();
         updateFromRequest(request);

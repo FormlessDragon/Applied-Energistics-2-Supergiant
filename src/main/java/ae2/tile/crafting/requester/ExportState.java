@@ -13,8 +13,12 @@ public final class ExportState implements StatusState {
         }
 
         long bufferedAmount = host.getStorageTracker().getBufferedAmount(slot, key);
-        long inserted = host.insert(key, bufferedAmount);
-        host.getStorageTracker().markExported(slot, key, inserted);
+        long inserted;
+        var tracker = host.getStorageTracker();
+        try (var observation = tracker.observeExport(slot, key)) {
+            inserted = host.insert(key, bufferedAmount);
+            tracker.markExported(slot, key, inserted, observation.observed());
+        }
         if (host.getStorageTracker().getBufferedAmount(slot, key) > 0) {
             return this;
         }

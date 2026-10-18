@@ -4,7 +4,7 @@ import ae2.api.crafting.cpu.ICraftingUnitTransformationRegistry;
 import ae2.core.AELog;
 import ae2.core.definitions.AEBlocks;
 import ae2.recipes.AERecipeTypes;
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -16,9 +16,9 @@ import java.util.Objects;
 public final class CraftingUnitTransformationRegistry implements ICraftingUnitTransformationRegistry {
     private static final CraftingUnitTransformationRegistry INSTANCE = new CraftingUnitTransformationRegistry();
 
-    private final Map<Block, Map<Item, Block>> upgradesByBase = new Object2ObjectLinkedOpenHashMap<>();
-    private final Map<Block, Item> removedUpgradesByBlock = new Object2ObjectLinkedOpenHashMap<>();
-    private final Map<Block, Block> baseBlocksByUpgrade = new Object2ObjectLinkedOpenHashMap<>();
+    private final Map<Block, Map<Item, Block>> upgradesByBase = new Object2ObjectOpenHashMap<>();
+    private final Map<Block, Item> removedUpgradesByBlock = new Object2ObjectOpenHashMap<>();
+    private final Map<Block, Block> baseBlocksByUpgrade = new Object2ObjectOpenHashMap<>();
     private boolean initializedFromRecipes;
 
     private CraftingUnitTransformationRegistry() {
@@ -43,7 +43,7 @@ public final class CraftingUnitTransformationRegistry implements ICraftingUnitTr
         Objects.requireNonNull(baseBlock, "baseBlock");
         Objects.requireNonNull(upgradedBlock, "upgradedBlock");
         Objects.requireNonNull(upgradeItem, "upgradeItem");
-        this.upgradesByBase.computeIfAbsent(baseBlock, ignored -> new Object2ObjectLinkedOpenHashMap<>())
+        this.upgradesByBase.computeIfAbsent(baseBlock, ignored -> new Object2ObjectOpenHashMap<>())
                            .put(upgradeItem, upgradedBlock);
         Item previousItem = this.removedUpgradesByBlock.put(upgradedBlock, upgradeItem);
         Block previousBase = this.baseBlocksByUpgrade.put(upgradedBlock, baseBlock);

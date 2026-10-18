@@ -26,6 +26,14 @@ public class ContainerRequesterTerm extends AbstractContainerRequester implement
     private final Long2ObjectOpenHashMap<RequesterServerView> byId = new Long2ObjectOpenHashMap<>();
     private final Map<TileRequester, RequesterServerView> byRequesters = new IdentityHashMap<>();
     private ILinkStatus linkStatus = ILinkStatus.ofDisconnected();
+    @Nullable
+    private IGrid syncGrid;
+    @Nullable
+    private IGrid directoryGrid;
+    private long directoryRevision = -1;
+    private boolean syncSourceInitialized;
+    private boolean sourceResetPending;
+    private boolean synchronizingRequesters;
 
     public ContainerRequesterTerm(InventoryPlayer playerInventory, RequesterTerminalHost host) {
         super(playerInventory, host);
@@ -43,12 +51,30 @@ public class ContainerRequesterTerm extends AbstractContainerRequester implement
 
     @Override
     public void broadcastChanges() {
-        if (isClientSide()) {
+        if (this.synchronizingRequesters || isClientSide()) {
             return;
         }
-        super.broadcastChanges();
+        this.synchronizingRequesters = true;
+        try {
+            super.broadcastChanges();
+            synchronizeRequesters();
+        } finally {
+            this.synchronizingRequesters = false;
+        }
+    }
 
+    private void synchronizeRequesters() {
         IGrid grid = getGrid();
+        if (!this.syncSourceInitialized || this.syncGrid != grid) {
+            this.syncSourceInitialized = true;
+            this.syncGrid = grid;
+            this.sourceResetPending = true;
+            advanceSyncSource();
+        }
+        if (this.sourceResetPending) {
+            sendFullUpdate(grid);
+            return;
+        }
         if (grid == null) {
             if (!this.byId.isEmpty() || !this.byRequesters.isEmpty()) {
                 sendFullUpdate(null);
@@ -56,12 +82,8 @@ public class ContainerRequesterTerm extends AbstractContainerRequester implement
             return;
         }
 
-        VisitorState state = visitRequesters(grid);
-        if (state.forceFullUpdate || state.total != byRequesters.size()) {
-            sendFullUpdate(grid);
-        } else {
-            sendPartialUpdate();
-        }
+        updateRequesterDirectory(grid);
+        sendPartialUpdate();
     }
 
     public ILinkStatus getLinkStatus() {
@@ -91,39 +113,60 @@ public class ContainerRequesterTerm extends AbstractContainerRequester implement
         }
 
         IGrid grid = getGrid();
-        if (grid != null && grid.getActiveMachines(TileRequester.class).contains(tracker.getRequester())) {
+        if (grid != null && grid == this.syncGrid
+            && grid.getActiveMachines(TileRequester.class).contains(tracker.getRequester())
+            && tracker.getServer() == tracker.getRequester().getRequests()) {
             return tracker;
         }
 
-        this.byId.remove(requesterId);
-        this.byRequesters.remove(tracker.getRequester());
         return null;
     }
 
-    private VisitorState visitRequesters(IGrid grid) {
-        VisitorState state = new VisitorState();
-        for (var requester : grid.getActiveMachines(TileRequester.class)) {
-            RequesterServerView requestTracker = byRequesters.get(requester);
-            if (requestTracker == null
-                || !requestTracker.getName().equals(requester.getRequesterName())
-                || requestTracker.getSortBy() != requester.getRequesterSortValue()
-                || requestTracker.getServer().size() != requester.getRequests().size()) {
-                state.forceFullUpdate = true;
-                return state;
-            }
-            state.total++;
+    private void updateRequesterDirectory(IGrid grid) {
+        long revision = grid.getActiveMachineSetRevision();
+        if (revision >= 0 && this.directoryGrid == grid && this.directoryRevision == revision) {
+            return;
         }
-        return state;
+        var active = grid.getActiveMachines(TileRequester.class);
+        for (var requester : active) {
+            if (!this.byRequesters.containsKey(requester)) {
+                var requestTracker = createTracker(requester);
+                this.byRequesters.put(requester, requestTracker);
+                this.byId.put(requestTracker.getId(), requestTracker);
+            }
+        }
+
+        // Every active requester is now represented; extra entries can only be removals.
+        if (this.byRequesters.size() != active.size()) {
+            var previous = this.byRequesters.entrySet().iterator();
+            while (previous.hasNext()) {
+                var entry = previous.next();
+                if (!active.contains(entry.getKey())) {
+                    var tracker = entry.getValue();
+                    sendRequesterPacket(RequesterSyncPacket.removeRequester(tracker.getId()));
+                    this.byId.remove(tracker.getId());
+                    previous.remove();
+                }
+            }
+        }
+        // Capture before enumeration/callbacks: a change during reconciliation must be seen next tick.
+        this.directoryGrid = grid;
+        this.directoryRevision = revision;
     }
 
     @Override
     protected void sendFullUpdate(@Nullable IGrid grid) {
+        this.sourceResetPending = true;
+        this.directoryGrid = null;
+        this.directoryRevision = -1;
+        long revision = grid == null ? -1 : grid.getActiveMachineSetRevision();
         this.byId.clear();
         this.byRequesters.clear();
 
-        sendPacketToClient(RequesterSyncPacket.clearAll());
+        sendRequesterPacket(RequesterSyncPacket.clearAll());
 
         if (grid == null) {
+            this.sourceResetPending = false;
             return;
         }
 
@@ -135,18 +178,25 @@ public class ContainerRequesterTerm extends AbstractContainerRequester implement
             this.byId.put(requestTracker.getId(), requestTracker);
             syncRequestTrackerFull(requestTracker);
         }
+        this.directoryGrid = grid;
+        this.directoryRevision = revision;
+        this.sourceResetPending = false;
     }
 
     @Override
     protected void sendPartialUpdate() {
-        for (RequesterServerView tracker : this.byRequesters.values()) {
+        for (var entry : this.byRequesters.entrySet()) {
+            RequesterServerView tracker = entry.getValue();
+            if (!tracker.refreshMetadata()) {
+                var replacement = createTracker(entry.getKey());
+                sendRequesterPacket(RequesterSyncPacket.removeRequester(tracker.getId()));
+                this.byId.remove(tracker.getId());
+                entry.setValue(replacement);
+                this.byId.put(replacement.getId(), replacement);
+                tracker = replacement;
+            }
             syncRequestTrackerPartial(tracker);
         }
     }
 
-    private static class VisitorState {
-
-        private int total;
-        private boolean forceFullUpdate;
-    }
 }

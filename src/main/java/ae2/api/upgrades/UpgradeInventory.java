@@ -78,7 +78,11 @@ abstract class UpgradeInventory extends AppEngInternalInventory implements Inter
         for (var is : this) {
             var maxInstalled = getMaxInstalled(is.getItem());
             if (maxInstalled > 0) {
-                this.installed.merge(is.getItem(), 1, (a, b) -> Math.min(maxInstalled, a + b));
+                Item upgrade = is.getItem();
+                int count = this.installed.getInt(upgrade);
+                if (count < maxInstalled) {
+                    this.installed.put(upgrade, count + 1);
+                }
             }
         }
     }

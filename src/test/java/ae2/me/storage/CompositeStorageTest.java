@@ -17,7 +17,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidTank;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.items.ItemStackHandler;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -291,7 +291,7 @@ class CompositeStorageTest {
         }
 
         @Override
-        @NonNull
+        @NotNull
         public ItemStack getStackInSlot(int slot) {
             this.reads++;
             return super.getStackInSlot(slot);

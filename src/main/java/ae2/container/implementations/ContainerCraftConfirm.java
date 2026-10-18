@@ -63,6 +63,7 @@ import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanMap;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
+import it.unimi.dsi.fastutil.shorts.ShortSet;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.entity.player.InventoryPlayer;
@@ -72,12 +73,16 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     private static final String ACTION_BACK = "back";
@@ -86,6 +91,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     private static final String ACTION_START_JOB = "startJob";
     private static final String ACTION_SET_TASK_PRIORITY = "setTaskPriority";
     private static final String ACTION_REPLAN = "replan";
+    private static final String ACTION_REQUEST_PLAN = "requestPlan";
 
     private static final SyncableSubmitResult NO_ERROR = new SyncableSubmitResult((ICraftingSubmitResult) null);
 
@@ -112,16 +118,29 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     @Nullable
     private AEKey whatToCraft;
     private long amount;
+    @GuiSync(13)
+    public String planSession = UUID.randomUUID().toString();
+    @Nullable
+    private UUID clientPlanRequest = UUID.randomUUID();
+    @Nullable
+    private UUID serverPlanRequest;
+    @Nullable
+    private String boundPlanSession;
+    private long planRevision;
+    private long lastPlanRevision = -1;
     private CalculationStrategy strategy = CalculationStrategy.REPORT_MISSING_ITEMS;
     @Nullable
     private Future<ICraftingPlan> job;
+    private Object calculationGeneration = new Object();
+    private boolean submitting;
+    @Nullable
+    private Object submittedGeneration;
+    @Nullable
+    private IGrid calculationGrid;
     @Nullable
     private ICraftingPlan result;
-    /**
-     * True once this confirmation submitted its plan. Only then do the crafting grid slots a batch order wants to fill
-     * outlive this container.
-     */
-    private boolean jobStarted;
+    @Nullable
+    private PendingGridFills.Order pendingFillsOrder;
     @Nullable
     private CraftingPlanSummary plan;
     @Nullable
@@ -153,6 +172,9 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     public ContainerCraftConfirm(InventoryPlayer ip, ISubGuiHost host) {
         super(ip, host);
         this.host = host;
+        if (isServerSide()) {
+            this.pendingFillsOrder = PendingGridFills.getOrderForHost(ip.player, host, getGrid());
+        }
         this.cpuCycler = new CraftingCPUCycler(this::cpuMatches, this::onCPUSelectionChanged);
         this.cpuCycler.setAllowNoSelection(true);
 
@@ -161,7 +183,8 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         registerClientAction(ACTION_SELECT_CPU_FROM_LIST, Integer.class, this::selectCpu);
         registerClientAction(ACTION_START_JOB, StartJobRequest.class, this::startJob);
         registerClientAction(ACTION_SET_TASK_PRIORITY, Integer.class, this::setTaskPriority);
-        registerClientAction(ACTION_REPLAN, this::replan);
+        registerClientAction(ACTION_REQUEST_PLAN, PlanRequest.class, 256, this::requestPlan);
+        registerClientAction(ACTION_REPLAN, PlanRequest.class, 256, this::replan);
     }
 
     public static void openWithCraftingList(@Nullable IActionHost terminal, EntityPlayerMP player,
@@ -202,7 +225,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
      *
      * <p>Instead of pretending that one pattern is the whole recipe, every distinct material the transfer could not
      * supply is calculated as its own plan against the current network, and the confirmation shows the merged result:
-     * one job that crafts all of the missing materials at once. The output of the transferred recipe stays the final
+     * one job that crafts all the missing materials at once. The output of the transferred recipe stays the final
      * output of that job, but it is only a placeholder, because the player crafts it by hand.
      */
     public static void openWithBatchCrafting(@Nullable IActionHost terminal, EntityPlayerMP player,
@@ -262,25 +285,56 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         return false;
     }
 
+    private static void cancelCalculations(List<Future<ICraftingPlan>> jobs) {
+        var detached = List.copyOf(jobs);
+        jobs.clear();
+        for (var future : detached) {
+            cancelCalculation(future);
+        }
+    }
+
+    private static void cancelCalculation(Future<ICraftingPlan> future) {
+        try {
+            future.cancel(true);
+        } catch (RuntimeException failure) {
+            AELog.error(failure, "Failed to cancel crafting confirmation calculation");
+        }
+    }
+
     public boolean planJob(AEKey what, long amount, CalculationStrategy strategy) {
-        this.cancelPendingCalculations();
-        this.result = null;
-        this.mergeAvailable = false;
-        invalidateMergeCache();
-        invalidateMergeableCpuCache();
-        this.clearError();
+        var generation = beginPlan();
+        if (generation == null) {
+            return false;
+        }
         this.whatToCraft = what;
         this.amount = amount;
         this.strategy = strategy;
 
         IGrid grid = getGrid();
-        if (grid == null) {
+        if (grid == null || this.calculationGeneration != generation) {
             return false;
         }
+        this.calculationGrid = grid;
 
-        this.job = grid.getCraftingService().beginCraftingCalculation(getPlayer().world, this::getActionSrc, what,
-            amount, strategy);
-        return true;
+        return startCalculation(() -> grid.getCraftingService().beginCraftingCalculation(getPlayer().world,
+            this::getActionSrc, what, amount, strategy));
+    }
+
+    @Nullable
+    private Object beginPlan() {
+        var generation = this.cancelPendingCalculations();
+        if (this.calculationGeneration != generation) {
+            return null;
+        }
+        this.result = null;
+        this.plan = null;
+        this.planRevision++;
+        this.mergeAvailable = false;
+        invalidateMergeCache();
+        invalidateMergeableCpuCache();
+        this.clearError();
+        sendPlanState();
+        return this.calculationGeneration == generation ? generation : null;
     }
 
     /**
@@ -288,14 +342,14 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
      * all done, so one CPU job crafts every missing material at once.
      */
     private boolean planBatchJob(List<GenericStack> missingMaterials, TemporaryPseudoCraftingProvider mainProvider) {
-        this.cancelPendingCalculations();
-        this.result = null;
-        this.mergeAvailable = false;
-        invalidateMergeCache();
-        invalidateMergeableCpuCache();
-        this.clearError();
-
+        var generation = beginPlan();
+        if (generation == null) {
+            return false;
+        }
         var mainOutput = mainProvider.pattern().getPrimaryOutput();
+        if (this.calculationGeneration != generation) {
+            return false;
+        }
         this.whatToCraft = mainOutput.what();
         this.amount = mainOutput.amount();
         this.strategy = CalculationStrategy.REPORT_MISSING_ITEMS;
@@ -306,26 +360,79 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         }
 
         ICraftingService craftingService = grid.getCraftingService();
-        var jobs = new ObjectArrayList<Future<ICraftingPlan>>(missingMaterials.size());
-        for (var material : missingMaterials) {
-            jobs.add(craftingService.beginCraftingCalculation(getPlayer().world, this::getActionSrc,
-                material.what(), material.amount(), CalculationStrategy.REPORT_MISSING_ITEMS));
+        var targets = List.copyOf(missingMaterials);
+        if (this.calculationGeneration != generation) {
+            return false;
         }
-
-        this.batchJobs = jobs;
-        this.batchTargets = List.copyOf(missingMaterials);
+        this.calculationGrid = grid;
+        this.batchTargets = targets;
         this.batchMainProvider = mainProvider;
+        return startBatchCalculations(targets, material -> craftingService.beginCraftingCalculation(
+            getPlayer().world, this::getActionSrc, material.what(), material.amount(),
+            CalculationStrategy.REPORT_MISSING_ITEMS));
+    }
+
+    private boolean startCalculation(Supplier<Future<ICraftingPlan>> starter) {
+        var generation = this.calculationGeneration;
+        var future = Objects.requireNonNull(starter.get(), "Calculation returned no future");
+        if (this.calculationGeneration != generation) {
+            cancelCalculation(future);
+            return false;
+        }
+        this.job = future;
         return true;
     }
 
-    private void cancelPendingCalculations() {
-        if (this.job != null) {
-            this.job.cancel(true);
-            this.job = null;
+    private boolean startBatchCalculations(List<GenericStack> targets,
+                                           Function<GenericStack, Future<ICraftingPlan>> starter) {
+        var generation = this.calculationGeneration;
+        var jobs = new ObjectArrayList<Future<ICraftingPlan>>(targets.size());
+        this.batchJobs = jobs;
+        boolean complete = false;
+        try {
+            for (var material : targets) {
+                if (this.calculationGeneration != generation || this.batchJobs != jobs) {
+                    return false;
+                }
+                var future = Objects.requireNonNull(starter.apply(material), "Calculation returned no future");
+                if (this.calculationGeneration != generation || this.batchJobs != jobs) {
+                    cancelCalculation(future);
+                    return false;
+                }
+                jobs.add(future);
+            }
+            complete = true;
+            return true;
+        } finally {
+            if (!complete) {
+                if (this.batchJobs == jobs) {
+                    this.batchJobs = null;
+                    this.batchTargets = null;
+                    this.batchMainProvider = null;
+                }
+                cancelCalculations(jobs);
+            }
         }
+    }
+
+    private Object cancelPendingCalculations() {
+        var generation = new Object();
+        this.calculationGeneration = generation;
+        this.calculationGrid = null;
+        var job = this.job;
+        var jobs = this.batchJobs;
+        this.job = null;
         this.batchJobs = null;
         this.batchTargets = null;
         this.batchMainProvider = null;
+        // Detach all ownership before any extension cancellation callback can install new work.
+        if (job != null) {
+            cancelCalculation(job);
+        }
+        if (jobs != null) {
+            cancelCalculations(jobs);
+        }
+        return generation;
     }
 
     public void cycleSelectedCPU(boolean next) {
@@ -381,89 +488,73 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             return;
         }
 
+        var generation = this.calculationGeneration;
         IGrid grid = this.getGrid();
-        if (grid == null) {
-            this.setValidContainer(false);
+        if (this.calculationGeneration != generation) {
+            return;
+        }
+        if (grid == null || this.calculationGrid != null && this.calculationGrid != grid) {
+            this.invalidateCalculationSource();
             return;
         }
 
-        if (this.batchJobs != null && allBatchJobsDone(this.batchJobs)) {
-            var batchJobs = this.batchJobs;
-            this.batchJobs = null;
+        var batchJobs = this.batchJobs;
+        if (batchJobs != null) {
             try {
-                var subPlans = new ObjectArrayList<ICraftingPlan>(batchJobs.size());
-                for (var batchJob : batchJobs) {
-                    subPlans.add(batchJob.get());
+                var subPlans = readCompletedCalculations(generation, batchJobs);
+                if (subPlans != null) {
+                    var mainProvider = this.batchMainProvider;
+                    if (mainProvider == null) {
+                        throw new IllegalStateException("Batch order is missing its placeholder output provider");
+                    }
+                    var completed = BatchCraftingPlan.combine(mainProvider.pattern().getPrimaryOutput(), subPlans,
+                        List.of(mainProvider));
+                    if (!isCalculationCurrent(generation, grid) || this.batchJobs != batchJobs) {
+                        return;
+                    }
+                    this.batchJobs = null;
+                    if (!publishCalculation(completed, generation, grid, true)) {
+                        return;
+                    }
                 }
-                var mainProvider = this.batchMainProvider;
-                if (mainProvider == null) {
-                    throw new IllegalStateException("Batch order is missing its placeholder output provider");
-                }
-
-                this.result = BatchCraftingPlan.combine(mainProvider.pattern().getPrimaryOutput(), subPlans,
-                    List.of(mainProvider));
-                if (shouldAutoStart(this.result, this.isAutoStart())) {
-                    this.startJob(false, true);
+            } catch (Exception failure) {
+                if (!isCalculationCurrent(generation, grid)) {
                     return;
                 }
-
-                if (!this.result.missingItems().isEmpty()) {
-                    this.setAutoStart(false);
-                    // Slots whose material can never be obtained are dropped, so the terminal stops showing slots that
-                    // nothing will ever be put into.
-                    PendingGridFills.dropUnavailable(getPlayer(), this.result.missingItems());
-                }
-
-                this.plan = CraftingPlanSummary.fromJob(grid, this.result);
-                this.mergeAvailable = canMergeCurrentResult(grid);
-                sendPacketToClient(new CraftConfirmPlanPacket(this.plan));
-            } catch (Throwable e) {
-                ITextComponent error = getCraftingErrorText(e);
-                this.getPlayerInventory().player.sendMessage(PlayerMessages.CraftingJobError.text(error));
-                AELog.warn("Failed to start crafting job.", e);
-                this.setValidContainer(false);
-                this.result = null;
-                this.batchTargets = null;
-                this.batchMainProvider = null;
-                invalidateMergeCache();
+                failCalculation(failure);
+                return;
+            }
+            if (!isCalculationCurrent(generation, grid)) {
                 return;
             }
         }
 
-        if (this.job != null && this.job.isDone()) {
+        var job = this.job;
+        if (job != null) {
             try {
-                this.result = this.job.get();
-                if (this.result == null) {
-                    this.getPlayerInventory().player.sendMessage(PlayerMessages.CraftingJobError.text(
-                        PlayerMessages.CraftingNoPlan.text()));
-                    AELog.warn(PlayerMessages.CraftingNoPlan.getTranslationKey());
-                    this.setValidContainer(false);
+                var completed = readCompletedCalculations(generation, List.of(job));
+                if (completed != null) {
+                    if (!isCalculationCurrent(generation, grid) || this.job != job) {
+                        return;
+                    }
                     this.job = null;
+                    if (!publishCalculation(completed.getFirst(), generation, grid, false)) {
+                        return;
+                    }
+                }
+            } catch (Exception failure) {
+                if (!isCalculationCurrent(generation, grid)) {
                     return;
                 }
-
-                if (shouldAutoStart(this.result, this.isAutoStart())) {
-                    this.startJob(false, true);
-                    return;
+                if (this.job == job) {
+                    this.job = null;
                 }
-
-                if (!this.result.missingItems().isEmpty()) {
-                    this.setAutoStart(false);
-                }
-
-                this.plan = CraftingPlanSummary.fromJob(grid, this.result);
-                this.mergeAvailable = canMergeCurrentResult(grid);
-                sendPacketToClient(new CraftConfirmPlanPacket(this.plan));
-            } catch (Throwable e) {
-                ITextComponent error = getCraftingErrorText(e);
-                this.getPlayerInventory().player.sendMessage(PlayerMessages.CraftingJobError.text(error));
-                AELog.warn("Failed to start crafting job.", e);
-                this.setValidContainer(false);
-                this.result = null;
-                invalidateMergeCache();
+                failCalculation(failure);
+                return;
             }
-
-            this.job = null;
+            if (!isCalculationCurrent(generation, grid)) {
+                return;
+            }
         }
         ensureMergeableCpuCache(grid);
         this.cpuCycler.detectAndSendChanges(grid);
@@ -473,13 +564,97 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         super.broadcastChanges();
     }
 
-    private static boolean allBatchJobsDone(List<Future<ICraftingPlan>> jobs) {
-        for (int i = 0, size = jobs.size(); i < size; i++) {
-            if (!jobs.get(i).isDone()) {
-                return false;
+    @Nullable
+    private List<ICraftingPlan> readCompletedCalculations(Object generation, List<Future<ICraftingPlan>> jobs)
+        throws ExecutionException, InterruptedException {
+        // Cancellation can clear the owned mutable batch while a Future invokes an owner callback.
+        var snapshot = List.copyOf(jobs);
+        for (var future : snapshot) {
+            if (this.calculationGeneration != generation) {
+                return null;
+            }
+            boolean done = future.isDone();
+            if (this.calculationGeneration != generation || !done) {
+                return null;
             }
         }
-        return true;
+        var plans = new ObjectArrayList<ICraftingPlan>(snapshot.size());
+        for (var future : snapshot) {
+            if (this.calculationGeneration != generation) {
+                return null;
+            }
+            var completed = future.get();
+            if (this.calculationGeneration != generation) {
+                return null;
+            }
+            plans.add(Objects.requireNonNull(completed, "Calculation returned no plan"));
+        }
+        return plans;
+    }
+
+    private boolean isCalculationCurrent(Object generation, IGrid grid) {
+        if (this.calculationGeneration != generation || this.calculationGrid != grid || !isValidContainer()) {
+            return false;
+        }
+        var currentGrid = getGrid();
+        return this.calculationGeneration == generation && this.calculationGrid == grid
+            && currentGrid == grid && isValidContainer();
+    }
+
+    private boolean publishCalculation(ICraftingPlan completed, Object generation, IGrid grid, boolean batch) {
+        boolean autoStart = shouldAutoStart(completed, this.isAutoStart());
+        var missing = completed.missingItems();
+        if (!isCalculationCurrent(generation, grid)) {
+            return false;
+        }
+        this.result = completed;
+        if (autoStart) {
+            this.startJob(false, true);
+            return false;
+        }
+        if (!missing.isEmpty()) {
+            this.setAutoStart(false);
+            if (batch) {
+                PendingGridFills.dropUnavailable(getPlayer(), this.pendingFillsOrder, missing);
+            }
+        }
+        if (!isCalculationCurrent(generation, grid) || this.result != completed) {
+            return false;
+        }
+        var summary = CraftingPlanSummary.fromJob(grid, completed);
+        if (!isCalculationCurrent(generation, grid) || this.result != completed) {
+            return false;
+        }
+        boolean mergeable = canMergeCurrentResult(grid);
+        if (!isCalculationCurrent(generation, grid) || this.result != completed) {
+            return false;
+        }
+        this.plan = summary;
+        this.mergeAvailable = mergeable;
+        sendPlanState();
+        return isCalculationCurrent(generation, grid);
+    }
+
+    private void invalidateCalculationSource() {
+        this.result = null;
+        this.plan = null;
+        this.mergeAvailable = false;
+        this.setValidContainer(false);
+        this.cancelPendingCalculations();
+    }
+
+    private void failCalculation(Exception failure) {
+        if (failure instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+        this.result = null;
+        this.plan = null;
+        invalidateMergeCache();
+        this.setValidContainer(false);
+        this.cancelPendingCalculations();
+        ITextComponent error = getCraftingErrorText(failure);
+        this.getPlayerInventory().player.sendMessage(PlayerMessages.CraftingJobError.text(error));
+        AELog.error(failure, "Failed to finish crafting calculation");
     }
 
     private void syncCpuList(IGrid grid) {
@@ -595,48 +770,125 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     }
 
     public void startJob(boolean forceStart, boolean skipMerge, boolean subscribed) {
-        clearError();
-
         if (isClientSide()) {
+            clearError();
             sendClientAction(ACTION_START_JOB, new StartJobRequest(forceStart, skipMerge, this.taskPriority, subscribed));
             return;
         }
 
-        if (this.result != null && !this.result.simulation()) {
-            if (!forceStart && !this.result.missingItems().isEmpty()) {
+        if (this.submitting || this.submittedGeneration != null
+            && this.submittedGeneration == this.calculationGeneration) {
+            return;
+        }
+        this.submitting = true;
+        try {
+            clearError();
+            startServerJob(forceStart, skipMerge, subscribed);
+        } finally {
+            this.submitting = false;
+        }
+    }
+
+    private void startServerJob(boolean forceStart, boolean skipMerge, boolean subscribed) {
+        var generation = this.calculationGeneration;
+        var completed = this.result;
+        if (completed != null && !completed.simulation()) {
+            if (!forceStart && !completed.missingItems().isEmpty()) {
                 return;
             }
             IGrid grid = getGrid();
-            if (grid == null) {
-                this.setValidContainer(false);
+            if (grid == null || !isCalculationCurrent(generation, grid) || this.result != completed) {
+                if (this.calculationGeneration == generation) {
+                    this.invalidateCalculationSource();
+                }
                 return;
             }
             ICraftingService craftingService = grid.getCraftingService();
-            ICraftingSubmitResult submitResult = craftingService.submitJob(this.result, null, this.selectedCpu, true,
-                this.getActionSrc(), forceStart, skipMerge, new CraftingJobOptions(this.taskPriority, subscribed));
-            this.setAutoStart(false);
-            if (submitResult.successful()) {
-                this.jobStarted = true;
+            var source = this.getActionSrc();
+            var options = new CraftingJobOptions(this.taskPriority, subscribed);
+            if (!isCalculationCurrent(generation, grid) || this.result != completed) {
+                return;
+            }
+            this.submittedGeneration = generation;
+            ICraftingSubmitResult submitResult;
+            boolean successful;
+            try (var fillsSubmission = PendingGridFills.beginSubmission(this.pendingFillsOrder)) {
+                submitResult = craftingService.submitJob(completed, null, this.selectedCpu, true,
+                    source, forceStart, skipMerge, options);
+                successful = submitResult.successful();
+                if (fillsSubmission != null) {
+                    fillsSubmission.complete(successful);
+                }
+            } catch (RuntimeException failure) {
+                failSubmission(generation, completed, failure);
+                return;
+            }
+            if (!isSubmissionCurrent(generation, grid, completed)) {
+                return;
+            }
+            if (successful) {
+                this.setAutoStart(false);
                 boolean hasQueuedJobs = this.autoCraftingQueue != null && !this.autoCraftingQueue.isEmpty();
                 EntityPlayer player = getPlayer();
+                if (!isSubmissionCurrent(generation, grid, completed)) {
+                    return;
+                }
                 if (hasQueuedJobs) {
                     if (player instanceof EntityPlayerMP serverPlayer) {
-                        ContainerCraftConfirm.openWithCraftingList(getActionHost(), serverPlayer, getLocator(),
-                            this.autoCraftingQueue, getReturnToContainerOverride());
+                        var actionHost = getActionHost();
+                        var locator = getLocator();
+                        var returnTo = getReturnToContainerOverride();
+                        if (isSubmissionCurrent(generation, grid, completed)) {
+                            ContainerCraftConfirm.openWithCraftingList(actionHost, serverPlayer, locator,
+                                this.autoCraftingQueue, returnTo);
+                        }
                     }
                 } else if (!(player instanceof EntityPlayerMP serverPlayer)
                     || !SwitchGuisPacket.restoreExternalGui(serverPlayer)) {
-                    this.host.returnToMainContainer(player, this);
+                    if (isSubmissionCurrent(generation, grid, completed)) {
+                        this.host.returnToMainContainer(player, this);
+                    }
                 }
             } else {
+                GenericStack output;
+                CraftingSubmitErrorCode errorCode;
+                Object errorDetail;
+                try {
+                    output = completed.finalOutput();
+                    if (!isSubmissionCurrent(generation, grid, completed)) {
+                        return;
+                    }
+                    errorCode = Objects.requireNonNull(submitResult.errorCode());
+                    if (!isSubmissionCurrent(generation, grid, completed)) {
+                        return;
+                    }
+                    errorDetail = submitResult.errorDetail();
+                } catch (RuntimeException failure) {
+                    failSubmission(generation, completed, failure);
+                    return;
+                }
+                if (!isSubmissionCurrent(generation, grid, completed)) {
+                    return;
+                }
+                this.submitError = new SyncableSubmitResult(new CraftingSubmitResult(null, errorCode, errorDetail));
+                this.setAutoStart(false);
+                this.submittedGeneration = null;
                 AELog.info("Couldn't submit crafting job for %dx%s: %s [Detail: %s]",
-                    this.result.finalOutput().amount(),
-                    this.result.finalOutput().what(),
-                    submitResult.errorCode(),
-                    submitResult.errorDetail());
-                this.submitError = new SyncableSubmitResult(submitResult);
+                    output.amount(), output.what(), errorCode, errorDetail);
             }
         }
+    }
+
+    private boolean isSubmissionCurrent(Object generation, IGrid grid, ICraftingPlan completed) {
+        return isCalculationCurrent(generation, grid) && this.result == completed;
+    }
+
+    private void failSubmission(Object generation, ICraftingPlan completed, RuntimeException failure) {
+        if (this.calculationGeneration == generation && this.result == completed) {
+            this.setAutoStart(false);
+            this.setValidContainer(false);
+        }
+        AELog.error(failure, "Crafting confirmation submission is unconfirmed; automatic retry stopped");
     }
 
     private void startJob(StartJobRequest request) {
@@ -649,13 +901,11 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     }
 
     @Override
-    public void onContainerClosed(EntityPlayer player) {
+    public void onContainerClosed(@NotNull EntityPlayer player) {
+        var order = this.pendingFillsOrder;
         super.onContainerClosed(player);
         this.cancelPendingCalculations();
-        if (!this.jobStarted) {
-            // The order was abandoned, so the crafting grid slots it wanted to fill are dropped as well.
-            PendingGridFills.scheduleAbandonCheck(player);
-        }
+        PendingGridFills.scheduleAbandonCheck(player, order);
     }
 
     private void onCPUSelectionChanged(@Nullable CraftingCPURecord cpuRecord, boolean cpusAvailable) {
@@ -709,7 +959,43 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     }
 
     public void setJob(@Nullable Future<ICraftingPlan> job) {
+        setJob(job, getGrid());
+    }
+
+    /**
+     * Adopts a transferred calculation without rebinding it to the receiving network.
+     */
+    public void setJob(@Nullable Future<ICraftingPlan> job, @Nullable IGrid source) {
+        setJob(job, source, this.pendingFillsOrder);
+    }
+
+    public void setJob(@Nullable Future<ICraftingPlan> job, @Nullable IGrid source,
+                       @Nullable PendingGridFills.Order order) {
+        var generation = beginPlan();
+        if (generation == null) {
+            if (job != null) {
+                cancelCalculation(job);
+            }
+            return;
+        }
+        var currentGrid = getGrid();
+        if (this.calculationGeneration != generation || source != currentGrid) {
+            if (this.calculationGeneration == generation) {
+                this.invalidateCalculationSource();
+            }
+            if (job != null) {
+                cancelCalculation(job);
+            }
+            return;
+        }
+        this.calculationGrid = source;
+        this.pendingFillsOrder = order;
         this.job = job;
+    }
+
+    @Nullable
+    public PendingGridFills.Order getPendingFillsOrder() {
+        return this.pendingFillsOrder;
     }
 
     @Nullable
@@ -719,6 +1005,96 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
 
     public void setPlan(@Nullable CraftingPlanSummary plan) {
         this.plan = plan;
+    }
+
+    @Override
+    public void onClientDataSync(ShortSet updatedFields) {
+        super.onClientDataSync(updatedFields);
+        if (updatedFields.contains((short) 13) && this.boundPlanSession == null && this.clientPlanRequest != null) {
+            // A stale introduction can only elicit a rejected request, never bind this client to an old window.
+            sendClientAction(ACTION_REQUEST_PLAN, new PlanRequest(this.planSession, null, this.clientPlanRequest));
+        }
+    }
+
+    private void requestPlan(PlanRequest request) {
+        if (!this.planSession.equals(request.session()) || request.request() == null
+            || request.previousRequest() != null
+            || this.serverPlanRequest != null && !this.serverPlanRequest.equals(request.request())) {
+            return;
+        }
+        this.serverPlanRequest = request.request();
+        sendPlanState();
+    }
+
+    private void sendPlanState() {
+        if (this.serverPlanRequest != null) {
+            sendPacketToClient(new CraftConfirmPlanPacket(this.windowId, this.planSession, this.serverPlanRequest,
+                this.planRevision, this.plan));
+        }
+    }
+
+    public void receivePlan(String session, UUID request, long revision, @Nullable CraftingPlanSummary plan) {
+        if (!request.equals(this.clientPlanRequest)
+            || this.boundPlanSession != null && !this.boundPlanSession.equals(session)
+            || revision < 0 || revision < this.lastPlanRevision
+            || revision == this.lastPlanRevision && this.plan != null) {
+            return;
+        }
+        this.boundPlanSession = session;
+        this.lastPlanRevision = revision;
+        this.plan = plan;
+    }
+
+    @Nullable
+    private PlanRequest beginClientReplan() {
+        if (this.boundPlanSession == null || this.clientPlanRequest == null || this.plan == null) {
+            return null;
+        }
+        var previous = this.clientPlanRequest;
+        this.clientPlanRequest = UUID.randomUUID();
+        this.lastPlanRevision = -1;
+        this.plan = null;
+        this.mergeAvailable = false;
+        return new PlanRequest(this.boundPlanSession, previous, this.clientPlanRequest);
+    }
+
+    private void replan(PlanRequest request) {
+        if (!this.planSession.equals(request.session()) || this.serverPlanRequest == null
+            || !this.serverPlanRequest.equals(request.previousRequest()) || request.request() == null
+            || this.serverPlanRequest.equals(request.request())) {
+            return;
+        }
+        this.serverPlanRequest = request.request();
+        replan();
+    }
+
+    public void replan() {
+        clearError();
+
+        if (isClientSide()) {
+            var request = beginClientReplan();
+            if (request != null) {
+                sendClientAction(ACTION_REPLAN, request);
+            }
+            return;
+        }
+
+        var batchTargets = this.batchTargets;
+        var batchMainProvider = this.batchMainProvider;
+        if (batchTargets != null && batchMainProvider != null) {
+            if (!planBatchJob(batchTargets, batchMainProvider)) {
+                goBack();
+            }
+            return;
+        }
+
+        if (this.whatToCraft != null) {
+            if (!planJob(this.whatToCraft, this.amount, this.strategy)) {
+                goBack();
+            }
+        } else {
+            goBack();
+        }
     }
 
     public void goBack() {
@@ -745,34 +1121,21 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         return this.host;
     }
 
-    public void replan() {
-        clearError();
-
-        if (isClientSide()) {
-            sendClientAction(ACTION_REPLAN);
-            return;
-        }
-
-        var batchTargets = this.batchTargets;
-        var batchMainProvider = this.batchMainProvider;
-        if (batchTargets != null && batchMainProvider != null) {
-            if (!planBatchJob(batchTargets, batchMainProvider)) {
-                goBack();
-            }
-            return;
-        }
-
-        if (this.whatToCraft != null) {
-            if (!planJob(this.whatToCraft, this.amount, this.strategy)) {
-                goBack();
-            }
-        } else {
-            goBack();
-        }
+    /**
+     * Returns the live network that produced the current result, before a GUI transition closes this owner.
+     */
+    @Nullable
+    public IGrid getResultGrid() {
+        var generation = this.calculationGeneration;
+        var source = this.calculationGrid;
+        return source != null && this.result != null && isCalculationCurrent(generation, source) ? source : null;
     }
 
     public void clearError() {
         this.submitError = NO_ERROR;
+    }
+
+    public record PlanRequest(String session, @Nullable UUID previousRequest, UUID request) {
     }
 
     @Nullable

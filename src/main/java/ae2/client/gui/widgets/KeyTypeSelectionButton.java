@@ -11,7 +11,7 @@ import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 import java.util.List;
@@ -92,7 +92,7 @@ public class KeyTypeSelectionButton extends IconButton {
     }
 
     @Override
-    public @NonNull List<ITextComponent> getTooltipMessage() {
+    public @NotNull List<ITextComponent> getTooltipMessage() {
         return List.of(title, descriptionSupplier.get());
     }
 

@@ -7,6 +7,11 @@ import ae2.tile.crafting.TileRequester;
 public record LinkState(ICraftingLink link) implements StatusState {
 
     @Override
+    public void cancel() {
+        this.link.cancel();
+    }
+
+    @Override
     public StatusState handle(TileRequester host, int slot) {
         if (this.link.isDone()) {
             return EXPORT;

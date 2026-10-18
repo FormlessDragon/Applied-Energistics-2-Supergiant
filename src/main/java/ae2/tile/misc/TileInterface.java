@@ -39,8 +39,9 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.util.Constants;
-
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
 import java.util.List;
 
 public class TileInterface extends AENetworkedTile
@@ -116,6 +117,25 @@ public class TileInterface extends AENetworkedTile
     }
 
     @Override
+    public void onChunkUnloaded() {
+        this.logic.suspendCraftingCalculations();
+        super.onChunkUnloaded();
+    }
+
+    @Override
+    public void setRemoved() {
+        this.logic.suspendCraftingCalculations();
+        super.setRemoved();
+    }
+
+    @Override
+    public void onReady() {
+        long generation = this.logic.suspendCraftingCalculations();
+        super.onReady();
+        this.logic.resumeCraftingCalculations(generation);
+    }
+
+    @Override
     public @Nullable String getCellTerminalSubnetId() {
         return this.cellTerminalSubnetId;
     }
@@ -161,7 +181,7 @@ public class TileInterface extends AENetworkedTile
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.ME_STORAGE) {
             return (T) this.logic.getInventory();
         }
@@ -172,7 +192,7 @@ public class TileInterface extends AENetworkedTile
     }
 
     @Override
-    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.ME_STORAGE) {
             return true;
         }

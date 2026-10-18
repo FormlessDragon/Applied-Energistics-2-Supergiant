@@ -34,7 +34,9 @@ repositories {
 }
 
 dependencies {
-    compileOnly "com.cleanroommc:sponge-mixin:0.20.12+mixin.0.8.7"
+    // 0.7.3+ recognizes DevLaunch through the SRG-to-MCP mapping property.
+    // Keep the runtime and annotation processor on the same CleanMix version.
+    implementation "com.cleanroommc:cleanmix:${propertyString('cleanmix_version')}"
     if (propertyBool('enable_lwjglx')) {
         compileOnly "com.cleanroommc:lwjglx:1.0.0"
     }

@@ -30,19 +30,44 @@ import ae2.me.Grid;
 import ae2.me.service.IngredientFlowService;
 import ae2.server.Commands;
 import ae2.server.subcommands.GridsCommand;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.EnumFacing;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+
 public class ContainerNetworkStatus extends AEBaseContainer {
     private static final String ACTION_EXPORT_GRID = "export_grid";
     private static final String ACTION_TOGGLE_FLOW_TRACKING = "toggle_flow_tracking";
+    private static final AtomicLong NEXT_STATUS_GENERATION = new AtomicLong(1);
 
     @Nullable
     private IGrid grid;
+    private static final int MAX_STATUS_PAGES = 64;
+    private static final int MAX_STATUS_PAGE_BYTES = 900_000;
+    @Nullable
+    private IInWorldGridNodeHost gridHost;
     private int delay = 40;
     private NetworkStatus status = new NetworkStatus();
     private boolean canExportGrid;
+    @Nullable
+    private EnumFacing gridSide;
+    @Nullable
+    private IGridNode gridNode;
+    private long statusGeneration = NEXT_STATUS_GENERATION.getAndIncrement();
+    private long statusRevision;
+    private long lastAcceptedStatusGeneration;
+    private long lastAcceptedStatusRevision;
+    @Nullable
+    private List<NetworkStatus> pendingStatusPages;
+    private int pendingStatusPageCount;
+    private int pendingStatusPagesReceived;
+    private boolean pendingCanExportGrid;
     @GuiSync(35)
     public boolean flowTrackingMode;
     @GuiSync(36)
@@ -54,10 +79,25 @@ public class ContainerNetworkStatus extends AEBaseContainer {
         buildForGridHost(host);
     }
 
+    private static boolean fitsStatusPage(NetworkStatusPacket packet) {
+        ByteBuf buffer = Unpooled.buffer();
+        try {
+            packet.toBytes(buffer);
+            return buffer.readableBytes() <= MAX_STATUS_PAGE_BYTES;
+        } catch (RuntimeException e) {
+            return false;
+        } finally {
+            buffer.release();
+        }
+    }
+
     private void buildForGridHost(@Nullable IInWorldGridNodeHost gridHost) {
+        this.gridHost = gridHost;
         if (gridHost != null) {
             for (var side : EnumFacing.VALUES) {
-                findNode(gridHost, side);
+                if (findNode(gridHost, side)) {
+                    break;
+                }
             }
         }
 
@@ -69,26 +109,35 @@ public class ContainerNetworkStatus extends AEBaseContainer {
         registerClientAction(ACTION_TOGGLE_FLOW_TRACKING, this::toggleFlowTrackingMode);
     }
 
-    private void findNode(IInWorldGridNodeHost host, EnumFacing side) {
-        if (this.grid == null) {
-            IGridNode node = host.getGridNode(side);
-            if (node != null) {
-                this.grid = node.grid();
-            }
+    private boolean findNode(IInWorldGridNodeHost host, EnumFacing side) {
+        IGridNode node = host.getGridNode(side);
+        if (node != null) {
+            this.gridSide = side;
+            this.gridNode = node;
+            this.grid = node.grid();
+            return true;
         }
+        return false;
     }
 
-    @Override
-    public void broadcastChanges() {
-        this.delay++;
-        if (isServerSide() && this.delay > 15 && this.grid != null) {
-            this.delay = 0;
-            this.status = NetworkStatus.fromGrid(this.grid);
-            this.canExportGrid = computeCanExportGrid();
-            this.refreshFlowTrackingState();
-            sendPacketToClient(new NetworkStatusPacket(this.status, this.canExportGrid));
+    private void resolveCurrentGrid() {
+        if (this.gridHost == null || this.gridSide == null) {
+            return;
         }
-        super.broadcastChanges();
+
+        IGridNode currentNode = this.gridHost.getGridNode(this.gridSide);
+        IGrid currentGrid = currentNode != null && currentNode.isActive() ? currentNode.grid() : null;
+        if (currentNode == this.gridNode && currentGrid == this.grid) {
+            return;
+        }
+
+        this.gridNode = currentNode;
+        this.grid = currentGrid;
+        this.statusGeneration = NEXT_STATUS_GENERATION.getAndIncrement();
+        this.statusRevision = 0;
+        this.status = new NetworkStatus();
+        this.canExportGrid = false;
+        this.refreshFlowTrackingState();
     }
 
     public NetworkStatus getStatus() {
@@ -103,12 +152,140 @@ public class ContainerNetworkStatus extends AEBaseContainer {
         this.canExportGrid = canExportGrid;
     }
 
+    @Override
+    public void broadcastChanges() {
+        if (isServerSide()) {
+            resolveCurrentGrid();
+            if (this.grid == null) {
+                this.setValidContainer(false);
+            }
+        }
+        this.delay++;
+        if (isServerSide() && this.delay > 15 && this.grid != null) {
+            this.delay = 0;
+            long currentTick = this.getPlayerInventory().player.world.getTotalWorldTime();
+            this.status = NetworkStatus.fromGridShared(this.grid, currentTick);
+            this.canExportGrid = computeCanExportGrid();
+            this.refreshFlowTrackingState();
+            this.statusRevision++;
+            sendStatusPages();
+        }
+        super.broadcastChanges();
+    }
+
+    private void sendStatusPages() {
+        var groups = new ObjectArrayList<>(this.status.getGroupedMachines());
+        int pageCount = Math.max(1, (groups.size() + NetworkStatus.MAX_MACHINE_GROUPS - 1)
+            / NetworkStatus.MAX_MACHINE_GROUPS);
+        if (pageCount > MAX_STATUS_PAGES) {
+            sendOversizeStatus();
+            return;
+        }
+
+        for (int pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+            int from = pageIndex * NetworkStatus.MAX_MACHINE_GROUPS;
+            int to = Math.min(groups.size(), from + NetworkStatus.MAX_MACHINE_GROUPS);
+            var pageStatus = this.status.withGroupedMachines(groups.subList(from, to));
+            var packet = new NetworkStatusPacket(this.windowId, this.statusGeneration, this.statusRevision,
+                pageIndex, pageCount, false, pageStatus, this.canExportGrid);
+            if (!fitsStatusPage(packet)) {
+                sendOversizeStatus();
+                return;
+            }
+            sendPacketToClient(packet);
+        }
+    }
+
+    private void sendOversizeStatus() {
+        sendPacketToClient(new NetworkStatusPacket(this.windowId, this.statusGeneration, this.statusRevision,
+            0, 1, true, new NetworkStatus(), false));
+    }
+
+    public boolean acceptStatusIdentity(int windowId, long sourceGeneration, long snapshotRevision) {
+        if (windowId != this.windowId || sourceGeneration <= 0 || snapshotRevision <= 0) {
+            return false;
+        }
+
+        if (this.lastAcceptedStatusGeneration == sourceGeneration) {
+            return snapshotRevision > this.lastAcceptedStatusRevision;
+        }
+
+        // A new grid source starts its own revision sequence. Generation is process-local and monotonic,
+        // so a delayed packet from an older source can never replace the current source.
+        if (this.lastAcceptedStatusGeneration != 0 && sourceGeneration <= this.lastAcceptedStatusGeneration) {
+            return false;
+        }
+
+        this.lastAcceptedStatusGeneration = sourceGeneration;
+        this.lastAcceptedStatusRevision = snapshotRevision;
+        return true;
+    }
+
+    public boolean acceptStatusPage(int windowId, long sourceGeneration, long snapshotRevision,
+                                    int pageIndex, int pageCount, boolean oversize,
+                                    @Nullable NetworkStatus page, boolean canExportGrid) {
+        boolean validPageShape = oversize
+            ? page == null && pageIndex == 0 && pageCount == 1
+            : page != null && pageIndex >= 0 && pageIndex < pageCount;
+        if (!validPageShape || windowId != this.windowId || sourceGeneration <= 0 || snapshotRevision <= 0
+            || pageCount > MAX_STATUS_PAGES) {
+            return false;
+        }
+
+        if (this.lastAcceptedStatusGeneration != 0 && sourceGeneration < this.lastAcceptedStatusGeneration) {
+            return false;
+        }
+        if (this.lastAcceptedStatusGeneration == sourceGeneration) {
+            if (this.pendingStatusPages == null && snapshotRevision <= this.lastAcceptedStatusRevision) {
+                return false;
+            }
+            if (this.pendingStatusPages != null && snapshotRevision < this.lastAcceptedStatusRevision) {
+                return false;
+            }
+        }
+
+        if (oversize) {
+            this.pendingStatusPages = null;
+            this.lastAcceptedStatusGeneration = sourceGeneration;
+            this.lastAcceptedStatusRevision = snapshotRevision;
+            this.status = new NetworkStatus();
+            this.canExportGrid = false;
+            return true;
+        }
+
+        if (this.pendingStatusPages == null || snapshotRevision != this.lastAcceptedStatusRevision
+            || this.pendingStatusPageCount != pageCount) {
+            this.pendingStatusPages = new ObjectArrayList<>(Collections.nCopies(pageCount, null));
+            this.pendingStatusPageCount = pageCount;
+            this.pendingStatusPagesReceived = 0;
+            this.pendingCanExportGrid = canExportGrid;
+            if (snapshotRevision > this.lastAcceptedStatusRevision) {
+                this.lastAcceptedStatusGeneration = sourceGeneration;
+                this.lastAcceptedStatusRevision = snapshotRevision;
+            }
+        }
+
+        if (this.pendingStatusPages.get(pageIndex) != null) {
+            return false;
+        }
+        this.pendingStatusPages.set(pageIndex, page);
+        this.pendingStatusPagesReceived++;
+        if (this.pendingStatusPagesReceived == this.pendingStatusPageCount) {
+            this.status = NetworkStatus.mergePages(this.pendingStatusPages);
+            this.canExportGrid = this.pendingCanExportGrid;
+            this.pendingStatusPages = null;
+            return true;
+        }
+        return false;
+    }
+
     public void exportGrid() {
         if (isClientSide()) {
             sendClientAction(ACTION_EXPORT_GRID);
             return;
         }
 
+        resolveCurrentGrid();
         if (!computeCanExportGrid()) {
             return;
         }
@@ -134,6 +311,9 @@ public class ContainerNetworkStatus extends AEBaseContainer {
     }
 
     private boolean computeCanExportGrid() {
+        if (isServerSide()) {
+            resolveCurrentGrid();
+        }
         if (!(this.grid instanceof Grid)) {
             return false;
         }
@@ -168,6 +348,7 @@ public class ContainerNetworkStatus extends AEBaseContainer {
             return;
         }
 
+        resolveCurrentGrid();
         final IngredientFlowService service = this.getIngredientFlowGridService();
         if (service == null || !AEConfig.instance().isIngredientFlowTrackingEnabled()) {
             return;

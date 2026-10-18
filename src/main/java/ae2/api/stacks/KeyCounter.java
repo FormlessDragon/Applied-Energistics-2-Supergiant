@@ -43,7 +43,7 @@ import java.util.Set;
  */
 public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     // First map contains a mapping from AEKey#primaryKey
-    private final Reference2ObjectMap<Object, VariantCounter> lists;
+    private Reference2ObjectMap<Object, VariantCounter> lists;
     private final boolean saturating;
 
     public KeyCounter() {
@@ -173,6 +173,24 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         }
     }
 
+    /**
+     * Takes the prepared counter's contents without copying its variant indexes. The source becomes empty;
+     * previously borrowed entries and fuzzy views must not be used across this replacement.
+     */
+    public void moveFrom(KeyCounter prepared) {
+        Objects.requireNonNull(prepared, "prepared");
+        if (prepared == this) {
+            return;
+        }
+        if (this.saturating != prepared.saturating) {
+            throw new IllegalArgumentException("Cannot move counters with different overflow policies");
+        }
+        var previous = this.lists;
+        this.lists = prepared.lists;
+        prepared.lists = previous;
+        prepared.clear();
+    }
+
     public boolean isEmpty() {
         for (var list : lists.values()) {
             if (!list.isEmpty()) {
@@ -247,7 +265,9 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     }
 
     public Set<AEKey> keySet() {
-        var keys = new ObjectOpenHashSet<AEKey>(size());
+        // The exact entry count would require traversing every variant map before this traversal. The primary-map
+        // count is a cheap lower bound and lets the set grow naturally for fuzzy variants.
+        var keys = new ObjectOpenHashSet<AEKey>(lists.size());
         for (var list : lists.values()) {
             for (var entry : list) {
                 keys.add(entry.getKey());

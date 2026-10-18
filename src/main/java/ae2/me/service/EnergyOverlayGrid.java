@@ -330,7 +330,7 @@ final class EnergyStorageGroup {
         if (count == Integer.MAX_VALUE) {
             throw new IllegalStateException("Power storage registration count overflow");
         }
-        this.counts.put(storage, count + 1);
+        this.counts.addTo(storage, 1);
         if (count == 0) {
             this.positions.put(storage, this.storages.size());
             this.storages.add(storage);
@@ -343,7 +343,7 @@ final class EnergyStorageGroup {
             throw new IllegalStateException("Cannot remove an unregistered power storage");
         }
         if (count > 1) {
-            this.counts.put(storage, count - 1);
+            this.counts.addTo(storage, -1);
             return;
         }
         this.counts.removeInt(storage);

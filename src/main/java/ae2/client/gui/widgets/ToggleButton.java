@@ -21,7 +21,7 @@ package ae2.client.gui.widgets;
 import ae2.client.gui.Icon;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.util.text.ITextComponent;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -80,7 +80,7 @@ public class ToggleButton extends IconButton {
     }
 
     @Override
-    public @NonNull List<ITextComponent> getTooltipMessage() {
+    public @NotNull List<ITextComponent> getTooltipMessage() {
         return this.state ? this.tooltipOn : this.tooltipOff;
     }
 

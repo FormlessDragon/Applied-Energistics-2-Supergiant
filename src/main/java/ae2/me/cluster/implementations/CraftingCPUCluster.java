@@ -20,6 +20,7 @@ package ae2.me.cluster.implementations;
 
 import ae2.api.config.Actionable;
 import ae2.api.config.CpuSelectionMode;
+import ae2.api.config.Setting;
 import ae2.api.config.Settings;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
@@ -35,6 +36,7 @@ import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.util.IConfigManager;
+import ae2.api.util.IConfigManagerListener;
 import ae2.client.gui.Icon;
 import ae2.crafting.execution.CraftingCpuLogic;
 import ae2.me.cluster.IAECluster;
@@ -54,6 +56,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.Set;
 
 public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
     public final CraftingCpuLogic craftingLogic = new CraftingCpuLogic(this);
@@ -67,11 +70,24 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
     protected long storage;
     protected MachineSource machineSrc;
     protected int accelerator;
+    private boolean readingNbt;
 
     public CraftingCPUCluster(BlockPos boundsMin, BlockPos boundsMax) {
         this.boundsMin = boundsMin;
         this.boundsMax = boundsMax;
-        this.configManager = IConfigManager.builder(this::markDirty)
+        this.configManager = IConfigManager.builder(new IConfigManagerListener() {
+                                               @Override
+                                               public void onSettingChanged(IConfigManager manager,
+                                                                            Setting<?> setting) {
+                                                   markDirty();
+                                               }
+
+                                               @Override
+                                               public void onSettingsChanged(IConfigManager manager,
+                                                                             Set<Setting<?>> settings) {
+                                                   markDirty();
+                                               }
+                                           })
                                            .registerSetting(Settings.CPU_SELECTION_MODE, CpuSelectionMode.ANY)
                                            .build();
     }
@@ -252,7 +268,7 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
 
     @Override
     public boolean isBusy() {
-        return craftingLogic.hasJob();
+        return craftingLogic.hasJob() || craftingLogic.hasUnconfirmedInventory();
     }
 
     @Nullable
@@ -322,8 +338,16 @@ public class CraftingCPUCluster implements IAECluster, ICraftingCPU {
     }
 
     public void readFromNBT(NBTTagCompound data) {
-        this.craftingLogic.readFromNBT(data);
-        this.configManager.readFromNBT(data);
+        if (this.readingNbt) {
+            throw new IllegalStateException("Cannot recursively load a crafting CPU cluster");
+        }
+        this.readingNbt = true;
+        try {
+            this.craftingLogic.readFromNBT(data);
+            this.configManager.readFromNBT(data);
+        } finally {
+            this.readingNbt = false;
+        }
     }
 
     public void updateName() {

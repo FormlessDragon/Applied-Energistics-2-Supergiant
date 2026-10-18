@@ -7,7 +7,7 @@ import java.util.List;
 
 final class IntrinsicEnchantment {
     private final Enchantment enchantment;
-    private final int level;
+    private final Integer level;
 
     IntrinsicEnchantment(Enchantment enchantment) {
         this.enchantment = enchantment;

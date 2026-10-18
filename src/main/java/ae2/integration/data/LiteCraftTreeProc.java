@@ -6,11 +6,10 @@ import ae2.crafting.CraftingTreeNode;
 import ae2.crafting.CraftingTreeProcess;
 import ae2.crafting.execution.CraftingSupplierLocation;
 import io.netty.buffer.ByteBuf;
-import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraft.network.PacketBuffer;
-
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -58,7 +57,7 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
         if (processTimes <= 0) {
             return null;
         }
-        List<LiteCraftTreeNode> inputs = new ArrayList<>();
+        List<LiteCraftTreeNode> inputs = new ArrayList<>(process.getNodes().size());
         LiteCraftTreeProc proc = new LiteCraftTreeProc(inputs, process.getMachineGroups(),
             process.getMachineLocations());
         for (Object2LongMap.Entry<CraftingTreeNode> entry : process.getNodes().object2LongEntrySet()) {
@@ -112,7 +111,7 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
                 machineLocations.put(machine, locations);
             }
         }
-        List<LiteCraftTreeNode> inputs = new ArrayList<>();
+        List<LiteCraftTreeNode> inputs = new ArrayList<>(size);
         LiteCraftTreeProc proc = new LiteCraftTreeProc(inputs, machines, machineLocations);
         for (int i = 0; i < size; i++) {
             inputs.add(LiteCraftTreeNode.fromBuffer(buf, stackSet, proc, limits, depth));
@@ -218,7 +217,7 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
     }
 
     public LiteCraftTreeProc withMissingOnly() {
-        List<LiteCraftTreeNode> missingInputs = new ArrayList<>();
+        List<LiteCraftTreeNode> missingInputs = new ArrayList<>(inputs.size());
         if (inputs instanceof RandomAccess) {
             for (int inputIndex = 0, inputCount = inputs.size(); inputIndex < inputCount; inputIndex++) {
                 LiteCraftTreeNode input = inputs.get(inputIndex);
@@ -254,7 +253,7 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
     }
 
     static final class MissingAllocator {
-        private final Object2LongLinkedOpenHashMap<AEKey> remainingMissingByKey = new Object2LongLinkedOpenHashMap<>();
+        private final Object2LongOpenHashMap<AEKey> remainingMissingByKey = new Object2LongOpenHashMap<>();
 
         long allocate(CraftingTreeNode node, long amount) {
             AEKey key = node.getWhat();

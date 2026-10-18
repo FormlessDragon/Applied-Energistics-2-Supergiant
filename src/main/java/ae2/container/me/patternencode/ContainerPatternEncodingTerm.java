@@ -13,6 +13,7 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.ILinkStatus;
 import ae2.api.storage.StorageHelper;
+import ae2.container.ContainerConstants;
 import ae2.container.GuiIds;
 import ae2.container.SlotSemantics;
 import ae2.container.crafting.DeferredRecipeLookup;
@@ -53,7 +54,6 @@ import it.unimi.dsi.fastutil.shorts.ShortSet;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.inventory.Container;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
@@ -126,12 +126,6 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         MAX_HEI_PROCESSING_RECIPE_INPUT_SLOTS * MAX_HEI_PROCESSING_RECIPE_CANDIDATES_PER_SLOT;
     private static final int MAX_HEI_PROCESSING_RECIPE_KEY_TAG_LENGTH = 4096;
 
-    private static final Container DUMMY_CONTAINER = new Container() {
-        @Override
-        public boolean canInteractWith(@NotNull EntityPlayer playerIn) {
-            return false;
-        }
-    };
     public final IntSet slotsSupportingFluidSubstitution = new IntArraySet();
     private final PatternEncodingLogic encodingLogic;
     private final FakeSlot[] craftingGridSlots = new FakeSlot[CRAFTING_GRID_SLOTS];
@@ -636,7 +630,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         boolean ingredientsChanged = !areCraftingIngredientsEqual(ingredients);
         boolean selectedRecipeChanged = !Objects.equals(this.lastResolvedRecipeId, this.selectedRecipeId);
         if (!this.craftingCandidatesValid || ingredientsChanged || selectedRecipeChanged) {
-            this.craftingInventory = new InventoryCrafting(DUMMY_CONTAINER, CRAFTING_GRID_WIDTH,
+            this.craftingInventory = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, CRAFTING_GRID_WIDTH,
                 CRAFTING_GRID_HEIGHT);
             for (int i = 0; i < ingredients.length; i++) {
                 this.craftingInventory.setInventorySlotContents(i, ingredients[i]);
@@ -718,7 +712,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
             return false;
         }
         for (int i = 0; i < ingredients.length; i++) {
-            if (!ItemStack.areItemStacksEqual(this.lastCraftingIngredients[i], ingredients[i])) {
+            if (!ItemStack.areItemStacksEqual(Objects.requireNonNull(this.lastCraftingIngredients[i]), ingredients[i])) {
                 return false;
             }
         }
@@ -775,7 +769,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
 
         InventoryCrafting craftingInventory = this.craftingInventory;
         if (craftingInventory == null || !areCraftingIngredientsEqual(ingredients)) {
-            craftingInventory = new InventoryCrafting(DUMMY_CONTAINER, CRAFTING_GRID_WIDTH, CRAFTING_GRID_HEIGHT);
+            craftingInventory = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, CRAFTING_GRID_WIDTH, CRAFTING_GRID_HEIGHT);
             this.craftingInventory = craftingInventory;
         }
         for (int i = 0; i < ingredients.length; i++) {
@@ -899,7 +893,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         ILinkStatus linkStatus = getHost().getLinkStatus();
         if (!linkStatus.connected()) {
             if (linkStatus.statusDescription() != null) {
-                getPlayer().sendStatusMessage(linkStatus.statusDescription(), false);
+                getPlayer().sendStatusMessage(Objects.requireNonNull(linkStatus.statusDescription()), false);
             }
             return;
         }
@@ -1202,7 +1196,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         ILinkStatus linkStatus = getHost().getLinkStatus();
         if (!linkStatus.connected()) {
             getPlayer().sendStatusMessage(linkStatus.statusDescription() != null
-                ? linkStatus.statusDescription()
+                ? Objects.requireNonNull(linkStatus.statusDescription())
                 : PlayerMessages.PatternUploadNoProviderTarget.text(), false);
             return null;
         }
@@ -1877,7 +1871,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
             return false;
         }
 
-        InventoryCrafting input = new InventoryCrafting(DUMMY_CONTAINER, CRAFTING_GRID_WIDTH, CRAFTING_GRID_HEIGHT);
+        InventoryCrafting input = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, CRAFTING_GRID_WIDTH, CRAFTING_GRID_HEIGHT);
         for (int i = 0; i < ingredients.length; i++) {
             input.setInventorySlotContents(i, ingredients[i]);
         }
@@ -1956,7 +1950,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
     }
 
     @Override
-    public void onContainerClosed(EntityPlayer player) {
+    public void onContainerClosed(@NotNull EntityPlayer player) {
         if (isServerSide()) {
             this.providerSelectionSession.close();
         }

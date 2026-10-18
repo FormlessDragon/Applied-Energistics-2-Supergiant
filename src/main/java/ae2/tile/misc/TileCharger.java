@@ -21,10 +21,10 @@ import ae2.api.AECapabilities;
 import ae2.api.config.Actionable;
 import ae2.api.config.PowerMultiplier;
 import ae2.api.config.PowerUnit;
+import ae2.api.features.ChargeableItems;
 import ae2.api.implementations.blockentities.ICrankable;
 import ae2.api.implementations.items.IAEItemPowerStorage;
 import ae2.api.implementations.items.IChargeableItemAdapter;
-import ae2.api.features.ChargeableItems;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.ticking.IGridTickable;
@@ -44,8 +44,9 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
-
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
 import java.io.IOException;
 import java.util.EnumSet;
 
@@ -229,7 +230,7 @@ public class TileCharger extends AENetworkedPoweredTile implements IGridTickable
     }
 
     @Override
-    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.CRANKABLE && getCrankable(facing) != null) {
             return true;
         }
@@ -238,7 +239,7 @@ public class TileCharger extends AENetworkedPoweredTile implements IGridTickable
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.CRANKABLE) {
             return (T) getCrankable(facing);
         }

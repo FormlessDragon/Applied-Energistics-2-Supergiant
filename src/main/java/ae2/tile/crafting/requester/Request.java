@@ -6,6 +6,8 @@ import ae2.api.stacks.GenericStack;
 import net.minecraft.nbt.NBTTagCompound;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Objects;
+
 public final class Request {
     private static final String ENABLED = "enabled";
     private static final String FORCE_START = "force";
@@ -29,6 +31,7 @@ public final class Request {
     private long amount;
     private long batchSize = 1;
     private RequestStatus clientStatus = RequestStatus.IDLE;
+    private long syncRevision;
 
     public Request() {
         this(null, -1);
@@ -65,7 +68,10 @@ public final class Request {
     }
 
     public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+        if (this.enabled != enabled) {
+            this.enabled = enabled;
+            this.syncRevision++;
+        }
     }
 
     public boolean isForceStart() {
@@ -73,7 +79,10 @@ public final class Request {
     }
 
     public void setForceStart(boolean forceStart) {
-        this.forceStart = forceStart;
+        if (this.forceStart != forceStart) {
+            this.forceStart = forceStart;
+            this.syncRevision++;
+        }
     }
 
     public void updateState(boolean enabled, boolean forceStart) {
@@ -81,6 +90,7 @@ public final class Request {
             boolean wasEnabled = this.enabled;
             this.enabled = enabled;
             this.forceStart = forceStart;
+            this.syncRevision++;
             if (enabled || wasEnabled == enabled) {
                 updated();
             } else {
@@ -96,6 +106,7 @@ public final class Request {
 
         this.enabled = false;
         this.clientStatus = status;
+        this.syncRevision++;
         updated();
     }
 
@@ -116,9 +127,11 @@ public final class Request {
         }
 
         long clampedAmount = clampAmount(stack.amount());
+        long initialBatchSize = clampBatchSize(stack.what().getAmountPerUnit());
         this.configuredStack = new GenericStack(stack.what(), clampedAmount);
         this.amount = clampedAmount;
-        this.batchSize = clampBatchSize(stack.what().getAmountPerUnit());
+        this.batchSize = initialBatchSize;
+        this.syncRevision++;
         changed();
     }
 
@@ -131,7 +144,11 @@ public final class Request {
     }
 
     public void setAmount(long amount) {
-        this.amount = clampAmount(amount);
+        long clamped = clampAmount(amount);
+        if (this.amount != clamped) {
+            this.amount = clamped;
+            this.syncRevision++;
+        }
     }
 
     public void updateAmount(long amount) {
@@ -143,6 +160,8 @@ public final class Request {
         long newAmount = clampAmount(amount);
         if (this.amount != newAmount) {
             this.amount = newAmount;
+            this.configuredStack = new GenericStack(Objects.requireNonNull(this.configuredStack).what(), newAmount);
+            this.syncRevision++;
             updated();
         }
     }
@@ -152,13 +171,18 @@ public final class Request {
     }
 
     public void setBatchSize(long batchSize) {
-        this.batchSize = clampBatchSize(batchSize);
+        long clamped = clampBatchSize(batchSize);
+        if (this.batchSize != clamped) {
+            this.batchSize = clamped;
+            this.syncRevision++;
+        }
     }
 
     public void updateBatchSize(long batchSize) {
         long newBatchSize = clampBatchSize(batchSize);
         if (this.batchSize != newBatchSize) {
             this.batchSize = newBatchSize;
+            this.syncRevision++;
             updated();
         }
     }
@@ -168,7 +192,18 @@ public final class Request {
     }
 
     public void setClientStatus(RequestStatus clientStatus) {
-        this.clientStatus = clientStatus == null ? RequestStatus.IDLE : clientStatus;
+        RequestStatus status = clientStatus == null ? RequestStatus.IDLE : clientStatus;
+        if (this.clientStatus != status) {
+            this.clientStatus = status;
+            this.syncRevision++;
+        }
+    }
+
+    /**
+     * Owner-thread change token for the serialized request fields; never persisted or sent over the wire.
+     */
+    public long getSyncRevision() {
+        return this.syncRevision;
     }
 
     public boolean isEmpty() {
@@ -201,6 +236,7 @@ public final class Request {
         this.configuredStack = null;
         this.amount = 0;
         this.batchSize = 1;
+        this.syncRevision++;
         changed();
     }
 
@@ -217,34 +253,46 @@ public final class Request {
     }
 
     public NBTTagCompound writeToNBT() {
+        // Freeze all fields before key serialization, which may call addon code.
+        boolean enabled = this.enabled;
+        boolean forceStart = this.forceStart;
+        GenericStack stack = this.configuredStack;
+        long amount = this.amount;
+        long batchSize = this.batchSize;
+        RequestStatus status = this.clientStatus;
         var tag = new NBTTagCompound();
         tag.setBoolean(ENABLED, enabled);
         tag.setBoolean(FORCE_START, forceStart);
-        tag.setTag(STACK, GenericStack.writeTag(configuredStack));
+        tag.setTag(STACK, GenericStack.writeTag(stack));
         tag.setLong(AMOUNT, amount);
         tag.setLong(BATCH, batchSize);
-        tag.setString(STATUS, clientStatus.name());
+        tag.setString(STATUS, status.name());
         return tag;
     }
 
     public void readFromNBT(NBTTagCompound tag) {
-        enabled = tag.getBoolean(ENABLED);
-        forceStart = tag.getBoolean(FORCE_START);
-        configuredStack = GenericStack.readTag(tag.getCompoundTag(STACK));
-        setAmount(tag.getLong(AMOUNT));
-        setBatchSize(tag.getLong(BATCH));
-        if (configuredStack != null) {
-            if (amount <= 0) {
-                configuredStack = null;
-                batchSize = 1;
-            } else {
-                configuredStack = new GenericStack(configuredStack.what(), amount);
+        try {
+            enabled = tag.getBoolean(ENABLED);
+            forceStart = tag.getBoolean(FORCE_START);
+            configuredStack = GenericStack.readTag(tag.getCompoundTag(STACK));
+            setAmount(tag.getLong(AMOUNT));
+            setBatchSize(tag.getLong(BATCH));
+            if (configuredStack != null) {
+                if (amount <= 0) {
+                    configuredStack = null;
+                    batchSize = 1;
+                } else {
+                    configuredStack = new GenericStack(configuredStack.what(), amount);
+                }
             }
+            clientStatus = readStatus(tag);
+        } finally {
+            this.syncRevision++;
         }
-        clientStatus = readStatus(tag);
     }
 
     void reset() {
+        this.syncRevision++;
         enabled = true;
         forceStart = false;
         configuredStack = null;

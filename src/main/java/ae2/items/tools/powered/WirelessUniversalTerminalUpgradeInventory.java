@@ -79,7 +79,11 @@ final class WirelessUniversalTerminalUpgradeInventory extends AppEngInternalInve
             for (var card : this) {
                 int maxInstalled = getMaxInstalled(card.getItem());
                 if (maxInstalled > 0) {
-                    installed.merge(card.getItem(), 1, (a, b) -> Math.min(maxInstalled, a + b));
+                    Item upgrade = card.getItem();
+                    int count = installed.getInt(upgrade);
+                    if (count < maxInstalled) {
+                        installed.put(upgrade, count + 1);
+                    }
                 }
             }
         }

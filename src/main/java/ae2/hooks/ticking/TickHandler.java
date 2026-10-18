@@ -18,6 +18,7 @@
 
 package ae2.hooks.ticking;
 
+import ae2.container.PendingGridFills;
 import ae2.core.AEConfig;
 import ae2.core.AELog;
 import ae2.crafting.CraftingCalculation;
@@ -29,9 +30,11 @@ import ae2.util.ILevelRunnable;
 import ae2.util.Platform;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
+import com.google.common.base.Ticker;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.crash.CrashReport;
 import net.minecraft.tileentity.TileEntity;
@@ -47,13 +50,16 @@ import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -62,16 +68,28 @@ public final class TickHandler {
     private static final int TIME_LIMIT_PROCESS_QUEUE_MILLISECONDS = 25;
     private static final TickHandler INSTANCE = new TickHandler();
     private final Queue<ILevelRunnable> serverQueue = new ConcurrentLinkedQueue<>();
-    private final Multimap<World, CraftingCalculation> craftingJobs = LinkedListMultimap.create();
+    private final Object queueSizeLock = new Object();
+    private final Reference2IntOpenHashMap<Queue<ILevelRunnable>> queueSizes = new Reference2IntOpenHashMap<>();
+    private final CraftingJobRegistry<CraftingCalculation> craftingJobs = new CraftingJobRegistry<>();
     private final Map<World, Queue<ILevelRunnable>> callQueue = new Reference2ObjectOpenHashMap<>();
+    private final Set<World> closedLevels = Collections.newSetFromMap(new IdentityHashMap<>());
     private final ServerBlockEntityRepo blockEntities = new ServerBlockEntityRepo();
     private final ServerGridRepo grids = new ServerGridRepo();
-    private final Stopwatch stopWatch = Stopwatch.createUnstarted();
+    private final Stopwatch stopWatch;
+    private boolean processingQueue;
+    private World processingLevel;
+    private long queueGeneration;
     private int processQueueElementsProcessed;
     private int processQueueElementsRemaining;
     private long tickCounter;
 
     private TickHandler() {
+        this(Ticker.systemTicker());
+    }
+
+    TickHandler(Ticker ticker) {
+        this.stopWatch = Stopwatch.createUnstarted(ticker);
+        queueSizes.defaultReturnValue(Integer.MIN_VALUE);
     }
 
     public static TickHandler instance() {
@@ -95,18 +113,36 @@ public final class TickHandler {
     }
 
     public void addCallable(World world, Runnable callable) {
-        addCallable(world, ignored -> callable.run());
+        tryAddCallable(world, ignored -> callable.run());
+    }
+
+    public boolean tryAddCallable(World world, Runnable callable) {
+        return tryAddCallable(world, ignored -> callable.run());
     }
 
     public void addCallable(World level, ILevelRunnable callable) {
+        tryAddCallable(level, callable);
+    }
+
+    /**
+     * Queues a callback when its owner is still accepting work.
+     *
+     * @return false when a world callback targets an unloaded world
+     */
+    public boolean tryAddCallable(World level, ILevelRunnable callable) {
         Preconditions.checkArgument(level == null || !level.isRemote, "Can only register server-side callbacks");
 
         if (level == null) {
-            this.serverQueue.add(callable);
+            enqueue(this.serverQueue, callable);
+            return true;
         } else {
             synchronized (this.callQueue) {
-                Queue<ILevelRunnable> queue = this.callQueue.computeIfAbsent(level, ignored -> new ArrayDeque<>());
-                queue.add(callable);
+                if (this.closedLevels.contains(level)) {
+                    return false;
+                }
+                Queue<ILevelRunnable> queue = this.callQueue.computeIfAbsent(level, ignored -> newQueue());
+                enqueue(queue, callable);
+                return true;
             }
         }
     }
@@ -119,14 +155,19 @@ public final class TickHandler {
     }
 
     public void shutdown() {
+        this.queueGeneration++;
         this.blockEntities.clear();
         this.grids.clear();
         synchronized (this.callQueue) {
             this.callQueue.clear();
+            this.closedLevels.clear();
         }
-        this.serverQueue.clear();
-        synchronized (this.craftingJobs) {
-            this.craftingJobs.clear();
+        synchronized (this.queueSizeLock) {
+            this.serverQueue.clear();
+            this.queueSizes.clear();
+        }
+        for (var job : this.craftingJobs.shutdown()) {
+            job.cancel();
         }
     }
 
@@ -147,8 +188,13 @@ public final class TickHandler {
             return;
         }
 
-        synchronized (this.craftingJobs) {
-            this.craftingJobs.removeAll(level);
+        PendingGridFills.clearWorld(level);
+
+        if (this.processingQueue && this.processingLevel == level) {
+            this.queueGeneration++;
+        }
+        for (var job : this.craftingJobs.closeWorld(level)) {
+            job.cancel();
         }
 
         var toDestroy = new ObjectArrayList<GridNode>();
@@ -168,7 +214,8 @@ public final class TickHandler {
 
         this.blockEntities.removeLevel(level);
         synchronized (this.callQueue) {
-            this.callQueue.remove(level);
+            this.closedLevels.add(level);
+            discardQueue(this.callQueue.remove(level));
         }
         if (level instanceof WorldServer serverLevel) {
             ServerCompassService.clearCache(serverLevel);
@@ -177,13 +224,14 @@ public final class TickHandler {
 
     @SubscribeEvent
     public void onServerStartTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.START) {
+        if (event.phase != TickEvent.Phase.START || this.processingQueue) {
             return;
         }
 
         this.processQueueElementsProcessed = 0;
         this.processQueueElementsRemaining = 0;
         this.stopWatch.reset();
+        this.craftingJobs.openSessionIfClosed();
 
         this.grids.updateNetworks();
         for (var grid : this.grids.getNetworks()) {
@@ -200,7 +248,7 @@ public final class TickHandler {
     @SubscribeEvent
     public void onWorldStartTick(TickEvent.WorldTickEvent event) {
         World level = event.world;
-        if (level == null || level.isRemote || event.phase != TickEvent.Phase.START) {
+        if (level == null || level.isRemote || event.phase != TickEvent.Phase.START || this.processingQueue) {
             return;
         }
 
@@ -208,14 +256,17 @@ public final class TickHandler {
         synchronized (this.callQueue) {
             queue = this.callQueue.remove(level);
         }
+        long generation = this.queueGeneration;
         this.processQueueElementsRemaining += this.processQueue(queue, level);
-        if (queue != null && !queue.isEmpty()) {
+        if (generation == this.queueGeneration && queue != null && !queue.isEmpty()) {
             synchronized (this.callQueue) {
                 Queue<ILevelRunnable> newQueue = this.callQueue.put(level, queue);
                 if (newQueue != null) {
-                    queue.addAll(newQueue);
+                    appendQueue(queue, newQueue);
                 }
             }
+        } else if (queue != null) {
+            discardQueue(queue);
         }
 
         this.grids.updateNetworks();
@@ -255,7 +306,7 @@ public final class TickHandler {
 
     @SubscribeEvent
     public void onServerEndTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
+        if (event.phase != TickEvent.Phase.END || this.processingQueue) {
             return;
         }
 
@@ -288,52 +339,192 @@ public final class TickHandler {
         return this.blockEntities.getReport();
     }
 
+    public long getCraftingSessionEpoch() {
+        return this.craftingJobs.getSessionEpoch();
+    }
+
     public void registerCraftingSimulation(World world, CraftingCalculation craftingCalculation) {
+        registerCraftingSimulation(world, craftingCalculation, this.getCraftingSessionEpoch());
+    }
+
+    public boolean registerCraftingSimulation(World world, CraftingCalculation craftingCalculation, long sessionEpoch) {
         Preconditions.checkArgument(!world.isRemote, "Trying to register a crafting job for a client-level");
 
-        synchronized (this.craftingJobs) {
-            this.craftingJobs.put(world, craftingCalculation);
+        if (!this.craftingJobs.register(world, craftingCalculation, sessionEpoch)) {
+            craftingCalculation.cancel();
+            return false;
         }
+        return true;
+    }
+
+    public void unregisterCraftingSimulation(World world, CraftingCalculation craftingCalculation) {
+        this.craftingJobs.unregister(world, craftingCalculation);
     }
 
     private int processQueue(Queue<ILevelRunnable> queue, World level) {
-        if (queue == null) {
+        if (queue == null || this.processingQueue) {
             return 0;
         }
 
+        long generation = this.queueGeneration;
+        this.processingQueue = true;
+        this.processingLevel = level;
         this.stopWatch.start();
-        while (!queue.isEmpty()) {
-            try {
-                ILevelRunnable runnable = queue.poll();
+        try {
+            while (generation == this.queueGeneration
+                && this.stopWatch.elapsed(TimeUnit.MILLISECONDS) < TIME_LIMIT_PROCESS_QUEUE_MILLISECONDS) {
+                ILevelRunnable runnable = poll(queue);
                 if (runnable == null) {
                     break;
                 }
-                runnable.call(level);
-                this.processQueueElementsProcessed++;
-
-                if (this.stopWatch.elapsed(TimeUnit.MILLISECONDS) > TIME_LIMIT_PROCESS_QUEUE_MILLISECONDS) {
-                    break;
+                try {
+                    runnable.call(level);
+                } catch (Exception exception) {
+                    AELog.warn(exception);
+                } finally {
+                    // An attempted callback consumes time even if it throws or reenters the handler.
+                    this.processQueueElementsProcessed++;
                 }
-            } catch (Exception exception) {
-                AELog.warn(exception);
             }
+        } finally {
+            this.stopWatch.stop();
+            this.processingQueue = false;
+            this.processingLevel = null;
         }
 
-        this.stopWatch.stop();
-        return queue.size();
+        return queuedCount(queue);
+    }
+
+    private Queue<ILevelRunnable> newQueue() {
+        var queue = new ArrayDeque<ILevelRunnable>();
+        synchronized (this.queueSizeLock) {
+            this.queueSizes.put(queue, 0);
+        }
+        return queue;
+    }
+
+    private void enqueue(Queue<ILevelRunnable> queue, ILevelRunnable runnable) {
+        synchronized (this.queueSizeLock) {
+            queue.add(runnable);
+            this.queueSizes.addTo(queue, 1);
+        }
+    }
+
+    @Nullable
+    private ILevelRunnable poll(Queue<ILevelRunnable> queue) {
+        synchronized (this.queueSizeLock) {
+            var runnable = queue.poll();
+            if (runnable != null) {
+                int count = this.queueSizes.getInt(queue);
+                if (count > 1) {
+                    this.queueSizes.addTo(queue, -1);
+                } else if (count != Integer.MIN_VALUE) {
+                    this.queueSizes.put(queue, 0);
+                }
+            }
+            return runnable;
+        }
+    }
+
+    private int queuedCount(Queue<ILevelRunnable> queue) {
+        synchronized (this.queueSizeLock) {
+            var count = this.queueSizes.getInt(queue);
+            return count != Integer.MIN_VALUE ? count : queue.size();
+        }
+    }
+
+    private void appendQueue(Queue<ILevelRunnable> target, Queue<ILevelRunnable> source) {
+        synchronized (this.queueSizeLock) {
+            int sourceCount = this.queueSizes.getInt(source);
+            if (sourceCount == Integer.MIN_VALUE) {
+                sourceCount = source.size();
+            }
+            target.addAll(source);
+            int targetCount = this.queueSizes.getInt(target);
+            if (targetCount == Integer.MIN_VALUE) {
+                this.queueSizes.put(target, sourceCount);
+            } else {
+                this.queueSizes.addTo(target, sourceCount);
+            }
+            source.clear();
+            this.queueSizes.removeInt(source);
+        }
+    }
+
+    private void discardQueue(@Nullable Queue<ILevelRunnable> queue) {
+        if (queue == null) {
+            return;
+        }
+        synchronized (this.queueSizeLock) {
+            queue.clear();
+            this.queueSizes.removeInt(queue);
+        }
     }
 
     private void simulateCraftingJobs(World world) {
-        synchronized (this.craftingJobs) {
-            final Collection<CraftingCalculation> jobSet = this.craftingJobs.get(world);
+        final Collection<CraftingCalculation> jobSet = this.craftingJobs.snapshot(world);
 
-            if (!jobSet.isEmpty()) {
-                final int jobSize = jobSet.size();
-                final int microSecondsPerTick = AEConfig.instance().getCraftingCalculationTimePerTick() * 1000;
-                final int simTime = Math.max(1, microSecondsPerTick / jobSize);
+        if (!jobSet.isEmpty()) {
+            final int jobSize = jobSet.size();
+            final int microSecondsPerTick = AEConfig.instance().getCraftingCalculationTimePerTick() * 1000;
+            final int simTime = Math.max(1, microSecondsPerTick / jobSize);
 
-                jobSet.removeIf(cj -> !cj.simulateFor(simTime));
+            for (var job : jobSet) {
+                if (!job.simulateFor(simTime)) {
+                    this.craftingJobs.unregister(world, job);
+                }
             }
+        }
+    }
+
+    static final class CraftingJobRegistry<T> {
+        private final Multimap<World, T> jobs = LinkedListMultimap.create();
+        private final Set<World> closedWorlds = Collections.newSetFromMap(new IdentityHashMap<>());
+        private boolean accepting = true;
+        private long sessionEpoch;
+
+        synchronized long getSessionEpoch() {
+            return this.sessionEpoch;
+        }
+
+        synchronized void openSessionIfClosed() {
+            if (!this.accepting) {
+                this.accepting = true;
+                this.sessionEpoch++;
+                this.closedWorlds.clear();
+            }
+        }
+
+        synchronized boolean register(World world, T job, long sessionEpoch) {
+            if (!this.accepting || sessionEpoch != this.sessionEpoch || this.closedWorlds.contains(world)) {
+                return false;
+            }
+            this.jobs.put(world, job);
+            return true;
+        }
+
+        synchronized void unregister(World world, T job) {
+            this.jobs.remove(world, job);
+        }
+
+        synchronized Collection<T> snapshot(World world) {
+            return List.copyOf(this.jobs.get(world));
+        }
+
+        synchronized Collection<T> closeWorld(World world) {
+            this.closedWorlds.add(world);
+            var jobs = List.copyOf(this.jobs.get(world));
+            this.jobs.removeAll(world);
+            return jobs;
+        }
+
+        synchronized Collection<T> shutdown() {
+            this.accepting = false;
+            this.sessionEpoch++;
+            var jobs = List.copyOf(this.jobs.values());
+            this.jobs.clear();
+            this.closedWorlds.clear();
+            return jobs;
         }
     }
 

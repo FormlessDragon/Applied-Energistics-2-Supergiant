@@ -27,8 +27,9 @@ import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.items.CapabilityItemHandler;
 import net.minecraftforge.items.IItemHandler;
-
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
 import java.util.List;
 
 public abstract class AEBaseInvTile extends AEBaseTile implements InternalInventoryHost {
@@ -87,7 +88,7 @@ public abstract class AEBaseInvTile extends AEBaseTile implements InternalInvent
     }
 
     @Override
-    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, @Nullable EnumFacing facing) {
         if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {
             return this.getExposedItemHandler(facing) != null;
         }
@@ -96,7 +97,7 @@ public abstract class AEBaseInvTile extends AEBaseTile implements InternalInvent
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {
             return (T) this.getExposedItemHandler(facing);
         }

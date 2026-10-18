@@ -1,7 +1,7 @@
 package ae2.crafting.graph;
 
-import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.crafting.IPatternDetails;
+import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKey2LongMap;
 import ae2.api.stacks.KeyCounter;
@@ -113,7 +113,7 @@ public record LocalDisplayFragment(AEKey output, long amount, long missing, List
                                         AEKey2LongMap remainingMissing) {
         long remaining = remainingMissing.getLong(node.getWhat());
         long allocated = Math.clamp(amount, 0, remaining);
-        remainingMissing.put(node.getWhat(), remaining - allocated);
+        remainingMissing.addTo(node.getWhat(), -allocated);
         return allocated;
     }
 }

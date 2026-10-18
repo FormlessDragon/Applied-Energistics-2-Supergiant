@@ -76,6 +76,7 @@ public class BasicCellInventory implements StorageCell, StorageCellStatistics {
     private final ObjectList<ListenerRegistration> listeners = new ObjectArrayList<>();
     private long storedItemCount;
     private long storedItems;
+    private boolean storedItemCountSaturated;
     private boolean persisted = true;
     private boolean dispatchingListeners;
     private boolean listUpdateRequired;
@@ -219,7 +220,13 @@ public class BasicCellInventory implements StorageCell, StorageCellStatistics {
                 cellItems.removeLong(what);
                 storedItems--;
             }
-            storedItemCount = Math.max(0, storedItemCount - extracted);
+            if (this.storedItemCountSaturated) {
+                // A saturated total cannot be decremented safely without knowing the exact sum of all keys.
+                // Rebuild only this exceptional path; ordinary totals remain incremental.
+                recalculateStoredAmounts();
+            } else {
+                storedItemCount = Math.max(0, storedItemCount - extracted);
+            }
             saveChanges();
             postChange(what, -extracted);
         }
@@ -294,7 +301,8 @@ public class BasicCellInventory implements StorageCell, StorageCellStatistics {
     }
 
     private void saveChanges() {
-        recalculateStoredAmounts();
+        // insert/extract maintain both counters incrementally. Full recalculation is reserved for loading
+        // untrusted or legacy NBT, so normal transfers do not rescan every stored key before persisting.
         this.persisted = false;
         if (saveProvider != null) {
             saveProvider.saveChanges();
@@ -307,6 +315,7 @@ public class BasicCellInventory implements StorageCell, StorageCellStatistics {
         cellItems.clear();
         storedItemCount = 0;
         storedItems = 0;
+        storedItemCountSaturated = false;
 
         NBTTagCompound tag = getOrCreateTag();
         if (tag.hasKey(STORAGE_CELL_INV_TAG, 9)) {
@@ -382,6 +391,9 @@ public class BasicCellInventory implements StorageCell, StorageCellStatistics {
         long inserted = Math.min(amount, remainingItemCount);
         if (mode == Actionable.MODULATE && inserted > 0) {
             cellItems.addTo(what, inserted);
+            if (!this.storedItemCountSaturated && inserted > Long.MAX_VALUE - this.storedItemCount) {
+                this.storedItemCountSaturated = true;
+            }
             storedItemCount = saturatedAdd(storedItemCount, inserted);
             if (currentAmount <= 0) {
                 storedItems++;
@@ -509,6 +521,7 @@ public class BasicCellInventory implements StorageCell, StorageCellStatistics {
     private void recalculateStoredAmounts() {
         this.storedItemCount = 0;
         this.storedItems = 0;
+        this.storedItemCountSaturated = false;
         ObjectList<AEKey> emptyKeys = new ObjectArrayList<>();
         for (Object2LongMap.Entry<AEKey> entry : cellItems.object2LongEntrySet()) {
             if (entry.getKey() == null) {
@@ -517,6 +530,9 @@ public class BasicCellInventory implements StorageCell, StorageCellStatistics {
             }
             long amount = entry.getLongValue();
             if (amount > 0) {
+                if (this.storedItemCount > Long.MAX_VALUE - amount) {
+                    this.storedItemCountSaturated = true;
+                }
                 this.storedItemCount = saturatedAdd(this.storedItemCount, amount);
                 this.storedItems++;
             } else {

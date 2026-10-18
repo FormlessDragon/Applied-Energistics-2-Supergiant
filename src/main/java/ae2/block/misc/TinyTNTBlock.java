@@ -41,9 +41,8 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.Explosion;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
-
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 import java.util.Objects;
@@ -63,13 +62,13 @@ public class TinyTNTBlock extends AEBaseBlock {
     }
 
     @Override
-    public @NonNull AxisAlignedBB getBoundingBox(IBlockState state, IBlockAccess source, BlockPos pos) {
+    public @NotNull AxisAlignedBB getBoundingBox(IBlockState state, IBlockAccess source, BlockPos pos) {
         return SHAPE;
     }
 
     @Override
     @SuppressWarnings("deprecation")
-    public AxisAlignedBB getCollisionBoundingBox(@NonNull IBlockState state, @NonNull IBlockAccess worldIn, @NonNull BlockPos pos) {
+    public AxisAlignedBB getCollisionBoundingBox(@NotNull IBlockState state, @NotNull IBlockAccess worldIn, @NotNull BlockPos pos) {
         return SHAPE;
     }
 
@@ -79,8 +78,8 @@ public class TinyTNTBlock extends AEBaseBlock {
     }
 
     @Override
-    public boolean onBlockActivated(@NonNull World world, @NonNull BlockPos pos, @NonNull IBlockState state, EntityPlayer player, @NonNull EnumHand hand,
-                                    @NonNull EnumFacing side, float hitX, float hitY, float hitZ) {
+    public boolean onBlockActivated(@NotNull World world, @NotNull BlockPos pos, @NotNull IBlockState state, EntityPlayer player, @NotNull EnumHand hand,
+                                    @NotNull EnumFacing side, float hitX, float hitY, float hitZ) {
         ItemStack heldItem = player.getHeldItem(hand);
         if (!heldItem.isEmpty() && (heldItem.getItem() == Items.FLINT_AND_STEEL
             || heldItem.getItem() == Items.FIRE_CHARGE)) {
@@ -113,7 +112,7 @@ public class TinyTNTBlock extends AEBaseBlock {
 
     @Override
     @SuppressWarnings("deprecation")
-    public void neighborChanged(@NonNull IBlockState state, World world, @NonNull BlockPos pos, @NonNull Block blockIn, @NonNull BlockPos fromPos) {
+    public void neighborChanged(@NotNull IBlockState state, World world, @NotNull BlockPos pos, @NotNull Block blockIn, @NotNull BlockPos fromPos) {
         if (world.getRedstonePowerFromNeighbors(pos) > 0) {
             this.startFuse(world, pos, null);
             world.setBlockToAir(pos);
@@ -121,7 +120,7 @@ public class TinyTNTBlock extends AEBaseBlock {
     }
 
     @Override
-    public void onBlockAdded(@NonNull World world, @NonNull BlockPos pos, @NonNull IBlockState state) {
+    public void onBlockAdded(@NotNull World world, @NotNull BlockPos pos, @NotNull IBlockState state) {
         super.onBlockAdded(world, pos, state);
 
         if (world.getRedstonePowerFromNeighbors(pos) > 0) {
@@ -131,7 +130,7 @@ public class TinyTNTBlock extends AEBaseBlock {
     }
 
     @Override
-    public void onEntityWalk(World world, @NonNull BlockPos pos, @NonNull Entity entity) {
+    public void onEntityWalk(World world, @NotNull BlockPos pos, @NotNull Entity entity) {
         if (!world.isRemote && entity instanceof EntityArrow arrow) {
             if (arrow.isBurning()) {
                 EntityLivingBase igniter = arrow.shootingEntity instanceof EntityLivingBase
@@ -144,12 +143,12 @@ public class TinyTNTBlock extends AEBaseBlock {
     }
 
     @Override
-    public boolean canDropFromExplosion(@NonNull Explosion exp) {
+    public boolean canDropFromExplosion(@NotNull Explosion exp) {
         return false;
     }
 
     @Override
-    public void onBlockExploded(@NonNull World world, @NonNull BlockPos pos, @NonNull Explosion exp) {
+    public void onBlockExploded(@NotNull World world, @NotNull BlockPos pos, @NotNull Explosion exp) {
         super.onBlockExploded(world, pos, exp);
         if (!world.isRemote) {
             TinyTNTPrimedEntity primedTinyTNTEntity = new TinyTNTPrimedEntity(world, pos.getX() + 0.5F, pos.getY(),

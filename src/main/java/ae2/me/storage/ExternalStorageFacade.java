@@ -281,6 +281,10 @@ public abstract class ExternalStorageFacade implements MEStorage {
                     GenericStack removedPackaged = GenericResourcePackageItem.unwrap(removed);
                     if (removedPackaged == null || !removedPackaged.what().equals(what)) {
                         AELog.warn("Item handler changed generic resource package while extracting %s", what);
+                        if (!restorePackage(handler, removed, i)) {
+                            throw new IllegalStateException("Could not restore changed generic resource package while "
+                                + "extracting " + what);
+                        }
                         continue;
                     }
 
@@ -293,8 +297,24 @@ public abstract class ExternalStorageFacade implements MEStorage {
                             leftoverPackage = handler.insertItem(slot, leftoverPackage, false);
                         }
                         if (!leftoverPackage.isEmpty()) {
-                            AELog.warn("Voided %s of %s because leftover generic resource package could not be returned",
-                                leftover, what);
+                            GenericStack remainingPackage = GenericResourcePackageItem.unwrap(leftoverPackage);
+                            if (remainingPackage == null || !remainingPackage.what().equals(what)
+                                || remainingPackage.amount() > leftover) {
+                                throw new IllegalStateException("Could not determine generic resource package remainder "
+                                    + "after leftover return failed. resource=" + what + ", amount=" + leftover);
+                            }
+
+                            long acceptedLeftover = leftover - remainingPackage.amount();
+                            ItemStack packageToRestore = GenericResourcePackageItem.wrap(what,
+                                removedPackaged.amount() - acceptedLeftover);
+                            if (!restorePackage(handler, packageToRestore, i)) {
+                                throw new IllegalStateException("Could not restore generic resource package after "
+                                    + "leftover return failed. resource=" + what + ", amount=" + leftover);
+                            }
+                            removedAmount = 0;
+                            extracted = removedAmount;
+                            totalExtracted += extracted;
+                            break;
                         }
                     }
                     extracted = removedAmount;
@@ -302,6 +322,22 @@ public abstract class ExternalStorageFacade implements MEStorage {
                 totalExtracted += extracted;
             }
             return totalExtracted;
+        }
+
+        private boolean restorePackage(IItemHandler handler, ItemStack packageStack, int originalSlot) {
+            if (packageStack.isEmpty()) {
+                return true;
+            }
+            ItemStack remainder = handler.insertItem(originalSlot, packageStack, false);
+            if (remainder.isEmpty()) {
+                return true;
+            }
+            for (int slot = 0; slot < handler.getSlots() && !remainder.isEmpty(); slot++) {
+                if (slot != originalSlot) {
+                    remainder = handler.insertItem(slot, remainder, false);
+                }
+            }
+            return remainder.isEmpty();
         }
 
         private boolean canReturnLeftoverPackage(AEKey what, long amount) {

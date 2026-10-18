@@ -44,7 +44,6 @@ import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.common.util.Constants;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -247,9 +246,7 @@ public class GenericStackInv implements MEStorage, GenericInternalInventory {
     }
 
     public NBTTagList writeToTag() {
-        List<GenericStack> stacks = new ObjectArrayList<>(this.stacks.length);
-        Collections.addAll(stacks, this.stacks);
-        return GenericStack.writeList(stacks);
+        return GenericStack.writeList(this.stacks);
     }
 
     public void writeToChildTag(NBTTagCompound tag, String name) {

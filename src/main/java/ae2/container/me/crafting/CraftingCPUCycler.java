@@ -24,8 +24,8 @@ import com.google.common.collect.ImmutableSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
-import it.unimi.dsi.fastutil.objects.Reference2IntMap;
-import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import net.minecraft.util.text.TextComponentString;
 
 import java.util.Collections;
@@ -39,7 +39,12 @@ public class CraftingCPUCycler {
     private final ChangeListener changeListener;
     private final ObjectList<CraftingCPURecord> cpus = new ObjectArrayList<>();
     private final List<CraftingCPURecord> readOnlyCpus = ObjectLists.unmodifiable(this.cpus);
-    private final Reference2IntMap<ICraftingCPU> cpuSerialMap = new Reference2IntOpenHashMap<>();
+    /**
+     * Only the current filtered CPUs are retained; removed CPUs must not stay alive through serial bookkeeping.
+     */
+    private final Reference2ObjectMap<ICraftingCPU, CraftingCPURecord> activeCpuRecords =
+        new Reference2ObjectOpenHashMap<>();
+    private IGrid activeNetwork;
     private int selectedCpu = -1;
     private int nextCpuSerial = 1;
     private boolean initialDataSent;
@@ -52,45 +57,54 @@ public class CraftingCPUCycler {
 
     public void detectAndSendChanges(IGrid network) {
         final ImmutableSet<ICraftingCPU> cpuSet = network.getCraftingService().getCpus();
-        var previouslySelectedCpu = this.selectedCpu >= 0 && this.selectedCpu < this.cpus.size()
+        boolean networkChanged = this.activeNetwork != network;
+        if (networkChanged) {
+            this.activeNetwork = network;
+            this.activeCpuRecords.clear();
+            this.cpus.clear();
+            this.selectedCpu = -1;
+        }
+
+        var previouslySelectedCpu = !networkChanged && this.selectedCpu >= 0 && this.selectedCpu < this.cpus.size()
             ? this.cpus.get(this.selectedCpu).getCpu()
             : null;
 
         int matches = 0;
-        boolean changed = !this.initialDataSent;
+        boolean changed = networkChanged || !this.initialDataSent;
         this.initialDataSent = true;
+        ObjectArrayList<ICraftingCPU> matchingCpus = new ObjectArrayList<>();
         for (ICraftingCPU cpu : cpuSet) {
-            boolean found = false;
-            for (int i = 0, size = this.cpus.size(); i < size; i++) {
-                CraftingCPURecord cpuRecord = this.cpus.get(i);
-                if (cpuRecord.getCpu() == cpu) {
-                    found = true;
-                    if (!Objects.equals(cpuRecord.getRawName(), cpu.getName())
-                        || cpuRecord.getSize() != cpu.getAvailableStorage()
-                        || cpuRecord.getProcessors() != cpu.getCoProcessors()) {
-                        changed = true;
-                    }
-                    break;
-                }
-            }
-
             final boolean matched = this.cpuFilter.test(cpu);
             if (matched) {
                 matches++;
-            }
-            if (found != matched) {
+                matchingCpus.add(cpu);
+                CraftingCPURecord cpuRecord = this.activeCpuRecords.get(cpu);
+                if (cpuRecord == null
+                    || !Objects.equals(cpuRecord.getRawName(), cpu.getName())
+                    || cpuRecord.getSize() != cpu.getAvailableStorage()
+                    || cpuRecord.getProcessors() != cpu.getCoProcessors()) {
+                    changed = true;
+                }
+            } else if (this.activeCpuRecords.containsKey(cpu)) {
                 changed = true;
             }
         }
 
-        if (changed || this.cpus.size() != matches) {
+        if (changed || this.cpus.size() != matches || this.activeCpuRecords.size() != matchingCpus.size()) {
             this.cpus.clear();
-            for (ICraftingCPU cpu : cpuSet) {
-                if (this.cpuFilter.test(cpu)) {
-                    this.cpus.add(new CraftingCPURecord(getOrAssignCpuSerial(cpu), cpu.getAvailableStorage(),
-                        cpu.getCoProcessors(), cpu));
-                }
+            Reference2ObjectMap<ICraftingCPU, CraftingCPURecord> refreshedRecords =
+                new Reference2ObjectOpenHashMap<>(matchingCpus.size());
+            for (var i = 0; i < matchingCpus.size(); i++) {
+                var cpu = matchingCpus.get(i);
+                CraftingCPURecord previousRecord = this.activeCpuRecords.get(cpu);
+                int serial = previousRecord != null ? previousRecord.getSerial() : this.nextCpuSerial++;
+                CraftingCPURecord record = new CraftingCPURecord(serial, cpu.getAvailableStorage(),
+                    cpu.getCoProcessors(), cpu);
+                this.cpus.add(record);
+                refreshedRecords.put(cpu, record);
             }
+            this.activeCpuRecords.clear();
+            this.activeCpuRecords.putAll(refreshedRecords);
 
             Collections.sort(this.cpus);
             for (int i = 0; i < this.cpus.size(); i++) {
@@ -111,15 +125,6 @@ public class CraftingCPUCycler {
 
             this.notifyListener();
         }
-    }
-
-    private int getOrAssignCpuSerial(ICraftingCPU cpu) {
-        int serial = this.cpuSerialMap.getInt(cpu);
-        if (serial == 0) {
-            serial = this.nextCpuSerial++;
-            this.cpuSerialMap.put(cpu, serial);
-        }
-        return serial;
     }
 
     public void cycleCpu(boolean next) {

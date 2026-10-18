@@ -27,6 +27,7 @@ import com.google.common.collect.Iterables;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.nbt.NBTTagList;
 
+import java.util.List;
 import java.util.Map;
 
 public class ListCraftingInventory implements ICraftingInventory {
@@ -77,21 +78,18 @@ public class ListCraftingInventory implements ICraftingInventory {
     }
 
     public void readFromNBT(NBTTagList data) {
+        var stacks = data == null ? List.<GenericStack>of() : GenericStack.readList(data);
         list.clear();
-
-        if (data != null) {
-            var stacks = GenericStack.readList(data);
-            for (int i = 0; i < stacks.size(); i++) {
-                var stack = stacks.get(i);
-                if (stack != null) {
-                    insert(stack.what(), stack.amount(), Actionable.MODULATE);
-                }
+        for (int i = 0; i < stacks.size(); i++) {
+            var stack = stacks.get(i);
+            if (stack != null) {
+                insert(stack.what(), stack.amount(), Actionable.MODULATE);
             }
         }
     }
 
     public NBTTagList writeToNBT() {
-        ObjectArrayList<GenericStack> stacks = new ObjectArrayList<>(list.size());
+        ObjectArrayList<GenericStack> stacks = new ObjectArrayList<>();
 
         for (var entry : list) {
             stacks.add(new GenericStack(entry.getKey(), entry.getLongValue()));

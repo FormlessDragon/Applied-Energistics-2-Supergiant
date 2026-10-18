@@ -19,6 +19,7 @@
 package ae2.client.render.cablebus;
 
 import ae2.client.render.VertexFormats;
+import ae2.util.collections.Enum2ByteMap;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -43,7 +44,7 @@ public class CubeBuilder {
     private final EnumMap<EnumFacing, TextureAtlasSprite> textures = new EnumMap<>(
         EnumFacing.class);
     private final EnumMap<EnumFacing, Vector4f> customUv = new EnumMap<>(EnumFacing.class);
-    private final EnumMap<EnumFacing, Byte> uvRotations = new EnumMap<>(EnumFacing.class);
+    private final Enum2ByteMap<EnumFacing> uvRotations = new Enum2ByteMap<>(EnumFacing.class);
     private final EnumSet<EnumFacing> flipU = EnumSet.noneOf(EnumFacing.class);
     private final EnumSet<EnumFacing> flipV = EnumSet.noneOf(EnumFacing.class);
     private VertexFormat format;
@@ -476,7 +477,7 @@ public class CubeBuilder {
         }
         Preconditions.checkArgument(rotation >= 0 && rotation <= 3, "rotation");
         if (rotation == 0) {
-            this.uvRotations.remove(facing);
+            this.uvRotations.removeByte(facing);
         } else {
             this.uvRotations.put(facing, (byte) rotation);
         }

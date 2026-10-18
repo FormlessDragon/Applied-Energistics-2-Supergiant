@@ -1004,12 +1004,14 @@ public class StorageBusPart extends UpgradeablePart
             private void queueThreadInvalidation() {
                 if (this.invalidationQueued.compareAndSet(false, true)) {
                     AELog.error("Storage bus target invoked a callback from the wrong thread; queuing a server-thread invalidation.");
-                    TickHandler.instance().addCallable(null, () -> {
+                    if (!TickHandler.instance().tryAddCallable(null, () -> {
                         this.invalidationQueued.set(false);
                         if (delegateListener == this) {
                             markCacheDirty();
                         }
-                    });
+                    })) {
+                        this.invalidationQueued.set(false);
+                    }
                 }
             }
         }

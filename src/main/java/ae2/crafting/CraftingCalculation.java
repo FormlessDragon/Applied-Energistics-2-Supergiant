@@ -133,12 +133,16 @@ public class CraftingCalculation {
     // The initially requested amount of "output", may be reduced depending on the strategy used
     private final long requestedAmount;
     private final CalculationStrategy strategy;
+    private final long craftingSessionEpoch;
     private final List<CraftAttempt> attempts = AELog.isCraftingLogEnabled() ? new ObjectArrayList<>() : null;
     private boolean simulate = false;
     private boolean allowMissing = false;
     private int missingSuppression = 0;
     private boolean running = false;
     private boolean done = false;
+    private boolean cancelled = false;
+    @Nullable
+    private Thread workerThread;
     private int time = 5;
     private int incTime = Integer.MAX_VALUE;
     private int maxRequestDepth = 0;
@@ -163,10 +167,26 @@ public class CraftingCalculation {
                                 GenericStack output, CalculationStrategy strategy,
                                 CraftingPerformanceListener performanceListener,
                                 @Nullable Object sharedMemoCache) {
+        this(level, grid, simRequester, output, strategy, performanceListener, sharedMemoCache,
+            TickHandler.instance().getCraftingSessionEpoch());
+    }
+
+    public CraftingCalculation(World level, IGrid grid, ICraftingSimulationRequester simRequester,
+                               GenericStack output, CalculationStrategy strategy,
+                               @Nullable Object sharedMemoCache, long craftingSessionEpoch) {
+        this(level, grid, simRequester, output, strategy, createPerformanceListener(), sharedMemoCache,
+            craftingSessionEpoch);
+    }
+
+    private CraftingCalculation(World level, IGrid grid, ICraftingSimulationRequester simRequester,
+                                GenericStack output, CalculationStrategy strategy,
+                                CraftingPerformanceListener performanceListener,
+                                @Nullable Object sharedMemoCache, long craftingSessionEpoch) {
         this.level = level;
         this.output = output.what();
         this.requestedAmount = output.amount();
         this.strategy = strategy;
+        this.craftingSessionEpoch = craftingSessionEpoch;
         this.simRequester = simRequester;
         this.performanceListener = performanceListener;
         this.temporaryProviders = List.copyOf(simRequester.getAdditionalProviders());
@@ -619,10 +639,13 @@ public class CraftingCalculation {
     }
 
     public ICraftingPlan run() throws InterruptedException {
+        this.workerThread = Thread.currentThread();
         long calculationStart = System.nanoTime();
         try {
             startPerformanceListener();
-            TickHandler.instance().registerCraftingSimulation(this.level, this);
+            if (!TickHandler.instance().registerCraftingSimulation(this.level, this, this.craftingSessionEpoch)) {
+                throw new InterruptedException("Crafting calculation session is closed");
+            }
             this.handlePausing();
 
             ICraftingPlan plan;
@@ -655,6 +678,7 @@ public class CraftingCalculation {
             throw new RuntimeException(ex);
         } finally {
             this.finish();
+            this.workerThread = null;
         }
     }
 
@@ -1016,15 +1040,19 @@ public class CraftingCalculation {
                 if (!this.running) {
                     AELog.craftingDebug("crafting job will now sleep");
 
-                    while (!this.running) {
+                    while (!this.running && !this.cancelled) {
                         this.monitor.wait();
+                    }
+
+                    if (this.cancelled) {
+                        throw new InterruptedException("Crafting calculation cancelled");
                     }
 
                     AELog.craftingDebug("crafting job now active");
                 }
             }
 
-            if (Thread.interrupted()) {
+            if (this.cancelled || Thread.interrupted()) {
                 throw new InterruptedException();
             }
         }
@@ -1035,7 +1063,24 @@ public class CraftingCalculation {
         synchronized (this.monitor) {
             this.running = false;
             this.done = true;
-            this.monitor.notify();
+            this.monitor.notifyAll();
+        }
+        TickHandler.instance().unregisterCraftingSimulation(this.level, this);
+    }
+
+    public void cancel() {
+        Thread thread;
+        synchronized (this.monitor) {
+            if (this.done) {
+                return;
+            }
+            this.cancelled = true;
+            this.running = false;
+            this.monitor.notifyAll();
+            thread = this.workerThread;
+        }
+        if (thread != null) {
+            thread.interrupt();
         }
     }
 
@@ -2210,7 +2255,7 @@ public class CraftingCalculation {
         this.time = micros;
 
         synchronized (this.monitor) {
-            if (this.done) {
+            if (this.done || this.cancelled) {
                 return false;
             }
 
@@ -2223,7 +2268,7 @@ public class CraftingCalculation {
 
             this.monitor.notify();
 
-            while (this.running) {
+            while (this.running && !this.cancelled) {
                 try {
                     this.monitor.wait();
                 } catch (InterruptedException ignored) {
@@ -2233,7 +2278,7 @@ public class CraftingCalculation {
             AELog.craftingDebug("main thread is now active");
         }
 
-        return true;
+        return !this.done && !this.cancelled;
     }
 
     private void logCraftingJob(ICraftingPlan plan) {
@@ -2892,7 +2937,9 @@ public class CraftingCalculation {
     }
 
     void putMemoResult(MemoKey key, MemoResult result) {
-        if (this.memoReplayEnabled) {
+        // A missing result depends on the inventory snapshot. Replaying it after the network is replenished would
+        // report the old shortage again; only complete results are safe across calculations.
+        if (this.memoReplayEnabled && result.missingItems.isEmpty()) {
             this.memoCache.put(key, result);
         }
     }
@@ -2927,7 +2974,8 @@ public class CraftingCalculation {
     }
 
     void putBundle(BundleKey key, Bundle bundle) {
-        if (this.memoReplayEnabled) {
+        // Bundles carry the same inventory-dependent missing state as their source memo result.
+        if (this.memoReplayEnabled && bundle.missingItems.isEmpty()) {
             this.memoCache.put(key, bundle);
         }
     }

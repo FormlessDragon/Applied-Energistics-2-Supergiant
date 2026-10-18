@@ -2,6 +2,7 @@ package ae2.client.gui.me.requester;
 
 import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.AEKeyType;
 import ae2.client.gui.MathExpressionParser;
 import ae2.client.gui.NumberEntryType;
 import ae2.client.gui.style.GuiStyle;
@@ -24,6 +25,7 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.ParsePosition;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.LongConsumer;
@@ -52,6 +54,11 @@ public class NumberField extends ConfirmableTextField {
     private String previewCacheText = "";
     private NumberEntryType previewCacheType = this.type;
     private String previewCacheValue = PREVIEW_ERROR;
+    private long lastSetValue;
+    @Nullable
+    private NumberEntryType lastSetType;
+    @Nullable
+    private String lastSetText;
 
     NumberField(int x, int y, GuiText label, GuiStyle style, long minValue, LongConsumer onConfirm) {
         super(style, Minecraft.getMinecraft().fontRenderer, x, y, WIDTH, HEIGHT);
@@ -70,15 +77,15 @@ public class NumberField extends ConfirmableTextField {
 
         this.setVisible(true);
         this.setMaxStringLength(MAX_TEXT_LENGTH);
-        this.setLongValue(0);
         this.setResponder(_ -> validate());
+        this.setLongValue(0);
         this.setOnConfirm(() -> {
-            if (getLongValue().isPresent()) {
-                onConfirm.accept(getLongValue().getAsLong());
+            var value = getLongValue();
+            if (value.isPresent()) {
+                onConfirm.accept(value.getAsLong());
                 setFocused(false);
             }
         });
-        validate();
     }
 
     public void renderWidget(FontRenderer font) {
@@ -171,10 +178,23 @@ public class NumberField extends ConfirmableTextField {
     }
 
     void setLongValue(long value) {
-        var internalValue = convertToInternalValue(Math.max(value, minValue));
-        setText(decimalFormat.format(internalValue));
+        value = Math.max(value, this.minValue);
+        if (value == this.lastSetValue && this.type.equals(this.lastSetType)
+            && getText().equals(this.lastSetText)) {
+            return;
+        }
+
+        var internalValue = convertToInternalValue(value);
+        String text = this.decimalFormat.format(internalValue);
+        boolean changed = !text.equals(getText());
+        setText(text);
         setCursorPositionEnd();
-        validate();
+        if (!changed) {
+            validate();
+        }
+        this.lastSetValue = value;
+        this.lastSetType = this.type;
+        this.lastSetText = getText();
     }
 
     private boolean isNumber() {
@@ -221,13 +241,21 @@ public class NumberField extends ConfirmableTextField {
         if (isFocusedIn && !this.isEnabled()) {
             return;
         }
+        boolean wasFocused = isFocused();
         super.setFocused(isFocusedIn);
+        if (wasFocused != isFocused() && this.decimalFormat != null) {
+            validate();
+        }
     }
 
     void adjustToType(@Nullable AEKey key) {
-        this.type = NumberEntryType.of(key);
-        this.unitSymbol = this.type.unit();
-        this.previewCacheText = "";
+        AEKeyType keyType = key == null ? null : key.getType();
+        int amountPerUnit = keyType == null ? 1 : keyType.getAmountPerUnit();
+        String unit = keyType == null ? null : keyType.getUnitSymbol();
+        if (this.type.amountPerUnit() != amountPerUnit || !Objects.equals(this.unitSymbol, unit)) {
+            this.type = new NumberEntryType(amountPerUnit, unit);
+            this.unitSymbol = unit;
+        }
         if (unitSymbol != null) {
             int unitWidth = Minecraft.getMinecraft().fontRenderer.getStringWidth(unitSymbol);
             resize(WIDTH - unitWidth, HEIGHT);

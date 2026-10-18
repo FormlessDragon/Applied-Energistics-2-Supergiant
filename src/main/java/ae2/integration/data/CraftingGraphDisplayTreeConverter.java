@@ -339,7 +339,7 @@ public final class CraftingGraphDisplayTreeConverter {
             if (requested <= 0) return 0;
             long available = remaining.getLong(key);
             long allocated = Math.min(requested, available);
-            if (allocated > 0) remaining.put(key, available - allocated);
+            if (allocated > 0) remaining.addTo(key, -allocated);
             return allocated;
         }
     }

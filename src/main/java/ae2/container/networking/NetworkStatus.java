@@ -31,13 +31,18 @@ import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.network.PacketBuffer;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 public class NetworkStatus {
-    private static final int MAX_MACHINE_GROUPS = 4096;
+    public static final int MAX_MACHINE_GROUPS = 4096;
     private static final int MIN_MACHINE_GROUP_BYTES = 18;
+    private static final long SHARED_SNAPSHOT_MAX_AGE = 15;
+    private static final ReferenceQueue<IGrid> SHARED_SNAPSHOT_QUEUE = new ReferenceQueue<>();
+    private static final Map<IdentityWeakGridKey, SharedSnapshot> SHARED_SNAPSHOTS = new Object2ObjectOpenHashMap<>();
 
     private double averagePowerInjection;
     private double averagePowerUsage;
@@ -51,6 +56,44 @@ public class NetworkStatus {
     private int channelsUsed;
 
     private List<MachineGroup> groupedMachines = ObjectLists.emptyList();
+
+    /**
+     * Returns one fully constructed status snapshot per grid and short server-tick window.
+     * The cache is deliberately bounded by time and weak grid keys so it cannot keep an unloaded grid alive.
+     */
+    public static synchronized NetworkStatus fromGridShared(IGrid grid, long currentTick) {
+        while (SHARED_SNAPSHOT_QUEUE.poll() instanceof IdentityWeakGridKey expired) {
+            SHARED_SNAPSHOTS.remove(expired);
+        }
+
+        var key = new IdentityWeakGridKey(grid);
+        if (grid.isEmpty()) {
+            SHARED_SNAPSHOTS.remove(key);
+            return fromGrid(grid);
+        }
+
+        var cached = SHARED_SNAPSHOTS.get(key);
+        if (cached != null && currentTick >= cached.sampleTick()
+            && currentTick - cached.sampleTick() <= SHARED_SNAPSHOT_MAX_AGE) {
+            return cached.status();
+        }
+
+        var status = fromGrid(grid);
+        SHARED_SNAPSHOTS.put(new IdentityWeakGridKey(grid, SHARED_SNAPSHOT_QUEUE),
+            new SharedSnapshot(currentTick, status));
+        return status;
+    }
+
+    public static NetworkStatus mergePages(List<NetworkStatus> pages) {
+        if (pages.isEmpty()) {
+            throw new IllegalArgumentException("Cannot merge an empty network status page list");
+        }
+        ObjectList<MachineGroup> groups = new ObjectArrayList<>();
+        for (NetworkStatus page : pages) {
+            groups.addAll(page.groupedMachines);
+        }
+        return pages.getFirst().withGroupedMachines(groups);
+    }
 
     public static NetworkStatus fromGrid(IGrid grid) {
         IEnergyService energyService = grid.getEnergyService();
@@ -96,6 +139,22 @@ public class NetworkStatus {
         status.groupedMachines = List.copyOf(groupedMachines.values());
 
         return status;
+    }
+
+    public NetworkStatus withGroupedMachines(List<MachineGroup> groups) {
+        NetworkStatus copy = new NetworkStatus();
+        copy.averagePowerInjection = this.averagePowerInjection;
+        copy.averagePowerUsage = this.averagePowerUsage;
+        copy.storedPower = this.storedPower;
+        copy.maxStoredPower = this.maxStoredPower;
+        copy.infiniteAveragePowerInjection = this.infiniteAveragePowerInjection;
+        copy.infiniteAveragePowerUsage = this.infiniteAveragePowerUsage;
+        copy.infiniteStoredPower = this.infiniteStoredPower;
+        copy.infiniteMaxStoredPower = this.infiniteMaxStoredPower;
+        copy.channelPower = this.channelPower;
+        copy.channelsUsed = this.channelsUsed;
+        copy.groupedMachines = List.copyOf(groups);
+        return copy;
     }
 
     @Nullable
@@ -194,5 +253,33 @@ public class NetworkStatus {
 
     public List<MachineGroup> getGroupedMachines() {
         return groupedMachines;
+    }
+
+    private record SharedSnapshot(long sampleTick, NetworkStatus status) {
+    }
+
+    private static final class IdentityWeakGridKey extends WeakReference<IGrid> {
+        private final int hash;
+
+        IdentityWeakGridKey(IGrid grid) {
+            super(grid);
+            this.hash = System.identityHashCode(grid);
+        }
+
+        IdentityWeakGridKey(IGrid grid, ReferenceQueue<IGrid> queue) {
+            super(grid, queue);
+            this.hash = System.identityHashCode(grid);
+        }
+
+        @Override
+        public int hashCode() {
+            return this.hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            IGrid grid = this.get();
+            return grid != null && obj instanceof IdentityWeakGridKey other && grid == other.get();
+        }
     }
 }

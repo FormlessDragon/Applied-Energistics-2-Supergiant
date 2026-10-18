@@ -6,6 +6,7 @@ import ae2.api.networking.crafting.ICraftingLink;
 import ae2.api.networking.crafting.ICraftingRequester;
 import ae2.api.stacks.AEKey;
 import net.minecraft.nbt.NBTTagCompound;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -83,17 +84,17 @@ public class CraftingLink implements ICraftingLink {
 
     @Override
     public void cancel() {
-        if (this.done) {
+        if (this.isDone() || this.isCanceled()) {
             return;
         }
 
         this.setCanceled(true);
 
-        if (this.tie != null) {
-            this.tie.cancel();
-        }
-
+        var nexus = this.tie;
         this.tie = null;
+        if (nexus != null) {
+            nexus.cancel();
+        }
     }
 
     @Override
@@ -115,14 +116,24 @@ public class CraftingLink implements ICraftingLink {
         return this.craftId;
     }
 
-    public void setNexus(CraftingLinkNexus nexus) {
+    public void setNexus(@Nullable CraftingLinkNexus nexus) {
+        boolean canceled = this.isCanceled();
+        boolean done = this.isDone();
         if (this.tie != null) {
             this.tie.remove(this);
         }
+        this.tie = null;
 
-        if (this.isCanceled() && nexus != null) {
-            nexus.cancel();
-            this.tie = null;
+        if (canceled || done) {
+            this.setCanceled(canceled);
+            this.setDone(done);
+            if (nexus != null) {
+                if (canceled) {
+                    nexus.cancel();
+                } else {
+                    nexus.markDone();
+                }
+            }
             return;
         }
 
@@ -138,7 +149,7 @@ public class CraftingLink implements ICraftingLink {
             return 0;
         }
 
-        if (this.tie.isCanceled()) {
+        if (this.tie.isCanceled() || this.tie.isDone()) {
             return 0;
         }
 
@@ -146,6 +157,10 @@ public class CraftingLink implements ICraftingLink {
     }
 
     public void markDone() {
+        if (this.isCanceled() || this.isDone()) {
+            return;
+        }
+        this.setDone(true);
         if (this.tie != null) {
             this.tie.markDone();
         }

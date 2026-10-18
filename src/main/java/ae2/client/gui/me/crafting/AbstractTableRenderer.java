@@ -64,6 +64,16 @@ public abstract class AbstractTableRenderer<T> {
     private T hoveredEntry;
     private final Reference2ObjectMap<T, List<String>> descriptionCache = new Reference2ObjectOpenHashMap<>();
 
+    /**
+     * Clears descriptions and hover state when the owning screen publishes a new table snapshot.
+     */
+    public final void clearSnapshotCache() {
+        this.descriptionCache.clear();
+        this.hoveredStack = null;
+        this.hoveredTooltip = null;
+        this.hoveredEntry = null;
+    }
+
     public AbstractTableRenderer(AEBaseGui<?> screen, int x, int y, int rows) {
         this.screen = screen;
         this.x = x;

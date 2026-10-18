@@ -9,8 +9,6 @@ import java.util.List;
 import java.util.Objects;
 
 final class GenericStackListCodec {
-    private static final int MAX_STACK_LIST_ENTRIES = 1024;
-
     private GenericStackListCodec() {
     }
 
@@ -25,10 +23,25 @@ final class GenericStackListCodec {
         return output;
     }
 
+    public static NBTTagList encode(GenericStack[] input) {
+        Objects.requireNonNull(input, "input");
+
+        var output = new NBTTagList();
+        for (var genericStack : input) {
+            output.appendTag(GenericStack.writeTag(genericStack));
+        }
+
+        return output;
+    }
+
     public static List<@Nullable GenericStack> decode(NBTTagList input) {
         Objects.requireNonNull(input, "input");
 
-        int count = Math.min(input.tagCount(), MAX_STACK_LIST_ENTRIES);
+        if (input.tagCount() > 0 && input.getTagType() != 10) {
+            throw new IllegalArgumentException("GenericStack list must contain compounds");
+        }
+        // The outer NBT reader owns the input budget; saved resources must never be silently truncated.
+        int count = input.tagCount();
         List<GenericStack> output = new ObjectArrayList<>(count);
         for (int i = 0; i < count; i++) {
             var tag = input.getCompoundTagAt(i);

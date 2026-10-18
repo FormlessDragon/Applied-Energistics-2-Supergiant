@@ -36,6 +36,11 @@ public class GuiRequester extends AbstractGuiRequester<ContainerRequester> {
     }
 
     @Override
+    protected void clearData() {
+        this.requesterReference = null;
+    }
+
+    @Override
     protected void refreshList() {
         this.lines.clear();
 
@@ -75,6 +80,15 @@ public class GuiRequester extends AbstractGuiRequester<ContainerRequester> {
         return this.requesterReference != null && this.requesterReference.getRequesterId() == requesterId
             ? this.requesterReference
             : null;
+    }
+
+    @Override
+    protected boolean removeRequester(long requesterId) {
+        if (findById(requesterId) == null) {
+            return false;
+        }
+        clearData();
+        return true;
     }
 
     @Override

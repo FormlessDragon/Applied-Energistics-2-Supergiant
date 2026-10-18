@@ -145,6 +145,19 @@ public class InterfacePart extends AEBasePart implements InterfaceLogicHost {
     }
 
     @Override
+    public void removeFromWorld() {
+        this.logic.suspendCraftingCalculations();
+        super.removeFromWorld();
+    }
+
+    @Override
+    public void addToWorld() {
+        long generation = this.logic.suspendCraftingCalculations();
+        super.addToWorld();
+        this.logic.resumeCraftingCalculations(generation);
+    }
+
+    @Override
     public Set<EnumFacing> getTargets() {
         var side = getSide();
         return side == null ? EnumSet.noneOf(EnumFacing.class) : EnumSet.of(side);

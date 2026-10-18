@@ -49,6 +49,7 @@ import java.util.List;
 
 public class CraftingTreeWidget implements ICompositeWidget {
     private static final int SCREENSHOT_TILE_SIZE = 2048;
+    private static final long MAX_SCREENSHOT_IMAGE_BYTES = 64L * 1024 * 1024;
 
     private static final int LINE_WIDTH = 1;
     private static final int LINE_HEIGHT = 2;
@@ -369,9 +370,25 @@ public class CraftingTreeWidget implements ICompositeWidget {
 
         Minecraft minecraft = Minecraft.getMinecraft();
         int renderScale = new ScaledResolution(minecraft).getScaleFactor();
-        int width = Math.max(1, getTotalWidth() + NODE_MARGIN_LEFT);
-        int height = Math.max(1, getTotalHeight());
-        BufferedImage image = new BufferedImage(width * renderScale, height * renderScale, BufferedImage.TYPE_INT_ARGB);
+        long logicalWidth = (long) getTotalWidth() + NODE_MARGIN_LEFT;
+        long logicalHeight = getTotalHeight();
+        long imageWidth = Math.max(1L, logicalWidth) * renderScale;
+        long imageHeight = Math.max(1L, logicalHeight) * renderScale;
+        long imageBytes;
+        try {
+            imageBytes = Math.multiplyExact(Math.multiplyExact(imageWidth, imageHeight), Integer.BYTES);
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException("Crafting tree screenshot dimensions overflow", e);
+        }
+        if (imageWidth > Integer.MAX_VALUE || imageHeight > Integer.MAX_VALUE
+            || imageBytes > MAX_SCREENSHOT_IMAGE_BYTES) {
+            throw new IllegalArgumentException(String.format(
+                "Crafting tree screenshot is too large: %dx%d pixels (%d bytes, max %d)",
+                imageWidth, imageHeight, imageBytes, MAX_SCREENSHOT_IMAGE_BYTES));
+        }
+        int width = (int) Math.max(1L, logicalWidth);
+        int height = (int) Math.max(1L, logicalHeight);
+        BufferedImage image = new BufferedImage((int) imageWidth, (int) imageHeight, BufferedImage.TYPE_INT_ARGB);
         int tileSize = Math.max(1, getScreenshotTileSize() / renderScale);
         Graphics2D graphics = image.createGraphics();
         try {
@@ -382,11 +399,15 @@ public class CraftingTreeWidget implements ICompositeWidget {
                     int framebufferWidth = tileWidth * renderScale;
                     int framebufferHeight = tileHeight * renderScale;
                     ScreenshotFramebuffer framebuffer = new ScreenshotFramebuffer(framebufferWidth, framebufferHeight);
+                    BufferedImage tile = null;
                     try {
                         renderScreenshotTile(framebuffer, tileX, tileY, tileWidth, tileHeight, renderScale);
-                        BufferedImage tile = readFramebuffer(framebuffer, framebufferWidth, framebufferHeight);
+                        tile = readFramebuffer(framebuffer, framebufferWidth, framebufferHeight);
                         graphics.drawImage(tile, tileX * renderScale, tileY * renderScale, null);
                     } finally {
+                        if (tile != null) {
+                            tile.flush();
+                        }
                         framebuffer.delete();
                         restoreMainFramebuffer(minecraft);
                     }
@@ -638,7 +659,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
             TreeRow row = rows.get(depth);
             int width = row.getWidth();
             while (width < maxWidth) {
-                row.widgets.add(row.createPlaceholder());
+                row.addWidget(row.createPlaceholder());
                 width += NODE_TOTAL_WIDTH;
             }
         }
@@ -650,7 +671,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
         }
         TreeRow row = rows.get(depth);
         for (int i = 0; i < count; i++) {
-            row.widgets.add(new Placeholder(height));
+            row.addWidget(new Placeholder(height));
         }
     }
 
@@ -661,7 +682,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
 
         TreeRow row = rows.get(depth);
         node.row = row;
-        row.widgets.add(node);
+        row.addWidget(node);
         if (node.countsAsNode()) {
             nodes++;
         }
@@ -688,6 +709,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
 
     private void alignJunctionToRowBottom(TreeNode junction) {
         junction.marginTop = Math.max(0, junction.row.getHeight() - LINE_TOTAL_HEIGHT);
+        junction.row.invalidateHeight();
     }
 
     @Nullable
@@ -697,15 +719,9 @@ public class CraftingTreeWidget implements ICompositeWidget {
         for (TreeRow row : rows) {
             int rowHeight = row.getHeight();
             if (y + rowHeight >= 0 && y <= scaledHeight) {
-                int x = offsetX;
-                for (RowElement element : row.widgets) {
-                    if (element instanceof TreeNode node) {
-                        node.currentPosition = new Point(x + NODE_MARGIN_LEFT, y + node.marginTop);
-                        if (node.isMouseOver(treeMouse)) {
-                            return node;
-                        }
-                    }
-                    x += element.getFullWidth();
+                TreeNode node = row.findNodeAt(treeMouse, offsetX, y);
+                if (node != null) {
+                    return node;
                 }
             }
             y += rowHeight;
@@ -893,9 +909,23 @@ public class CraftingTreeWidget implements ICompositeWidget {
         int getFullWidth();
 
         int getFullHeight();
+
+        boolean hasPos();
+
+        int getPos();
+
+        void setPos(int pos);
     }
 
-    private record Placeholder(int height) implements RowElement {
+    private static class Placeholder implements RowElement {
+
+        private final int height;
+        private int pos;
+        private boolean hasPos;
+
+        private Placeholder(int height) {
+            this.height = height;
+        }
 
         @Override
         public int getFullWidth() {
@@ -905,6 +935,22 @@ public class CraftingTreeWidget implements ICompositeWidget {
         @Override
         public int getFullHeight() {
             return height;
+        }
+
+        @Override
+        public boolean hasPos() {
+            return hasPos;
+        }
+
+        @Override
+        public int getPos() {
+            return pos;
+        }
+
+        @Override
+        public void setPos(int pos) {
+            hasPos = true;
+            this.pos = pos;
         }
     }
 
@@ -978,6 +1024,8 @@ public class CraftingTreeWidget implements ICompositeWidget {
 
     private final class TreeRow {
         private final List<RowElement> widgets = new ObjectArrayList<>();
+        private int width;
+        private int height;
 
         private void render(Point rowPosition, int renderWidth, Point mouse) {
             render(rowPosition, renderWidth, mouse, true);
@@ -1018,30 +1066,70 @@ public class CraftingTreeWidget implements ICompositeWidget {
         }
 
         private Point getRelativePosition(TreeNode node) {
-            int x = 0;
-            for (RowElement element : widgets) {
-                if (element == node) {
-                    return new Point(x + NODE_MARGIN_LEFT, node.marginTop);
-                }
-                x += element.getFullWidth();
+            if (node.hasPos()) {
+                int x = node.getPos();
+                return new Point(x + NODE_MARGIN_LEFT, node.marginTop);
             }
             return null;
         }
 
         private int getWidth() {
-            int width = 0;
-            for (RowElement element : widgets) {
-                width += element.getFullWidth();
-            }
             return width;
         }
 
         private int getHeight() {
-            int height = 0;
+            return height;
+        }
+
+        private void addWidget(RowElement element) {
+            element.setPos(width);
+            width += element.getFullWidth();
+            height = Math.max(height, element.getFullHeight());
+            widgets.add(element);
+        }
+
+        private void invalidateHeight() {
+            height = 0;
             for (RowElement element : widgets) {
                 height = Math.max(height, element.getFullHeight());
             }
-            return height;
+        }
+
+        @Nullable
+        private TreeNode findNodeAt(Point mouse, int rowX, int rowY) {
+            if (widgets.isEmpty()) {
+                return null;
+            }
+
+            int localX = mouse.x() - rowX;
+            int threshold = localX - NODE_MARGIN_LEFT;
+            int low = 0;
+            int high = widgets.size();
+            while (low < high) {
+                int middle = (low + high) >>> 1;
+                RowElement element = widgets.get(middle);
+                int start = element.getPos();
+                if (start + element.getFullWidth() <= threshold) {
+                    low = middle + 1;
+                } else {
+                    high = middle;
+                }
+            }
+
+            for (int i = low; i < widgets.size(); i++) {
+                RowElement element = widgets.get(i);
+                int start = element.getPos();
+                if (start > localX + NODE_WIDTH) {
+                    break;
+                }
+                if (element instanceof TreeNode node) {
+                    node.currentPosition = new Point(rowX + start + NODE_MARGIN_LEFT, rowY + node.marginTop);
+                    if (node.isMouseOver(mouse)) {
+                        return node;
+                    }
+                }
+            }
+            return null;
         }
 
         private Placeholder createPlaceholder() {
@@ -1078,6 +1166,8 @@ public class CraftingTreeWidget implements ICompositeWidget {
         private TreeNode previous;
         private TreeNode next;
         private Point currentPosition = Point.ZERO;
+        private int pos;
+        private boolean hasPos;
 
         private TreeNode(@NotNull LiteCraftTreeNode node) {
             this.node = node;
@@ -1112,6 +1202,22 @@ public class CraftingTreeWidget implements ICompositeWidget {
         @Override
         public int getFullHeight() {
             return marginTop + (junction ? LINE_TOTAL_HEIGHT : NODE_TOTAL_HEIGHT);
+        }
+
+        @Override
+        public boolean hasPos() {
+            return hasPos;
+        }
+
+        @Override
+        public int getPos() {
+            return pos;
+        }
+
+        @Override
+        public void setPos(int pos) {
+            hasPos = true;
+            this.pos = pos;
         }
 
         private int getChildLinkRenderWidth() {

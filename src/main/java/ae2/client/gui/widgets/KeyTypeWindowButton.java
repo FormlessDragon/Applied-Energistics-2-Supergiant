@@ -5,7 +5,7 @@ import ae2.client.gui.Icon;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Objects;
@@ -51,7 +51,7 @@ public class KeyTypeWindowButton extends IconButton {
     }
 
     @Override
-    public @NonNull List<ITextComponent> getTooltipMessage() {
+    public @NotNull List<ITextComponent> getTooltipMessage() {
         StringJoiner joiner = new StringJoiner(", ");
         for (AEKeyType keyType : this.enabledTypesSupplier.get()) {
             joiner.add(keyType.getDescription().getFormattedText());

@@ -8,7 +8,7 @@ import ae2.parts.storagebus.StorageBusPart;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.util.ResourceLocation;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 import java.util.List;
@@ -33,7 +33,7 @@ public final class StorageBusScanner implements CellTerminalScanner.Bus {
     }
 
     @Override
-    public @NonNull List<? extends CellTerminalBusTarget> scan(IGrid grid) {
+    public @NotNull List<? extends CellTerminalBusTarget> scan(IGrid grid) {
         var result = new ObjectArrayList<CellTerminalBusTarget>();
         for (var storageBus : storageBuses(grid)) {
             if (storageBus.getSide() != null) {

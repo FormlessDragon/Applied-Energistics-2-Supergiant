@@ -41,6 +41,9 @@ import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.crafting.execution.CraftingSupplierLocator;
 import ae2.util.ContiguousGrouping;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
@@ -55,6 +58,7 @@ import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.text.TextFormatting;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
@@ -126,7 +130,7 @@ public class CPUSelectionList implements ICompositeWidget {
     private final GuiStyle style;
     private final AETextField searchField;
     private final List<HeaderSettingButton<?>> headerButtons;
-    private final List<RowModeButton> rowModeButtons = new ObjectArrayList<>();
+    private final Int2ObjectMap<RowModeButton> rowModeButtons = new Int2ObjectOpenHashMap<>();
     private final ViewState viewState = new ViewState();
     private final ObjectArrayList<ContainerCraftingStatus.CraftingCpuListEntry> visibleCpus = new ObjectArrayList<>();
     private Rectangle bounds = new Rectangle(0, 0, 0, 0);
@@ -212,16 +216,20 @@ public class CPUSelectionList implements ICompositeWidget {
         return text.setStyle(new Style().setColor(TextFormatting.GRAY));
     }
 
-    private static String normalizedName(ContainerCraftingStatus.CraftingCpuListEntry cpu) {
-        return getCpuNameStatic(cpu).getFormattedText().toLowerCase(Locale.ROOT);
+    private static String normalizedName(ContainerCraftingStatus.CraftingCpuListEntry cpu,
+                                         Int2ObjectMap<String> cache) {
+        return cache.computeIfAbsent(cpu.serial(), ignored ->
+            getCpuNameStatic(cpu).getFormattedText().toLowerCase(Locale.ROOT));
     }
 
-    @Nullable
-    private static String normalizedOutputName(ContainerCraftingStatus.CraftingCpuListEntry cpu) {
-        var currentJob = cpu.currentJob();
-        return currentJob == null
-            ? null
-            : currentJob.what().getDisplayName().getFormattedText().toLowerCase(Locale.ROOT);
+    private static @NotNull String normalizedOutputName(ContainerCraftingStatus.CraftingCpuListEntry cpu,
+                                                        Int2ObjectMap<String> cache) {
+        return cache.computeIfAbsent(cpu.serial(), ignored -> {
+            var currentJob = cpu.currentJob();
+            return currentJob == null
+                ? ""
+                : currentJob.what().getDisplayName().getFormattedText().toLowerCase(Locale.ROOT);
+        });
     }
 
     static String getRenameInitialText(ContainerCraftingStatus.CraftingCpuListEntry cpu) {
@@ -234,6 +242,25 @@ public class CPUSelectionList implements ICompositeWidget {
 
     private static boolean isActive(ContainerCraftingStatus.CraftingCpuListEntry cpu) {
         return cpu.currentJob() != null;
+    }
+
+    private static boolean matchesSearch(String normalizedSearch,
+                                         ContainerCraftingStatus.CraftingCpuListEntry cpu,
+                                         Int2ObjectMap<String> nameCache,
+                                         Int2ObjectMap<String> outputCache) {
+        if (normalizedSearch.isEmpty()) {
+            return true;
+        }
+        if (normalizedSearch.startsWith("#")) {
+            return CraftingCpuSearch.matches(normalizedSearch, normalizedName(cpu, nameCache), null);
+        }
+        if (normalizedSearch.startsWith("$")) {
+            return CraftingCpuSearch.matches(normalizedSearch, null, normalizedOutputName(cpu, outputCache));
+        }
+        return CraftingCpuSearch.matches(
+            normalizedSearch,
+            normalizedName(cpu, nameCache),
+            normalizedOutputName(cpu, outputCache));
     }
 
     private static void drawScaledString(String text, int x, int y, int color) {
@@ -655,6 +682,11 @@ public class CPUSelectionList implements ICompositeWidget {
         lastViewResult = result;
         lastCpuList = cpuList;
         lastSelectedCpuSerial = selectedCpuSerial;
+        var currentSerials = new IntOpenHashSet(cpuList.cpus().size());
+        for (var cpu : cpuList.cpus()) {
+            currentSerials.add(cpu.serial());
+        }
+        this.rowModeButtons.keySet().removeIf(serial -> !currentSerials.contains(serial));
         visibleCpus.clear();
         visibleCpus.addAll(result.visibleCpus());
         int hiddenRows = Math.max(0, visibleCpus.size() - getVisibleRows());
@@ -752,16 +784,15 @@ public class CPUSelectionList implements ICompositeWidget {
     private RowModeButton getOrCreateRowModeButton(ContainerCraftingStatus.CraftingCpuListEntry cpu, int buttonX,
                                                    int buttonY) {
 
-        for (var rowModeButton : rowModeButtons) {
-            if (rowModeButton.cpuSerial() == cpu.serial()) {
-                rowModeButton.moveTo(buttonX, buttonY);
-                rowModeButton.set(cpu.mode());
-                return rowModeButton;
-            }
+        var rowModeButton = rowModeButtons.get(cpu.serial());
+        if (rowModeButton != null) {
+            rowModeButton.moveTo(buttonX, buttonY);
+            rowModeButton.set(cpu.mode());
+            return rowModeButton;
         }
 
-        var rowModeButton = new RowModeButton(cpu.serial(), cpu.mode(), buttonX, buttonY);
-        rowModeButtons.add(rowModeButton);
+        rowModeButton = new RowModeButton(cpu.serial(), cpu.mode(), buttonX, buttonY);
+        rowModeButtons.put(cpu.serial(), rowModeButton);
         return rowModeButton;
     }
 
@@ -1357,12 +1388,15 @@ public class CPUSelectionList implements ICompositeWidget {
 
         public ViewResult compute(List<ContainerCraftingStatus.CraftingCpuListEntry> cpus, int selectedCpuSerial) {
             String normalizedSearch = searchText.trim().toLowerCase(Locale.ROOT);
-            Comparator<ContainerCraftingStatus.CraftingCpuListEntry> comparator = comparator();
+            Int2ObjectMap<String> nameCache = new Int2ObjectOpenHashMap<>();
+            Int2ObjectMap<String> outputCache = new Int2ObjectOpenHashMap<>();
+            Comparator<ContainerCraftingStatus.CraftingCpuListEntry> comparator = comparator(nameCache);
             List<ContainerCraftingStatus.CraftingCpuListEntry> filtered = cpus.stream()
-                                                                              .filter(cpu -> CraftingCpuSearch.matches(
+                                                                              .filter(cpu -> matchesSearch(
                                                                                   normalizedSearch,
-                                                                                  normalizedName(cpu),
-                                                                                  normalizedOutputName(cpu)))
+                                                                                  cpu,
+                                                                                  nameCache,
+                                                                                  outputCache))
                                                                               .filter(cpu -> modeFilter.matches(cpu.mode()))
                                                                               .filter(activityFilter::matches)
                                                                               .sorted(comparator)
@@ -1381,11 +1415,11 @@ public class CPUSelectionList implements ICompositeWidget {
             return new ViewResult(filtered, resolvedSelectedCpuSerial);
         }
 
-        private Comparator<ContainerCraftingStatus.CraftingCpuListEntry> comparator() {
+        private Comparator<ContainerCraftingStatus.CraftingCpuListEntry> comparator(Int2ObjectMap<String> nameCache) {
             Comparator<ContainerCraftingStatus.CraftingCpuListEntry> comparator = switch (sortMode) {
                 case NAME -> sortDirection == SortDirection.ASCENDING
-                    ? Comparator.comparing(CPUSelectionList::normalizedName)
-                    : Comparator.comparing(CPUSelectionList::normalizedName, Comparator.reverseOrder());
+                    ? Comparator.comparing(cpu -> normalizedName(cpu, nameCache))
+                    : Comparator.comparing(cpu -> normalizedName(cpu, nameCache), Comparator.reverseOrder());
                 case CAPACITY -> sortDirection == SortDirection.ASCENDING
                     ? Comparator.comparingLong(ContainerCraftingStatus.CraftingCpuListEntry::storage)
                     : Comparator.comparingLong(ContainerCraftingStatus.CraftingCpuListEntry::storage).reversed();
@@ -1400,7 +1434,7 @@ public class CPUSelectionList implements ICompositeWidget {
                     : Comparator.comparingInt(ContainerCraftingStatus.CraftingCpuListEntry::priority).reversed();
             };
 
-            return comparator.thenComparing(CPUSelectionList::normalizedName)
+            return comparator.thenComparing(cpu -> normalizedName(cpu, nameCache))
                              .thenComparingInt(ContainerCraftingStatus.CraftingCpuListEntry::serial);
         }
     }

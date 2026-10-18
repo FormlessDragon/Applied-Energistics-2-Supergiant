@@ -116,7 +116,7 @@ public final class TransformLogic {
                 e -> e != null && !e.isDead);
 
             List<Ingredient> missing = new ObjectArrayList<>(recipe.getIngredients());
-            Reference2IntMap<EntityItem> consumed = new Reference2IntOpenHashMap<>();
+            Reference2IntOpenHashMap<EntityItem> consumed = new Reference2IntOpenHashMap<>();
             consumed.defaultReturnValue(0);
 
             if (recipe.getCircumstance().isExplosion()) {
@@ -137,7 +137,7 @@ public final class TransformLogic {
                     Ingredient ingredient = iterator.next();
                     int alreadyClaimed = consumed.getInt(itemEntity);
                     if (ingredient.apply(stack) && stack.getCount() - alreadyClaimed > 0) {
-                        consumed.put(itemEntity, alreadyClaimed + 1);
+                        consumed.addTo(itemEntity, 1);
                         iterator.remove();
                         break;
                     }

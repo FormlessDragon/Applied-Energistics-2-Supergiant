@@ -122,7 +122,8 @@ mcpForge {
     runs {
         configureEach {
             programArguments.addAll('--username', propertyString('minecraft_username'))
-            systemProperty('crl.dev.mixin', 'ae2.default.mixins.json,ae2.mod.mixins.json')
+            systemProperty('net.minecraftforge.gradle.GradleStart.srg.srg-mcp',
+                layout.buildDirectory.file('moddev/artifacts/intermediateToNamed.srg').get().asFile.absolutePath)
             systemProperty('mixin.debug.export', 'true')
             def extraArgs = propertyString('extra_jvm_args')
             if (extraArgs != null && !extraArgs.trim().isEmpty()) {
@@ -154,6 +155,16 @@ mcpForge {
     }
 }
 
+tasks.named('runClient') {
+    dependsOn 'syncDevResourcesToClasses'
+    dependsOn 'syncDevClassesToResources'
+}
+
+tasks.named('runServer') {
+    dependsOn 'syncDevResourcesToClasses'
+    dependsOn 'syncDevClassesToResources'
+}
+
 if (propertyBool('enable_shadow')) {
     def reobfShadowJar = obfuscation.reobfuscate(tasks.named('shadowJar'), sourceSets.main)
     reobfTaskName = reobfShadowJar.name
@@ -180,7 +191,7 @@ if (useMixins) {
 dependencies {
     if (useMixins) {
         annotationProcessor 'com.cleanroommc:mixinextras-common:0.5.5'
-        annotationProcessor 'com.cleanroommc:cleanmix:0.7.2'
+        annotationProcessor "com.cleanroommc:cleanmix:${propertyString('cleanmix_version')}"
     }
     if (propertyBool('use_lombok_ap')) {
         compileOnly "org.projectlombok:lombok:${propertyString('lombok_version')}"

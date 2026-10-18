@@ -22,6 +22,7 @@ import ae2.api.networking.ticking.TickRateModulation;
 import ae2.api.networking.ticking.TickingRequest;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.AEKey2LongMap;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.MEStorage;
@@ -31,9 +32,11 @@ import ae2.api.util.AECableType;
 import ae2.api.util.IConfigManager;
 import ae2.api.util.IConfigurableObject;
 import ae2.client.render.crafting.AssemblerAnimationStatus;
+import ae2.container.ContainerConstants;
 import ae2.container.GuiIds;
 import ae2.container.ISubGui;
 import ae2.core.AEConfig;
+import ae2.core.AELog;
 import ae2.core.definitions.AEBlocks;
 import ae2.core.definitions.AEItems;
 import ae2.core.gui.GuiOpener;
@@ -53,10 +56,11 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.Container;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
@@ -65,9 +69,12 @@ import net.minecraftforge.common.util.Constants;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 public class TileMolecularAssembler extends AENetworkedTile implements IUpgradeableObject, IGridTickable,
     ICraftingProvider, PatternContainer, IPriorityHost, IConfigurableObject, InternalInventoryHost {
@@ -76,23 +83,22 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     private static final String NBT_UPGRADES = "upgrades";
     private static final String NBT_PRIORITY = "priority";
     private static final String NBT_CACHED_OUTPUTS = "cachedOutputs";
+    private static final String NBT_CACHED_INPUTS = "cachedInputs";
     private static final String NBT_PENDING_CRAFTS = "pendingCrafts";
     private static final String NBT_MAIN_OUTPUT = "mainOutput";
     private static final String NBT_OUTPUT_BUFFER = "outputBuffer";
+    private static final String NBT_OUTPUT_TRANSFER = "outputTransfer";
+    private static final String NBT_COMPLETED_OUTPUTS = "completedOutputs";
     private static final String NBT_CURRENT_PATTERN = "currentPattern";
     private static final String NBT_PROGRESS = "progress";
+    private static final List<String> CRAFT_DATA_KEYS = List.of(NBT_CACHED_INPUTS, NBT_CACHED_OUTPUTS,
+        NBT_PENDING_CRAFTS, NBT_MAIN_OUTPUT, NBT_CURRENT_PATTERN, NBT_PROGRESS);
     private static final int BASE_INPUT_BUFFER_SLOTS = 9;
     private static final int OUTPUT_BUFFER_SLOTS = BASE_INPUT_BUFFER_SLOTS + 1;
     private static final int MAX_CRAFT_PROGRESS = 100;
 
-    private static final Container NULL_CONTAINER = new Container() {
-        @Override
-        public boolean canInteractWith(EntityPlayer playerIn) {
-            return false;
-        }
-    };
 
-    private final InventoryCrafting craftingInv = new InventoryCrafting(NULL_CONTAINER, 3, 3);
+    private final InventoryCrafting craftingInv = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, 3, 3);
     private final IConfigManager configManager = IConfigManager.builder(this::onConfigChanged)
                                                                .registerSetting(Settings.PATTERN_ACCESS_TERMINAL,
                                                                    YesNo.YES)
@@ -103,11 +109,21 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         new PatternFilter());
     private final InternalInventory terminalPatternInventory = new ActivePatternInventory();
     private long terminalContentsVersion;
+    private final CraftOutputBuffer outputBuffer = new CraftOutputBuffer();
+    private int indexedPatternSlots = -1;
     private final IUpgradeInventory upgrades = new MolecularAssemblerUpgradeInventory(this);
-    private final ObjectList<GenericStack> cachedOutputs = new ObjectArrayList<>();
-    private final ObjectList<IAssemblerPattern> patterns = new ObjectArrayList<>();
-    private final ObjectOpenHashSet<AEItemKey> patternKeys = new ObjectOpenHashSet<>();
-    private final GenericStackInv outputBuffer = new GenericStackInv(this::onBufferChanged, OUTPUT_BUFFER_SLOTS);
+    private Object patternGeneration = new Object();
+    private ObjectList<GenericStack> cachedOutputs = new ObjectArrayList<>();
+    private ObjectList<GenericStack> cachedInputs = new ObjectArrayList<>();
+    private ObjectList<IAssemblerPattern> patterns = new ObjectArrayList<>();
+    private ObjectOpenHashSet<AEItemKey> patternKeys = new ObjectOpenHashSet<>();
+    private ArrayDeque<GenericStack> completedOutputs = new ArrayDeque<>();
+    private long outputBufferRevision;
+    @Nullable
+    private ArrayDeque<GenericStack> blockedOutputQueue;
+    private long blockedOutputRevision;
+    @Nullable
+    private NBTBase unresolvedCompletedOutputs;
     private final IActionSource actionSource = new MachineSource(this::getGridNode);
     private int priority;
     @Nullable
@@ -116,6 +132,15 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     @Nullable
     private GenericStack currentMainOutput;
     private int pendingCrafts;
+    private Object craftGeneration = new Object();
+    private boolean preparingPush;
+    private boolean injectingOutput;
+    private boolean preparingOutputs;
+    private UUID outputGeneration = UUID.randomUUID();
+    @Nullable
+    private NBTBase outputTransfer;
+    @Nullable
+    private NBTTagCompound unresolvedCraft;
     private boolean powered;
     private boolean patternsActive;
     private double progress;
@@ -132,32 +157,49 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
             .addService(ICraftingProvider.class, this);
     }
 
+    private static ObjectList<GenericStack> readCraftStacks(NBTTagCompound data, String key) {
+        ObjectList<GenericStack> result = new ObjectArrayList<>();
+        if (!data.hasKey(key)) {
+            return result;
+        }
+        if (!(data.getTag(key) instanceof NBTTagList list)
+            || list.tagCount() > 0 && list.getTagType() != Constants.NBT.TAG_COMPOUND) {
+            throw new IllegalArgumentException("Invalid craft list " + key);
+        }
+        // This is durable custody, so every saved entry must be read or the entire batch retained as unresolved.
+        for (int index = 0; index < list.tagCount(); index++) {
+            var tag = list.getCompoundTagAt(index);
+            result.add(readCraftStack(tag));
+        }
+        return result;
+    }
+
+    private static void requireCraftTagType(NBTTagCompound data, String key, int type) {
+        if (data.hasKey(key) && !data.hasKey(key, type)) {
+            throw new IllegalArgumentException("Invalid craft metadata type " + key);
+        }
+    }
+
+    private static GenericStack readCraftStack(NBTTagCompound tag) {
+        var what = AEKey.fromTagGeneric(tag);
+        if (what == null || !tag.hasKey(GenericStack.AMOUNT_FIELD, Constants.NBT.TAG_LONG)
+            || tag.getLong(GenericStack.AMOUNT_FIELD) <= 0
+            || what instanceof AEItemKey itemKey && AEItems.MISSING_CONTENT.is(itemKey)) {
+            throw new IllegalArgumentException("Unresolved craft resource");
+        }
+        return new GenericStack(what, tag.getLong(GenericStack.AMOUNT_FIELD));
+    }
+
     @Override
     public void onReady() {
         super.onReady();
         if (this.world != null && !this.world.isRemote) {
             this.updatePatterns();
+            if (this.hasPendingCraftEscrow()) {
+                this.recalculateCurrentPattern();
+            }
             this.updatePoweredState();
             this.updateSleepiness();
-        }
-    }
-
-    @Override
-    public void saveAdditional(NBTTagCompound data) {
-        super.saveAdditional(data);
-        this.configManager.writeToNBT(data);
-        this.patternInventory.writeToNBT(data, NBT_PATTERNS);
-        this.upgrades.writeToNBT(data, NBT_UPGRADES);
-        data.setInteger(NBT_PRIORITY, this.priority);
-        this.writeCachedOutputs(data);
-        data.setInteger(NBT_PENDING_CRAFTS, this.pendingCrafts);
-        data.setTag(NBT_MAIN_OUTPUT, GenericStack.writeTag(this.currentMainOutput));
-        this.outputBuffer.writeToChildTag(data, NBT_OUTPUT_BUFFER);
-        data.setDouble(NBT_PROGRESS, this.progress);
-        if (!this.currentPatternStack.isEmpty()) {
-            data.setTag(NBT_CURRENT_PATTERN, this.currentPatternStack.writeToNBT(new NBTTagCompound()));
-        } else {
-            data.removeTag(NBT_CURRENT_PATTERN);
         }
     }
 
@@ -171,46 +213,20 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         return AECableType.COVERED;
     }
 
-    private static ItemStack readStack(NBTTagCompound tag) {
-        try {
-            return new ItemStack(tag);
-        } catch (RuntimeException ignored) {
-            return ItemStack.EMPTY;
-        }
+    @Override
+    public void setRemoved() {
+        this.patternGeneration = new Object();
+        this.outputGeneration = UUID.randomUUID();
+        this.craftGeneration = new Object();
+        super.setRemoved();
     }
 
     @Override
-    public void loadTag(NBTTagCompound data) {
-        super.loadTag(data);
-        this.configManager.readFromNBT(data);
-        this.patternInventory.readFromNBT(data, NBT_PATTERNS);
-        this.upgrades.readFromNBT(data, NBT_UPGRADES);
-        this.priority = data.getInteger(NBT_PRIORITY);
-        this.readCachedOutputs(data);
-        this.pendingCrafts = Math.max(0, data.getInteger(NBT_PENDING_CRAFTS));
-        this.currentMainOutput = data.hasKey(NBT_MAIN_OUTPUT, Constants.NBT.TAG_COMPOUND)
-            ? GenericStack.readTag(data.getCompoundTag(NBT_MAIN_OUTPUT))
-            : null;
-        this.outputBuffer.readFromChildTag(data, NBT_OUTPUT_BUFFER);
-        this.progress = data.getDouble(NBT_PROGRESS);
-        this.currentPatternStack = data.hasKey(NBT_CURRENT_PATTERN, Constants.NBT.TAG_COMPOUND)
-            ? readStack(data.getCompoundTag(NBT_CURRENT_PATTERN))
-            : ItemStack.EMPTY;
-        this.currentPattern = null;
-        this.reboot = true;
-        this.updatePatterns();
-        this.recalculateCurrentPattern();
-    }
-
-    @Override
-    public void onMainNodeStateChanged(IGridNodeListener.State reason) {
-        this.updatePoweredState();
-        boolean active = this.getMainNode().isOnline();
-        if (active != this.patternsActive) {
-            this.patternsActive = active;
-            ICraftingProvider.requestUpdate(this.getMainNode());
-        }
-        this.updateSleepiness();
+    public void onChunkUnloaded() {
+        this.patternGeneration = new Object();
+        this.outputGeneration = UUID.randomUUID();
+        this.craftGeneration = new Object();
+        super.onChunkUnloaded();
     }
 
     @Override
@@ -234,40 +250,41 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     }
 
     @Override
-    public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
-        if (!this.getMainNode().isActive()) {
-            return TickRateModulation.SLEEP;
+    public void saveAdditional(NBTTagCompound data) {
+        super.saveAdditional(data);
+        this.configManager.writeToNBT(data);
+        this.patternInventory.writeToNBT(data, NBT_PATTERNS);
+        this.upgrades.writeToNBT(data, NBT_UPGRADES);
+        data.setInteger(NBT_PRIORITY, this.priority);
+        this.writeCachedOutputs(data);
+        this.writeCachedInputs(data);
+        data.setInteger(NBT_PENDING_CRAFTS, this.pendingCrafts);
+        data.setTag(NBT_MAIN_OUTPUT, GenericStack.writeTag(this.currentMainOutput));
+        this.outputBuffer.writeToChildTag(data, NBT_OUTPUT_BUFFER);
+        data.removeTag(NBT_COMPLETED_OUTPUTS);
+        if (this.unresolvedCompletedOutputs != null) {
+            data.setTag(NBT_COMPLETED_OUTPUTS, this.unresolvedCompletedOutputs.copy());
+        } else if (!this.completedOutputs.isEmpty()) {
+            data.setTag(NBT_COMPLETED_OUTPUTS, GenericStack.writeList(new ArrayList<>(this.completedOutputs)));
         }
-
-        boolean didOutputWork = this.injectOutputBuffer();
-        if (this.currentPattern == null) {
-            this.updateSleepiness();
-            return didOutputWork ? TickRateModulation.URGENT : TickRateModulation.SLEEP;
+        data.removeTag(NBT_OUTPUT_TRANSFER);
+        if (this.outputTransfer != null) {
+            data.setTag(NBT_OUTPUT_TRANSFER, this.outputTransfer.copy());
         }
-
-        if (this.reboot) {
-            ticksSinceLastCall = 1;
-            this.reboot = false;
+        data.setDouble(NBT_PROGRESS, this.progress);
+        if (!this.currentPatternStack.isEmpty()) {
+            data.setTag(NBT_CURRENT_PATTERN, this.currentPatternStack.writeToNBT(new NBTTagCompound()));
+        } else {
+            data.removeTag(NBT_CURRENT_PATTERN);
         }
-
-        int speed = this.getSpeedPerTick();
-        this.progress += this.usePower(ticksSinceLastCall, speed, this.getPowerMultiplier());
-        if (this.progress < MAX_CRAFT_PROGRESS) {
-            return TickRateModulation.FASTER;
-        }
-
-        this.progress = 0;
-        if (this.tryCompleteCraft(speed)) {
-            if (this.pendingCrafts <= 0) {
-                this.clearCurrentCraft();
+        if (this.unresolvedCraft != null) {
+            for (var key : CRAFT_DATA_KEYS) {
+                data.removeTag(key);
+                if (this.unresolvedCraft.hasKey(key)) {
+                    data.setTag(key, this.unresolvedCraft.getTag(key).copy());
+                }
             }
-            this.saveChanges();
-            this.updateSleepiness();
-            return this.awake ? TickRateModulation.IDLE : TickRateModulation.SLEEP;
         }
-
-        this.updateSleepiness();
-        return TickRateModulation.SLOWER;
     }
 
     @Override
@@ -284,50 +301,131 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     }
 
     @Override
-    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder, int multiplier) {
-        if (!this.getMainNode().isActive()
-            || !(patternDetails instanceof IAssemblerPattern assemblerPattern)
-            || !this.patterns.contains(assemblerPattern)
-            || multiplier <= 0) {
-            return false;
+    public void loadTag(NBTTagCompound data) {
+        this.patternGeneration = new Object();
+        this.outputGeneration = UUID.randomUUID();
+        this.outputTransfer = data.hasKey(NBT_OUTPUT_TRANSFER) ? data.getTag(NBT_OUTPUT_TRANSFER).copy() : null;
+        this.completedOutputs = new ArrayDeque<>();
+        this.blockedOutputQueue = null;
+        this.unresolvedCompletedOutputs = null;
+        try {
+            this.completedOutputs = new ArrayDeque<>(readCraftStacks(data, NBT_COMPLETED_OUTPUTS));
+        } catch (RuntimeException failure) {
+            this.unresolvedCompletedOutputs = data.getTag(NBT_COMPLETED_OUTPUTS).copy();
+            AELog.error(failure, "Retained invalid completed molecular assembler outputs at " + this.pos);
         }
-
-        if (this.pendingCrafts + multiplier > this.getParallelLimit()) {
-            return false;
+        this.craftGeneration = new Object();
+        super.loadTag(data);
+        this.configManager.readFromNBT(data);
+        this.patternInventory.readFromNBT(data, NBT_PATTERNS);
+        this.upgrades.readFromNBT(data, NBT_UPGRADES);
+        this.priority = data.getInteger(NBT_PRIORITY);
+        this.unresolvedCraft = null;
+        this.cachedInputs.clear();
+        this.cachedOutputs.clear();
+        this.pendingCrafts = 0;
+        this.progress = 0;
+        this.currentMainOutput = null;
+        this.currentPatternStack = ItemStack.EMPTY;
+        try {
+            var inputs = readCraftStacks(data, NBT_CACHED_INPUTS);
+            var outputs = readCraftStacks(data, NBT_CACHED_OUTPUTS);
+            requireCraftTagType(data, NBT_PENDING_CRAFTS, Constants.NBT.TAG_INT);
+            requireCraftTagType(data, NBT_PROGRESS, Constants.NBT.TAG_DOUBLE);
+            requireCraftTagType(data, NBT_MAIN_OUTPUT, Constants.NBT.TAG_COMPOUND);
+            requireCraftTagType(data, NBT_CURRENT_PATTERN, Constants.NBT.TAG_COMPOUND);
+            int pending = data.getInteger(NBT_PENDING_CRAFTS);
+            double savedProgress = data.getDouble(NBT_PROGRESS);
+            var mainOutputTag = data.getCompoundTag(NBT_MAIN_OUTPUT);
+            var mainOutput = mainOutputTag.isEmpty() ? null : readCraftStack(mainOutputTag);
+            var patternTag = data.getCompoundTag(NBT_CURRENT_PATTERN);
+            var patternStack = patternTag.isEmpty() ? ItemStack.EMPTY : new ItemStack(patternTag);
+            if (pending < 0 || !Double.isFinite(savedProgress) || savedProgress < 0
+                || !patternTag.isEmpty() && patternStack.isEmpty()) {
+                throw new IllegalArgumentException("Invalid craft metadata");
+            }
+            boolean hasResources = !inputs.isEmpty() || !outputs.isEmpty();
+            if (pending == 0 && hasResources
+                || pending > 0 && (outputs.isEmpty() || mainOutput == null || patternStack.isEmpty())) {
+                throw new IllegalArgumentException("Inconsistent pending craft metadata");
+            }
+            this.cachedInputs = inputs;
+            this.cachedOutputs = outputs;
+            this.pendingCrafts = pending;
+            this.progress = savedProgress;
+            this.currentMainOutput = mainOutput;
+            this.currentPatternStack = patternStack;
+        } catch (RuntimeException e) {
+            this.unresolvedCraft = new NBTTagCompound();
+            for (var key : CRAFT_DATA_KEYS) {
+                if (data.hasKey(key)) {
+                    this.unresolvedCraft.setTag(key, data.getTag(key).copy());
+                }
+            }
+            AELog.warn("Molecular assembler retained unresolved craft data at %s: %s", this.pos, e.toString());
         }
-
-        KeyCounter[] representativeInput = copyInputHolder(inputHolder);
-        ItemStack[] sparseInputs = new ItemStack[BASE_INPUT_BUFFER_SLOTS];
-        assemblerPattern.fillCraftingGrid(representativeInput, (slot, stack) -> sparseInputs[slot] = stack);
-        ObjectList<GenericStack> newOutputs = collectOutputs(assemblerPattern, sparseInputs, inputHolder, multiplier);
-        GenericStack newMainOutput = newOutputs.isEmpty() ? null : newOutputs.getFirst();
-        if (newOutputs.isEmpty()) {
-            return false;
-        }
-        if (this.currentPattern != null && !canMergePattern(assemblerPattern, newMainOutput, multiplier)) {
-            return false;
-        }
-        for (KeyCounter counter : inputHolder) {
-            counter.clear();
-        }
-        if (this.currentPattern == null) {
-            this.currentPattern = assemblerPattern;
-            this.currentPatternStack = patternDetails.getDefinition().toStack();
-            this.currentMainOutput = new GenericStack(newMainOutput.what(), newMainOutput.amount() / multiplier);
-            this.progress = 0;
-            this.reboot = true;
-        }
-        mergeCachedOutputs(newOutputs);
-        this.pendingCrafts += multiplier;
-        this.saveChanges();
-        this.updateSleepiness();
-        return true;
+        this.outputBuffer.readFromChildTag(data, NBT_OUTPUT_BUFFER);
+        this.currentPattern = null;
+        this.reboot = true;
+        this.updatePatterns();
+        this.recalculateCurrentPattern();
     }
 
     @Override
-    public boolean canMergePatternPush(IPatternDetails patternDetails) {
-        return this.getMainNode().isActive() && patternDetails instanceof IAssemblerPattern
-            && this.patterns.contains(patternDetails);
+    public void onMainNodeStateChanged(IGridNodeListener.State reason) {
+        this.outputGeneration = UUID.randomUUID();
+        this.craftGeneration = new Object();
+        this.updatePoweredState();
+        boolean active = this.getMainNode().isOnline();
+        if (active != this.patternsActive) {
+            this.patternsActive = active;
+            ICraftingProvider.requestUpdate(this.getMainNode());
+        }
+        this.updateSleepiness();
+    }
+
+    @Override
+    public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
+        if (!this.getMainNode().isActive()) {
+            return TickRateModulation.SLEEP;
+        }
+
+        this.refillOutputBuffer();
+        boolean didOutputWork = this.injectOutputBuffer();
+        if (this.outputTransfer != null || this.injectingOutput || this.unresolvedCompletedOutputs != null) {
+            this.updateSleepiness();
+            return TickRateModulation.SLEEP;
+        }
+        if (this.currentPattern == null) {
+            this.updateSleepiness();
+            return didOutputWork ? TickRateModulation.URGENT
+                : this.awake ? TickRateModulation.IDLE : TickRateModulation.SLEEP;
+        }
+
+        if (this.reboot) {
+            ticksSinceLastCall = 1;
+            this.reboot = false;
+        }
+
+        int speed = this.getSpeedPerTick();
+        if (this.progress < MAX_CRAFT_PROGRESS) {
+            this.progress += this.usePower(ticksSinceLastCall, speed, this.getPowerMultiplier());
+        }
+        if (this.progress < MAX_CRAFT_PROGRESS) {
+            return TickRateModulation.FASTER;
+        }
+
+        if (this.tryCompleteCraft(speed)) {
+            if (this.pendingCrafts <= 0) {
+                this.clearCurrentCraft();
+            }
+            this.saveChanges();
+            this.updateSleepiness();
+            return this.awake ? TickRateModulation.IDLE : TickRateModulation.SLEEP;
+        }
+
+        this.updateSleepiness();
+        return TickRateModulation.SLOWER;
     }
 
     @Override
@@ -340,8 +438,17 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     }
 
     @Override
-    public boolean isBusy() {
-        return MolecularAssemblerPushLimits.isBusy(this.getParallelLimit(), this.pendingCrafts);
+    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder, int multiplier) {
+        if (this.preparingPush || this.injectingOutput || this.preparingOutputs || this.outputTransfer != null
+            || !this.completedOutputs.isEmpty() || this.unresolvedCompletedOutputs != null) {
+            return false;
+        }
+        this.preparingPush = true;
+        try {
+            return preparePatternPush(patternDetails, inputHolder, multiplier);
+        } finally {
+            this.preparingPush = false;
+        }
     }
 
     @Nullable
@@ -406,15 +513,64 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         saveChanges();
     }
 
-    @Override
-    public PatternContainerGroup getTerminalGroup() {
-        ITextComponent name = hasCustomName()
-            ? new TextComponentString(getCustomName())
-            : TextComponentItemStack.of(AEBlocks.MOLECULAR_ASSEMBLER.stack());
-        return new PatternContainerGroup(
-            AEItemKey.of(AEBlocks.MOLECULAR_ASSEMBLER.item()),
-            name,
-            Collections.emptyList());
+    private boolean preparePatternPush(IPatternDetails patternDetails, KeyCounter[] inputHolder, int multiplier) {
+        var generation = this.craftGeneration;
+        var sourceWorld = this.world;
+        if (!this.getMainNode().isActive()
+            || !(patternDetails instanceof IAssemblerPattern assemblerPattern)
+            || !this.patterns.contains(assemblerPattern)
+            || multiplier <= 0
+            || (this.currentPattern == null && this.hasPendingCraftEscrow())) {
+            return false;
+        }
+
+        if (multiplier > this.getParallelLimit() - this.pendingCrafts) {
+            return false;
+        }
+
+        KeyCounter[] representativeInput = copyInputHolder(inputHolder);
+        ItemStack[] sparseInputs = new ItemStack[BASE_INPUT_BUFFER_SLOTS];
+        assemblerPattern.fillCraftingGrid(representativeInput, (slot, stack) -> sparseInputs[slot] = stack);
+        ObjectList<GenericStack> newOutputs = collectOutputs(assemblerPattern, sparseInputs, inputHolder, multiplier);
+        ObjectList<GenericStack> newInputs = collectInputs(inputHolder);
+        GenericStack newMainOutput = newOutputs.isEmpty() ? null : newOutputs.getFirst();
+        if (newOutputs.isEmpty()) {
+            return false;
+        }
+        if (this.currentPattern != null && !canMergePattern(assemblerPattern, newMainOutput, multiplier)) {
+            return false;
+        }
+        var preparedInputs = prepareCombinedStacks(this.cachedInputs, newInputs);
+        var preparedOutputs = prepareCombinedStacks(this.cachedOutputs, newOutputs);
+        if (preparedInputs == null || preparedOutputs == null) {
+            return false;
+        }
+        boolean startingCraft = this.currentPattern == null;
+        var patternStack = startingCraft ? patternDetails.getDefinition().toStack() : this.currentPatternStack;
+        var mainOutput = startingCraft
+            ? new GenericStack(newMainOutput.what(), newMainOutput.amount() / multiplier) : this.currentMainOutput;
+
+        if (!this.getMainNode().isActive() || this.world != sourceWorld || this.craftGeneration != generation) {
+            return false;
+        }
+
+        // No extension calls or aggregation after transferring custody from the caller.
+        this.craftGeneration = new Object();
+        if (startingCraft) {
+            this.currentPattern = assemblerPattern;
+            this.currentPatternStack = patternStack;
+            this.currentMainOutput = mainOutput;
+            this.progress = 0;
+            this.reboot = true;
+        }
+        this.cachedInputs = preparedInputs;
+        this.cachedOutputs = preparedOutputs;
+        this.pendingCrafts += multiplier;
+        for (KeyCounter counter : inputHolder) {
+            counter.clear();
+        }
+        this.notifyCommittedCraft();
+        return true;
     }
 
     @Override
@@ -480,28 +636,18 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
     }
 
     @Override
-    public void addAdditionalDrops(List<ItemStack> drops) {
-        super.addAdditionalDrops(drops);
-        for (ItemStack pattern : this.patternInventory) {
-            if (!pattern.isEmpty()) {
-                drops.add(pattern.copy());
-            }
-        }
-        for (ItemStack upgrade : this.upgrades) {
-            if (!upgrade.isEmpty()) {
-                drops.add(upgrade.copy());
-            }
-        }
-        this.addGenericStackDrops(this.outputBuffer, drops);
+    public boolean canMergePatternPush(IPatternDetails patternDetails) {
+        return this.unresolvedCraft == null && this.outputTransfer == null && !this.injectingOutput && !this.preparingOutputs
+            && this.completedOutputs.isEmpty() && this.unresolvedCompletedOutputs == null
+            && this.getMainNode().isActive() && patternDetails instanceof IAssemblerPattern
+            && this.patterns.contains(patternDetails);
     }
 
     @Override
-    public void clearContent() {
-        super.clearContent();
-        this.patternInventory.clear();
-        this.upgrades.clear();
-        this.outputBuffer.clear();
-        this.clearCurrentCraft();
+    public boolean isBusy() {
+        return this.unresolvedCraft != null || this.outputTransfer != null || this.injectingOutput || this.preparingOutputs
+            || !this.completedOutputs.isEmpty() || this.unresolvedCompletedOutputs != null
+            || MolecularAssemblerPushLimits.isBusy(this.getParallelLimit(), this.pendingCrafts);
     }
 
     @Nullable
@@ -531,34 +677,131 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         return PatternProviderCapacity.getPageCount(this.getActivePatternSlots());
     }
 
+    @Override
+    public PatternContainerGroup getTerminalGroup() {
+        ITextComponent name = hasCustomName()
+            ? new TextComponentString(Objects.requireNonNull(getCustomName()))
+            : TextComponentItemStack.of(AEBlocks.MOLECULAR_ASSEMBLER.stack());
+        return new PatternContainerGroup(
+            AEItemKey.of(AEBlocks.MOLECULAR_ASSEMBLER.item()),
+            name,
+            Collections.emptyList());
+    }
+
+    @Override
+    public void addAdditionalDrops(List<ItemStack> drops) {
+        super.addAdditionalDrops(drops);
+        for (ItemStack pattern : this.patternInventory) {
+            if (!pattern.isEmpty()) {
+                drops.add(pattern.copy());
+            }
+        }
+        for (ItemStack upgrade : this.upgrades) {
+            if (!upgrade.isEmpty()) {
+                drops.add(upgrade.copy());
+            }
+        }
+        if (this.unresolvedCraft != null) {
+            var recovery = AEItems.MISSING_CONTENT.stack();
+            var recoveryTag = new NBTTagCompound();
+            recoveryTag.setTag("assembler_pending_craft", this.unresolvedCraft.copy());
+            recoveryTag.setString("missing_content_error", "Unresolved molecular assembler craft; original data retained");
+            recovery.setTagCompound(recoveryTag);
+            drops.add(recovery);
+        } else {
+            this.addGenericStackDrops(this.cachedInputs, drops);
+        }
+        if (this.outputTransfer != null) {
+            var recovery = AEItems.MISSING_CONTENT.stack();
+            var tag = new NBTTagCompound();
+            tag.setTag("assembler_output_transfer", this.outputTransfer.copy());
+            tag.setString("missing_content_error", "Unconfirmed assembler output transfer; do not automatically refund");
+            recovery.setTagCompound(tag);
+            drops.add(recovery);
+        }
+        if (this.unresolvedCompletedOutputs != null) {
+            var recovery = AEItems.MISSING_CONTENT.stack();
+            var tag = new NBTTagCompound();
+            tag.setTag("assembler_completed_outputs", this.unresolvedCompletedOutputs.copy());
+            tag.setString("missing_content_error", "Invalid completed assembler outputs; original data retained");
+            recovery.setTagCompound(tag);
+            drops.add(recovery);
+        } else {
+            this.addGenericStackDrops(this.completedOutputs, drops);
+        }
+        this.addGenericStackDrops(this.outputBuffer, drops);
+    }
+
+    @Override
+    public void clearContent() {
+        this.patternGeneration = new Object();
+        this.outputGeneration = UUID.randomUUID();
+        this.outputTransfer = null;
+        this.completedOutputs.clear();
+        this.blockedOutputQueue = null;
+        this.unresolvedCompletedOutputs = null;
+        super.clearContent();
+        this.patternInventory.clear();
+        this.upgrades.clear();
+        this.outputBuffer.clear();
+        this.clearCurrentCraft();
+    }
+
     private void updatePatterns() {
-        this.terminalContentsVersion++;
-        this.patterns.clear();
-        this.patternKeys.clear();
+        var generation = new Object();
+        this.patternGeneration = generation;
+        this.craftGeneration = new Object();
         World level = this.world;
-        if (level == null) {
+        int activeSlots = this.getActivePatternSlots();
+        var stacks = new ItemStack[activeSlots];
+        for (int slot = 0; slot < activeSlots; slot++) {
+            stacks[slot] = this.patternInventory.getStackInSlot(slot).copy();
+        }
+        ObjectList<IAssemblerPattern> preparedPatterns = new ObjectArrayList<>();
+        var preparedKeys = new ObjectOpenHashSet<AEItemKey>();
+        if (level != null) {
+            for (var stack : stacks) {
+                if (this.patternGeneration != generation || this.world != level) {
+                    return;
+                }
+                try {
+                    AEItemKey key = AEItemKey.of(stack);
+                    IPatternDetails details = PatternDetailsHelper.decodePattern(stack, level);
+                    if (details instanceof IAssemblerPattern pattern) {
+                        preparedPatterns.add(pattern);
+                        if (key != null) {
+                            preparedKeys.add(key);
+                        }
+                    }
+                } catch (RuntimeException failure) {
+                    AELog.error(failure, "Failed to decode molecular assembler pattern at " + this.pos);
+                }
+            }
+        }
+        if (this.patternGeneration != generation || this.world != level) {
             return;
         }
-
-        for (int slot = 0; slot < this.getActivePatternSlots(); slot++) {
-            ItemStack stack = this.patternInventory.getStackInSlot(slot);
-            IPatternDetails details = PatternDetailsHelper.decodePattern(stack, level);
-            if (!(details instanceof IAssemblerPattern pattern)) {
-                continue;
-            }
-            this.patterns.add(pattern);
-            AEItemKey key = AEItemKey.of(stack);
-            if (key != null) {
-                this.patternKeys.add(key);
-            }
+        // No extension calls between publishing the complete list and its matching identity index.
+        this.patterns = preparedPatterns;
+        this.patternKeys = preparedKeys;
+        this.indexedPatternSlots = activeSlots;
+        this.terminalContentsVersion++;
+        if (level != null) {
+            ICraftingProvider.requestUpdate(this.getMainNode());
         }
-
-        ICraftingProvider.requestUpdate(this.getMainNode());
     }
 
     private void recalculateCurrentPattern() {
+        if (this.unresolvedCraft != null) {
+            this.preserveCurrentCraftForRecovery();
+            return;
+        }
         if (this.currentPatternStack.isEmpty() || this.world == null) {
-            this.clearCurrentCraft();
+            if (this.hasPendingCraftEscrow()) {
+                this.preserveCurrentCraftForRecovery();
+            } else {
+                this.clearCurrentCraft();
+            }
             return;
         }
 
@@ -566,57 +809,61 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         if (details instanceof IAssemblerPattern assemblerPattern) {
             this.currentPattern = assemblerPattern;
         } else {
-            this.clearCurrentCraft();
+            this.preserveCurrentCraftForRecovery();
         }
     }
 
     private boolean tryCompleteCraft(int speed) {
+        if (this.unresolvedCraft != null || this.outputTransfer != null || this.injectingOutput || this.preparingOutputs
+            || !this.completedOutputs.isEmpty() || this.unresolvedCompletedOutputs != null) {
+            return false;
+        }
+        var generation = this.craftGeneration;
+        var outputGeneration = this.outputGeneration;
+        long bufferRevision = this.outputBufferRevision;
         Objects.requireNonNull(this.currentPattern);
         int runs = this.pendingCrafts;
         if (runs <= 0) {
             return false;
         }
 
-        if (!canFitOutputs(this.cachedOutputs)) {
+        var preparedOutputs = prepareOutputs(this.cachedOutputs);
+        if (this.craftGeneration != generation || !this.outputGeneration.equals(outputGeneration)
+            || this.outputBufferRevision != bufferRevision) {
             return false;
         }
 
-        this.pendingCrafts = 0;
-        for (int i = 0; i < this.cachedOutputs.size(); i++) {
-            var result = this.cachedOutputs.get(i);
-            this.outputBuffer.insert(result.what(), result.amount(), Actionable.MODULATE, this.actionSource);
-        }
-        this.cachedOutputs.clear();
+        var completedOutput = this.currentMainOutput;
+        this.outputBuffer.publish(preparedOutputs, true);
 
-        if (this.currentMainOutput != null && this.world != null) {
+        if (completedOutput != null && this.world != null) {
             InitNetwork.sendToAllNearExcept(null, this.pos.getX(), this.pos.getY(), this.pos.getZ(), 32,
-                this.world, new AssemblerAnimationPacket(this.pos, (byte) speed, this.currentMainOutput.what()));
+                this.world, new AssemblerAnimationPacket(this.pos, (byte) speed, completedOutput.what()));
         }
         this.injectOutputBuffer();
         return true;
     }
 
-    private boolean canFitOutputs(List<GenericStack> results) {
-        GenericStackInv simulated = new GenericStackInv(null, this.outputBuffer.size());
-        for (int i = 0; i < this.outputBuffer.size(); i++) {
-            simulated.setStack(i, this.outputBuffer.getStack(i));
-        }
-        for (int i = 0; i < results.size(); i++) {
-            var result = results.get(i);
-            if (simulated.insert(result.what(), result.amount(), Actionable.MODULATE, this.actionSource) < result.amount()) {
-                return false;
+    private PreparedOutputs prepareOutputs(Iterable<GenericStack> results) {
+        this.preparingOutputs = true;
+        try {
+            GenericStackInv simulated = new GenericStackInv(null, this.outputBuffer.size());
+            for (int slot = 0; slot < this.outputBuffer.size(); slot++) {
+                simulated.setStack(slot, this.outputBuffer.getStack(slot));
             }
+            var remaining = new ArrayDeque<GenericStack>();
+            boolean moved = false;
+            for (var result : results) {
+                long inserted = simulated.insert(result.what(), result.amount(), Actionable.MODULATE, this.actionSource);
+                moved |= inserted > 0;
+                if (inserted < result.amount()) {
+                    remaining.addLast(new GenericStack(result.what(), result.amount() - inserted));
+                }
+            }
+            return new PreparedOutputs(simulated, remaining, moved);
+        } finally {
+            this.preparingOutputs = false;
         }
-        return true;
-    }
-
-    private boolean injectOutputBuffer() {
-        IGrid grid = this.getMainNode().getGrid();
-        if (grid == null) {
-            return false;
-        }
-
-        return this.injectIntoNetwork(this.outputBuffer, grid.getStorageService().getInventory());
     }
 
     private int usePower(int ticksPassed, int bonusValue, double acceleratorTax) {
@@ -655,17 +902,27 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
             this.upgrades.getInstalledUpgrades(AEItems.PARALLEL_CARD.item()));
     }
 
-    private void updateSleepiness() {
-        boolean previousAwake = this.awake;
-        this.awake = this.currentPattern != null || !this.outputBuffer.isEmpty();
-        if (previousAwake != this.awake) {
-            this.getMainNode().ifPresent((grid, node) -> {
-                if (this.awake) {
-                    grid.getTickManager().wakeDevice(node);
-                } else {
-                    grid.getTickManager().sleepDevice(node);
-                }
-            });
+    private void refillOutputBuffer() {
+        if (this.completedOutputs.isEmpty() || this.injectingOutput || this.preparingOutputs || this.outputTransfer != null
+            || this.unresolvedCompletedOutputs != null) {
+            return;
+        }
+        var generation = this.outputGeneration;
+        var queue = this.completedOutputs;
+        long revision = this.outputBufferRevision;
+        if (this.blockedOutputQueue == queue && this.blockedOutputRevision == revision) {
+            return;
+        }
+        var prepared = prepareOutputs(queue);
+        if (this.outputGeneration.equals(generation) && this.completedOutputs == queue
+            && this.outputBufferRevision == revision && this.outputTransfer == null && !this.injectingOutput) {
+            if (prepared.moved()) {
+                this.outputBuffer.publish(prepared, false);
+            } else {
+                // The frozen queue cannot fit this exact buffer; retry after a real content change.
+                this.blockedOutputQueue = queue;
+                this.blockedOutputRevision = revision;
+            }
         }
     }
 
@@ -683,31 +940,89 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         }
     }
 
+    private boolean injectOutputBuffer() {
+        IGrid grid = this.getMainNode().getGrid();
+        if (grid == null) {
+            return false;
+        }
+
+        return this.injectIntoNetwork(grid.getStorageService().getInventory());
+    }
+
+    private void updateSleepiness() {
+        // An offer temporarily leaves the buffer, but this synchronous call is still active.
+        // Publish scheduling only after its receipt or unknown outcome has been settled.
+        if (this.injectingOutput) {
+            return;
+        }
+        boolean previousAwake = this.awake;
+        this.awake = this.outputTransfer == null && this.unresolvedCompletedOutputs == null
+            && (this.currentPattern != null || !this.outputBuffer.isEmpty() || !this.completedOutputs.isEmpty());
+        if (previousAwake != this.awake) {
+            this.getMainNode().ifPresent((grid, node) -> {
+                if (this.awake) {
+                    grid.getTickManager().wakeDevice(node);
+                } else {
+                    grid.getTickManager().sleepDevice(node);
+                }
+            });
+        }
+    }
+
     private void clearCurrentCraft() {
+        this.craftGeneration = new Object();
+        this.unresolvedCraft = null;
         this.currentPattern = null;
         this.currentPatternStack = ItemStack.EMPTY;
         this.currentMainOutput = null;
         this.cachedOutputs.clear();
+        this.cachedInputs.clear();
         this.pendingCrafts = 0;
         this.progress = 0;
+    }
+
+    private boolean hasPendingCraftEscrow() {
+        return this.unresolvedCraft != null || this.pendingCrafts > 0
+            || !this.cachedInputs.isEmpty() || !this.cachedOutputs.isEmpty();
     }
 
     private void onConfigChanged() {
         this.saveChanges();
     }
 
-    void onUpgradesChanged() {
-        this.saveChanges();
-        this.updatePatterns();
+    private void preserveCurrentCraftForRecovery() {
+        this.craftGeneration = new Object();
+        this.currentPattern = null;
+        this.updateSleepiness();
     }
 
     boolean isPatternSlotOccupied(int slot) {
         return slot >= 0 && slot < this.patternInventory.size() && !this.patternInventory.getStackInSlot(slot).isEmpty();
     }
 
-    private void onBufferChanged() {
+    void onUpgradesChanged() {
+        // Speed and parallelism changes invalidate a prepared push, but do not alter pattern definitions.
+        this.craftGeneration = new Object();
+        if (this.indexedPatternSlots != this.getActivePatternSlots()) {
+            this.updatePatterns();
+        }
         this.saveChanges();
-        this.updateSleepiness();
+    }
+
+    private void onBufferChanged() {
+        this.outputBufferRevision++;
+        this.blockedOutputQueue = null;
+        this.notifyCommittedCraft();
+    }
+
+    private void notifyCommittedCraft() {
+        // Custody has already changed. A notification failure must not hide the successful resource receipt.
+        try {
+            this.saveChanges();
+        } catch (RuntimeException failure) {
+            AELog.error(failure, "Failed to mark committed molecular assembler state dirty at " + this.pos);
+        }
+        this.notifyCraftScheduling();
     }
 
     private boolean canMergePattern(IAssemblerPattern assemblerPattern, GenericStack newMainOutput, int multiplier) {
@@ -725,6 +1040,23 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
             && this.currentMainOutput.amount() == newMainOutput.amount() / multiplier;
     }
 
+    private void notifyCraftScheduling() {
+        try {
+            this.updateSleepiness();
+        } catch (RuntimeException failure) {
+            AELog.error(failure, "Failed to schedule committed molecular assembler state at " + this.pos);
+        }
+    }
+
+    private long getTemplateAmount(IPatternDetails.IInput input, AEKey key) {
+        for (GenericStack possibleInput : input.possibleInputs()) {
+            if (possibleInput.what().equals(key)) {
+                return possibleInput.amount();
+            }
+        }
+        return 1;
+    }
+
     private ObjectList<GenericStack> collectOutputs(IAssemblerPattern assemblerPattern, ItemStack[] sparseInputs,
                                                     KeyCounter[] inputHolder, int multiplier) {
         for (int slot = 0; slot < sparseInputs.length; slot++) {
@@ -737,8 +1069,10 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
             return new ObjectArrayList<>();
         }
         ObjectList<GenericStack> result = new ObjectArrayList<>();
+        if (outputStack.amount() <= 0 || outputStack.amount() > Long.MAX_VALUE / multiplier) {
+            return result;
+        }
         result.add(new GenericStack(outputStack.what(), outputStack.amount() * multiplier));
-        KeyCounter remainders = new KeyCounter();
         var inputs = assemblerPattern.getInputs();
         for (int i = 0; i < Math.min(inputs.length, inputHolder.length); i++) {
             for (var entry : inputHolder[i]) {
@@ -748,39 +1082,37 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
                 }
                 long templateAmount = getTemplateAmount(inputs[i], entry.getKey());
                 if (templateAmount > 0) {
-                    remainders.add(remainder, entry.getLongValue() / templateAmount);
+                    long remainingAmount = entry.getLongValue() / templateAmount;
+                    if (remainingAmount > 0) {
+                        result.add(new GenericStack(remainder, remainingAmount));
+                    }
                 }
             }
-        }
-        for (var entry : remainders) {
-            result.add(new GenericStack(entry.getKey(), entry.getLongValue()));
         }
         return result;
     }
 
-    private long getTemplateAmount(IPatternDetails.IInput input, AEKey key) {
-        for (GenericStack possibleInput : input.possibleInputs()) {
-            if (possibleInput.what().equals(key)) {
-                return possibleInput.amount();
+    @Nullable
+    private ObjectList<GenericStack> prepareCombinedStacks(List<GenericStack> existing,
+                                                           List<GenericStack> additions) {
+        var amounts = new AEKey2LongMap.OpenHashMap();
+        for (var stacks : List.of(existing, additions)) {
+            for (var stack : stacks) {
+                long amount = stack.amount();
+                if (amount <= 0) {
+                    return null;
+                }
+                long previous = amounts.addTo(stack.what(), amount);
+                if (previous > Long.MAX_VALUE - amount) {
+                    return null;
+                }
             }
         }
-        return 1;
-    }
-
-    private void mergeCachedOutputs(List<GenericStack> outputs) {
-        KeyCounter merged = new KeyCounter();
-        for (int i = 0; i < this.cachedOutputs.size(); i++) {
-            var cachedOutput = this.cachedOutputs.get(i);
-            merged.add(cachedOutput.what(), cachedOutput.amount());
+        ObjectList<GenericStack> result = new ObjectArrayList<>(amounts.size());
+        for (var entry : amounts.object2LongEntrySet()) {
+            result.add(new GenericStack(entry.getKey(), entry.getLongValue()));
         }
-        for (int i = 0; i < outputs.size(); i++) {
-            var output = outputs.get(i);
-            merged.add(output.what(), output.amount());
-        }
-        this.cachedOutputs.clear();
-        for (var entry : merged) {
-            this.cachedOutputs.add(new GenericStack(entry.getKey(), entry.getLongValue()));
-        }
+        return result;
     }
 
     private KeyCounter[] copyInputHolder(KeyCounter[] inputHolder) {
@@ -801,17 +1133,115 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         data.setTag(NBT_CACHED_OUTPUTS, GenericStack.writeList(this.cachedOutputs));
     }
 
-    private void readCachedOutputs(NBTTagCompound data) {
-        this.cachedOutputs.clear();
-        if (!data.hasKey(NBT_CACHED_OUTPUTS, Constants.NBT.TAG_LIST)) {
+    private ObjectList<GenericStack> collectInputs(KeyCounter[] inputHolder) {
+        ObjectList<GenericStack> result = new ObjectArrayList<>();
+        for (var counter : inputHolder) {
+            for (var entry : counter) {
+                if (entry.getLongValue() > 0) {
+                    result.add(new GenericStack(entry.getKey(), entry.getLongValue()));
+                }
+            }
+        }
+        return result;
+    }
+
+    private void writeCachedInputs(NBTTagCompound data) {
+        if (this.cachedInputs.isEmpty()) {
+            data.removeTag(NBT_CACHED_INPUTS);
             return;
         }
 
-        var stacks = GenericStack.readList(data.getTagList(NBT_CACHED_OUTPUTS, Constants.NBT.TAG_COMPOUND));
-        for (int i = 0; i < stacks.size(); i++) {
-            var stack = stacks.get(i);
+        data.setTag(NBT_CACHED_INPUTS, GenericStack.writeList(this.cachedInputs));
+    }
+
+    private void addGenericStackDrops(Iterable<GenericStack> stacks, List<ItemStack> drops) {
+        for (var stack : stacks) {
             if (stack != null) {
-                this.cachedOutputs.add(stack);
+                stack.what().addDrops(stack.amount(), drops, this.world, this.pos);
+            }
+        }
+    }
+
+    private boolean injectIntoNetwork(MEStorage storage) {
+        if (this.injectingOutput || this.preparingOutputs || this.outputTransfer != null || this.unresolvedCompletedOutputs != null) {
+            return false;
+        }
+        this.injectingOutput = true;
+        boolean didSomething = false;
+        try {
+            var generation = this.outputGeneration;
+            for (int slot = 0; slot < this.outputBuffer.size(); slot++) {
+                GenericStack stack = this.outputBuffer.getStack(slot);
+                if (stack == null) {
+                    continue;
+                }
+
+                // Preserve the exact offered amount before any external mutation. The target token is diagnostic
+                // for this runtime call, not a durable receipt issued by the target storage.
+                var transfer = new NBTTagCompound();
+                transfer.setInteger("schema", 2);
+                transfer.setUniqueId("id", UUID.randomUUID());
+                transfer.setUniqueId("sourceGeneration", generation);
+                transfer.setString("targetClass", storage.getClass().getName());
+                transfer.setInteger("targetInstance", System.identityHashCode(storage));
+                transfer.setInteger("slot", slot);
+                transfer.setString("state", "held");
+                transfer.setTag("offered", GenericStack.writeTag(stack));
+                if (!this.outputGeneration.equals(generation) || this.outputBuffer.getStack(slot) != stack) {
+                    return didSomething;
+                }
+                long bufferRevision = this.outputBufferRevision;
+                this.outputTransfer = transfer;
+                this.outputBuffer.setTransferredSlot(slot, null);
+                this.notifyCommittedCraft();
+                if (!this.outputGeneration.equals(generation) || this.outputTransfer != transfer
+                    || this.outputBufferRevision != bufferRevision) {
+                    return didSomething;
+                }
+
+                // There is no callback between this transition and the target call. A snapshot taken
+                // by the earlier save notification records held resources; one taken by the target
+                // records an unconfirmed outcome. Neither persisted phase authorizes automatic replay.
+                transfer.setString("state", "unconfirmed");
+                final long inserted;
+                try {
+                    inserted = storage.insert(stack.what(), stack.amount(), Actionable.MODULATE, this.actionSource);
+                } catch (RuntimeException failure) {
+                    AELog.error(failure, "Unconfirmed molecular assembler output transfer at " + this.pos);
+                    return didSomething;
+                }
+                if (inserted < 0 || inserted > stack.amount()) {
+                    AELog.warn("Invalid molecular assembler output receipt at %s: offered=%d, inserted=%d",
+                        this.pos, stack.amount(), inserted);
+                    return didSomething;
+                }
+                if (!this.outputGeneration.equals(generation) || this.outputTransfer != transfer
+                    || this.outputBufferRevision != bufferRevision) {
+                    // A lifecycle or inventory callback now owns the recovery record. Never write into the replacement state.
+                    return didSomething;
+                }
+
+                long remaining = stack.amount() - inserted;
+                this.outputBuffer.setTransferredSlot(slot,
+                    remaining == 0 ? null : new GenericStack(stack.what(), remaining));
+                this.outputTransfer = null;
+                didSomething |= inserted > 0;
+                if (inserted > 0) {
+                    this.outputBufferRevision++;
+                    this.blockedOutputQueue = null;
+                }
+                this.notifyCommittedCraft();
+                if (!this.outputGeneration.equals(generation) || this.outputTransfer != null) {
+                    return didSomething;
+                }
+            }
+            return didSomething;
+        } finally {
+            this.injectingOutput = false;
+            if (this.outputTransfer != null) {
+                this.notifyCommittedCraft();
+            } else {
+                this.notifyCraftScheduling();
             }
         }
     }
@@ -823,6 +1253,9 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
                 stack.what().addDrops(stack.amount(), drops, this.world, this.pos);
             }
         }
+    }
+
+    private record PreparedOutputs(GenericStackInv buffer, ArrayDeque<GenericStack> remaining, boolean moved) {
     }
 
     public IGridNode getGridNode() {
@@ -849,30 +1282,26 @@ public class TileMolecularAssembler extends AENetworkedTile implements IUpgradea
         return false;
     }
 
-    private boolean injectIntoNetwork(GenericStackInv inv, MEStorage storage) {
-        boolean didSomething = false;
-        boolean changed = false;
-        for (int i = 0; i < inv.size(); i++) {
-            GenericStack stack = inv.getStack(i);
-            if (stack == null) {
-                continue;
-            }
-
-            long inserted = storage.insert(stack.what(), stack.amount(), Actionable.MODULATE, this.actionSource);
-            if (inserted <= 0) {
-                continue;
-            }
-
-            long remaining = stack.amount() - inserted;
-            inv.setStack(i, remaining <= 0 ? null : new GenericStack(stack.what(), remaining));
-            didSomething = true;
-            changed = true;
+    private final class CraftOutputBuffer extends GenericStackInv {
+        private CraftOutputBuffer() {
+            super(TileMolecularAssembler.this::onBufferChanged, OUTPUT_BUFFER_SLOTS);
         }
 
-        if (changed) {
-            this.saveChanges();
+        private void setTransferredSlot(int slot, @Nullable GenericStack stack) {
+            this.stacks[slot] = stack;
         }
-        return didSomething;
+
+        private void publish(PreparedOutputs prepared, boolean finishCraft) {
+            // Publish both output owners before any listener; completed work never refunds its inputs.
+            for (int slot = 0; slot < this.stacks.length; slot++) {
+                this.stacks[slot] = prepared.buffer().getStack(slot);
+            }
+            completedOutputs = prepared.remaining();
+            if (finishCraft) {
+                clearCurrentCraft();
+            }
+            onChange();
+        }
     }
 
     private class PatternFilter implements IAEItemFilter {

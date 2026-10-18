@@ -203,9 +203,13 @@ public class VoidCellInventory implements StorageCell, CondenserLogicHost {
             return 0;
         }
         long currentAmount = cellItems.getLong(what);
-        long newAmount = Long.MAX_VALUE - currentAmount < amount ? Long.MAX_VALUE : currentAmount + amount;
-        cellItems.put(what, newAmount);
-        return newAmount - currentAmount;
+        long remaining = Long.MAX_VALUE - currentAmount;
+        if (amount >= remaining) {
+            cellItems.put(what, Long.MAX_VALUE);
+            return remaining;
+        }
+        cellItems.addTo(what, amount);
+        return amount;
     }
 
     boolean isValidStoredOutput(AEKey what) {

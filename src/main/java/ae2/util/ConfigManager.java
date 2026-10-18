@@ -24,6 +24,7 @@ import ae2.api.util.IConfigManagerListener;
 import ae2.api.util.UnsupportedSettingException;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.nbt.NBTTagCompound;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -37,6 +38,10 @@ public final class ConfigManager implements IConfigManager {
     private static final Logger LOG = LoggerFactory.getLogger(ConfigManager.class);
 
     private final Map<Setting<?>, Enum<?>> settings = new Reference2ObjectOpenHashMap<>();
+    private final ReferenceOpenHashSet<Setting<?>> changedSettings = new ReferenceOpenHashSet<>();
+    private boolean loading;
+    private boolean notifying;
+    private boolean changedWhileLoading;
     @Nullable
     private final IConfigManagerListener listener;
 
@@ -72,8 +77,11 @@ public final class ConfigManager implements IConfigManager {
             throw new UnsupportedSettingException("Setting " + setting.getName() + " is not supported.");
         }
         this.settings.put(setting, newValue);
-        if (this.listener != null) {
+        if (this.listener != null && !this.loading) {
             this.listener.onSettingChanged(this, setting);
+        } else if (this.loading) {
+            this.changedWhileLoading = true;
+            this.changedSettings.add(setting);
         }
     }
 
@@ -90,33 +98,68 @@ public final class ConfigManager implements IConfigManager {
 
     @Override
     public void readFromNBT(NBTTagCompound src) {
-        for (var setting : this.settings.keySet()) {
-            if (src.hasKey(setting.getName(), 8)) {
-                String value = src.getString(setting.getName());
-                try {
-                    setting.setFromString(this, value);
-                } catch (IllegalArgumentException e) {
-                    warnFailedSettingLoad(setting, value, e);
+        beginLoading();
+        try {
+            for (var setting : this.settings.keySet()) {
+                if (src.hasKey(setting.getName(), 8)) {
+                    String value = src.getString(setting.getName());
+                    try {
+                        setting.setFromString(this, value);
+                    } catch (IllegalArgumentException e) {
+                        warnFailedSettingLoad(setting, value, e);
+                    }
                 }
             }
+        } finally {
+            endLoading();
         }
     }
 
     @Override
     public boolean importSettings(Map<String, String> settings) {
         boolean anythingRead = false;
-        for (var setting : this.settings.keySet()) {
-            String value = settings.get(setting.getName());
-            if (value != null) {
-                try {
-                    setting.setFromString(this, value);
-                    anythingRead = true;
-                } catch (IllegalArgumentException e) {
-                    warnFailedSettingLoad(setting, value, e);
+        beginLoading();
+        try {
+            for (var setting : this.settings.keySet()) {
+                String value = settings.get(setting.getName());
+                if (value != null) {
+                    try {
+                        setting.setFromString(this, value);
+                        anythingRead = true;
+                    } catch (IllegalArgumentException e) {
+                        warnFailedSettingLoad(setting, value, e);
+                    }
                 }
             }
+        } finally {
+            endLoading();
         }
         return anythingRead;
+    }
+
+    private void beginLoading() {
+        if (this.loading || this.notifying) {
+            throw new IllegalStateException("Cannot load configuration recursively");
+        }
+        this.loading = true;
+        this.changedWhileLoading = false;
+        this.changedSettings.clear();
+    }
+
+    private void endLoading() {
+        this.loading = false;
+        if (this.changedWhileLoading && this.listener != null) {
+            this.changedWhileLoading = false;
+            var settings = Collections.unmodifiableSet(this.changedSettings);
+            this.notifying = true;
+            try {
+                this.listener.onSettingsChanged(this, settings);
+            } finally {
+                this.notifying = false;
+            }
+        } else {
+            this.changedSettings.clear();
+        }
     }
 
     @Override

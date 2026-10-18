@@ -11,7 +11,6 @@ import ae2.api.upgrades.Upgrades;
 import ae2.core.AELog;
 import ae2.util.ConfigInventory;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.Reference2IntMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -173,7 +172,7 @@ public final class CellTerminalWriteSupport {
     }
 
     private static void validateUpgradeSnapshot(IUpgradeInventory inventory, List<ItemStack> slots) {
-        Reference2IntMap<Item> installed = new Reference2IntOpenHashMap<>();
+        Reference2IntOpenHashMap<Item> installed = new Reference2IntOpenHashMap<>();
 
         for (int slot = 0; slot < slots.size(); slot++) {
             ItemStack stack = slots.get(slot);
@@ -193,7 +192,7 @@ public final class CellTerminalWriteSupport {
                 fail("Cell Terminal upgrade write rejected unsupported card. slot=%d, stack=%s", slot, stack);
             }
 
-            int updatedCount = installed.merge(item, 1, Integer::sum);
+            int updatedCount = installed.addTo(item, 1) + 1;
             if (updatedCount > maxInstalled) {
                 fail("Cell Terminal upgrade write exceeds card limit. slot=%d, stack=%s, count=%d, max=%d",
                     slot, stack, updatedCount, maxInstalled);

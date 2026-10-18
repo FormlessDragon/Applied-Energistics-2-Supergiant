@@ -39,7 +39,7 @@ public record CellTerminalContentSnapshot(List<GenericStack> entries, String con
     public static CellTerminalContentSnapshot fromCounter(KeyCounter counter) {
         Objects.requireNonNull(counter, "counter");
 
-        var sortableEntries = new ArrayList<SortableEntry>(counter.size());
+        var sortableEntries = new ArrayList<SortableEntry>();
         for (var entry : counter) {
             if (entry.getLongValue() > 0) {
                 AEKey key = entry.getKey();

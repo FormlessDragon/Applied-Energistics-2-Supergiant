@@ -21,6 +21,7 @@ package ae2.core;
 import ae2.api.implementations.items.AddWirelessTerminalEvent;
 import ae2.capabilities.Capabilities;
 import ae2.cellterminal.internal.InitCellTerminalApi;
+import ae2.container.PendingGridFills;
 import ae2.container.crafting.LastCraftingRecipeTracker;
 import ae2.core.definitions.AEBlockEntities;
 import ae2.core.definitions.AEEntities;
@@ -130,6 +131,7 @@ public final class AppEngBase implements AppEng {
 
     @Mod.EventHandler
     public void serverAboutToStart(FMLServerAboutToStartEvent event) {
+        PendingGridFills.startSession();
         ChunkLoadingService.getInstance().onServerAboutToStart();
     }
 
@@ -143,11 +145,13 @@ public final class AppEngBase implements AppEng {
 
     @Mod.EventHandler
     public void serverStopping(FMLServerStoppingEvent event) {
+        PendingGridFills.shutdown();
         ChunkLoadingService.getInstance().onServerStopping();
     }
 
     @Mod.EventHandler
     public void serverStopped(FMLServerStoppedEvent event) {
+        PendingGridFills.shutdown();
         RequestBox.clear();
         PlayerTracker.clear();
         NetworkAnalyserItem.clearCache();

@@ -66,8 +66,9 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.util.Constants;
-
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.List;
@@ -471,7 +472,7 @@ public class TileInscriber extends AENetworkedPoweredTile
     }
 
     @Override
-    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.CRANKABLE && getCrankable(facing) != null) {
             return true;
         }
@@ -479,7 +480,7 @@ public class TileInscriber extends AENetworkedPoweredTile
     }
 
     @Override
-    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.CRANKABLE) {
             return AECapabilities.CRANKABLE.cast(getCrankable(facing));
         }

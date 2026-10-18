@@ -18,16 +18,18 @@
 
 package ae2.container.me.items;
 
+import ae2.api.config.Actionable;
 import ae2.api.inventories.ISegmentedInventory;
 import ae2.api.inventories.InternalInventory;
+import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.energy.IEnergySource;
-import ae2.api.config.Actionable;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.storage.ITerminalHost;
 import ae2.api.storage.StorageHelper;
+import ae2.container.ContainerConstants;
 import ae2.container.GuiIds;
 import ae2.container.PendingGridFills;
 import ae2.container.SlotSemantics;
@@ -53,6 +55,7 @@ import ae2.me.storage.LinkStatusRespectingInventory;
 import ae2.parts.reporting.CraftingTerminalPart;
 import ae2.util.inv.PlayerInternalInventory;
 import com.google.common.base.Preconditions;
+import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -62,20 +65,19 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.shorts.ShortSet;
-import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.network.PacketBuffer;
 import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.inventory.Container;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.CraftingManager;
 import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.item.crafting.Ingredient;
+import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.NonNullList;
 import net.minecraft.util.ResourceLocation;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -98,12 +100,6 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
     private static final int GRID_TOP = 17;
     private static final int OUTPUT_X = 124;
     private static final int OUTPUT_Y = 35;
-    private static final Container RECIPE_FINDING_CONTAINER = new Container() {
-        @Override
-        public boolean canInteractWith(EntityPlayer playerIn) {
-            return false;
-        }
-    };
 
     private final InternalInventory craftingGrid;
     private final CraftingMatrixSlot[] craftingSlots = new CraftingMatrixSlot[9];
@@ -193,7 +189,7 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
             return;
         }
 
-        InventoryCrafting craftingInventory = new InventoryCrafting(RECIPE_FINDING_CONTAINER, GRID_WIDTH, GRID_HEIGHT);
+        InventoryCrafting craftingInventory = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, GRID_WIDTH, GRID_HEIGHT);
         for (int i = 0; i < testInput.size(); i++) {
             craftingInventory.setInventorySlotContents(i, testInput.get(i));
         }
@@ -254,7 +250,7 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
         // recipe output, which the player crafts by hand from those materials. The slots the materials belong to are
         // remembered so the terminal shows them there and fills them once they arrive.
         var targets = mergeGridFills(gridFills);
-        PendingGridFills.set(player, gridFills);
+        PendingGridFills.set(player, gridFills, this, node.grid());
         var provider = new TemporaryPseudoCraftingProvider(targets, outputs);
         ContainerCraftConfirm.openWithBatchCrafting(getActionHost(), player, getLocator(), targets, provider);
     }
@@ -383,7 +379,7 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
         }
 
         NonNullList<ItemStack> testInput = NonNullList.withSize(this.craftingSlots.length, ItemStack.EMPTY);
-        InventoryCrafting craftingInventory = new InventoryCrafting(RECIPE_FINDING_CONTAINER, GRID_WIDTH, GRID_HEIGHT);
+        InventoryCrafting craftingInventory = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, GRID_WIDTH, GRID_HEIGHT);
         for (int i = 0; i < testInput.size(); i++) {
             ItemStack stack = this.craftingSlots[i].getStack().copy();
             testInput.set(i, stack);
@@ -438,7 +434,7 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
         }
 
         NonNullList<ItemStack> testInput = NonNullList.withSize(this.craftingSlots.length, ItemStack.EMPTY);
-        InventoryCrafting craftingInventory = new InventoryCrafting(RECIPE_FINDING_CONTAINER, GRID_WIDTH, GRID_HEIGHT);
+        InventoryCrafting craftingInventory = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, GRID_WIDTH, GRID_HEIGHT);
         for (int i = 0; i < testInput.size(); i++) {
             ItemStack stack = this.craftingSlots[i].getStack().copy();
             testInput.set(i, stack);
@@ -508,7 +504,7 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
     }
 
     @Override
-    public void onContainerClosed(EntityPlayer player) {
+    public void onContainerClosed(@NotNull EntityPlayer player) {
         if (isServerSide()) {
             if (this.clearGridOnClose) {
                 moveCraftingGridToNetwork();
@@ -525,13 +521,19 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
      */
     private void updatePendingGridFills() {
         var player = getPlayerInventory().player;
-        List<GridFill> fills = PendingGridFills.get(player);
+        if (PendingGridFills.getOrder(player) == null) {
+            this.pendingGridFills = GridFillSync.EMPTY;
+            return;
+        }
+        var node = getGridNode();
+        var grid = node == null ? null : node.grid();
+        List<GridFill> fills = PendingGridFills.get(player, this, grid);
         if (fills == null || fills.isEmpty()) {
             this.pendingGridFills = GridFillSync.EMPTY;
             return;
         }
 
-        fillAvailableSlots(fills);
+        fillAvailableSlots(fills, grid);
         this.pendingGridFills = new GridFillSync(List.copyOf(fills));
     }
 
@@ -539,9 +541,8 @@ public class ContainerCraftingTerm extends ContainerMEStorage implements ICrafti
      * Moves every material the network can already supply into its slot, and forgets the slot once it is complete or
      * the player put something else into it.
      */
-    private void fillAvailableSlots(List<GridFill> fills) {
-        IGridNode node = getGridNode();
-        var storage = node == null ? null : node.grid().getStorageService().getInventory();
+    private void fillAvailableSlots(List<GridFill> fills, @Nullable IGrid grid) {
+        var storage = grid == null ? null : grid.getStorageService().getInventory();
         if (storage == null) {
             return;
         }

@@ -24,7 +24,6 @@ import ae2.api.config.SortOrder;
 import ae2.api.config.ViewItems;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
-import ae2.api.util.FlowRate;
 import ae2.client.gui.me.search.RepoSearch;
 import ae2.client.gui.widgets.IScrollSource;
 import ae2.client.gui.widgets.ISortSource;
@@ -34,9 +33,11 @@ import ae2.core.AELog;
 import ae2.util.prioritylist.IPartitionList;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import it.unimi.dsi.fastutil.longs.LongLongPair;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -85,7 +86,11 @@ public class Repo implements IClientRepo {
     private final ObjectArrayList<GridInventoryEntry> craftingPinnedEntries = new ObjectArrayList<>();
     private final ObjectArrayList<GridInventoryEntry> playerPinnedEntries = new ObjectArrayList<>();
     private final Map<AEKey, PinnedKeys.PinReason> pinnedReasons = new Object2ObjectOpenHashMap<>();
-    private Map<AEKey, FlowRate> flowRates = new HashMap<>();
+    private Map<AEKey, LongLongPair> flowRates = new Object2ObjectOpenHashMap<>();
+    private long flowSourceGeneration = Long.MIN_VALUE;
+    private long flowSnapshotId = Long.MIN_VALUE;
+    @Nullable
+    private FlowPageAssembly flowPages;
     /**
      * Entries by item ID to speed up ingredient matching.
      */
@@ -576,6 +581,7 @@ public class Repo implements IClientRepo {
 
     public final void clear() {
         clearEntries();
+        this.flowRates = new HashMap<>();
         this.view.clear();
         this.pinnedSlots.clear();
         this.pinnedSlotUserSlotIndexes.clear();
@@ -688,12 +694,108 @@ public class Repo implements IClientRepo {
         }
     }
 
-    public FlowRate getFlowRate(AEKey what) {
+    public LongLongPair getFlowRate(AEKey what) {
         return this.flowRates.get(what);
     }
 
-    public void updateFlowRates(final Map<AEKey, FlowRate> rates) {
+    public void updateFlowRates(final Map<AEKey, LongLongPair> rates) {
         this.flowRates = rates;
+    }
+
+    public boolean updateFlowRates(long sourceGeneration, Map<AEKey, LongLongPair> rates) {
+        return updateFlowRates(sourceGeneration, 0, 0, 1, true, rates);
+    }
+
+    public boolean clearFlowRates(long sourceGeneration) {
+        return clearFlowRates(sourceGeneration, 0);
+    }
+
+    public boolean updateFlowRates(long sourceGeneration, long snapshotId, int pageIndex, int pageCount,
+                                   boolean complete, Map<AEKey, LongLongPair> rates) {
+        if (sourceGeneration < this.flowSourceGeneration
+            || sourceGeneration == this.flowSourceGeneration && snapshotId < this.flowSnapshotId) {
+            return false;
+        }
+
+        if (sourceGeneration > this.flowSourceGeneration) {
+            this.flowSourceGeneration = sourceGeneration;
+            this.flowSnapshotId = Long.MIN_VALUE;
+            this.flowPages = null;
+        }
+
+        if (!complete) {
+            this.flowSnapshotId = snapshotId;
+            this.flowPages = null;
+            boolean changed = !this.flowRates.isEmpty();
+            this.flowRates = new Object2ObjectOpenHashMap<>();
+            return changed;
+        }
+
+        if (pageIndex < 0 || pageIndex >= pageCount) {
+            return false;
+        }
+        if (pageCount == 1) {
+            this.flowSnapshotId = snapshotId;
+            this.flowPages = null;
+            this.flowRates = new Object2ObjectOpenHashMap<>(rates);
+            return true;
+        }
+
+        if (this.flowPages == null || snapshotId > this.flowPages.snapshotId
+            || pageCount != this.flowPages.pageCount) {
+            this.flowPages = new FlowPageAssembly(snapshotId, pageCount);
+        }
+        if (snapshotId < this.flowPages.snapshotId) {
+            return false;
+        }
+
+        this.flowPages.pages.put(pageIndex, new Object2ObjectOpenHashMap<>(rates));
+        if (this.flowPages.pages.size() != pageCount) {
+            return false;
+        }
+
+        var combined = new HashMap<AEKey, LongLongPair>();
+        for (var page : this.flowPages.pages.values()) {
+            combined.putAll(page);
+        }
+        this.flowSnapshotId = snapshotId;
+        this.flowPages = null;
+        this.flowRates = combined;
+        return true;
+    }
+
+    public boolean clearFlowRates(long sourceGeneration, long snapshotId) {
+        if (sourceGeneration < this.flowSourceGeneration) {
+            return false;
+        }
+        if (sourceGeneration == this.flowSourceGeneration && snapshotId < this.flowSnapshotId) {
+            return false;
+        }
+
+        this.flowSourceGeneration = sourceGeneration;
+        this.flowSnapshotId = snapshotId;
+        boolean changed = !this.flowRates.isEmpty() || this.flowPages != null;
+        this.flowPages = null;
+        this.flowRates = new HashMap<>();
+        return changed;
+    }
+
+    public void clearFlowRates() {
+        this.flowPages = null;
+        if (!this.flowRates.isEmpty()) {
+            this.flowRates = new HashMap<>();
+        }
+    }
+
+    private static final class FlowPageAssembly {
+        private final long snapshotId;
+        private final int pageCount;
+        private final Int2ObjectMap<Map<AEKey, LongLongPair>> pages = new Int2ObjectOpenHashMap<>();
+
+        private FlowPageAssembly(long snapshotId, int pageCount) {
+            this.snapshotId = snapshotId;
+            this.pageCount = pageCount;
+        }
     }
 
     @Override

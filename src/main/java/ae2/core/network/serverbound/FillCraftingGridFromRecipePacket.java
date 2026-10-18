@@ -766,9 +766,11 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
             for (Object2LongMap.Entry<AEKey> entry : storage.findFuzzy(key, FuzzyMode.IGNORE_ALL)) {
                 AEKey foundKey = entry.getKey();
                 if (foundKey instanceof AEItemKey foundItemKey && foundItemKey.matches(ingredient)) {
-                    result.merge(foundItemKey,
-                        new AbstractObject2LongMap.BasicEntry<>(foundItemKey, entry.getLongValue()),
-                        (left, right) -> left.getLongValue() >= right.getLongValue() ? left : right);
+                    Object2LongMap.Entry<AEItemKey> current = result.get(foundItemKey);
+                    if (current == null || current.getLongValue() < entry.getLongValue()) {
+                        result.put(foundItemKey,
+                            new AbstractObject2LongMap.BasicEntry<>(foundItemKey, entry.getLongValue()));
+                    }
                 }
             }
         }

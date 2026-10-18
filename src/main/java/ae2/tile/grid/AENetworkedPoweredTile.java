@@ -33,7 +33,7 @@ import ae2.tile.powersink.AEBasePoweredTile;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
-
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class AENetworkedPoweredTile extends AEBasePoweredTile implements IGridConnectedTile {
@@ -107,7 +107,7 @@ public class AENetworkedPoweredTile extends AEBasePoweredTile implements IGridCo
     }
 
     @Override
-    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.IN_WORLD_GRID_NODE_HOST) {
             return true;
         }
@@ -119,7 +119,7 @@ public class AENetworkedPoweredTile extends AEBasePoweredTile implements IGridCo
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.IN_WORLD_GRID_NODE_HOST) {
             return AECapabilities.IN_WORLD_GRID_NODE_HOST.cast(this);
         }

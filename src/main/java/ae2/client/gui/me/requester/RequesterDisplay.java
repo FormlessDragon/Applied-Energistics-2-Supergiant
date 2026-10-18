@@ -6,7 +6,13 @@ import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
 
 public interface RequesterDisplay {
+    default boolean acceptSyncIdentity(int windowId, long sourceGeneration) {
+        return false;
+    }
+
     void postClearAll();
+
+    void postRemoveRequester(long requesterId);
 
     void postFullUpdate(long requesterId, @Nullable ITextComponent requesterName, long sortValue, int requestCount,
                         Int2ObjectMap<NBTTagCompound> rows);

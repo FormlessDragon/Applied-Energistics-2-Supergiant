@@ -58,6 +58,11 @@ public final class PatternImportPriorityContextImpl implements PatternImportPrio
     }
 
     private static GridInventoryEntry mergeEntries(GridInventoryEntry left, GridInventoryEntry right) {
+        if (left.storedAmount() >= right.storedAmount()
+            && left.requestableAmount() >= right.requestableAmount()
+            && (left.craftable() || !right.craftable())) {
+            return left;
+        }
         return new GridInventoryEntry(
             left.serial(),
             left.what(),

@@ -536,12 +536,14 @@ public class StorageService implements IStorageService, IGridServiceProvider {
             if (this.invalidationQueued.compareAndSet(false, true)) {
                 AELog.error("Storage monitor %s invoked a callback from the wrong thread; queuing a server-thread invalidation.",
                     this.monitor);
-                TickHandler.instance().addCallable(null, () -> {
+                if (!TickHandler.instance().tryAddCallable(null, () -> {
                     this.invalidationQueued.set(false);
                     if (isValid(this.monitor)) {
                         invalidateCache();
                     }
-                });
+                })) {
+                    this.invalidationQueued.set(false);
+                }
             }
         }
     }

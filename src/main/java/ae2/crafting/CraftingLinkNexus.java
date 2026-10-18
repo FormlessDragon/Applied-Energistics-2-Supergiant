@@ -2,6 +2,7 @@ package ae2.crafting;
 
 import ae2.api.networking.IGrid;
 import ae2.api.networking.crafting.ICraftingRequester;
+import ae2.core.AELog;
 import ae2.me.service.CraftingService;
 import org.jetbrains.annotations.Nullable;
 
@@ -51,18 +52,7 @@ public class CraftingLinkNexus {
     }
 
     void cancel() {
-        this.canceled = true;
-
-        if (this.getRequest() != null) {
-            this.getRequest().setCanceled(true);
-            if (this.getRequest().getRequester() != null) {
-                this.getRequest().getRequester().jobStateChange(this.getRequest());
-            }
-        }
-
-        if (this.cpu != null) {
-            this.cpu.setCanceled(true);
-        }
+        finish(true);
     }
 
     void remove(CraftingLink craftingLink) {
@@ -76,6 +66,7 @@ public class CraftingLinkNexus {
     void add(CraftingLink craftingLink) {
         if (craftingLink.getCpu() != null) {
             this.cpu = craftingLink;
+            applyTerminalState(craftingLink);
         } else if (craftingLink.getRequester() != null) {
             this.setRequest(craftingLink);
         }
@@ -90,17 +81,41 @@ public class CraftingLinkNexus {
     }
 
     void markDone() {
-        this.done = true;
+        finish(false);
+    }
 
-        if (this.getRequest() != null) {
-            this.getRequest().setDone(true);
-            if (this.getRequest().getRequester() != null) {
-                this.getRequest().getRequester().jobStateChange(this.getRequest());
-            }
+    private void finish(boolean canceled) {
+        if (this.canceled || this.done) {
+            return;
         }
-
+        this.canceled = canceled;
+        this.done = !canceled;
+        var request = this.req;
+        if (request != null) {
+            applyTerminalState(request);
+        }
         if (this.cpu != null) {
-            this.cpu.setDone(true);
+            applyTerminalState(this.cpu);
+        }
+        notifyRequester(request);
+    }
+
+    private void applyTerminalState(CraftingLink link) {
+        if (this.canceled) {
+            link.setCanceled(true);
+        } else if (this.done) {
+            link.setDone(true);
+        }
+    }
+
+    private void notifyRequester(@Nullable CraftingLink request) {
+        var requester = request == null ? null : request.getRequester();
+        if (requester != null) {
+            try {
+                requester.jobStateChange(request);
+            } catch (RuntimeException failure) {
+                AELog.error(failure, "Failed to notify a crafting requester of a terminal link");
+            }
         }
     }
 
@@ -122,8 +137,15 @@ public class CraftingLinkNexus {
         return this.req;
     }
 
-    public void setRequest(CraftingLink req) {
+    public void setRequest(@Nullable CraftingLink req) {
+        if (this.req == req) {
+            return;
+        }
         this.req = req;
+        if (req != null && (this.canceled || this.done)) {
+            applyTerminalState(req);
+            notifyRequester(req);
+        }
     }
 
     @Override

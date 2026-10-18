@@ -7,6 +7,7 @@ import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerChangedDimensionEvent;
+import net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerRespawnEvent;
 
@@ -61,17 +62,21 @@ public final class PlayerState {
 
     @SubscribeEvent
     public void onPlayerClone(PlayerEvent.Clone event) {
+        PendingGridFills.playerLeft(event.getOriginal());
+        PendingGridFills.playerJoined(event.getEntityPlayer());
         setHoldingCtrl(event.getEntityPlayer(), isHoldingCtrl(event.getOriginal()));
         clear(event.getOriginal());
     }
 
     @SubscribeEvent
     public void onPlayerRespawn(PlayerRespawnEvent event) {
+        PendingGridFills.playerJoined(event.player);
         clear(event.player);
     }
 
     @SubscribeEvent
     public void onPlayerChangedDimension(PlayerChangedDimensionEvent event) {
+        PendingGridFills.playerJoined(event.player);
         clear(event.player);
     }
 
@@ -80,6 +85,11 @@ public final class PlayerState {
         clear(event.player);
         // A player who left is not in a crafting terminal anymore, so the slots a batch order wanted to fill are
         // dropped rather than filled the next time that player opens the terminal.
-        PendingGridFills.clear(event.player);
+        PendingGridFills.playerLeft(event.player);
+    }
+
+    @SubscribeEvent
+    public void onPlayerLoggedIn(PlayerLoggedInEvent event) {
+        PendingGridFills.playerJoined(event.player);
     }
 }

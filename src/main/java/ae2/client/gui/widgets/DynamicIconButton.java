@@ -2,7 +2,7 @@ package ae2.client.gui.widgets;
 
 import ae2.client.gui.Icon;
 import net.minecraft.util.text.ITextComponent;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.awt.Rectangle;
 import java.util.List;
@@ -38,7 +38,7 @@ public class DynamicIconButton extends IconButton {
     }
 
     @Override
-    public @NonNull List<ITextComponent> getTooltipMessage() {
+    public @NotNull List<ITextComponent> getTooltipMessage() {
         return this.tooltipSupplier.get();
     }
 

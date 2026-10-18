@@ -15,7 +15,7 @@ public class EnchantmentHelperMixin {
     private static void hookGetItemEnchantmentLevel(Enchantment enchID, ItemStack stack,
                                                     CallbackInfoReturnable<Integer> cir) {
         if (cir.getReturnValueI() == 0 && stack.getItem() instanceof IntrinsicEnchantItem item) {
-            int level = item.getIntrinsicEnchantLevel(stack, enchID);
+            Integer level = item.getIntrinsicEnchantLevel(stack, enchID);
             if (level != 0) {
                 cir.setReturnValue(level);
             }

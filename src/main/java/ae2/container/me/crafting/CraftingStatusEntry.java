@@ -28,10 +28,16 @@ import java.util.Objects;
 
 public record CraftingStatusEntry(long serial, @Nullable AEKey what, long storedAmount, long activeAmount,
                                   long pendingAmount) implements Comparable<CraftingStatusEntry> {
-    private static final Comparator<CraftingStatusEntry> COMPARATOR = Comparator
-        .comparingLong((CraftingStatusEntry e) -> e.activeAmount() + e.pendingAmount())
-        .thenComparingLong(CraftingStatusEntry::storedAmount)
-        .reversed();
+    private static final Comparator<CraftingStatusEntry> COMPARATOR = (left, right) -> {
+        // Values are non-negative on the wire, so unsigned comparison preserves sums up to 2^64 - 2.
+        int byActiveAndPending = Long.compareUnsigned(
+            right.activeAmount() + right.pendingAmount(),
+            left.activeAmount() + left.pendingAmount());
+        if (byActiveAndPending != 0) {
+            return byActiveAndPending;
+        }
+        return Long.compare(right.storedAmount(), left.storedAmount());
+    };
 
     public static CraftingStatusEntry read(PacketBuffer buffer) {
         long serial = buffer.readVarLong();

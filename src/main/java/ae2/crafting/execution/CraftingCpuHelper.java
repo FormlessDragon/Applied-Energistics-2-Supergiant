@@ -51,10 +51,12 @@ public class CraftingCpuHelper {
      */
     public static KeyCounter extractInitialItems(ICraftingPlan plan, IGrid grid,
                                                  ListCraftingInventory cpuInventory, IActionSource src) {
+        var usedItems = plan.usedItems();
+        var missingItems = plan.missingItems();
         var storage = grid.getStorageService().getInventory();
         var remainingMissing = new KeyCounter();
 
-        for (var entry : plan.usedItems()) {
+        for (var entry : usedItems) {
             var what = entry.getKey();
             var toExtract = entry.getLongValue();
             var extracted = storage.extract(what, toExtract, Actionable.MODULATE, src);
@@ -65,7 +67,7 @@ public class CraftingCpuHelper {
             }
         }
 
-        for (var entry : plan.missingItems()) {
+        for (var entry : missingItems) {
             var what = entry.getKey();
             var toExtract = entry.getLongValue();
             var extracted = storage.extract(what, toExtract, Actionable.MODULATE, src);

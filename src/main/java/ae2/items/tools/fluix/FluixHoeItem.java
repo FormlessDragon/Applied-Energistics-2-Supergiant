@@ -7,24 +7,26 @@ import net.minecraft.init.Enchantments;
 import net.minecraft.item.ItemHoe;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.Objects;
 
 public class FluixHoeItem extends ItemHoe implements IntrinsicEnchantItem {
     private final IntrinsicEnchantment intrinsicEnchantment = new IntrinsicEnchantment(Enchantments.FORTUNE);
 
     public FluixHoeItem() {
-        super(FluixToolType.FLUIX);
+        super(Objects.requireNonNull(FluixToolType.FLUIX));
         this.setMaxStackSize(1);
     }
 
     @Override
-    public int getIntrinsicEnchantLevel(ItemStack stack, Enchantment enchantment) {
+    public Integer getIntrinsicEnchantLevel(ItemStack stack, Enchantment enchantment) {
         return intrinsicEnchantment.getLevel(enchantment);
     }
 
     @Override
-    public void addInformation(ItemStack stack, World world, List<String> lines, ITooltipFlag advancedTooltips) {
+    public void addInformation(@NotNull ItemStack stack, World world, @NotNull List<String> lines, @NotNull ITooltipFlag advancedTooltips) {
         super.addInformation(stack, world, lines, advancedTooltips);
         intrinsicEnchantment.appendHoverText(lines);
     }

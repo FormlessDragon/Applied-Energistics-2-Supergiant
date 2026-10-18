@@ -24,7 +24,7 @@ final class PatternRecipeTransferUserError implements IRecipeTransferError {
     }
 
     @Override
-    public Type getType() {
+    public @NotNull Type getType() {
         enableTransferButton();
         return Type.USER_FACING;
     }

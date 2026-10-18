@@ -20,6 +20,15 @@ public final class BlockedState implements StatusState {
     }
 
     @Override
+    public void cancel() {
+        var plan = this.simulatedPlanState;
+        this.simulatedPlanState = null;
+        if (plan != null) {
+            plan.cancel();
+        }
+    }
+
+    @Override
     public StatusState handle(TileRequester host, int slot) {
         if (host.shouldDelayRetry(slot, this.status)) {
             return this;

@@ -28,6 +28,7 @@ import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.energy.CapabilityEnergy;
 import net.minecraftforge.energy.IEnergyStorage;
+import org.jetbrains.annotations.NotNull;
 
 public class TileEnergyGenerator extends AEBaseTile implements ServerTickingTile, IEnergyStorage {
     private int generationRate = 8;
@@ -134,7 +135,7 @@ public class TileEnergyGenerator extends AEBaseTile implements ServerTickingTile
     }
 
     @Override
-    public boolean hasCapability(Capability<?> capability, EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, EnumFacing facing) {
         if (capability == CapabilityEnergy.ENERGY) {
             return true;
         }
@@ -143,7 +144,7 @@ public class TileEnergyGenerator extends AEBaseTile implements ServerTickingTile
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T getCapability(Capability<T> capability, EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, EnumFacing facing) {
         if (capability == CapabilityEnergy.ENERGY) {
             return (T) this;
         }

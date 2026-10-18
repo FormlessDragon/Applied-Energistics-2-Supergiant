@@ -18,8 +18,8 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -261,7 +261,7 @@ public class NetworkCraftingProviders {
         var captured = captureProvider(provider);
         synchronized (lock) {
             var previous = this.craftingProviders.get(node);
-            if (previous != null && previous.captured.sameContents(captured)) {
+            if (previous != null && Objects.requireNonNull(previous.captured).sameContents(captured)) {
                 return;
             }
             if (previous != null) {
@@ -301,7 +301,7 @@ public class NetworkCraftingProviders {
         var captured = captureProvider(provider);
         synchronized (lock) {
             var previous = this.globalProviders.get(provider);
-            if (previous != null && previous.captured.sameContents(captured)) {
+            if (previous != null && Objects.requireNonNull(previous.captured).sameContents(captured)) {
                 return;
             }
             if (previous != null) {
@@ -531,12 +531,12 @@ public class NetworkCraftingProviders {
         private void mount(NetworkCraftingProviders methods) {
             this.handles = new ObjectArrayList<>(patterns.size());
             for (var emitable : emitableItems) {
-                methods.emitableItems.merge(emitable, 1, Integer::sum);
+                methods.emitableItems.addTo(emitable, 1);
             }
             for (int i = 0; i < patterns.size(); i++) {
                 var occurrence = patterns.get(i);
                 var pattern = occurrence.pattern;
-                methods.knownPatternDefinitions.merge(occurrence.definition, 1, Integer::sum);
+                methods.knownPatternDefinitions.addTo(occurrence.definition, 1);
 
                 // output -> pattern (for simulation)
                 methods.craftableItemsList.add(occurrence.primaryOutput, 1);
@@ -555,15 +555,18 @@ public class NetworkCraftingProviders {
 
         private void unmount(NetworkCraftingProviders methods) {
             for (var emitable : emitableItems) {
-                methods.emitableItems.compute(emitable, (ignored, cnt) -> cnt == null || cnt <= 1 ? null : cnt - 1);
+                if (methods.emitableItems.addTo(emitable, -1) <= 1) {
+                    methods.emitableItems.removeInt(emitable);
+                }
             }
             for (int i = 0; i < patterns.size(); i++) {
                 final int patternIndex = i;
                 var occurrence = patterns.get(i);
                 var pattern = occurrence.pattern;
                 var handle = handles.get(i);
-                methods.knownPatternDefinitions.compute(occurrence.definition,
-                    (ignored, cnt) -> cnt == null || cnt <= 1 ? null : cnt - 1);
+                if (methods.knownPatternDefinitions.addTo(occurrence.definition, -1) <= 1) {
+                    methods.knownPatternDefinitions.removeInt(occurrence.definition);
+                }
 
                 methods.craftableItemsList.remove(occurrence.primaryOutput, 1);
 
@@ -707,7 +710,7 @@ public class NetworkCraftingProviders {
         }
 
         @Override
-        public @NonNull Iterator<ICraftingProvider> iterator() {
+        public @NotNull Iterator<ICraftingProvider> iterator() {
             synchronized (lock) {
                 ensureOrder();
                 return new Iterator<>() {

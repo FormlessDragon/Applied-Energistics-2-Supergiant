@@ -13,7 +13,7 @@ import ae2.core.localization.GuiText;
 import ae2.text.TextComponentItemStack;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.awt.Rectangle;
 import java.util.ArrayList;
@@ -171,7 +171,7 @@ public class GuiPatternImportPrioritySettings<C extends ContainerPatternEncoding
         }
 
         @Override
-        public @NonNull List<ITextComponent> getTooltipMessage() {
+        public @NotNull List<ITextComponent> getTooltipMessage() {
             return this.tooltipLines;
         }
 

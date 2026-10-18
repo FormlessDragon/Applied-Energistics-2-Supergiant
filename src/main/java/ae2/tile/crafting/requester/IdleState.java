@@ -7,6 +7,7 @@ import ae2.tile.crafting.TileRequester;
 public final class IdleState implements StatusState {
     @Override
     public StatusState handle(TileRequester host, int slot) {
+        long generation = host.getRequestGeneration(slot);
         AEKey bufferedKey = host.getStorageTracker().getBufferedKey(slot);
         if (bufferedKey != null && host.getStorageTracker().getBufferedAmount(slot, bufferedKey) > 0) {
             return EXPORT;
@@ -15,12 +16,19 @@ public final class IdleState implements StatusState {
         Request request = host.getRequests().get(slot);
         AEKey key = request.getKey();
         host.getStorageTracker().watch(slot, key);
+        if (generation != host.getRequestGeneration(slot)) {
+            return IDLE;
+        }
         if (!request.isEnabled() || request.isEmpty() || key == null) {
             return this;
         }
 
         if (host.getStorageTracker().getPendingInsertionAmount(slot, key) == 0) {
-            host.getStorageTracker().setKnownAmount(slot, key, host.getStoredAmount(key));
+            long stored = host.getStoredAmount(key);
+            if (generation != host.getRequestGeneration(slot)) {
+                return IDLE;
+            }
+            host.getStorageTracker().setKnownAmount(slot, key, stored);
         }
 
         if (host.getStorageTracker().computeAmountToCraft(slot, request) > 0) {

@@ -44,7 +44,7 @@ public record CraftingStatus(boolean fullStatus, long elapsedTime, long remainin
         this.elapsedTime = elapsedTime;
         this.remainingItemCount = remainingItemCount;
         this.startItemCount = startItemCount;
-        this.entries = ImmutableList.copyOf(entries);
+        this.entries = List.copyOf(entries);
         this.suspended = suspended;
         this.priority = priority;
         this.finalOutput = finalOutput;

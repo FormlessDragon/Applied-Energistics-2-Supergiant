@@ -38,7 +38,6 @@ import ae2.util.IDebugExportable;
 import ae2.util.JsonStreamUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ClassToInstanceMap;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.MutableClassToInstanceMap;
 import com.google.gson.stream.JsonWriter;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -378,7 +377,7 @@ public class GridNode implements IGridNode, IPathItem, IDebugExportable {
 
     @Override
     public List<IGridConnection> getConnections() {
-        return ImmutableList.copyOf(this.connections.values());
+        return List.copyOf(this.connections.values());
     }
 
     public boolean hasNoConnections() {

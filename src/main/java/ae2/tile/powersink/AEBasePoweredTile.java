@@ -35,6 +35,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.energy.CapabilityEnergy;
 import net.minecraftforge.energy.IEnergyStorage;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
@@ -251,7 +252,7 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
     }
 
     @Override
-    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, @Nullable EnumFacing facing) {
         if (capability == CapabilityEnergy.ENERGY && this.getEnergyStorage(facing) != null) {
             return true;
         }
@@ -260,7 +261,7 @@ public abstract class AEBasePoweredTile extends AEBaseInvTile
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == CapabilityEnergy.ENERGY) {
             return (T) this.getEnergyStorage(facing);
         }

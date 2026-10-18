@@ -31,8 +31,8 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 
 import java.awt.Rectangle;
 import java.util.Collections;
@@ -64,14 +64,14 @@ public abstract class IconButton extends GuiButton implements ITooltip {
     }
 
     @Override
-    public void playPressSound(SoundHandler soundHandler) {
+    public void playPressSound(@NotNull SoundHandler soundHandler) {
         if (!disableClickSound) {
             super.playPressSound(soundHandler);
         }
     }
 
     @Override
-    public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
+    public boolean mousePressed(@NotNull Minecraft minecraft, int mouseX, int mouseY) {
         boolean wasFocused = this.focused;
         boolean pressed = super.mousePressed(minecraft, mouseX, mouseY);
         if (pressed) {
@@ -102,7 +102,7 @@ public abstract class IconButton extends GuiButton implements ITooltip {
     }
 
     @Override
-    public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
+    public void drawButton(@NotNull Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
         if (!this.visible) {
             return;
         }
@@ -170,7 +170,7 @@ public abstract class IconButton extends GuiButton implements ITooltip {
     }
 
     @Override
-    public @NonNull List<ITextComponent> getTooltipMessage() {
+    public @NotNull List<ITextComponent> getTooltipMessage() {
         return Collections.singletonList(getMessageComponent());
     }
 

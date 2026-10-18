@@ -22,8 +22,8 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -67,7 +67,7 @@ public final class InterfaceSubnetScanner implements CellTerminalScanner.Subnet 
     }
 
     @Override
-    public @NonNull List<? extends CellTerminalSubnetTarget> scan(IGrid grid) {
+    public @NotNull List<? extends CellTerminalSubnetTarget> scan(IGrid grid) {
         var subnetBuilders = new Reference2ObjectOpenHashMap<IGrid, SubnetBuilder>();
         scanOutboundConnections(grid, subnetBuilders);
         scanInboundConnections(grid, subnetBuilders);

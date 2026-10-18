@@ -25,7 +25,6 @@ import ae2.tile.crafting.requester.Request;
 import com.google.common.collect.HashMultimap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.ItemStack;
@@ -41,9 +40,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.WeakHashMap;
 
 public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTerm> implements ITextFieldGui {
     private static final Rectangle FOOTER_BBOX = new Rectangle(0, 133, GUI_WIDTH, GUI_FOOTER_HEIGHT + 2);
@@ -51,7 +47,6 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
     private final Long2ObjectMap<ClientRequester> byId = new Long2ObjectOpenHashMap<>();
     private final HashMultimap<String, ClientRequester> byName = HashMultimap.create();
     private final ArrayList<String> requesterNames = new ArrayList<>();
-    private final Map<String, Set<Object>> searchCache = new WeakHashMap<>();
     private final AETextField searchField;
 
     public GuiRequesterTerm(ContainerRequesterTerm container, InventoryPlayer playerInventory,
@@ -82,10 +77,6 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
 
     private static String requesterDisplayName(ClientRequester requester) {
         return requester.getDisplayName().getFormattedText();
-    }
-
-    private static String requesterSearchName(ClientRequester requester) {
-        return requester.getSearchName();
     }
 
     private static boolean keyMatchesSearchQuery(@Nullable AEKey key, String searchTerm) {
@@ -144,24 +135,17 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
         this.byId.clear();
         this.byName.clear();
         this.requesterNames.clear();
-        this.searchCache.clear();
     }
 
     @Override
     protected void refreshList() {
-        this.searchCache.clear();
         this.byName.clear();
 
         String searchQuery = this.searchField.getText().toLowerCase(Locale.ROOT);
-        Set<Object> cachedSearch = searchByQuery(searchQuery);
-        boolean rebuild = cachedSearch.isEmpty();
 
         for (ClientRequester requester : this.byId.values()) {
-            if (!rebuild && !cachedSearch.contains(requester)) {
-                continue;
-            }
-
-            boolean found = searchQuery.isEmpty() || requesterSearchName(requester).contains(searchQuery);
+            String name = requesterDisplayName(requester);
+            boolean found = searchQuery.isEmpty() || name.toLowerCase(Locale.ROOT).contains(searchQuery);
             if (!found) {
                 for (int i = 0; i < requester.getRequests().size(); i++) {
                     found = keyMatchesSearchQuery(requester.getRequests().get(i).getKey(), searchQuery);
@@ -172,10 +156,7 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
             }
 
             if (found) {
-                this.byName.put(requesterDisplayName(requester), requester);
-                cachedSearch.add(requester);
-            } else {
-                cachedSearch.remove(requester);
+                this.byName.put(name, requester);
             }
         }
 
@@ -230,6 +211,11 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
     }
 
     @Override
+    protected boolean removeRequester(long requesterId) {
+        return this.byId.remove(requesterId) != null;
+    }
+
+    @Override
     protected Rectangle getFooterBounds() {
         return FOOTER_BBOX;
     }
@@ -239,16 +225,6 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
         button.set(next);
         AEConfig.instance().setTerminalStyle(next);
         this.setWorldAndResolution(this.mc, this.width, this.height);
-    }
-
-    private Set<Object> searchByQuery(String searchQuery) {
-        Set<Object> cache = this.searchCache.computeIfAbsent(searchQuery, ignored -> new ObjectOpenHashSet<>());
-
-        if (cache.isEmpty() && searchQuery.length() > 1) {
-            cache.addAll(searchByQuery(searchQuery.substring(0, searchQuery.length() - 1)));
-        }
-
-        return cache;
     }
 
     private void addWirelessUniversalTerminalButton() {

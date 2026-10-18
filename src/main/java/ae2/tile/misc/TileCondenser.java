@@ -45,7 +45,7 @@ import net.minecraftforge.fluids.capability.FluidTankProperties;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.fluids.capability.IFluidTankProperties;
 import net.minecraftforge.items.IItemHandler;
-
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class TileCondenser extends AEBaseInvTile implements IConfigurableObject, CondenserLogicHost {
@@ -207,7 +207,7 @@ public class TileCondenser extends AEBaseInvTile implements IConfigurableObject,
     }
 
     @Override
-    public boolean hasCapability(Capability<?> capability, @Nullable EnumFacing facing) {
+    public boolean hasCapability(@NotNull Capability<?> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.ME_STORAGE) {
             return true;
         }
@@ -219,7 +219,7 @@ public class TileCondenser extends AEBaseInvTile implements IConfigurableObject,
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T getCapability(Capability<T> capability, @Nullable EnumFacing facing) {
+    public <T> T getCapability(@NotNull Capability<T> capability, @Nullable EnumFacing facing) {
         if (capability == AECapabilities.ME_STORAGE) {
             return (T) this.getMEStorage();
         }

@@ -19,7 +19,6 @@
 package ae2.block.paint;
 
 import ae2.helpers.Splotch;
-import com.google.common.collect.ImmutableList;
 
 import java.util.Collection;
 import java.util.List;
@@ -32,7 +31,7 @@ public class PaintSplotches {
     private final List<Splotch> splotches;
 
     public PaintSplotches(Collection<Splotch> splotches) {
-        this.splotches = ImmutableList.copyOf(splotches);
+        this.splotches = List.copyOf(splotches);
     }
 
     List<Splotch> getSplotches() {

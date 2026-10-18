@@ -146,6 +146,11 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
     protected void updateBeforeRender() {
         super.updateBeforeRender();
 
+        CraftingStatus pendingStatus = this.container.consumeClientStatus();
+        if (pendingStatus != null) {
+            postUpdate(pendingStatus);
+        }
+
         List<CraftingStatusEntry> visibleEntries = getVisualEntries();
         List<CraftingStatusEntry> allEntries = this.status != null ? this.status.entries() : Collections.emptyList();
         this.cancel.enabled = !allEntries.isEmpty();
@@ -247,6 +252,10 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
     }
 
     public void postUpdate(CraftingStatus status) {
+        if (CraftingStatus.EMPTY.equals(status) && CraftingStatus.EMPTY.equals(this.status)) {
+            return;
+        }
+
         Long2ObjectMap<CraftingStatusEntry> entries;
         if (this.status == null || status.fullStatus()) {
             entries = new Long2ObjectLinkedOpenHashMap<>();
@@ -283,10 +292,11 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
             status.elapsedTime(),
             status.remainingItemCount(),
             status.startItemCount(),
-            sortedEntries,
+            Collections.unmodifiableList(sortedEntries),
             status.suspended(),
             status.priority(),
             status.finalOutput());
+        this.table.clearSnapshotCache();
         this.filteredStatus = null;
         this.suspend.setMessage(status.suspended() ? GuiText.Resume.text() : GuiText.Suspend.text());
     }

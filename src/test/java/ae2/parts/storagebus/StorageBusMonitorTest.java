@@ -19,7 +19,7 @@ import net.minecraft.init.Items;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -143,7 +143,7 @@ class StorageBusMonitorTest {
         assertFalse(((NetworkStorage) child.getInventory()).hasListeners());
     }
 
-    private static @NonNull StorageService createChild(AtomicInteger scans, AEItemKey key, AtomicInteger amount) {
+    private static @NotNull StorageService createChild(AtomicInteger scans, AEItemKey key, AtomicInteger amount) {
         var child = new StorageService(new EmptyGrid());
         child.addGlobalStorageProvider(mounts -> mounts.mount(new MEStorageMonitor() {
             public void getAvailableStacks(KeyCounter out) {

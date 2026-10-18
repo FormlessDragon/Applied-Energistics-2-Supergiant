@@ -256,9 +256,13 @@ public abstract class IOBusPart extends UpgradeablePart implements IGridTickable
     }
 
     private void updateState() {
+        this.onConfigOrUpgradesChanged();
         filter = null; // rebuild the filter
 
         updateRedstoneState();
+    }
+
+    protected void onConfigOrUpgradesChanged() {
     }
 
     @Override

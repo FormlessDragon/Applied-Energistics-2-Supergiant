@@ -542,14 +542,28 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
                 if (!registration.active) {
                     continue;
                 }
-                if (!registration.listener.isValid(registration.verificationToken)) {
+                String callback = "isValid";
+                try {
+                    if (!registration.listener.isValid(registration.verificationToken)) {
+                        registration.active = false;
+                        continue;
+                    }
+                    // Validation itself may unregister or replace this registration.
+                    if (!registration.active) {
+                        continue;
+                    }
+                    if (listUpdate) {
+                        callback = "onListUpdate";
+                        registration.listener.onListUpdate();
+                    } else {
+                        callback = "onStackChange";
+                        registration.listener.onStackChange(what, delta);
+                    }
+                } catch (RuntimeException exception) {
                     registration.active = false;
-                    continue;
-                }
-                if (listUpdate) {
-                    registration.listener.onListUpdate();
-                } else {
-                    registration.listener.onStackChange(what, delta);
+                    AELog.error(exception, "Composite storage listener "
+                        + registration.listener.getClass().getName()
+                        + " failed in " + callback + "; removing the failed registration.");
                 }
             }
         } finally {
@@ -679,14 +693,16 @@ public class CompositeStorage implements MEStorageMonitor, ITickingMonitor {
             if (this.invalidationQueued.compareAndSet(false, true)) {
                 AELog.error("External storage %s invoked a callback from the wrong thread; queuing a server-thread invalidation.",
                     this.monitor);
-                TickHandler.instance().addCallable(null, () -> {
+                if (!TickHandler.instance().tryAddCallable(null, () -> {
                     this.invalidationQueued.set(false);
                     var composite = this.owner;
                     if (composite != null && isValid(this)) {
                         composite.eventDirty = true;
                         composite.requestListUpdate();
                     }
-                });
+                })) {
+                    this.invalidationQueued.set(false);
+                }
             }
         }
     }

@@ -10,6 +10,12 @@ public interface StatusState {
 
     StatusState handle(TileRequester host, int slot);
 
+    /**
+     * Releases calculations or submitted links owned by this state without waiting for workers.
+     */
+    default void cancel() {
+    }
+
     RequestStatus type();
 
     TickRateModulation getTickRateModulation();

@@ -2,8 +2,8 @@ package ae2.client.gui.me.common;
 
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AmountFormat;
-import ae2.api.util.FlowRate;
 import ae2.core.localization.GuiText;
+import it.unimi.dsi.fastutil.longs.LongLongPair;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
@@ -21,23 +21,23 @@ public final class FlowRateFormatter {
      *
      * @return the formatted line, or {@code null} if the key had no flow at all.
      */
-    public static ITextComponent format(AEKey what, FlowRate rate, int windowMinutes) {
-        if (rate == null || rate.in() == 0 && rate.out() == 0) {
+    public static ITextComponent format(AEKey what, LongLongPair rate, int windowMinutes) {
+        if (rate == null || rate.leftLong() == 0 && rate.rightLong() == 0) {
             return null;
         }
 
         String window = formatWindow(windowMinutes);
 
-        if (rate.in() == 0) {
-            return GuiText.FlowRateShort.text(window, formatOutRate(what, rate.out()));
-        } else if (rate.out() == 0) {
-            return GuiText.FlowRateShort.text(window, formatInRate(what, rate.in()));
+        if (rate.leftLong() == 0) {
+            return GuiText.FlowRateShort.text(window, formatOutRate(what, rate.rightLong()));
+        } else if (rate.rightLong() == 0) {
+            return GuiText.FlowRateShort.text(window, formatInRate(what, rate.leftLong()));
         } else {
             return GuiText.FlowRateFull.text(
                 window,
-                formatInRate(what, rate.in()),
-                formatOutRate(what, rate.out()),
-                formatTotalForChat(what, rate.net()));
+                formatInRate(what, rate.leftLong()),
+                formatOutRate(what, rate.rightLong()),
+                formatTotalForChat(what, rate.leftLong() - rate.rightLong()));
         }
     }
 
@@ -57,9 +57,12 @@ public final class FlowRateFormatter {
      * Formats a single signed total for chat, greening inflows and reddening outflows.
      */
     public static ITextComponent formatTotalForChat(long total) {
+        String magnitude = total == Long.MIN_VALUE
+            ? Long.toUnsignedString(total)
+            : Long.toString(Math.abs(total));
         return new TextComponentString(
             (total >= 0 ? TextFormatting.GREEN : TextFormatting.RED)
-                + (total >= 0 ? "+" : "-") + Math.abs(total) + TextFormatting.RESET);
+                + (total >= 0 ? "+" : "-") + magnitude + TextFormatting.RESET);
     }
 
     private static ITextComponent formatTotalForChat(AEKey what, long total) {
@@ -75,6 +78,9 @@ public final class FlowRateFormatter {
      * would place the minus sign inside the number and could never express the explicit plus sign used for inflows.
      */
     private static String formatSignedAmount(AEKey what, long amount) {
+        if (amount == Long.MIN_VALUE) {
+            return "-" + Long.toUnsignedString(amount);
+        }
         String formatted = what.formatAmount(Math.abs(amount), AmountFormat.FULL);
         return (amount >= 0 ? "+" : "-") + formatted;
     }
