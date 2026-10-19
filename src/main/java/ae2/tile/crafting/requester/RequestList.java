@@ -3,26 +3,23 @@ package ae2.tile.crafting.requester;
 import net.minecraft.nbt.NBTTagCompound;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public final class RequestList {
 
-    private final List<Request> requests;
+    private final Request[] requests;
 
     public RequestList(@Nullable RequestHost host, int size) {
-        this.requests = new ArrayList<>(size);
+        this.requests = new Request[size];
         for (int i = 0; i < size; i++) {
-            this.requests.add(new Request(host, i));
+            this.requests[i] = new Request(host, i);
         }
     }
 
     public int size() {
-        return this.requests.size();
+        return this.requests.length;
     }
 
     public Request get(int index) {
-        return this.requests.get(index);
+        return this.requests[index];
     }
 
     public NBTTagCompound writeToNBT() {

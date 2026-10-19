@@ -34,7 +34,6 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import org.jetbrains.annotations.NotNull;
-import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
@@ -131,7 +130,7 @@ public class ContainerPatternProvider extends AEBaseContainer
     }
 
     @Override
-    public @NonNull ItemStack transferStackInSlot(EntityPlayer player, int index) {
+    public @NotNull ItemStack transferStackInSlot(EntityPlayer player, int index) {
         if (!isClientSide() && index >= 0 && index < this.inventorySlots.size()) {
             Slot sourceSlot = this.inventorySlots.get(index);
             if (isValidQuickMoveSource(sourceSlot, player)

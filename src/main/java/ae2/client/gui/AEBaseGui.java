@@ -94,7 +94,6 @@ import net.minecraftforge.fml.client.config.GuiUtils;
 import net.minecraftforge.fml.common.Optional;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
@@ -900,7 +899,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     }
 
     @Override
-    protected void drawSlot(@NonNull Slot slot) {
+    protected void drawSlot(@NotNull Slot slot) {
         if (!(slot instanceof AppEngSlot appEngSlot)) {
             super.drawSlot(slot);
             renderHoveredSlotOverlayIfNeeded(slot);
@@ -1368,7 +1367,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     }
 
     @Override
-    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, @NonNull ClickType clickType) {
+    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, @NotNull ClickType clickType) {
         if (container.isClientSideSlot(slot)) {
             return;
         }

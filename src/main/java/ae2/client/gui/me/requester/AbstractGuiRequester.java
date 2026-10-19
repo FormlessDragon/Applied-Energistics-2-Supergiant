@@ -27,8 +27,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.awt.Rectangle;
@@ -281,7 +281,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
     }
 
     @Override
-    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, @NonNull ClickType clickType) {
+    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, @NotNull ClickType clickType) {
         if (!(slot instanceof RequestSlot requestSlot)) {
             super.handleMouseClick(slot, slotId, mouseButton, clickType);
             return;

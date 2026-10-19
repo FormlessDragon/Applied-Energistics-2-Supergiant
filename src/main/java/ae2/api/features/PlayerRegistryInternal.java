@@ -26,8 +26,8 @@ import com.google.common.collect.HashBiMap;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.storage.MapStorage;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -167,7 +167,7 @@ public final class PlayerRegistryInternal extends AESavedData implements IPlayer
     }
 
     @Override
-    public @NonNull NBTTagCompound writeToNBT(@NonNull NBTTagCompound compound) {
+    public @NotNull NBTTagCompound writeToNBT(@NotNull NBTTagCompound compound) {
         requireValid();
         int index = 0;
         int[] playerIds = new int[mapping.size()];

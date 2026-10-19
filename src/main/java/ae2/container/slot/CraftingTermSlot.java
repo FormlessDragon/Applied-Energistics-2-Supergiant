@@ -56,7 +56,6 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import org.jetbrains.annotations.NotNull;
-import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
@@ -136,7 +135,7 @@ public class CraftingTermSlot extends AppEngCraftingSlot {
     }
 
     @Override
-    public @NotNull ItemStack onTake(@NonNull EntityPlayer player, @NonNull ItemStack stack) {
+    public @NotNull ItemStack onTake(@NotNull EntityPlayer player, @NotNull ItemStack stack) {
         return stack;
     }
 

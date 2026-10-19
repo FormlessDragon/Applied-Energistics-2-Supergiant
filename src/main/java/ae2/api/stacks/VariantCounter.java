@@ -4,7 +4,6 @@ import ae2.api.config.FuzzyMode;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMaps;
 import org.jetbrains.annotations.NotNull;
-import org.jspecify.annotations.NonNull;
 
 import java.util.AbstractCollection;
 import java.util.Collection;
@@ -177,7 +176,7 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
                 }
 
                 @Override
-                public @NonNull Iterator<Object2LongMap.Entry<AEKey>> iterator() {
+                public @NotNull Iterator<Object2LongMap.Entry<AEKey>> iterator() {
                     var source = Object2LongMaps.fastIterator(records);
                     return new Iterator<>() {
                         private Object2LongMap.Entry<AEKey> next;

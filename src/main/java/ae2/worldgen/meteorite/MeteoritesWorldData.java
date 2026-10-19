@@ -20,7 +20,7 @@ import net.minecraft.world.gen.structure.StructureBoundingBox;
 import net.minecraft.world.storage.MapStorage;
 import net.minecraft.world.storage.WorldSavedData;
 import net.minecraftforge.common.util.Constants.NBT;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.util.BitSet;
@@ -535,7 +535,7 @@ public class MeteoritesWorldData extends WorldSavedData {
     }
 
     @Override
-    public @NonNull NBTTagCompound writeToNBT(NBTTagCompound compound) {
+    public @NotNull NBTTagCompound writeToNBT(NBTTagCompound compound) {
         requireValid();
         compound.setBoolean(TAG_LEGACY_SPAWN_DATA_CHECKED, legacySpawnDataChecked);
         if (legacySpawnDataSignature != null) {

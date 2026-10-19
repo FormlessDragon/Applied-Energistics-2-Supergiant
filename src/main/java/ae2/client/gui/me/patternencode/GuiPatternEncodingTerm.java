@@ -41,8 +41,8 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
@@ -259,7 +259,7 @@ public class GuiPatternEncodingTerm extends GuiMEStorage<ContainerPatternEncodin
     }
 
     @Override
-    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, @NonNull ClickType clickType) {
+    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, @NotNull ClickType clickType) {
         if (mouseButton == 2 && this.container.canModifyAmountForSlot(slot)) {
             return;
         }

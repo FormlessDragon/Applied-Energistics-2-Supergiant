@@ -47,8 +47,8 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
@@ -329,7 +329,7 @@ public class GuiPEATerm extends AbstractPatternAccessTerm<ContainerPEATerm> impl
     }
 
     @Override
-    protected void drawSlot(@NonNull Slot slot) {
+    protected void drawSlot(@NotNull Slot slot) {
         if (slot instanceof RepoSlot && isProviderListSlot(slot)) {
             return;
         }
