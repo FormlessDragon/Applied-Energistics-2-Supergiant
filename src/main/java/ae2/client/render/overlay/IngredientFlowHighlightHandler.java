@@ -3,7 +3,6 @@ package ae2.client.render.overlay;
 import ae2.api.util.FlowSearchDTO;
 import ae2.client.gui.me.common.FlowRateFormatter;
 import ae2.core.localization.PlayerMessages;
-import ae2.crafting.execution.CraftingSupplierLocator;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
@@ -42,6 +41,7 @@ public class IngredientFlowHighlightHandler {
     }
 
     public void showFlowLocations(Minecraft minecraft, List<FlowSearchDTO> flows, ITextComponent ingredientName) {
+        clear();
         if (minecraft.player == null || minecraft.world == null) {
             return;
         }
@@ -53,25 +53,21 @@ public class IngredientFlowHighlightHandler {
         }
 
         List<OverlayHighlightLocation> locations = new ObjectArrayList<>(flows.size());
-        this.highlightedNetTotals.clear();
         int currentDimension = minecraft.world.provider.getDimension();
 
         for (FlowSearchDTO flow : flows) {
+            if (flow.dimension != currentDimension) {
+                continue;
+            }
             BlockPos pos = flow.position;
-            int dimension = flow.dimension;
             ITextComponent rate = FlowRateFormatter.formatTotalForChat(flow.netTotal());
 
-            if (dimension == currentDimension) {
-                OverlayHighlightLocation location =
-                    new OverlayHighlightLocation(dimension, pos, null, OverlayHighlightShape.WHOLE_BLOCK);
-                locations.add(location);
-                this.highlightedNetTotals.put(location, flow.netTotal());
-                sendFlowMessage(minecraft, PlayerMessages.IngredientFlowHighlighted.text(
-                    ingredientName, rate, pos.getX(), pos.getY(), pos.getZ()));
-            } else {
-                sendFlowMessage(minecraft, PlayerMessages.IngredientFlowInOtherDim.text(
-                    ingredientName, rate, CraftingSupplierLocator.getDimensionName(dimension)));
-            }
+            OverlayHighlightLocation location =
+                new OverlayHighlightLocation(currentDimension, pos, null, OverlayHighlightShape.WHOLE_BLOCK);
+            locations.add(location);
+            this.highlightedNetTotals.put(location, flow.netTotal());
+            sendFlowMessage(minecraft, PlayerMessages.IngredientFlowHighlighted.text(
+                ingredientName, rate, pos.getX(), pos.getY(), pos.getZ()));
         }
 
         showLocations(minecraft, locations);
@@ -101,13 +97,14 @@ public class IngredientFlowHighlightHandler {
 
     public void clear() {
         this.currentDimensionLocations.clear();
+        this.highlightedNetTotals.clear();
     }
 
     @SubscribeEvent
     public void renderWorldLast(RenderWorldLastEvent event) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft.world == null || minecraft.player == null) {
-            this.currentDimensionLocations.clear();
+            clear();
             return;
         }
         if (this.currentDimensionLocations.isEmpty()) {
@@ -115,7 +112,7 @@ public class IngredientFlowHighlightHandler {
         }
         if (minecraft.world.provider.getDimension() != this.highlightedDimension
             || System.currentTimeMillis() > this.expiresAt) {
-            this.currentDimensionLocations.clear();
+            clear();
             return;
         }
         if (((System.currentTimeMillis() / 300L) & 1L) == 1L) {
