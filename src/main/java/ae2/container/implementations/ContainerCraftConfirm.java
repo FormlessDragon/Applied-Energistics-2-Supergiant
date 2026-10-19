@@ -58,7 +58,6 @@ import ae2.crafting.execution.CraftingSubmitResult;
 import ae2.items.tools.powered.WirelessTerminals;
 import ae2.me.helpers.PlayerSource;
 import ae2.util.SearchInventoryEvent;
-import com.google.common.primitives.Ints;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanMap;
@@ -1106,7 +1105,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
                 ContainerCraftConfirm.openWithCraftingList(getActionHost(), serverPlayer, getLocator(),
                     this.autoCraftingQueue, getReturnToContainerOverride());
             } else if (this.whatToCraft != null) {
-                ContainerCraftAmount.open(serverPlayer, getLocator(), this.whatToCraft, Ints.saturatedCast(this.amount),
+                ContainerCraftAmount.open(serverPlayer, getLocator(), this.whatToCraft, this.amount,
                     getReturnToContainerOverride());
             } else {
                 this.host.returnToMainContainer(getPlayer(), this);

@@ -20,6 +20,7 @@ import ae2.me.service.CraftingService;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.init.Items;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.math.BlockPos;
@@ -113,6 +114,32 @@ class CraftingCpuRestoreTest {
         assertThrows(IllegalArgumentException.class, () -> target.moveFrom(saturated));
         assertEquals(13, target.get(apple));
         assertEquals(Long.MAX_VALUE, saturated.get(carrot));
+    }
+
+    @Test
+    void cpuInventoryAndJobWaitingListsBeyond1024SurviveSaveAndReload() {
+        var resources = new NBTTagList();
+        for (int i = 0; i < 1025; i++) {
+            var stack = new ItemStack(Items.APPLE);
+            var tag = new NBTTagCompound();
+            tag.setInteger("variant", i);
+            stack.setTagCompound(tag);
+            resources.appendTag(GenericStack.writeTag(new GenericStack(AEItemKey.of(stack), i + 1L)));
+        }
+        var data = image(7, true);
+        data.setTag("inventory", resources);
+        data.getCompoundTag("job").setTag("waitingFor", resources.copy());
+        var first = new Fixture();
+        first.logic.readFromNBT(data);
+        var saved = new NBTTagCompound();
+        first.logic.writeToNBT(saved);
+        var restored = new Fixture();
+        restored.logic.readFromNBT(saved);
+        assertEquals(1025, restored.logic.getInventory().list.size());
+        for (var resource : GenericStack.readList(resources)) {
+            assertEquals(resource.amount(), restored.logic.getInventory().list.get(resource.what()));
+            assertEquals(resource.amount(), restored.logic.getWaitingFor(resource.what()));
+        }
     }
 
     @Test

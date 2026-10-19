@@ -107,6 +107,28 @@ class CraftingStatusIdentityTest {
         assertEquals(2, merged.elapsedTime());
     }
 
+    @Test
+    void cpuSwitchClearsPreviousEntriesAndLateStatusCannotRestoreThem() throws Exception {
+        var container = allocate(ContainerCraftingCPU.class);
+        var firstKey = new TestKey("first");
+        var secondKey = new TestKey("second");
+        container.acceptClientStatus(4, 10, new CraftingStatus(true, 0, 0, 0,
+            List.of(new CraftingStatusEntry(1, firstKey, 7, 0, 0)), false, 0, null));
+        assertEquals(firstKey, container.consumeClientStatus().entries().getFirst().what());
+        container.acceptClientStatus(5, 1, new CraftingStatus(true, 0, 0, 0,
+            List.of(new CraftingStatusEntry(2, secondKey, 3, 0, 0)), false, 0, null));
+        container.acceptClientStatus(4, 11, new CraftingStatus(true, 0, 0, 0,
+            List.of(new CraftingStatusEntry(1, firstKey, 99, 0, 0)), false, 0, null));
+        var current = container.consumeClientStatus();
+        assertEquals(1, current.entries().size());
+        assertEquals(secondKey, current.entries().getFirst().what());
+        container.acceptClientStatus(5, 2, new CraftingStatus(false, 0, 0, 0,
+            List.of(new CraftingStatusEntry(2, null, 0, 0, 0)), false, 0, null));
+        assertEquals(CraftingStatus.EMPTY, container.consumeClientStatus());
+        container.acceptClientStatus(5, 1, current);
+        assertNull(container.consumeClientStatus());
+    }
+
     private static final class TestKey extends AEKey {
         private final String name;
 

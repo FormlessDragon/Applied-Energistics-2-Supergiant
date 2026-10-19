@@ -110,6 +110,7 @@ import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.fml.common.Optional;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
@@ -706,7 +707,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     }
 
     @Override
-    protected void drawSlot(Slot slot) {
+    protected void drawSlot(@NonNull Slot slot) {
         if (slot instanceof RepoSlot repoSlot) {
             drawRepoSlot(repoSlot);
             renderHoveredSlotOverlayIfNeeded(slot);
@@ -829,7 +830,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     }
 
     @Override
-    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, ClickType clickType) {
+    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, @NonNull ClickType clickType) {
         if (slot instanceof RepoSlot repoSlot) {
             if (canInteractWithRepo()) {
                 handleRepoSlotMouseClick(repoSlot, mouseButton, clickType);

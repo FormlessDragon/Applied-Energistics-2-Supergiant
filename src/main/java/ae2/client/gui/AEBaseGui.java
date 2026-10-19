@@ -94,6 +94,7 @@ import net.minecraftforge.fml.client.config.GuiUtils;
 import net.minecraftforge.fml.common.Optional;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
@@ -111,6 +112,7 @@ import java.util.RandomAccess;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+@SuppressWarnings("DataFlowIssue")
 @Optional.Interface(iface = "yalter.mousetweaks.api.IMTModGuiContainer2", modid = "mousetweaks")
 public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer implements IMTModGuiContainer2 {
     /**
@@ -701,27 +703,62 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     }
 
     private void drawHoveringTextAtTopZ(ItemStack tooltipStack, List<String> tooltip, int mouseX, int mouseY) {
+        float previousGuiZLevel = this.zLevel;
+        float previousItemZLevel = this.itemRender.zLevel;
+        boolean previousLighting = GL11.glIsEnabled(GL11.GL_LIGHTING);
+        boolean previousLight0 = GL11.glIsEnabled(GL11.GL_LIGHT0);
+        boolean previousLight1 = GL11.glIsEnabled(GL11.GL_LIGHT1);
+        boolean previousColorMaterial = GL11.glIsEnabled(GL11.GL_COLOR_MATERIAL);
+        boolean previousDepth = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
+        boolean previousBlend = GL11.glIsEnabled(GL11.GL_BLEND);
+
         GlStateManager.pushMatrix();
         RenderHelper.disableStandardItemLighting();
         GlStateManager.disableLighting();
+        GlStateManager.disableDepth();
         GlStateManager.translate(0.0F, 0.0F, TOOLTIP_Z_LEVEL);
-        // Tooltip listeners render item models with Forge's conventions, so keep a zero z baseline and depth enabled.
-        float previousItemZLevel = this.itemRender.zLevel;
-        this.itemRender.zLevel = 0.0F;
         this.zLevel = TOOLTIP_Z_LEVEL;
+        this.itemRender.zLevel = 0.0F;
         try {
             GuiUtils.preItemToolTip(tooltipStack);
             try {
-                GlStateManager.enableDepth();
                 drawHoveringText(tooltip, mouseX, mouseY);
             } finally {
                 GuiUtils.postItemToolTip();
             }
         } finally {
             this.itemRender.zLevel = previousItemZLevel;
-            this.zLevel = 0.0F;
-            GlStateManager.enableDepth();
-            GlStateManager.enableLighting();
+            this.zLevel = previousGuiZLevel;
+            if (previousLighting) {
+                GlStateManager.enableLighting();
+            } else {
+                GlStateManager.disableLighting();
+            }
+            if (previousLight0) {
+                GlStateManager.enableLight(0);
+            } else {
+                GlStateManager.disableLight(0);
+            }
+            if (previousLight1) {
+                GlStateManager.enableLight(1);
+            } else {
+                GlStateManager.disableLight(1);
+            }
+            if (previousColorMaterial) {
+                GlStateManager.enableColorMaterial();
+            } else {
+                GlStateManager.disableColorMaterial();
+            }
+            if (previousDepth) {
+                GlStateManager.enableDepth();
+            } else {
+                GlStateManager.disableDepth();
+            }
+            if (previousBlend) {
+                GlStateManager.enableBlend();
+            } else {
+                GlStateManager.disableBlend();
+            }
             GlStateManager.popMatrix();
         }
     }
@@ -863,7 +900,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     }
 
     @Override
-    protected void drawSlot(Slot slot) {
+    protected void drawSlot(@NonNull Slot slot) {
         if (!(slot instanceof AppEngSlot appEngSlot)) {
             super.drawSlot(slot);
             renderHoveredSlotOverlayIfNeeded(slot);
@@ -1331,7 +1368,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
     }
 
     @Override
-    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, ClickType clickType) {
+    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, @NonNull ClickType clickType) {
         if (container.isClientSideSlot(slot)) {
             return;
         }

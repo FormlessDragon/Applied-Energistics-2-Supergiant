@@ -27,6 +27,7 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.ClickType;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.text.ITextComponent;
+import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 
@@ -111,7 +112,7 @@ public class GuiStockExportBus<T extends ContainerStockExportBus> extends GuiUpg
     }
 
     @Override
-    protected void handleMouseClick(Slot slot, int slotId, int mouseButton, ClickType clickType) {
+    protected void handleMouseClick(Slot slot, int slotId, int mouseButton, @NonNull ClickType clickType) {
         if (mouseButton == 2 && canModifyAmount(slot)) {
             return;
         }

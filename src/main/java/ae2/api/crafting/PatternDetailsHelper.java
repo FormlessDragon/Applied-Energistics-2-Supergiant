@@ -40,8 +40,6 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public final class PatternDetailsHelper {
-    public static final long MAX_PROCESSING_PATTERN_AMOUNT = Integer.MAX_VALUE;
-
     private static final List<IPatternDetailsDecoder> DECODERS = new CopyOnWriteArrayList<>();
 
     static {

@@ -15,6 +15,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class RequestCanonicalAmountTest {
     @Test
+    void fullLongAmountsAndBatchSizesAreRetainedWhileLowerBoundsStillApply() {
+        var request = new Request();
+        request.updateConfiguredStack(new GenericStack(new TestKey(), Long.MAX_VALUE));
+        request.updateBatchSize(Long.MAX_VALUE);
+        assertEquals(Long.MAX_VALUE, request.getAmount());
+        assertEquals(Long.MAX_VALUE, request.getConfiguredStack().amount());
+        assertEquals(Long.MAX_VALUE, request.getBatchSize());
+
+        request.updateAmount(Long.MAX_VALUE - 1);
+        assertEquals(Long.MAX_VALUE - 1, request.getAmount());
+        assertEquals(Long.MAX_VALUE - 1, request.getConfiguredStack().amount());
+
+        request.setAmount(Long.MIN_VALUE);
+        request.setBatchSize(Long.MIN_VALUE);
+        assertEquals(0, request.getAmount());
+        assertEquals(1, request.getBatchSize());
+    }
+
+    @Test
     void amountUpdateKeepsConfiguredStackAndWrittenTagCanonical() {
         var request = new Request();
         request.updateConfiguredStack(new GenericStack(new TestKey(), 1));

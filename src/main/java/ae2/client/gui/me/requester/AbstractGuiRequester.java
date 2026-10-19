@@ -2,10 +2,7 @@ package ae2.client.gui.me.requester;
 
 import ae2.api.behaviors.ContainerItemStrategies;
 import ae2.api.behaviors.EmptyingAction;
-import ae2.api.stacks.AmountFormat;
-import ae2.api.stacks.GenericStack;
 import ae2.client.gui.AEBaseGui;
-import ae2.client.gui.me.common.StackSizeRenderer;
 import ae2.client.gui.style.Blitter;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.widgets.ITextFieldGui;
@@ -23,8 +20,6 @@ import ae2.tile.crafting.requester.RequestList;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.gui.GuiTextField;
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.ClickType;
 import net.minecraft.inventory.Slot;
@@ -33,6 +28,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.awt.Rectangle;
@@ -245,37 +241,6 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
     }
 
     @Override
-    protected void drawSlot(Slot slot) {
-        if (!(slot instanceof RequestSlot appEngSlot)) {
-            super.drawSlot(slot);
-            return;
-        }
-
-        if (appEngSlot.getRawStack().isEmpty()) {
-            super.drawSlot(slot);
-            return;
-        }
-
-        ItemStack stack = appEngSlot.getDisplayStack();
-        if (stack.isEmpty()) {
-            return;
-        }
-
-        RenderHelper.enableGUIStandardItemLighting();
-        GlStateManager.enableDepth();
-        this.itemRender.renderItemAndEffectIntoGUI(this.mc.player, stack, slot.xPos, slot.yPos);
-        this.itemRender.renderItemOverlayIntoGUI(this.fontRenderer, stack, slot.xPos, slot.yPos, "");
-
-        GenericStack genericStack = GenericStack.unwrapItemStack(appEngSlot.getRawStack());
-        if (genericStack != null && genericStack.amount() > 1) {
-            String amount = genericStack.what().formatAmount(genericStack.amount(), AmountFormat.SLOT);
-            StackSizeRenderer.renderSizeLabel(this.fontRenderer, slot.xPos, slot.yPos, amount, false);
-        }
-
-        renderHoveredSlotOverlayIfNeeded(slot);
-    }
-
-    @Override
     protected void renderHoveredToolTip(int mouseX, int mouseY) {
         for (RequestRowWidget row : this.requestWidgets) {
             if (row.drawTooltip(this, mouseX, mouseY)) {
@@ -316,7 +281,7 @@ public abstract class AbstractGuiRequester<C extends AbstractContainerRequester>
     }
 
     @Override
-    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, ClickType clickType) {
+    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, @NonNull ClickType clickType) {
         if (!(slot instanceof RequestSlot requestSlot)) {
             super.handleMouseClick(slot, slotId, mouseButton, clickType);
             return;

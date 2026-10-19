@@ -235,6 +235,14 @@ public class ContainerNetworkStatus extends AEBaseContainer {
         if (this.lastAcceptedStatusGeneration != 0 && sourceGeneration < this.lastAcceptedStatusGeneration) {
             return false;
         }
+        if (sourceGeneration > this.lastAcceptedStatusGeneration) {
+            // A new Grid starts its own revision sequence; it may begin below the previous Grid's revision.
+            this.pendingStatusPages = null;
+            this.pendingStatusPageCount = 0;
+            this.pendingStatusPagesReceived = 0;
+            this.lastAcceptedStatusGeneration = sourceGeneration;
+            this.lastAcceptedStatusRevision = 0;
+        }
         if (this.lastAcceptedStatusGeneration == sourceGeneration) {
             if (this.pendingStatusPages == null && snapshotRevision <= this.lastAcceptedStatusRevision) {
                 return false;
@@ -246,7 +254,6 @@ public class ContainerNetworkStatus extends AEBaseContainer {
 
         if (oversize) {
             this.pendingStatusPages = null;
-            this.lastAcceptedStatusGeneration = sourceGeneration;
             this.lastAcceptedStatusRevision = snapshotRevision;
             this.status = new NetworkStatus();
             this.canExportGrid = false;

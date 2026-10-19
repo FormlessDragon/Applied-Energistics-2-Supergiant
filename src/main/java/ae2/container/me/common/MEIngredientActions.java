@@ -145,7 +145,7 @@ public final class MEIngredientActions {
             return false;
         }
 
-        int amount = Math.clamp(initialAmount, what.getAmountPerUnit(), Integer.MAX_VALUE);
+        long amount = Math.max(initialAmount, what.getAmountPerUnit());
         if (preserveReturnToContainerOverride) {
             ContainerCraftAmount.open(player, locator, what, amount, player.openContainer);
         } else {

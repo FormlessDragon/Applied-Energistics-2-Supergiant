@@ -7,7 +7,6 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKeyType;
 import ae2.api.stacks.GenericStack;
 import ae2.helpers.externalstorage.GenericStackInv;
-import com.google.common.primitives.Ints;
 import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -101,13 +100,13 @@ public class ConfigGuiInventory implements InternalInventory, GenericStackDispla
 
         var unwrapped = GenericStack.unwrapItemStack(stack);
         if (unwrapped != null) {
-            if (unwrapped.what() instanceof AEItemKey itemKey) {
-                stack = itemKey.toStack(Math.max(1, Ints.saturatedCast(unwrapped.amount())));
-            } else if (inv.isSupportedType(unwrapped.what())) {
-                return unwrapped;
-            } else {
+            if (!inv.isSupportedType(unwrapped.what())) {
                 return null;
             }
+            if (unwrapped.what() instanceof AEItemKey && unwrapped.amount() < 1) {
+                return new GenericStack(unwrapped.what(), 1);
+            }
+            return unwrapped;
         }
 
         if (inv.isSupportedType(AEKeyType.items())) {

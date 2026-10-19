@@ -18,7 +18,11 @@ final class AEPatternHelper {
         for (int i = 0; i < sparseStacks.size(); i++) {
             var stack = sparseStacks.get(i);
             if (stack != null) {
-                totals.addTo(stack.what(), stack.amount());
+                long amount = stack.amount();
+                long previous = totals.addTo(stack.what(), amount);
+                if (amount > 0 && previous > Long.MAX_VALUE - amount) {
+                    throw new IllegalArgumentException("Combined pattern amount exceeds long range.");
+                }
             }
         }
 

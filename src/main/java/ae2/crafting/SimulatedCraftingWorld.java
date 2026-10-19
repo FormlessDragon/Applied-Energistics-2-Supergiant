@@ -1,5 +1,6 @@
 package ae2.crafting;
 
+import com.google.common.base.Predicate;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.init.Biomes;
@@ -8,13 +9,14 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.profiler.Profiler;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldProvider;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.EmptyChunk;
 import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraft.world.chunk.storage.IChunkLoader;
 import net.minecraft.world.gen.structure.template.TemplateManager;
@@ -22,8 +24,12 @@ import net.minecraft.world.storage.IPlayerFileData;
 import net.minecraft.world.storage.ISaveHandler;
 import net.minecraft.world.storage.WorldInfo;
 import net.minecraftforge.common.DimensionManager;
+import org.jspecify.annotations.NonNull;
 
+import javax.annotation.Nullable;
 import java.io.File;
+import java.util.List;
+import java.util.Random;
 
 /**
  * A server-side stand-in for a client level, handed to the simulated player used by
@@ -37,6 +43,7 @@ import java.io.File;
  * <p>The instance is immutable after construction and safe to share; see {@link CraftingEventSimulation} for
  * the caching policy.</p>
  */
+@SuppressWarnings("NullableProblems")
 final class SimulatedCraftingWorld extends World {
 
     private final MinecraftServer server;
@@ -67,12 +74,12 @@ final class SimulatedCraftingWorld extends World {
      * instead of tripping over the absent chunk provider.
      */
     @Override
-    public Chunk getChunk(int chunkX, int chunkZ) {
+    public @NonNull Chunk getChunk(int chunkX, int chunkZ) {
         return new EmptyChunk(this, chunkX, chunkZ);
     }
 
     @Override
-    public Chunk getChunk(BlockPos pos) {
+    public @NonNull Chunk getChunk(BlockPos pos) {
         return getChunk(pos.getX() >> 4, pos.getZ() >> 4);
     }
 
@@ -82,52 +89,52 @@ final class SimulatedCraftingWorld extends World {
     }
 
     @Override
-    public IBlockState getBlockState(BlockPos pos) {
+    public @NonNull IBlockState getBlockState(@NonNull BlockPos pos) {
         return Blocks.AIR.getDefaultState();
     }
 
     @Override
-    public TileEntity getTileEntity(BlockPos pos) {
+    public TileEntity getTileEntity(@NonNull BlockPos pos) {
         return null;
     }
 
     @Override
-    public Biome getBiome(BlockPos pos) {
+    public @NonNull Biome getBiome(@NonNull BlockPos pos) {
         return Biomes.PLAINS;
     }
 
     @Override
-    public boolean isAirBlock(BlockPos pos) {
+    public boolean isAirBlock(@NonNull BlockPos pos) {
         return true;
     }
 
     @Override
-    public boolean isBlockLoaded(BlockPos pos) {
+    public boolean isBlockLoaded(@NonNull BlockPos pos) {
         return false;
     }
 
     @Override
-    public boolean isBlockLoaded(BlockPos pos, boolean allowEmpty) {
+    public boolean isBlockLoaded(@NonNull BlockPos pos, boolean allowEmpty) {
         return false;
     }
 
     @Override
-    public boolean setBlockState(BlockPos pos, IBlockState newState) {
+    public boolean setBlockState(@NonNull BlockPos pos, @NonNull IBlockState newState) {
         return false;
     }
 
     @Override
-    public boolean setBlockState(BlockPos pos, IBlockState newState, int flags) {
+    public boolean setBlockState(@NonNull BlockPos pos, @NonNull IBlockState newState, int flags) {
         return false;
     }
 
     @Override
-    public boolean setBlockToAir(BlockPos pos) {
+    public boolean setBlockToAir(@NonNull BlockPos pos) {
         return false;
     }
 
     @Override
-    public boolean spawnEntity(Entity entityIn) {
+    public boolean spawnEntity(@NonNull Entity entityIn) {
         return false;
     }
 
@@ -136,6 +143,7 @@ final class SimulatedCraftingWorld extends World {
      * operation as soon as {@link #getMapFileFromName} answers {@code null}, and the simulated world is never
      * asked to save anything else.
      */
+    @SuppressWarnings("NullableProblems")
     private static final class StubSaveHandler implements ISaveHandler {
         @Override
         public WorldInfo loadWorldInfo() {
@@ -147,16 +155,16 @@ final class SimulatedCraftingWorld extends World {
         }
 
         @Override
-        public IChunkLoader getChunkLoader(WorldProvider provider) {
+        public IChunkLoader getChunkLoader(@NonNull WorldProvider provider) {
             return null;
         }
 
         @Override
-        public void saveWorldInfoWithPlayer(WorldInfo worldInformation, NBTTagCompound tagCompound) {
+        public void saveWorldInfoWithPlayer(@NonNull WorldInfo worldInformation, @NonNull NBTTagCompound tagCompound) {
         }
 
         @Override
-        public void saveWorldInfo(WorldInfo worldInformation) {
+        public void saveWorldInfo(@NonNull WorldInfo worldInformation) {
         }
 
         @Override
@@ -174,13 +182,110 @@ final class SimulatedCraftingWorld extends World {
         }
 
         @Override
-        public File getMapFileFromName(String mapName) {
+        public File getMapFileFromName(@NonNull String mapName) {
             return null;
         }
 
         @Override
         public TemplateManager getStructureTemplateManager() {
             return null;
+        }
+    }
+
+    private static class EmptyChunk extends Chunk {
+        public EmptyChunk(World world, int x, int z) {
+            super(world, x, z);
+        }
+
+        public boolean isAtLocation(int x, int z) {
+            return this.x == x && this.z == z;
+        }
+
+        public int getHeightValue(int x, int z) {
+            return 0;
+        }
+
+        public void generateHeightMap() {
+        }
+
+        public void generateSkylightMap() {
+        }
+
+        public @NonNull IBlockState getBlockState(@NonNull BlockPos pos) {
+            return Blocks.AIR.getDefaultState();
+        }
+
+        public int getBlockLightOpacity(@NonNull BlockPos pos) {
+            return 255;
+        }
+
+        public int getLightFor(EnumSkyBlock sky, @NonNull BlockPos pos) {
+            return sky.defaultLightValue;
+        }
+
+        public void setLightFor(@NonNull EnumSkyBlock sky, @NonNull BlockPos pos, int value) {
+        }
+
+        public int getLightSubtracted(@NonNull BlockPos pos, int amount) {
+            return 0;
+        }
+
+        public void addEntity(@NonNull Entity entity) {
+        }
+
+        public void removeEntity(@NonNull Entity entity) {
+        }
+
+        public void removeEntityAtIndex(@NonNull Entity entity, int index) {
+        }
+
+        public boolean canSeeSky(@NonNull BlockPos pos) {
+            return false;
+        }
+
+        @Nullable
+        public TileEntity getTileEntity(@NonNull BlockPos pos, Chunk.@NonNull EnumCreateEntityType createType) {
+            return null;
+        }
+
+        public void addTileEntity(@NonNull TileEntity tileEntity) {
+        }
+
+        public void addTileEntity(@NonNull BlockPos pos, @NonNull TileEntity tileEntity) {
+        }
+
+        public void removeTileEntity(@NonNull BlockPos pos) {
+        }
+
+        public void onLoad() {
+        }
+
+        public void onUnload() {
+        }
+
+        public void markDirty() {
+        }
+
+        public void getEntitiesWithinAABBForEntity(@Nullable Entity entity, @NonNull AxisAlignedBB aabb, @NonNull List<Entity> listToFill, @NonNull Predicate<? super Entity> valid) {
+        }
+
+        public <T extends Entity> void getEntitiesOfTypeWithinAABB(@NonNull Class<? extends T> entityClass, @NonNull AxisAlignedBB aabb, @NonNull List<T> listToFill, @NonNull Predicate<? super T> valid) {
+        }
+
+        public boolean needsSaving(boolean flag) {
+            return false;
+        }
+
+        public @NonNull Random getRandomWithSeed(long seed) {
+            return new Random((this.getWorld().getSeed() + ((long) this.x * this.x * 4987142) + (this.x * 5947611L) + (long) this.z * this.z * 4392871L + (this.z * 389711L)) ^ seed);
+        }
+
+        public boolean isEmpty() {
+            return true;
+        }
+
+        public boolean isEmptyBetween(int startY, int endY) {
+            return true;
         }
     }
 }

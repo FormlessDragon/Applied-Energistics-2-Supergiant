@@ -1,6 +1,5 @@
 package ae2.core.network.serverbound;
 
-import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.stacks.GenericStack;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.me.common.MEIngredientAction;
@@ -55,8 +54,7 @@ public class HeiIngredientActionPacket extends ServerboundPacket {
 
     @Override
     public void handleServer(EntityPlayerMP player) {
-        if (this.isInvalid() || this.action == null || this.stack == null || this.stack.amount() <= 0
-            || this.stack.amount() > PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT) {
+        if (this.isInvalid() || this.action == null || this.stack == null || this.stack.amount() <= 0) {
             return;
         }
 

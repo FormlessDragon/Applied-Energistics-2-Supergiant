@@ -1,6 +1,5 @@
 package ae2.parts.encoding;
 
-import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.stacks.GenericStack;
 
 import java.util.List;
@@ -14,7 +13,7 @@ public final class ProcessingPatternAmountHelper {
             if (stack == null) {
                 continue;
             }
-            if (!canApplyAmount(stack.amount(), stack.what().getAmountPerUnit(), operation)) {
+            if (!canApplyAmount(stack.amount(), operation)) {
                 return false;
             }
         }
@@ -28,7 +27,7 @@ public final class ProcessingPatternAmountHelper {
         return new GenericStack(stack.what(), applyAmount(stack.amount(), operation));
     }
 
-    static boolean canApplyAmount(long amount, long amountPerUnit, Operation operation) {
+    static boolean canApplyAmount(long amount, Operation operation) {
         if (amount <= 0) {
             return false;
         }
@@ -38,33 +37,27 @@ public final class ProcessingPatternAmountHelper {
         if (operation.multiplier > 1 && amount > Long.MAX_VALUE / operation.multiplier) {
             return false;
         }
-        long newAmount = applyAmount(amount, operation);
-        if (newAmount <= 0) {
-            return false;
-        }
-        return newAmount <= PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT;
+        return true;
     }
 
     static long applyAmount(long amount, Operation operation) {
-        return amount * operation.multiplier / operation.divisor + operation.delta;
+        return amount * operation.multiplier / operation.divisor;
     }
 
     public enum Operation {
-        MULTIPLY_2(2, 1, 0),
-        MULTIPLY_3(3, 1, 0),
-        MULTIPLY_5(5, 1, 0),
-        DIVIDE_2(1, 2, 0),
-        DIVIDE_3(1, 3, 0),
-        DIVIDE_5(1, 5, 0);
+        MULTIPLY_2(2, 1),
+        MULTIPLY_3(3, 1),
+        MULTIPLY_5(5, 1),
+        DIVIDE_2(1, 2),
+        DIVIDE_3(1, 3),
+        DIVIDE_5(1, 5);
 
         private final long multiplier;
         private final long divisor;
-        private final long delta;
 
-        Operation(long multiplier, long divisor, long delta) {
+        Operation(long multiplier, long divisor) {
             this.multiplier = multiplier;
             this.divisor = divisor;
-            this.delta = delta;
         }
     }
 }

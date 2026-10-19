@@ -6,6 +6,7 @@ import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
 import ae2.client.gui.me.common.GuiMEStorage;
 import ae2.client.gui.me.common.RepoSlot;
+import ae2.container.me.common.ContainerMEStorage;
 import ae2.container.me.common.GridInventoryEntry;
 import ae2.container.me.common.IClientRepo;
 import ae2.core.AEConfig;
@@ -143,15 +144,17 @@ public class NetworkAmount {
     }
 
     private static boolean resolveFromOpenTerminal(List<String> tooltip, AEKey what) {
-        if (!(Minecraft.getMinecraft().currentScreen instanceof GuiMEStorage<?> guiME)) {
+        var minecraft = Minecraft.getMinecraft();
+        if (minecraft.player == null || !(minecraft.player.openContainer instanceof ContainerMEStorage container)) {
             return false;
         }
 
-        if (guiME.getSlotUnderMouse() instanceof RepoSlot) {
+        if (minecraft.currentScreen instanceof GuiMEStorage<?> guiME && guiME.getSlotUnderMouse() instanceof RepoSlot) {
             return true;
         }
 
-        IClientRepo repo = guiME.getContainer().getClientRepo();
+        // Subscreens and HEI recipe views keep the terminal container and its synchronized inventory open.
+        IClientRepo repo = container.getClientRepo();
         if (repo == null) {
             return false;
         }

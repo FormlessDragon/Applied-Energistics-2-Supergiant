@@ -129,7 +129,7 @@ public class NumberEntryWidget implements ICompositeWidget {
 
         this.textField = new ConfirmableTextField(style, font, 0, 0, 0, font.FONT_HEIGHT);
         this.textField.setEnableBackgroundDrawing(false);
-        this.textField.setMaxStringLength(16);
+        this.textField.setMaxStringLength(64);
         this.textField.setTextColor(normalTextColor);
         this.textField.setVisible(true);
         this.textField.setResponder(ignored -> {

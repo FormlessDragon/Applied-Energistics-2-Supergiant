@@ -47,12 +47,10 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Objects;
 
 public class ContainerCraftAmount extends AEBaseContainer implements ISubGui {
-    public static final int MAX_AUTO_CRAFT_AMOUNT = 1_000_000;
-
     private final AppEngSlot craftingItem;
     private final ISubGuiHost host;
     @GuiSync(4)
-    public int initialAmount = 1;
+    public long initialAmount = 1;
     @Nullable
     private AEKey whatToCraft;
 
@@ -64,11 +62,11 @@ public class ContainerCraftAmount extends AEBaseContainer implements ISubGui {
         this.addSlot(this.craftingItem, SlotSemantics.MACHINE_OUTPUT);
     }
 
-    public static void open(EntityPlayerMP player, GuiHostLocator locator, AEKey whatToCraft, int initialAmount) {
+    public static void open(EntityPlayerMP player, GuiHostLocator locator, AEKey whatToCraft, long initialAmount) {
         open(player, locator, whatToCraft, initialAmount, null);
     }
 
-    public static void open(EntityPlayerMP player, GuiHostLocator locator, AEKey whatToCraft, int initialAmount,
+    public static void open(EntityPlayerMP player, GuiHostLocator locator, AEKey whatToCraft, long initialAmount,
                             @Nullable Container returnToContainerOverride) {
         SwitchGuisPacket.openSubGui(player, locator, GuiIds.GuiKey.CRAFT_AMOUNT, returnToContainerOverride);
 
@@ -87,13 +85,13 @@ public class ContainerCraftAmount extends AEBaseContainer implements ISubGui {
         return this.getPlayerInventory().player.world;
     }
 
-    private void setWhatToCraft(AEKey whatToCraft, int initialAmount) {
+    private void setWhatToCraft(AEKey whatToCraft, long initialAmount) {
         this.whatToCraft = Objects.requireNonNull(whatToCraft, "whatToCraft");
-        this.initialAmount = Math.clamp(initialAmount, 1, MAX_AUTO_CRAFT_AMOUNT);
+        this.initialAmount = Math.max(initialAmount, 1);
         this.craftingItem.putStack(GenericStack.wrapInItemStack(whatToCraft, 1));
     }
 
-    public void confirm(int amount, boolean craftMissingAmount, boolean autoStart) {
+    public void confirm(long amount, boolean craftMissingAmount, boolean autoStart) {
         if (!isServerSide()) {
             InitNetwork.sendToServer(new ConfirmAutoCraftPacket(this.windowId, amount, craftMissingAmount, autoStart));
             return;
@@ -103,7 +101,7 @@ public class ContainerCraftAmount extends AEBaseContainer implements ISubGui {
             return;
         }
 
-        if (amount <= 0 || amount > MAX_AUTO_CRAFT_AMOUNT) {
+        if (amount <= 0) {
             return;
         }
 
@@ -117,8 +115,7 @@ public class ContainerCraftAmount extends AEBaseContainer implements ISubGui {
                     if (storedAmount >= amount) {
                         amount = 0;
                     } else {
-                        long missingAmount = amount - storedAmount;
-                        amount = (int) missingAmount;
+                        amount -= storedAmount;
                     }
                 }
             }
@@ -149,7 +146,7 @@ public class ContainerCraftAmount extends AEBaseContainer implements ISubGui {
         return GenericStack.unwrapItemStack(this.craftingItem.getDisplayStack());
     }
 
-    public int getInitialAmount() {
+    public long getInitialAmount() {
         return this.initialAmount;
     }
 }

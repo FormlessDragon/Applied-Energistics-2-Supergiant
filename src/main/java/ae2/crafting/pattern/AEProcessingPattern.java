@@ -1,7 +1,6 @@
 package ae2.crafting.pattern;
 
 import ae2.api.crafting.IPatternDetails;
-import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.crafting.PatternDetailsTooltip;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
@@ -181,15 +180,13 @@ public class AEProcessingPattern implements IPatternDetails {
         if (stacks instanceof RandomAccess) {
             for (int i = 0; i < stacks.size(); i++) {
                 var stack = stacks.get(i);
-                if (stack != null && (stack.amount() <= 0
-                    || stack.amount() > PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT)) {
+                if (stack != null && stack.amount() <= 0) {
                     throw new IllegalArgumentException("Processing pattern " + role + " amount is out of range.");
                 }
             }
         } else {
             for (GenericStack stack : stacks) {
-                if (stack != null && (stack.amount() <= 0
-                    || stack.amount() > PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT)) {
+                if (stack != null && stack.amount() <= 0) {
                     throw new IllegalArgumentException("Processing pattern " + role + " amount is out of range.");
                 }
             }

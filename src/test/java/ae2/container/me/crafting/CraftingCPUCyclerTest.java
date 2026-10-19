@@ -18,6 +18,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CraftingCPUCyclerTest {
@@ -59,7 +61,7 @@ class CraftingCPUCyclerTest {
         var lastSelection = new AtomicReference<CraftingCPURecord>();
         var cycler = new CraftingCPUCycler(cpu -> true, (selected, available) -> lastSelection.set(selected));
         cycler.detectAndSendChanges(fixture.grid);
-        int firstSerial = cycler.cpus().get(0).getSerial();
+        int firstSerial = cycler.cpus().getFirst().getSerial();
         assertEquals(2, activeRecordCount(cycler));
         assertEquals(2, cycler.cpus().size());
 
@@ -72,7 +74,7 @@ class CraftingCPUCyclerTest {
         cycler.detectAndSendChanges(fixture.grid);
         assertEquals(1, activeRecordCount(cycler));
         assertEquals(1, cycler.cpus().size());
-        int rejoinedSerial = cycler.cpus().get(0).getSerial();
+        int rejoinedSerial = cycler.cpus().getFirst().getSerial();
         assertTrue(rejoinedSerial > firstSerial);
         assertNotNull(lastSelection.get());
 
@@ -80,7 +82,7 @@ class CraftingCPUCyclerTest {
         secondFixture.cpus.add(firstCpu);
         cycler.detectAndSendChanges(secondFixture.grid);
         assertEquals(1, activeRecordCount(cycler));
-        assertTrue(cycler.cpus().get(0).getSerial() > rejoinedSerial);
+        assertTrue(cycler.cpus().getFirst().getSerial() > rejoinedSerial);
     }
 
     @Test
@@ -99,6 +101,33 @@ class CraftingCPUCyclerTest {
         assertEquals(64, activeRecordCount(cycler));
         assertEquals(first.stream().map(CraftingCPURecord::getSerial).toList(),
             cycler.cpus().stream().map(CraftingCPURecord::getSerial).toList());
+    }
+
+    @Test
+    void filteringSortingAndStaleSerialSelectionKeepTheCurrentCpuOrEmptyState() {
+        var fixture = new Fixture();
+        var small = fixture.cpu(1);
+        var large = fixture.cpu(4);
+        fixture.cpus.add(small);
+        fixture.cpus.add(fixture.cpu(2));
+        fixture.cpus.add(large);
+        var selected = new AtomicReference<CraftingCPURecord>();
+        var cycler = new CraftingCPUCycler(cpu -> cpu.getAvailableStorage() != 2,
+            (cpu, available) -> selected.set(cpu));
+        cycler.detectAndSendChanges(fixture.grid);
+        assertEquals(List.of(large, small), cycler.cpus().stream().map(CraftingCPURecord::getCpu).toList());
+        int oldSerial = cycler.cpus().getLast().getSerial();
+        cycler.selectCpu(oldSerial);
+        assertSame(small, selected.get().getCpu());
+        fixture.cpus.remove(small);
+        cycler.detectAndSendChanges(fixture.grid);
+        cycler.selectCpu(oldSerial);
+        assertSame(large, selected.get().getCpu());
+        fixture.cpus.clear();
+        cycler.detectAndSendChanges(fixture.grid);
+        cycler.selectCpu(oldSerial);
+        assertNull(selected.get());
+        assertEquals(-1, cycler.getSelectedCpuSerial());
     }
 
     private static final class Fixture {
@@ -120,16 +149,14 @@ class CraftingCPUCyclerTest {
 
         private ICraftingCPU cpu(int id) {
             return (ICraftingCPU) Proxy.newProxyInstance(
-                Fixture.class.getClassLoader(), new Class<?>[]{ICraftingCPU.class}, (proxy, method, args) -> {
-                    return switch (method.getName()) {
-                        case "getAvailableStorage" -> (long) id;
-                        case "getCoProcessors" -> id;
-                        case "getSelectionMode" -> CpuSelectionMode.ANY;
-                        case "hashCode" -> System.identityHashCode(proxy);
-                        case "equals" -> proxy == args[0];
-                        case "toString" -> "cpu-" + id;
-                        default -> primitiveDefault(method);
-                    };
+                Fixture.class.getClassLoader(), new Class<?>[]{ICraftingCPU.class}, (proxy, method, args) -> switch (method.getName()) {
+                    case "getAvailableStorage" -> (long) id;
+                    case "getCoProcessors" -> id;
+                    case "getSelectionMode" -> CpuSelectionMode.ANY;
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "equals" -> proxy == args[0];
+                    case "toString" -> "cpu-" + id;
+                    default -> primitiveDefault(method);
                 });
         }
     }

@@ -44,10 +44,6 @@ public final class StatusDisplay implements ITooltip {
         tooltip.add(new TextComponentString(" "));
     }
 
-    private static ITextComponent statusText(RequestStatus status) {
-        return GuiText.requesterStatus(status).text().setStyle(new Style().setColor(statusFormatting(status)));
-    }
-
     private static TextFormatting statusFormatting(RequestStatus status) {
         return switch (status) {
             case IDLE, REQUESTING, PLANNING -> TextFormatting.DARK_GREEN;
@@ -124,8 +120,7 @@ public final class StatusDisplay implements ITooltip {
             addStatusTooltipLine(tooltip, RequestStatus.EXPORTING);
             addStatusTooltipLine(tooltip, RequestStatus.UNCONFIRMED);
         } else {
-            tooltip.add(statusText(getVisibleStatus()));
-            tooltip.add(new TextComponentString(" "));
+            addStatusTooltipLine(tooltip, getVisibleStatus());
             tooltip.add(GuiText.RequesterStatusShift.text().setStyle(
                 new Style().setColor(TextFormatting.GRAY)));
         }

@@ -135,7 +135,7 @@ public final class PatternModifierLogic {
                     return false;
                 }
             } else {
-                if (stack.amount() > PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT / factor) {
+                if (stack.amount() > Long.MAX_VALUE / factor) {
                     return false;
                 }
             }

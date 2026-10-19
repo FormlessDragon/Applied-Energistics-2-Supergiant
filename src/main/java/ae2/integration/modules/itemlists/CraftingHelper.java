@@ -1,6 +1,5 @@
 package ae2.integration.modules.itemlists;
 
-import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
@@ -192,8 +191,7 @@ public final class CraftingHelper {
         }
 
         for (GenericStack stack : stacks) {
-            if (stack != null && stack.what() != null && stack.amount() > 0
-                && stack.amount() <= PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT) {
+            if (stack != null && stack.what() != null && stack.amount() > 0) {
                 result.add(stack);
                 if (result.size() >= maxSize) {
                     break;

@@ -61,7 +61,7 @@ public class ContainerPatternModifier extends AEBaseContainer {
     @Nullable
     private final PatternProviderLogicHost patternProvider;
     @GuiSync(33)
-    private final boolean providerInventoryAvailable;
+    private boolean providerInventoryAvailable;
     @GuiSync(31)
     private int page;
     @GuiSync(32)

@@ -1,6 +1,5 @@
 package ae2.client.gui.me.requester;
 
-import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKeyType;
 import ae2.client.gui.MathExpressionParser;
@@ -41,7 +40,6 @@ public class NumberField extends ConfirmableTextField {
 
     private static final int TEXT_COLOR = 0xFF_FFFF;
     private static final int ERROR_COLOR = 0xFF_0000;
-    private static final long MAX_VALUE = PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT;
 
     private final GuiText label;
     private final DecimalFormat decimalFormat;
@@ -123,8 +121,8 @@ public class NumberField extends ConfirmableTextField {
             } else if (internalValue.compareTo(convertToInternalValue(minValue)) < 0) {
                 var formatted = decimalFormat.format(convertToInternalValue(minValue));
                 validationErrors.add(GuiText.NumberLessThanMinValue.text(formatted));
-            } else if (internalValue.compareTo(convertToInternalValue(MAX_VALUE)) > 0) {
-                var formatted = decimalFormat.format(convertToInternalValue(MAX_VALUE));
+            } else if (internalValue.compareTo(convertToInternalValue(Long.MAX_VALUE)) > 0) {
+                var formatted = decimalFormat.format(convertToInternalValue(Long.MAX_VALUE));
                 validationErrors.add(GuiText.NumberGreaterThanMaxValue.text(formatted));
             } else {
                 var externalValue = convertToExternalValue(internalValue);
@@ -171,7 +169,7 @@ public class NumberField extends ConfirmableTextField {
         }
 
         long value = externalValue.getAsLong();
-        if (value < minValue || value > MAX_VALUE) {
+        if (value < minValue) {
             return OptionalLong.empty();
         }
         return OptionalLong.of(value);

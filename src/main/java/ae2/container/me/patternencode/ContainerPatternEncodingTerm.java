@@ -1984,7 +1984,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
             return;
         }
 
-        ItemStack renamed = itemKey.toStack((int) Math.min(stack.amount(), Integer.MAX_VALUE));
+        ItemStack renamed = itemKey.toStack();
         if (request.name != null && request.name.length() > MAX_CUSTOM_NAME_LENGTH) {
             return;
         }
@@ -1993,7 +1993,7 @@ public class ContainerPatternEncodingTerm extends ContainerMEStorage
         } else {
             renamed.setStackDisplayName(request.name);
         }
-        setProcessingStack(slot, GenericStack.fromItemStack(renamed));
+        setProcessingStack(slot, new GenericStack(AEItemKey.of(renamed), stack.amount()));
         broadcastChanges();
     }
 

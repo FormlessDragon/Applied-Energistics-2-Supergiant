@@ -20,7 +20,6 @@ package ae2.me.service;
 
 import ae2.api.config.Actionable;
 import ae2.api.crafting.IPatternDetails;
-import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.networking.GridHelper;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
@@ -287,10 +286,6 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
     private static boolean ownsCraftingCpus(IGridNode gridNode) {
         var owner = gridNode.getOwner();
         return owner instanceof ICraftingCPUTileEntity || owner instanceof ICraftingCpuProvider;
-    }
-
-    private static long clampRecursiveIngredientReserveAmount(long amount) {
-        return Math.clamp(amount, 0, PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT);
     }
 
     @Override
@@ -646,8 +641,8 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
             return;
         }
 
-        this.recursiveIngredientReserveAmount = clampRecursiveIngredientReserveAmount(
-            savedData.getLong(TAG_RECURSIVE_INGREDIENT_RESERVE_AMOUNT));
+        this.recursiveIngredientReserveAmount = Math.max(
+            savedData.getLong(TAG_RECURSIVE_INGREDIENT_RESERVE_AMOUNT), 0);
         this.recursiveIngredientReserveAmountRestored = true;
     }
 
@@ -820,7 +815,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
     @Override
     public void setRecursiveIngredientReserveAmount(long amount) {
-        this.recursiveIngredientReserveAmount = clampRecursiveIngredientReserveAmount(amount);
+        this.recursiveIngredientReserveAmount = Math.max(amount, 0);
     }
 
     public Iterable<ICraftingProvider> getProviders(IPatternDetails key) {

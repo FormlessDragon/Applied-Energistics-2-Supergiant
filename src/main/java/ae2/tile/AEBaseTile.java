@@ -245,6 +245,15 @@ public class AEBaseTile extends TileEntity implements ITickable, ICustomName {
         if (this.world != null) {
             IBlockState state = this.getBlockState();
             if (state != null) {
+                // The 1.12 block-state network id only contains four metadata bits. For orientable AE blocks,
+                // the authoritative facing/spin is carried by this tile update instead of the listed state.
+                if (this.world.isRemote && state.getBlock() instanceof AEBaseTileBlock<?> block) {
+                    IBlockState syncedState = block.getTileEntityBlockState(state, this);
+                    if (syncedState != state) {
+                        this.world.setBlockState(this.pos, syncedState, 2);
+                        state = syncedState;
+                    }
+                }
                 this.world.notifyBlockUpdate(this.pos, state, state, 3);
             }
             this.world.markBlockRangeForRenderUpdate(this.pos, this.pos);

@@ -7,14 +7,14 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 public class ConfirmAutoCraftPacket extends ServerboundPacket {
     private int windowId;
-    private int amount;
+    private long amount;
     private boolean craftMissingAmount;
     private boolean autoStart;
 
     public ConfirmAutoCraftPacket() {
     }
 
-    public ConfirmAutoCraftPacket(int windowId, int amount, boolean craftMissingAmount, boolean autoStart) {
+    public ConfirmAutoCraftPacket(int windowId, long amount, boolean craftMissingAmount, boolean autoStart) {
         this.windowId = windowId;
         this.amount = amount;
         this.craftMissingAmount = craftMissingAmount;
@@ -24,7 +24,7 @@ public class ConfirmAutoCraftPacket extends ServerboundPacket {
     @Override
     protected void read(ByteBuf buf) {
         this.windowId = buf.readInt();
-        this.amount = buf.readInt();
+        this.amount = buf.readLong();
         this.craftMissingAmount = buf.readBoolean();
         this.autoStart = buf.readBoolean();
         if (buf.isReadable()) {
@@ -35,7 +35,7 @@ public class ConfirmAutoCraftPacket extends ServerboundPacket {
     @Override
     protected void write(ByteBuf buf) {
         buf.writeInt(this.windowId);
-        buf.writeInt(this.amount);
+        buf.writeLong(this.amount);
         buf.writeBoolean(this.craftMissingAmount);
         buf.writeBoolean(this.autoStart);
     }
@@ -48,7 +48,7 @@ public class ConfirmAutoCraftPacket extends ServerboundPacket {
         if (container.windowId != this.windowId) {
             return;
         }
-        if (this.amount <= 0 || this.amount > ContainerCraftAmount.MAX_AUTO_CRAFT_AMOUNT) {
+        if (this.amount <= 0) {
             return;
         }
         container.confirm(this.amount, this.craftMissingAmount, this.autoStart);

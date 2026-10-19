@@ -25,6 +25,7 @@ public class FlowLocationsPacket extends ClientboundPacket {
     private static final int MAX_COMPRESSED_BYTES = 512 * 1024;
 
     private List<FlowSearchDTO> locations = List.of();
+    private NBTTagCompound encodedLocations;
     private AEKey what;
 
     public FlowLocationsPacket() {
@@ -43,6 +44,7 @@ public class FlowLocationsPacket extends ClientboundPacket {
         final int size = data.readInt();
         if (size < 0 || size > MAX_COMPRESSED_BYTES || size > data.readableBytes()) {
             this.locations = List.of();
+            this.encodedLocations = null;
             buf.skipBytes(buf.readableBytes());
             return;
         }
@@ -52,9 +54,11 @@ public class FlowLocationsPacket extends ClientboundPacket {
 
         try (var bytes = new ByteArrayInputStream(compressed);
              var input = new DataInputStream(bytes)) {
-            this.locations = FlowSearchDTO.readAsListFromNBT(CompressedStreamTools.read(input));
+            this.locations = List.of();
+            this.encodedLocations = CompressedStreamTools.read(input);
         } catch (IOException | RuntimeException e) {
             this.locations = List.of();
+            this.encodedLocations = null;
         }
     }
 
@@ -86,7 +90,15 @@ public class FlowLocationsPacket extends ClientboundPacket {
     @Override
     @SideOnly(Side.CLIENT)
     public void handleClient(Minecraft minecraft) {
-        IngredientFlowHighlightHandler.INSTANCE.showFlowLocations(minecraft, this.locations,
+        List<FlowSearchDTO> decodedLocations = this.locations;
+        if (this.encodedLocations != null) {
+            try {
+                decodedLocations = FlowSearchDTO.readAsListFromNBT(this.encodedLocations, minecraft.world);
+            } catch (RuntimeException e) {
+                decodedLocations = List.of();
+            }
+        }
+        IngredientFlowHighlightHandler.INSTANCE.showFlowLocations(minecraft, decodedLocations,
             this.what == null ? new TextComponentString("") : this.what.getDisplayName());
     }
 }

@@ -57,8 +57,8 @@ public class IngredientFlowHighlightHandler {
         int currentDimension = minecraft.world.provider.getDimension();
 
         for (FlowSearchDTO flow : flows) {
-            BlockPos pos = flow.location.getPos();
-            int dimension = flow.location.getLevel().provider.getDimension();
+            BlockPos pos = flow.position;
+            int dimension = flow.dimension;
             ITextComponent rate = FlowRateFormatter.formatTotalForChat(flow.netTotal());
 
             if (dimension == currentDimension) {

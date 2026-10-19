@@ -75,9 +75,11 @@ public class StackTooltipRenderer {
     }
 
     private static String createSpacer(FontRenderer font, int width) {
-        int spaceWidth = Math.max(1, font.getStringWidth(" "));
+        // Thaumcraft treats four ASCII spaces as an aspect anchor. NBSP has the same
+        // invisible width in Forge's font renderer without matching that anchor.
+        int spaceWidth = Math.max(1, font.getStringWidth("\u00a0"));
         int chars = Math.max(1, (width + spaceWidth - 1) / spaceWidth);
-        return " ".repeat(chars);
+        return "\u00a0".repeat(chars);
     }
 
     private static String createReservedLine(FontRenderer font, int width) {

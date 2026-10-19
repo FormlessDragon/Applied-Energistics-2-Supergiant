@@ -56,7 +56,6 @@ public class GuiCraftAmount extends AEBaseGui<ContainerCraftAmount> {
 
         this.amountToCraft = widgets.addNumberEntryWidget("amountToCraft", NumberEntryType.UNITLESS);
         this.amountToCraft.setMinValue(1);
-        this.amountToCraft.setMaxValue(ContainerCraftAmount.MAX_AUTO_CRAFT_AMOUNT);
         this.amountToCraft.setLongValue(1);
         this.amountToCraft.setTextFieldStyle(style.getWidget("amountToCraftInput"));
         this.amountToCraft.setPreviewFieldStyle(style.getWidget("amountToCraftPreview"));
@@ -81,11 +80,11 @@ public class GuiCraftAmount extends AEBaseGui<ContainerCraftAmount> {
             this.shiftDown = newShiftDown;
             this.next.setMessage(newShiftDown ? this.startText : this.nextText);
         }
-        this.next.enabled = this.amountToCraft.getIntValue().orElse(0) > 0;
+        this.next.enabled = this.amountToCraft.getLongValue().orElse(0) > 0;
     }
 
     private void confirm() {
-        int amount = this.amountToCraft.getIntValue().orElse(0);
+        long amount = this.amountToCraft.getLongValue().orElse(0);
         boolean craftMissingAmount = this.amountToCraft.startsWithEquals();
         if (amount <= 0) {
             return;

@@ -1,6 +1,5 @@
 package ae2.core.network.serverbound;
 
-import ae2.api.crafting.PatternDetailsHelper;
 import ae2.container.me.common.AbstractContainerRequester;
 import ae2.core.network.ServerboundPacket;
 import io.netty.buffer.ByteBuf;
@@ -98,10 +97,7 @@ public class RequesterUpdatePacket extends ServerboundPacket {
     }
 
     private boolean hasValidNumbers() {
-        return this.amount >= 0
-            && this.amount <= PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT
-            && this.batchSize >= 1
-            && this.batchSize <= PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT;
+        return this.amount >= 0 && this.batchSize >= 1;
     }
 
     @Override

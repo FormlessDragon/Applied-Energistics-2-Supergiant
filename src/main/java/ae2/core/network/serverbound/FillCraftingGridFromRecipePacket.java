@@ -2,7 +2,6 @@ package ae2.core.network.serverbound;
 
 import ae2.api.config.Actionable;
 import ae2.api.config.FuzzyMode;
-import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.crafting.ICraftingService;
@@ -130,8 +129,7 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
     private static List<GenericStack> copyGenericStacks(List<GenericStack> stacks, int maxSize) {
         List<GenericStack> result = new ObjectArrayList<>(Math.min(stacks.size(), maxSize));
         for (GenericStack stack : stacks) {
-            if (stack != null && stack.amount() > 0
-                && stack.amount() <= PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT) {
+            if (stack != null && stack.amount() > 0) {
                 result.add(stack);
                 if (result.size() >= maxSize) {
                     break;
@@ -159,8 +157,7 @@ public class FillCraftingGridFromRecipePacket extends ServerboundPacket {
             } catch (RuntimeException e) {
                 return null;
             }
-            if (stack == null || stack.amount() <= 0
-                || stack.amount() > PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT) {
+            if (stack == null || stack.amount() <= 0) {
                 return null;
             }
             result.add(stack);

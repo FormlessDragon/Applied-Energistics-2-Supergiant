@@ -34,6 +34,7 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 
@@ -42,7 +43,7 @@ public class ContainerPatternProvider extends AEBaseContainer
 
     public static final String ACTION_SET_PAGE = "setPage";
     @GuiSync(12)
-    public final boolean remote;
+    public boolean remote;
     private final PatternProviderLogicHost host;
     private final PatternProviderLogic logic;
     private final List<AppEngSlot> patternSlots = new ObjectArrayList<>();
@@ -130,7 +131,7 @@ public class ContainerPatternProvider extends AEBaseContainer
     }
 
     @Override
-    public ItemStack transferStackInSlot(EntityPlayer player, int index) {
+    public @NonNull ItemStack transferStackInSlot(EntityPlayer player, int index) {
         if (!isClientSide() && index >= 0 && index < this.inventorySlots.size()) {
             Slot sourceSlot = this.inventorySlots.get(index);
             if (isValidQuickMoveSource(sourceSlot, player)

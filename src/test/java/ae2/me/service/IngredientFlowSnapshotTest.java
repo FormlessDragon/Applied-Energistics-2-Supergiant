@@ -1,13 +1,16 @@
 package ae2.me.service;
 
+import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.util.DimensionalBlockPos;
+import ae2.core.AEConfig;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
@@ -21,13 +24,23 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IngredientFlowSnapshotTest {
-    // Populate two distinct time buckets without starting the game or relying on wall-clock delays.
-    @SuppressWarnings("unchecked")
+    @BeforeAll
+    static void bootstrap() {
+        Bootstrap.register();
+        AEConfig.init();
+    }
+
+
     private static Object addBucket(IngredientFlowService service, AEKey key, long in, long out) throws Exception {
+        return addBucket(service, key, in, out, 0L);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object addBucket(IngredientFlowService service, AEKey key, long in, long out, long start) throws Exception {
         var bucketClass = Class.forName(IngredientFlowService.class.getName() + "$Bucket");
         var bucketConstructor = bucketClass.getDeclaredConstructor(long.class);
         bucketConstructor.setAccessible(true);
-        var bucket = bucketConstructor.newInstance(0L);
+        var bucket = bucketConstructor.newInstance(start);
         var accumulatorClass = Class.forName(IngredientFlowService.class.getName() + "$ItemFlowAccumulator");
         var accumulatorConstructor = accumulatorClass.getDeclaredConstructor();
         accumulatorConstructor.setAccessible(true);
@@ -64,7 +77,7 @@ class IngredientFlowSnapshotTest {
     }
 
     @Test
-    void locationTotalsKeepFirstSeenOrderFilterZeroAndDoNotReuseBucketValues() throws Exception {
+    void locationTotalsFilterZeroAndDoNotReuseBucketValues() throws Exception {
         Bootstrap.register();
         var unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
         unsafeField.setAccessible(true);
@@ -122,5 +135,52 @@ class IngredientFlowSnapshotTest {
         assertEquals(5, next.get(key).rightLong());
         assertEquals(Long.MAX_VALUE, first.get(key).leftLong());
         assertEquals(10, first.get(key).rightLong());
+    }
+
+    @Test
+    void recordingSaturatesBothDirectionsAndDisableDiscardsTheHistory() {
+        boolean previousEnabled = AEConfig.GENERAL.enableIngredientFlowTracking;
+        AEConfig.GENERAL.enableIngredientFlowTracking = true;
+        try {
+            var key = AEItemKey.of(Items.APPLE);
+            var service = new IngredientFlowService();
+            service.recordFlow(key, 7, IActionSource.empty());
+            assertTrue(service.getAllRecentFlow().isEmpty());
+            service.setTrackingEnabled(true);
+            service.recordFlow(key, 7, IActionSource.empty());
+            var first = service.getAllRecentFlow();
+            service.recordFlow(key, Long.MAX_VALUE, IActionSource.empty());
+            service.recordFlow(key, Long.MIN_VALUE, IActionSource.empty());
+            service.recordFlow(key, -1, IActionSource.empty());
+            var next = service.getAllRecentFlow();
+            assertEquals(Long.MAX_VALUE, next.get(key).leftLong());
+            assertEquals(Long.MAX_VALUE, next.get(key).rightLong());
+            assertEquals(7, first.get(key).leftLong());
+            assertEquals(0, first.get(key).rightLong());
+            service.setTrackingEnabled(false);
+            service.setTrackingEnabled(true);
+            assertTrue(service.getAllRecentFlow().isEmpty());
+        } finally {
+            AEConfig.GENERAL.enableIngredientFlowTracking = previousEnabled;
+        }
+    }
+
+    @Test
+    void expiredBucketsLeaveTotalsAndInvalidateOnlyTheCurrentSnapshot() throws Exception {
+        var key = AEItemKey.of(Items.APPLE);
+        var service = new IngredientFlowService();
+        long now = System.currentTimeMillis();
+        long window = AEConfig.instance().getIngredientFlowTrackingWindowMinutes() * 60_000L;
+        addBucket(service, key, 10, 20, now - window - 10_000);
+        addBucket(service, key, 3, 4, now + 10_000);
+        var before = service.getAllRecentFlow();
+        service.onServerEndTick();
+        var after = service.getAllRecentFlow();
+        assertEquals(3, after.get(key).leftLong());
+        assertEquals(4, after.get(key).rightLong());
+        assertEquals(13, before.get(key).leftLong());
+        assertEquals(24, before.get(key).rightLong());
+        service.onServerEndTick();
+        assertSame(after, service.getAllRecentFlow());
     }
 }

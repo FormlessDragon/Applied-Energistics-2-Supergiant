@@ -1,6 +1,5 @@
 package ae2.tile.crafting.requester;
 
-import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -15,7 +14,6 @@ public final class Request {
     private static final String AMOUNT = "amount";
     private static final String BATCH = "batch";
     private static final String STATUS = "status";
-    private static final long MAX_REQUEST_AMOUNT = PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT;
 
     @Nullable
     private final RequestHost host;
@@ -53,14 +51,6 @@ public final class Request {
         } catch (IllegalArgumentException ignored) {
             return RequestStatus.IDLE;
         }
-    }
-
-    private static long clampAmount(long amount) {
-        return Math.clamp(amount, 0, MAX_REQUEST_AMOUNT);
-    }
-
-    private static long clampBatchSize(long batchSize) {
-        return Math.clamp(batchSize, 1, MAX_REQUEST_AMOUNT);
     }
 
     public boolean isEnabled() {
@@ -126,8 +116,8 @@ public final class Request {
             return;
         }
 
-        long clampedAmount = clampAmount(stack.amount());
-        long initialBatchSize = clampBatchSize(stack.what().getAmountPerUnit());
+        long clampedAmount = Math.max(stack.amount(), 0);
+        long initialBatchSize = Math.max(stack.what().getAmountPerUnit(), 1);
         this.configuredStack = new GenericStack(stack.what(), clampedAmount);
         this.amount = clampedAmount;
         this.batchSize = initialBatchSize;
@@ -144,7 +134,7 @@ public final class Request {
     }
 
     public void setAmount(long amount) {
-        long clamped = clampAmount(amount);
+        long clamped = Math.max(amount, 0);
         if (this.amount != clamped) {
             this.amount = clamped;
             this.syncRevision++;
@@ -157,10 +147,9 @@ public final class Request {
             return;
         }
 
-        long newAmount = clampAmount(amount);
-        if (this.amount != newAmount) {
-            this.amount = newAmount;
-            this.configuredStack = new GenericStack(Objects.requireNonNull(this.configuredStack).what(), newAmount);
+        if (this.amount != amount) {
+            this.amount = amount;
+            this.configuredStack = new GenericStack(Objects.requireNonNull(this.configuredStack).what(), amount);
             this.syncRevision++;
             updated();
         }
@@ -171,7 +160,7 @@ public final class Request {
     }
 
     public void setBatchSize(long batchSize) {
-        long clamped = clampBatchSize(batchSize);
+        long clamped = Math.max(batchSize, 1);
         if (this.batchSize != clamped) {
             this.batchSize = clamped;
             this.syncRevision++;
@@ -179,7 +168,7 @@ public final class Request {
     }
 
     public void updateBatchSize(long batchSize) {
-        long newBatchSize = clampBatchSize(batchSize);
+        long newBatchSize = Math.max(batchSize, 1);
         if (this.batchSize != newBatchSize) {
             this.batchSize = newBatchSize;
             this.syncRevision++;

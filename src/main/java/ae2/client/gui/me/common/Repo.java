@@ -713,7 +713,10 @@ public class Repo implements IClientRepo {
     public boolean updateFlowRates(long sourceGeneration, long snapshotId, int pageIndex, int pageCount,
                                    boolean complete, Map<AEKey, LongLongPair> rates) {
         if (sourceGeneration < this.flowSourceGeneration
-            || sourceGeneration == this.flowSourceGeneration && snapshotId < this.flowSnapshotId) {
+            || sourceGeneration == this.flowSourceGeneration
+            && (snapshotId < this.flowSnapshotId
+            || snapshotId > 0 && snapshotId == this.flowSnapshotId
+            || this.flowPages != null && snapshotId < this.flowPages.snapshotId)) {
             return false;
         }
 
@@ -741,14 +744,16 @@ public class Repo implements IClientRepo {
             return true;
         }
 
-        if (this.flowPages == null || snapshotId > this.flowPages.snapshotId
-            || pageCount != this.flowPages.pageCount) {
+        if (this.flowPages == null || snapshotId > this.flowPages.snapshotId) {
             this.flowPages = new FlowPageAssembly(snapshotId, pageCount);
         }
-        if (snapshotId < this.flowPages.snapshotId) {
+        if (snapshotId < this.flowPages.snapshotId || pageCount != this.flowPages.pageCount) {
             return false;
         }
 
+        if (this.flowPages.pages.containsKey(pageIndex)) {
+            return false;
+        }
         this.flowPages.pages.put(pageIndex, new Object2ObjectOpenHashMap<>(rates));
         if (this.flowPages.pages.size() != pageCount) {
             return false;
@@ -768,7 +773,9 @@ public class Repo implements IClientRepo {
         if (sourceGeneration < this.flowSourceGeneration) {
             return false;
         }
-        if (sourceGeneration == this.flowSourceGeneration && snapshotId < this.flowSnapshotId) {
+        if (sourceGeneration == this.flowSourceGeneration
+            && (snapshotId < this.flowSnapshotId
+            || this.flowPages != null && snapshotId < this.flowPages.snapshotId)) {
             return false;
         }
 

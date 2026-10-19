@@ -1,6 +1,5 @@
 package ae2.client.gui.me.items;
 
-import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.stacks.GenericStack;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.Icon;
@@ -17,7 +16,6 @@ import ae2.container.AEBaseContainer;
 import ae2.container.SlotSemantics;
 import ae2.core.localization.GuiText;
 import ae2.text.TextComponentItemStack;
-import com.google.common.primitives.Longs;
 import net.minecraft.inventory.Slot;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.Nullable;
@@ -52,7 +50,6 @@ public class GuiSetProcessingPatternAmount extends AEBaseGui<AEBaseContainer> {
 
         this.amount = widgets.addNumberEntryWidget("amountToStock", NumberEntryType.of(currentStack.what()));
         this.amount.setLongValue(currentStack.amount());
-        this.amount.setMaxValue(getMaxAmount());
         GuiStyle currentStyle = getStyle();
         if (currentStyle == null) {
             throw new IllegalStateException("GUI style has not been initialized");
@@ -73,18 +70,13 @@ public class GuiSetProcessingPatternAmount extends AEBaseGui<AEBaseContainer> {
 
     private void confirm() {
         this.amount.getLongValue().ifPresent(newAmount -> {
-            long constrained = Longs.constrainToRange(newAmount, 0, getMaxAmount());
-            this.setter.accept(constrained <= 0 ? null : new GenericStack(this.currentStack.what(), constrained));
+            this.setter.accept(newAmount <= 0 ? null : new GenericStack(this.currentStack.what(), newAmount));
             returnToParent();
         });
     }
 
     private void openNumberEntryButtonSettings() {
         switchToScreen(new GuiNumberEntryButtonSettings(this));
-    }
-
-    private long getMaxAmount() {
-        return PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT;
     }
 
     private void removeDisplaySlot() {

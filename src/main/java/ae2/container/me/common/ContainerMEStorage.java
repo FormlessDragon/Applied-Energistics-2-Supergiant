@@ -25,7 +25,6 @@ import ae2.api.config.SortDir;
 import ae2.api.config.SortOrder;
 import ae2.api.config.ViewItems;
 import ae2.api.config.YesNo;
-import ae2.api.crafting.PatternDetailsHelper;
 import ae2.api.implementations.blockentities.IViewCellStorage;
 import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGrid;
@@ -516,7 +515,7 @@ public class ContainerMEStorage extends AEBaseContainer
     }
 
     public void setRecursiveIngredientReserveAmount(long amount) {
-        long clampedAmount = Math.clamp(amount, 0, PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT);
+        long clampedAmount = Math.max(amount, 0);
         this.recursiveIngredientReserveAmount = clampedAmount;
         if (isServerSide()) {
             this.lastSentRecursiveIngredientReserveAmount = clampedAmount;

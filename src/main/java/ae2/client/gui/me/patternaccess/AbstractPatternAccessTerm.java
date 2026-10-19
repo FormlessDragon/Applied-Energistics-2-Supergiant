@@ -67,6 +67,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import org.lwjgl.input.Keyboard;
 
 import java.awt.Rectangle;
@@ -461,7 +462,7 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
     }
 
     @Override
-    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, ClickType clickType) {
+    protected void handleMouseClick(@Nullable Slot slot, int slotId, int mouseButton, @NonNull ClickType clickType) {
         if (slot instanceof GuiPatternSlot patternSlot) {
             if (canInteractWithPatternAccess()) {
                 handlePatternSlotClick(patternSlot, mouseButton, clickType);

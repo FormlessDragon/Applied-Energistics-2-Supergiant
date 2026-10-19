@@ -1,7 +1,5 @@
 package ae2.core.mixins;
 
-import com.cleanroommc.discovery.CleanroomModDiscoverer;
-
 import java.util.Set;
 
 public final class MixinDecisions {
@@ -16,7 +14,7 @@ public final class MixinDecisions {
         "ae2.mixins.hei.MixinBookmarkOverlay",
         "ae2.mixins.hei.MixinLeftAreaDispatcher");
 
-    public static final boolean JEI_PRESENT = CleanroomModDiscoverer.instance().isModPresent("jei");
+    public static final boolean JEI_PRESENT = isClassPresent("mezz.jei.JustEnoughItems");
     public static final boolean HEI_PRESENT = isClassPresent("mezz.jei.gui.navigation.NavigationLayout");
 
     /**

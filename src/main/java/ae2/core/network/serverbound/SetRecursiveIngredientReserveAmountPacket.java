@@ -1,6 +1,5 @@
 package ae2.core.network.serverbound;
 
-import ae2.api.crafting.PatternDetailsHelper;
 import ae2.container.me.common.ContainerMEStorage;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.ServerboundPacket;
@@ -52,7 +51,7 @@ public class SetRecursiveIngredientReserveAmountPacket extends ServerboundPacket
             return;
         }
 
-        long clampedAmount = Math.clamp(this.amount, 0, PatternDetailsHelper.MAX_PROCESSING_PATTERN_AMOUNT);
+        long clampedAmount = Math.max(this.amount, 0);
         gridNode.grid().getCraftingService().setRecursiveIngredientReserveAmount(clampedAmount);
         container.setRecursiveIngredientReserveAmount(clampedAmount);
         InitNetwork.CHANNEL.sendTo(new RecursiveIngredientReserveAmountPacket(clampedAmount), player);
