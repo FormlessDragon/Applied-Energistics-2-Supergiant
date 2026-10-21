@@ -919,7 +919,7 @@ public final class NativeCellTerminalTargets {
         public final CellTerminalContentSnapshot previewContent() {
             StorageCell cell = getCellInventory();
             return cell != null ? CellTerminalContentSnapshot.fromCounter(cell.getAvailableStacks())
-                : CellTerminalContentSnapshot.fromCounter(new KeyCounter());
+                : CellTerminalContentSnapshot.empty();
         }
 
         @Override

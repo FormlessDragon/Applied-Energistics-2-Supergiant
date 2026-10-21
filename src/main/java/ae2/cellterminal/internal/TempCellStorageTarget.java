@@ -189,7 +189,7 @@ public final class TempCellStorageTarget implements CellTerminalStorageTarget {
         @Override
         public CellTerminalContentSnapshot previewContent() {
             StorageCell cell = getCellInventory();
-            return cell == null ? CellTerminalContentSnapshot.fromCounter(new KeyCounter())
+            return cell == null ? CellTerminalContentSnapshot.empty()
                 : CellTerminalContentSnapshot.fromCounter(cell.getAvailableStacks());
         }
 
