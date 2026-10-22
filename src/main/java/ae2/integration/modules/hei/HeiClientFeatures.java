@@ -54,7 +54,7 @@ final class HeiClientFeatures {
             addTooltipLine(event, GuiText.CellViewShortcut.getLocal(KeyBindings.showRecipe.getDisplayName()));
         }
 
-        Object hovered = GenericIngredientHelper.getHoveredIngredient();
+        Object hovered = GenericIngredientHelper.getHoveredInBookmark();
         GenericStack stack = GenericIngredientHelper.ingredientToStack(hovered);
         if (stack == null || !(stack.what() instanceof AEItemKey itemKey)) {
             return;
@@ -79,7 +79,7 @@ final class HeiClientFeatures {
             return;
         }
 
-        GenericStack stack = GenericIngredientHelper.ingredientToStack(GenericIngredientHelper.getHoveredIngredient());
+        GenericStack stack = GenericIngredientHelper.ingredientToStack(GenericIngredientHelper.getHoveredInBookmark());
         if (stack == null) {
             return;
         }

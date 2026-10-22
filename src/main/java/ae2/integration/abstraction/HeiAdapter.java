@@ -47,6 +47,11 @@ public interface HeiAdapter {
     }
 
     @Nullable
+    default Object getHoveredInBookmark() {
+        return null;
+    }
+
+    @Nullable
     default String getRecipeCategoryTitle(String uid) {
         return null;
     }

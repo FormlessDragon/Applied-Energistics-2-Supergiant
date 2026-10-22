@@ -15,6 +15,7 @@ import ae2.core.localization.GuiText;
 import ae2.core.localization.Tooltips;
 import ae2.crafting.execution.CraftingSupplierLocation;
 import ae2.crafting.execution.CraftingSupplierLocator;
+import ae2.integration.Integrations;
 import ae2.integration.data.LiteCraftTreeNode;
 import ae2.integration.data.LiteCraftTreeProc;
 import ae2.integration.modules.hei.CraftingTreeUtils;
@@ -478,7 +479,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
     @Override
     public boolean onKeyTyped(char typedChar, int keyCode) {
         GenericStack hoveredOutput = hovered == null ? null : hovered.getOutput();
-        if (hoveredOutput != null) {
+        if (Integrations.hei().isEnabled() && hoveredOutput != null) {
             int showRecipeKeyCode = KeyBindings.showRecipe.getKeyCode();
             int showUsesKeyCode = KeyBindings.showUses.getKeyCode();
             int bookmarkKeyCode = KeyBindings.bookmark.getKeyCode();

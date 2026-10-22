@@ -15,6 +15,7 @@ import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.clientbound.NetworkAmountResultPacket;
 import ae2.core.network.serverbound.NetworkAmountQueryPacket;
+import ae2.integration.Integrations;
 import ae2.integration.modules.baubles.BaublesIntegration;
 import ae2.integration.modules.hei.GenericIngredientHelper;
 import net.minecraft.client.Minecraft;
@@ -31,9 +32,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.WeakHashMap;
 
-/**
- * Shows how much of the hovered ingredient the player's ME network stores.
- */
 @SideOnly(Side.CLIENT)
 public class NetworkAmount {
 
@@ -64,10 +62,6 @@ public class NetworkAmount {
         }
     }
 
-    /**
-     * Forgets a server session, whose amounts say nothing about the next one. The terminals the player carries are
-     * scanned again right away rather than staying unknown for the rest of the scan period.
-     */
     public static void clear() {
         AMOUNTS.clear();
         REFRESH_AT.clear();
@@ -76,11 +70,8 @@ public class NetworkAmount {
 
     public static void acceptAmountResult(AEKey what, long amount) {
         AMOUNTS.put(what, amount);
-        // The next request is counted from the answer, so that a response slower than the refresh period does not make
-        // the next frame ask again.
         REFRESH_AT.put(what, (long) (clientTicks + (amount == NetworkAmountResultPacket.NO_ANSWER ? IDLE_TICKS : REFRESH_TICKS)));
         if (amount == NetworkAmountResultPacket.NO_ANSWER) {
-            // The terminals may have moved since they were last looked for.
             scanCountdown = 0;
         }
     }
@@ -95,11 +86,6 @@ public class NetworkAmount {
         appendLine(event.getToolTip(), ingredient);
     }
 
-    /**
-     * Appends the amount of the network the given HEI ingredient belongs to. HEI draws the ingredients of its list and
-     * its bookmarks itself, so the tooltip of an ingredient that is not an item never reaches
-     * {@link ItemTooltipEvent}.
-     */
     public static void appendTooltipLine(@Nullable Object ingredient, List<String> tooltip) {
         if (!AEConfig.instance().isShowAmountsInNetwork()) {
             return;
@@ -153,7 +139,6 @@ public class NetworkAmount {
             return true;
         }
 
-        // Subscreens and HEI recipe views keep the terminal container and its synchronized inventory open.
         IClientRepo repo = container.getClientRepo();
         if (repo == null) {
             return false;
@@ -188,13 +173,6 @@ public class NetworkAmount {
         baubleTerminals = baubles;
     }
 
-    /**
-     * Bit i of the result is set while slot i holds a wireless terminal.
-     * <p>
-     * A slot at or above {@link Long#SIZE} cannot be reported: {@code 1L << slot} wraps around and would claim a
-     * terminal in a slot that holds none. The inventory has 41 slots and baubles has far fewer, so the limit
-     * is never reached.
-     */
     private static long scanTerminals(EntityPlayer player, int slots, boolean isBaubleSlot) {
         long terminals = 0;
         for (int slot = 0; slot < Math.min(slots, Long.SIZE); slot++) {
@@ -218,9 +196,11 @@ public class NetworkAmount {
             if (wrapped != null) {
                 return wrapped;
             }
+
+            return GenericStack.fromItemStack(itemStack);
         }
 
-        return GenericIngredientHelper.ingredientToStack(ingredient);
+        return Integrations.hei().ingredientToStack(ingredient);
     }
 
     @NotNull
@@ -229,7 +209,7 @@ public class NetworkAmount {
             return event.getItemStack();
         }
 
-        Object ingredient = GenericIngredientHelper.getHoveredIngredient();
+        Object ingredient = Integrations.hei().getHoveredInBookmark();
         return ingredient != null ? ingredient : event.getItemStack();
     }
 }

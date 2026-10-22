@@ -1,5 +1,6 @@
 package ae2.integration.modules.hei;
 
+import ae2.api.integrations.hei.IngredientConverter;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.integration.abstraction.HeiAdapter;
@@ -54,6 +55,12 @@ public class HeiModule implements HeiAdapter {
     @Override
     public void addBookmarkGroup(List<GenericStack> stacks) {
         HeiBookmarkHelper.addBookmarkGroup(stacks);
+    }
+
+    @Override
+    @Nullable
+    public Object getHoveredInBookmark() {
+        return GenericIngredientHelper.getHoveredInBookmark();
     }
 
     @Override
