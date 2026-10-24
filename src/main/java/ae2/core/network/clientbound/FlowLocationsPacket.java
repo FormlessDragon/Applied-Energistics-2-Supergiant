@@ -98,7 +98,7 @@ public class FlowLocationsPacket extends ClientboundPacket {
                 decodedLocations = List.of();
             }
         }
-        IngredientFlowHighlightHandler.INSTANCE.showFlowLocations(minecraft, decodedLocations,
+        IngredientFlowHighlightHandler.INSTANCE.showFlowLocations(minecraft, decodedLocations, this.what,
             this.what == null ? new TextComponentString("") : this.what.getDisplayName());
     }
 }

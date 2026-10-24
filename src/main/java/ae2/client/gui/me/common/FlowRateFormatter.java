@@ -77,7 +77,7 @@ public final class FlowRateFormatter {
      * The sign is added here because {@link AEKey#formatAmount} formats the magnitude only: passing a negative value
      * would place the minus sign inside the number and could never express the explicit plus sign used for inflows.
      */
-    private static String formatSignedAmount(AEKey what, long amount) {
+    public static String formatSignedAmount(AEKey what, long amount) {
         if (amount == Long.MIN_VALUE) {
             return "-" + Long.toUnsignedString(amount);
         }

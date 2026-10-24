@@ -3,6 +3,7 @@ package ae2.integration.data;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.KeyCounter;
 import ae2.crafting.CraftingTreeNode;
 import ae2.crafting.CraftingTreeProcess;
 import ae2.crafting.execution.CraftingSupplierLocation;
@@ -65,7 +66,7 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
                                 boolean recursiveDisplayNode) {
         long processTimes = patternTimesAllocator == null
             ? process.getTreeDisplayTimes()
-            : recursiveDisplayNode ? process.getTreeRequestTimes() : patternTimesAllocator.allocate(process);
+            : patternTimesAllocator.times(process, recursiveDisplayNode);
         if (processTimes <= 0) {
             return null;
         }
@@ -268,11 +269,27 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
 
     static final class MissingAllocator {
         private final Object2LongOpenHashMap<AEKey> remainingMissingByKey = new Object2LongOpenHashMap<>();
+        private final boolean fromPlan;
+
+        /**
+         * Shares out what the calculation is missing of each key.
+         */
+        MissingAllocator() {
+            this.fromPlan = false;
+        }
+
+        /**
+         * Shares out the given missing items.
+         */
+        MissingAllocator(KeyCounter missingItems) {
+            this.fromPlan = true;
+            missingItems.forEach(remainingMissingByKey::put);
+        }
 
         long allocate(CraftingTreeNode node, long amount) {
             AEKey key = node.getWhat();
             long remainingMissing;
-            if (remainingMissingByKey.containsKey(key)) {
+            if (fromPlan || remainingMissingByKey.containsKey(key)) {
                 remainingMissing = remainingMissingByKey.getLong(key);
             } else {
                 remainingMissing = node.getMissing();

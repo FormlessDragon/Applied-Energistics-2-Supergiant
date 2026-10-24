@@ -25,6 +25,7 @@ import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.crafting.graph.CraftingGraphDisplaySnapshot;
 import ae2.integration.data.LiteCraftTreeNode;
+import ae2.api.stacks.AEKey;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import org.jetbrains.annotations.Nullable;
@@ -93,9 +94,28 @@ public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarri
             }
         }
         long repairedBytes = LongMath.saturatedAdd(bytes, (long) Math.ceil(additionalBytes));
+        long intermediate = patternTimes.equals(this.patternTimes) ? this.intermediateFinalOutputAmount
+            : Math.max(0, getFinalOutputCrafted(finalOutput.what(), patternTimes) - finalOutput.amount());
         return new CraftingPlan(finalOutput, repairedBytes, simulation, multiplePaths, usedItems, emittedItems, missingItems,
-            intermediateFinalOutputAmount, patternTimes, tree, temporaryProviders, graphDisplayBuilder, attemptMetrics,
+            intermediate, patternTimes, tree, temporaryProviders, graphDisplayBuilder, attemptMetrics,
             calculation);
+    }
+
+    /**
+     * How much of the final output the crafts make. What they make beyond the request first returns to the CPU, for
+     * the crafts that take it.
+     */
+    private static long getFinalOutputCrafted(AEKey finalOutput, Object2LongMap<IPatternDetails> patternTimes) {
+        long crafted = 0;
+        for (var entry : patternTimes.object2LongEntrySet()) {
+            for (var output : entry.getKey().getOutputs()) {
+                if (finalOutput.matches(output)) {
+                    crafted = LongMath.saturatedAdd(crafted,
+                        LongMath.saturatedMultiply(entry.getLongValue(), output.amount()));
+                }
+            }
+        }
+        return crafted;
     }
 
     public GenericStack finalOutput() {

@@ -2,6 +2,7 @@ package ae2.client.gui.me.crafting;
 
 import ae2.api.client.AEKeyRendering;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
+import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AmountFormat;
 import ae2.api.stacks.GenericStack;
 import ae2.client.Point;
@@ -37,7 +38,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraftforge.fml.client.config.GuiUtils;
+import net.minecraft.util.text.TextFormatting;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.BufferUtils;
@@ -389,12 +390,37 @@ public class CraftingTreeWidget implements ICompositeWidget {
         return maxDepth;
     }
 
+    /**
+     * Only machine nodes use the generic widget tooltip. Ingredient nodes are drawn by the screen through
+     * {@link #getHoveredKeyTooltip}, see there.
+     */
     @Nullable
     @Override
     public Tooltip getTooltip(int mouseX, int mouseY) {
         Point relativeMouse = toScaledTreeMouse(new Point(mouseX, mouseY));
         TreeNode node = findNodeAt(relativeMouse);
-        return node == null ? null : node.getTooltip();
+        return node == null ? null : node.getMachineTooltip();
+    }
+
+    /**
+     * Returns the tooltip of the hovered ingredient node. Like every other AE2 screen, it must be drawn together with
+     * the key's stack: mods such as Thaumcraft reserve tooltip lines for an item and then draw into them during
+     * rendering, which fails when the generic widget tooltip renders the lines without a stack.
+     *
+     * @param mouseX mouse position relative to the screen's origin
+     * @param mouseY mouse position relative to the screen's origin
+     */
+    @Nullable
+    public KeyTooltip getHoveredKeyTooltip(int mouseX, int mouseY) {
+        if (!isVisible() || !bounds.contains(mouseX, mouseY)) {
+            return null;
+        }
+        Point relativeMouse = toScaledTreeMouse(new Point(mouseX, mouseY));
+        TreeNode node = findNodeAt(relativeMouse);
+        return node == null ? null : node.getKeyTooltip();
+    }
+
+    public record KeyTooltip(AEKey what, List<ITextComponent> lines) {
     }
 
     public BufferedImage createNodeAreaScreenshot() {
@@ -1647,49 +1673,40 @@ public class CraftingTreeWidget implements ICompositeWidget {
                 && mouse.y() < currentPosition.y() + LINE_HEIGHT + NODE_HEIGHT;
         }
 
-        private Tooltip getTooltip() {
-            if (machine != null) {
-                int extraLines = machineLocations.isEmpty() ? 0 :
-                    (GuiScreen.isShiftKeyDown() ? machineLocations.size() : 1);
-                List<ITextComponent> lines = new ObjectArrayList<>(machine.tooltip().size() + 1 + extraLines);
-                lines.add(machine.name());
-                lines.addAll(machine.tooltip());
-                if (!machineLocations.isEmpty()) {
-                    if (GuiScreen.isShiftKeyDown()) {
-                        for (CraftingSupplierLocation location : machineLocations) {
-                            lines.add(formatMachineLocation(location));
-                        }
-                    } else {
-                        lines.add(GuiText.CraftingTreeHighlightProvider.text());
-                    }
-                }
-                return new Tooltip(lines);
+        @Nullable
+        private Tooltip getMachineTooltip() {
+            if (machine == null) {
+                return null;
             }
-            if (node == null) {
-                return new Tooltip(List.of());
+            int extraLines = machineLocations.isEmpty() ? 0 :
+                (GuiScreen.isShiftKeyDown() ? machineLocations.size() : 1);
+            List<ITextComponent> lines = new ObjectArrayList<>(machine.tooltip().size() + 1 + extraLines);
+            lines.add(machine.name());
+            lines.addAll(machine.tooltip());
+            if (!machineLocations.isEmpty()) {
+                if (GuiScreen.isShiftKeyDown()) {
+                    for (CraftingSupplierLocation location : machineLocations) {
+                        lines.add(formatMachineLocation(location));
+                    }
+                } else {
+                    lines.add(GuiText.CraftingTreeHighlightProvider.text());
+                }
+            }
+            return new Tooltip(lines);
+        }
+
+        @Nullable
+        private KeyTooltip getKeyTooltip() {
+            if (machine != null || node == null) {
+                return null;
             }
             GenericStack output = node.output();
             if (output == null) {
-                return new Tooltip(List.of());
+                return null;
             }
 
-            ItemStack definition = output.what().wrapForDisplayOrFilter();
-            GuiScreen screen = Minecraft.getMinecraft().currentScreen;
-            if (screen == null) {
-                return new Tooltip(List.of());
-            }
-            List<String> itemTooltip;
-            GuiUtils.preItemToolTip(definition);
-            try {
-                itemTooltip = screen.getItemToolTip(definition);
-            } finally {
-                GuiUtils.postItemToolTip();
-            }
-            List<ITextComponent> lines = new ObjectArrayList<>(itemTooltip.size() + 4);
-            for (String line : itemTooltip) {
-                lines.add(new TextComponentString(line));
-            }
-
+            List<ITextComponent> lines = AEKeyRendering.getTooltip(output.what());
+            int keyLines = lines.size();
             lines.add(Tooltips.getAmountTooltip(ButtonToolTips.Amount, output));
             if (missing) {
                 lines.add(new TextComponentString(node.missing() > 0
@@ -1712,7 +1729,13 @@ public class CraftingTreeWidget implements ICompositeWidget {
                 lines.add(new TextComponentString(GuiText.CraftingTreeFolded.getLocal(fold.crafts())));
             }
 
-            return new Tooltip(lines);
+            for (int i = keyLines; i < lines.size(); i++) {
+                ITextComponent line = lines.get(i);
+                if (line.getStyle().getColor() == null) {
+                    line.getStyle().setColor(TextFormatting.GRAY);
+                }
+            }
+            return new KeyTooltip(output.what(), lines);
         }
 
         private ITextComponent formatMachineLocation(CraftingSupplierLocation location) {

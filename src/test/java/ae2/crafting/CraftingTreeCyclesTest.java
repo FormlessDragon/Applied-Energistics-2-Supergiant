@@ -1,12 +1,16 @@
 package ae2.crafting;
 
+import ae2.api.crafting.IPatternDetails;
 import ae2.api.networking.crafting.ICraftingPlan;
+import ae2.api.stacks.AEKey;
+import ae2.api.stacks.KeyCounter;
 import ae2.client.gui.me.crafting.CraftingTreeCycleView;
 import ae2.core.localization.PlayerMessages;
 import ae2.integration.data.CraftingTreeStackRegistry;
 import ae2.integration.data.LiteCraftTreeNode;
 import ae2.integration.data.LiteCraftTreeProc;
 import io.netty.buffer.Unpooled;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static ae2.crafting.CraftingTestNetwork.key;
+import static ae2.crafting.CraftingTestNetwork.names;
 import static ae2.crafting.CraftingTestNetwork.of;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class CraftingTreeCyclesTest {
 
-    private static LiteCraftTreeNode tree(ICraftingPlan plan) throws Exception {
+    static LiteCraftTreeNode tree(ICraftingPlan plan) throws Exception {
         return ((CraftingPlanDisplaySource) plan).requestDisplayTree().get(30, TimeUnit.SECONDS);
     }
 
@@ -44,7 +49,7 @@ class CraftingTreeCyclesTest {
         }
     }
 
-    private static String describe(LiteCraftTreeNode node, String indent) {
+    static String describe(LiteCraftTreeNode node, String indent) {
         var text = new StringBuilder(indent).append(node.output().what()).append(" x").append(node.output().amount());
         if (node.feedback() >= 0) text.append(" fed back ").append(node.feedback());
         text.append('\n');
@@ -81,6 +86,39 @@ class CraftingTreeCyclesTest {
             if (proc.cycle() >= 0) count[0]++;
         });
         return count[0];
+    }
+
+    /**
+     * The crafts of each pattern the tree shows, from how much the crafts take of their first input. A craft can show
+     * one input as several nodes, such as what a cycle feeds back and what comes from storage.
+     */
+    static Object2LongOpenHashMap<IPatternDetails> shownCrafts(LiteCraftTreeNode root) {
+        var crafts = new Object2LongOpenHashMap<IPatternDetails>();
+        walk(root, node -> {
+        }, proc -> {
+            AEKey what = proc.inputs().getFirst().output().what();
+            long taken = 0;
+            for (var input : proc.inputs()) {
+                if (input.output().what().equals(what)) taken += input.output().amount();
+            }
+            long perCraft = 0;
+            for (var patternInput : proc.pattern().getInputs()) {
+                var possible = patternInput.possibleInputs()[0];
+                if (possible.what().equals(what)) {
+                    perCraft += possible.amount() * patternInput.getMultiplier();
+                }
+            }
+            crafts.addTo(proc.pattern(), taken / perCraft);
+        });
+        return crafts;
+    }
+
+    static KeyCounter shownMissing(LiteCraftTreeNode root) {
+        var missing = new KeyCounter();
+        walk(root, node -> missing.add(node.output().what(), node.missing()), proc -> {
+        });
+        missing.removeZeros();
+        return missing;
     }
 
     private static CraftingTestNetwork threeCraftCycle() {
@@ -272,5 +310,34 @@ class CraftingTreeCyclesTest {
         assertTrue(cycle.items().contains(key("p")) && cycle.items().contains(key("q")), cycle.items().toString());
         assertEquals(cycle.items().size() - 1, cycle.patterns().size(), "a pattern between each two items");
         assertEquals(1 + cycle.patterns().size(), cycle.describe().size(), "the cycle, then each pattern");
+    }
+
+    @Test
+    void theTreeOfACycleShowsTheCraftsAndMissingItemsOfThePlan() throws Exception {
+        // One craft each of 4 stone -> 5 bricks and 1 brick -> 2 stone takes more stone than it makes, so the plan is
+        // repaired after the calculation to the crafts that balance; the tree must show those, not one round.
+        for (long[] stock : new long[][]{{0, 0}, {3, 0}, {4, 0}, {0, 10}, {64, 64}}) {
+            var net = new CraftingTestNetwork();
+            net.pattern("stone2brick", of("stone", 4), of("brick", 5));
+            var brick2stone = net.pattern("brick2stone", of("brick", 1), of("stone", 2));
+            if (stock[0] > 0) net.store("stone", stock[0]);
+            if (stock[1] > 0) net.store("brick", stock[1]);
+            String context = stock[0] + " stone and " + stock[1] + " bricks stored";
+
+            var plan = net.plan("stone", 1000);
+            var root = tree(plan);
+
+            assertEquals(new Object2LongOpenHashMap<>(plan.patternTimes()), shownCrafts(root),
+                () -> context + "\n" + describe(root, ""));
+            var missing = shownMissing(root);
+            assertEquals(names(plan.missingItems()), names(missing), () -> context + "\n" + describe(root, ""));
+            assertEquals(0, root.missing(), () -> context + ": a missing seed is taken by the cycle, not the request");
+            long stoneCrafted = 2 * plan.patternTimes().getLong(brick2stone);
+            assertEquals(stoneCrafted - 1000, plan.intermediateFinalOutputAmount(),
+                () -> context + ": the CPU keeps the crafted stone beyond the request for the brick crafts");
+            long stoneTaken = 4 * plan.patternTimes().getLong(net.patterns.getFirst());
+            assertTrue(stoneCrafted + stock[0] + missing.get(key("stone")) >= 1000 + stoneTaken,
+                context);
+        }
     }
 }

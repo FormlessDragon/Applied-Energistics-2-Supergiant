@@ -182,6 +182,16 @@ public class GuiCraftingTree extends AEBaseGui<ContainerCraftingTree> {
     }
 
     @Override
+    protected void renderHoveredToolTip(int mouseX, int mouseY) {
+        super.renderHoveredToolTip(mouseX, mouseY);
+
+        CraftingTreeWidget.KeyTooltip hovered = tree.getHoveredKeyTooltip(mouseX - guiLeft, mouseY - guiTop);
+        if (hovered != null) {
+            drawKeyTooltipWithImages(mouseX, mouseY, hovered.what(), hovered.lines());
+        }
+    }
+
+    @Override
     public void updateScreen() {
         super.updateScreen();
         container.checkClientTransferTimeout();

@@ -24,6 +24,7 @@ import ae2.api.config.SortOrder;
 import ae2.api.config.ViewItems;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.AEKey2LongMap;
 import ae2.client.gui.me.search.RepoSearch;
 import ae2.client.gui.widgets.IScrollSource;
 import ae2.client.gui.widgets.ISortSource;
@@ -44,6 +45,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.item.Item;
 import net.minecraft.item.crafting.Ingredient;
 import org.jetbrains.annotations.Nullable;
@@ -64,6 +66,11 @@ import java.util.Set;
  */
 public class Repo implements IClientRepo {
     private static final int NO_USER_PIN_SLOT = -1;
+    /**
+     * Serials at or below this value belong to client-only entries; the server only hands out positive serials and
+     * uses -1 for "no entry".
+     */
+    private static final long FIRST_FLOW_ONLY_SERIAL = -2;
 
     public static final Comparator<GridInventoryEntry> AMOUNT_ASC = Comparator
         .comparingDouble((GridInventoryEntry entry) -> {
@@ -91,6 +98,8 @@ public class Repo implements IClientRepo {
     private long flowSnapshotId = Long.MIN_VALUE;
     @Nullable
     private FlowPageAssembly flowPages;
+    private final AEKey2LongMap flowOnlySerials = new AEKey2LongMap.OpenHashMap();
+    private long nextFlowOnlySerial = FIRST_FLOW_ONLY_SERIAL;
     /**
      * Entries by item ID to speed up ingredient matching.
      */
@@ -201,6 +210,43 @@ public class Repo implements IClientRepo {
         return null;
     }
 
+    private static void addShownKeys(Set<AEKey> shownKeys, List<GridInventoryEntry> shownEntries) {
+        for (var entry : shownEntries) {
+            if (entry != null && entry.what() != null) {
+                shownKeys.add(entry.what());
+            }
+        }
+    }
+
+    private void addEntriesToView(Collection<GridInventoryEntry> entries) {
+        for (var entry : entries) {
+            if (PinnedKeys.isCraftingPinned(entry.what())) {
+                craftingPinnedEntries.add(entry);
+            }
+        }
+
+        for (var entry : entries) {
+            if (PinnedKeys.isCraftingPinned(entry.what())) {
+                continue;
+            }
+
+            if (PinnedKeys.isPlayerPinned(entry.what())) {
+                if (shouldUsePlayerPinForCurrentView(entry)) {
+                    playerPinnedEntries.add(entry);
+                    continue;
+                }
+            }
+
+            if (passesViewFilters(entry)) {
+                this.view.add(entry);
+            }
+        }
+    }
+
+    private static boolean isFlowOnlyEntry(GridInventoryEntry entry) {
+        return entry.serial() <= FIRST_FLOW_ONLY_SERIAL;
+    }
+
     public final void updateView() {
         // While the view is paused, we try to only append to the view list in order to avoid mis-clicks by the
         // player due to items shifting under their mouse cursor.
@@ -241,6 +287,7 @@ public class Repo implements IClientRepo {
             newEntries.size(entriesToAppend);
 
             addEntriesToView(newEntries);
+            addFlowOnlyEntriesToView();
         } else {
             this.view.clear();
             this.craftingPinnedEntries.clear();
@@ -250,6 +297,7 @@ public class Repo implements IClientRepo {
             this.playerPinnedEntries.ensureCapacity(this.entries.size());
 
             addEntriesToView(this.entries.values());
+            addFlowOnlyEntriesToView();
         }
 
         // Don't re-sort while being paused
@@ -281,25 +329,30 @@ public class Repo implements IClientRepo {
         }
     }
 
-    private void addEntriesToView(Collection<GridInventoryEntry> entries) {
-        for (var entry : entries) {
-            if (PinnedKeys.isCraftingPinned(entry.what())) {
-                craftingPinnedEntries.add(entry);
-            }
+    /**
+     * The server drops keys that are no longer stored, requestable or craftable, but they may still have flow inside
+     * the tracking window. Show those keys in the flowing view as zero-amount entries so their flow can still be
+     * inspected and located. Interactions with them are ignored, see {@link #resolveInteractionEntry}.
+     */
+    private void addFlowOnlyEntriesToView() {
+        if (this.sortSrc.getSortDisplay() != ViewItems.FLOWING || this.flowRates.isEmpty()) {
+            this.flowOnlySerials.clear();
+            return;
         }
+        this.flowOnlySerials.keySet().removeIf(key -> !this.flowRates.containsKey(key));
 
-        for (var entry : entries) {
-            if (PinnedKeys.isCraftingPinned(entry.what())) {
+        var shownKeys = new ObjectOpenHashSet<AEKey>(this.view.size() + this.playerPinnedEntries.size()
+                + this.craftingPinnedEntries.size());
+        addShownKeys(shownKeys, this.view);
+        addShownKeys(shownKeys, this.playerPinnedEntries);
+        addShownKeys(shownKeys, this.craftingPinnedEntries);
+
+        for (var what : this.flowRates.keySet()) {
+            if (this.liveEntriesByKey.containsKey(what) || shownKeys.contains(what)) {
                 continue;
             }
-
-            if (PinnedKeys.isPlayerPinned(entry.what())) {
-                if (shouldUsePlayerPinForCurrentView(entry)) {
-                    playerPinnedEntries.add(entry);
-                    continue;
-                }
-            }
-
+            long serial = this.flowOnlySerials.computeIfAbsent(what, ignored -> this.nextFlowOnlySerial--);
+            var entry = new GridInventoryEntry(serial, what, 0, 0, false);
             if (passesViewFilters(entry)) {
                 this.view.add(entry);
             }
@@ -553,13 +606,14 @@ public class Repo implements IClientRepo {
     /**
      * Maps a displayed (possibly frozen) entry to the live server entry that should be used for extraction.
      * While paused, the visible serial may have been reused; the live table is keyed by {@link AEKey}.
+     * Flow-only entries are unknown to the server and resolve the same way.
      */
     @Nullable
     public final GridInventoryEntry resolveInteractionEntry(@Nullable GridInventoryEntry displayed) {
         if (displayed == null || displayed.what() == null) {
             return displayed;
         }
-        if (!isPaused()) {
+        if (!isPaused() && !isFlowOnlyEntry(displayed)) {
             return displayed;
         }
 

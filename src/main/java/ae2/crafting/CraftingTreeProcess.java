@@ -734,15 +734,19 @@ public class CraftingTreeProcess {
     }
 
     void accumulateNet(KeyCounter netByKey) {
+        accumulateNet(netByKey, 1);
+    }
+
+    void accumulateNet(KeyCounter netByKey, long times) {
         for (int i = 0, size = this.outputs.size(); i < size; i++) {
             var output = this.outputs.get(i);
-            netByKey.add(output.what(), output.amount());
+            netByKey.add(output.what(), LongMath.saturatedMultiply(output.amount(), times));
         }
         for (int slot = 0; slot < this.slotNodes.length; slot++) {
             var node = this.slotNodes[slot];
             netByKey.add(node.getWhat(),
                 LongMath.saturatedSubtract(0, LongMath.saturatedMultiply(node.getTemplateAmount(),
-                    this.inputs[slot].getMultiplier())));
+                    LongMath.saturatedMultiply(this.inputs[slot].getMultiplier(), times))));
         }
     }
 
@@ -773,6 +777,14 @@ public class CraftingTreeProcess {
 
     public IPatternDetails getDetails() {
         return this.details;
+    }
+
+    /**
+     * The key of the node this process crafts for, or null if it has none.
+     */
+    @Nullable
+    AEKey getRequestedKey() {
+        return this.parent == null ? null : this.parent.getWhat();
     }
 
     public List<PatternContainerGroup> getMachineGroups() {

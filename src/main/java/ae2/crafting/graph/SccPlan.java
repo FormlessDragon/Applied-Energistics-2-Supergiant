@@ -29,6 +29,8 @@ public final class SccPlan {
 
     private final int componentId;
     private final boolean local;
+    private final boolean ring;
+    private final Reference2LongMap<CraftingGraphNode> takenByCycle;
     private final List<CraftingGraphNode> nodes;
     private final Reference2LongMap<CraftingGraphNode> craftTimes;
     private final Reference2LongMap<CraftingGraphNode> plannedOutput;
@@ -39,8 +41,18 @@ public final class SccPlan {
                     Reference2LongMap<CraftingGraphNode> craftTimes,
                     Reference2LongMap<CraftingGraphNode> plannedOutput,
                     Reference2ObjectMap<CraftingGraphEdge, SeedLedger> seeds, KeyCounter boundaryDemands) {
+        this(componentId, local, false, nodes, craftTimes, plannedOutput, seeds, boundaryDemands, emptyLongMap());
+    }
+
+    private SccPlan(int componentId, boolean local, boolean ring, List<CraftingGraphNode> nodes,
+                    Reference2LongMap<CraftingGraphNode> craftTimes,
+                    Reference2LongMap<CraftingGraphNode> plannedOutput,
+                    Reference2ObjectMap<CraftingGraphEdge, SeedLedger> seeds, KeyCounter boundaryDemands,
+                    Reference2LongMap<CraftingGraphNode> takenByCycle) {
         this.componentId = componentId;
         this.local = local;
+        this.ring = ring;
+        this.takenByCycle = Reference2LongMaps.unmodifiable(takenByCycle);
         // The node list is always the frozen component list from the topology; wrapping avoids a redundant copy.
         this.nodes = Collections.unmodifiableList(nodes);
         this.craftTimes = Reference2LongMaps.unmodifiable(craftTimes);
@@ -56,6 +68,20 @@ public final class SccPlan {
                                      Reference2LongMap<CraftingGraphNode> plannedOutput,
                                      Reference2ObjectMap<CraftingGraphEdge, SeedLedger> seeds) {
         return new SccPlan(componentId, false, nodes, craftTimes, plannedOutput, seeds, new KeyCounter());
+    }
+
+    /**
+     * A ring planned natively, see DemandPropagation#solveRing.
+     *
+     * @param takenByCycle of each node, how much of its output a node of the ring applied before it takes
+     */
+    public static SccPlan ringPlan(int componentId, List<CraftingGraphNode> nodes,
+                                   Reference2LongMap<CraftingGraphNode> craftTimes,
+                                   Reference2LongMap<CraftingGraphNode> plannedOutput,
+                                   Reference2ObjectMap<CraftingGraphEdge, SeedLedger> seeds,
+                                   Reference2LongMap<CraftingGraphNode> takenByCycle) {
+        return new SccPlan(componentId, false, true, nodes, craftTimes, plannedOutput, seeds, new KeyCounter(),
+            takenByCycle);
     }
 
     public static SccPlan localPlan(int componentId, List<CraftingGraphNode> nodes,
@@ -101,6 +127,17 @@ public final class SccPlan {
 
     public boolean local() {
         return local;
+    }
+
+    public boolean ring() {
+        return ring;
+    }
+
+    /**
+     * For a ring, how much of the node's output is taken back by the ring before it leaves the craft.
+     */
+    public long takenByCycle(CraftingGraphNode node) {
+        return takenByCycle.getLong(node);
     }
 
     public List<CraftingGraphNode> nodes() {

@@ -256,10 +256,11 @@ public final class CraftingGraphDisplayTreeConverter {
             if (node.localDisplay() != null) {
                 appendLocalProcesses(node.localDisplay(), processes, node.inputs(), node.craftTimes(), snapshot, path,
                     materializedProcesses, missingAllocator);
-                if (processes.isEmpty()) appendGraphProcess(node, processes, snapshot, path, materializedProcesses,
-                    missingAllocator);
+                if (processes.isEmpty()) appendGraphProcess(node, nodeIndex, processes, snapshot, path,
+                    materializedProcesses, missingAllocator);
             } else {
-                appendGraphProcess(node, processes, snapshot, path, materializedProcesses, missingAllocator);
+                appendGraphProcess(node, nodeIndex, processes, snapshot, path, materializedProcesses,
+                    missingAllocator);
             }
             if (processes.isEmpty() && node.external() > 0) {
                 var terminal = new ObjectArrayList<LiteCraftTreeNode>(1);
@@ -279,13 +280,13 @@ public final class CraftingGraphDisplayTreeConverter {
         }
     }
 
-    private static void appendGraphProcess(CraftingGraphDisplaySnapshot.Node node,
+    private static void appendGraphProcess(CraftingGraphDisplaySnapshot.Node node, int nodeIndex,
                                            List<LiteCraftTreeProc> processes,
                                            CraftingGraphDisplaySnapshot snapshot,
                                            BitSet path, BitSet materialized, MissingAllocator missingAllocator) {
         var children = new ObjectArrayList<LiteCraftTreeNode>(node.inputs().size());
         var process = new LiteCraftTreeProc(children, node.machines(), node.machineLocations(), node.pattern(), -1);
-        appendEdges(node.inputs(), node.craftTimes(), children, process, snapshot, path, materialized,
+        appendEdges(node.inputs(), nodeIndex, node.craftTimes(), children, process, snapshot, path, materialized,
             missingAllocator);
         if (!children.isEmpty()) processes.add(process);
     }
@@ -308,7 +309,8 @@ public final class CraftingGraphDisplayTreeConverter {
         if (snapshot != null) {
             var children = new ObjectArrayList<LiteCraftTreeNode>();
             var boundaryProcess = new LiteCraftTreeProc(children, List.of(), Map.of());
-            appendEdges(edges, craftTimes, children, boundaryProcess, snapshot, path, materialized, missingAllocator);
+            appendEdges(edges, -1, craftTimes, children, boundaryProcess, snapshot, path, materialized,
+                missingAllocator);
             if (!children.isEmpty()) {
                 processes.add(boundaryProcess);
             }
@@ -323,7 +325,10 @@ public final class CraftingGraphDisplayTreeConverter {
             missingAllocator.allocate(fragment.output(), fragment.missing()));
     }
 
-    private static void appendEdges(List<CraftingGraphDisplaySnapshot.Edge> edges, long craftTimes,
+    /**
+     * @param nodeIndex the node taking the edges, or -1 for the boundary of a local unit
+     */
+    private static void appendEdges(List<CraftingGraphDisplaySnapshot.Edge> edges, int nodeIndex, long craftTimes,
                                     List<LiteCraftTreeNode> children, LiteCraftTreeProc process,
                                     CraftingGraphDisplaySnapshot snapshot, BitSet path, BitSet materialized,
                                     MissingAllocator missingAllocator) {
@@ -334,8 +339,14 @@ public final class CraftingGraphDisplayTreeConverter {
             }
             if (isFeedback(edge) && craftTimes > 0) {
                 long fedBack = LongMath.saturatedMultiply(edge.amountPerCraft(), craftTimes);
-                children.add(new LiteCraftTreeNode(process, new GenericStack(edge.inputKey(), fedBack), List.of(), 0,
-                    LiteCraftTreeNode.FEEDBACK_PENDING));
+                if (edge.producerIndex() != nodeIndex) {
+                    // Around a ring, what comes from storage or is missing is shown as such below, not fed back
+                    fedBack = Math.max(0, fedBack - edge.seedRequired());
+                }
+                if (fedBack > 0) {
+                    children.add(new LiteCraftTreeNode(process, new GenericStack(edge.inputKey(), fedBack), List.of(),
+                        0, LiteCraftTreeNode.FEEDBACK_PENDING));
+                }
             }
             long terminalAmount = edge.extractedExternal() + edge.missing();
             if (terminalAmount > 0) {

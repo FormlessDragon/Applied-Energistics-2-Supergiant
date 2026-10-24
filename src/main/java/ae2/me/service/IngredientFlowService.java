@@ -11,6 +11,7 @@ import ae2.api.stacks.AEKey;
 import ae2.api.util.DimensionalBlockPos;
 import ae2.api.util.FlowSearchDTO;
 import ae2.core.AEConfig;
+import ae2.me.InWorldGridNode;
 import ae2.parts.AEBasePart;
 import ae2.util.JsonStreamUtil;
 import com.google.gson.stream.JsonWriter;
@@ -20,7 +21,6 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.entity.Entity;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.math.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
@@ -160,6 +160,24 @@ public class IngredientFlowService implements IGridService, IGridServiceProvider
         this.flowRevision++;
     }
 
+    @Nullable
+    private static DimensionalBlockPos resolveHostLocation(@Nullable Object owner) {
+        if (owner instanceof TileEntity tile) {
+            return new DimensionalBlockPos(tile);
+        }
+        if (owner instanceof IPartHost partHost) {
+            return partHost.getLocation();
+        }
+        if (owner instanceof IPart part && part instanceof AEBasePart basePart
+            && basePart.getHost() != null) {
+            return basePart.getHost().getLocation();
+        }
+        if (owner instanceof Entity entity) {
+            return new DimensionalBlockPos(entity.world, entity.getPosition());
+        }
+        return null;
+    }
+
     private DimensionalBlockPos resolveLocation(IActionSource src) {
         if (src.machine().isEmpty()) {
             return null;
@@ -171,26 +189,19 @@ public class IngredientFlowService implements IGridService, IGridServiceProvider
             return null;
         }
 
-        BlockPos blockPos = resolveBlockPos(owner);
-        if (blockPos == null) {
-            return null;
+        DimensionalBlockPos location = resolveHostLocation(owner);
+        if (location != null) {
+            return location;
         }
-        return new DimensionalBlockPos(node.getLevel(), blockPos);
-    }
 
-    private BlockPos resolveBlockPos(Object owner) {
-        if (owner instanceof TileEntity tile) {
-            return tile.getPos();
+        // Hosts such as ME interfaces (mainNode::getNode) or wireless terminals are not placed in the world
+        // themselves, so fall back to whatever owns the node they act through.
+        location = resolveHostLocation(node.getOwner());
+        if (location != null) {
+            return location;
         }
-        if (owner instanceof IPartHost partHost) {
-            return partHost.getLocation().getPos();
-        }
-        if (owner instanceof IPart part && part instanceof AEBasePart basePart
-            && basePart.getHost() != null) {
-            return basePart.getHost().getLocation().getPos();
-        }
-        if (owner instanceof Entity entity) {
-            return entity.getPosition();
+        if (node instanceof InWorldGridNode inWorldNode && inWorldNode.getLocation() != null) {
+            return new DimensionalBlockPos(node.getLevel(), inWorldNode.getLocation());
         }
         return null;
     }

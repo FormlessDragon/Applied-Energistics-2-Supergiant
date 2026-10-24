@@ -6,19 +6,26 @@ import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.crafting.CraftingTreeNode;
 import ae2.crafting.CraftingTreeProcess;
+import com.google.common.math.LongMath;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import net.minecraft.network.PacketBuffer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.RandomAccess;
+import java.util.Set;
 
 public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
     /**
@@ -62,8 +69,11 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
 
     public static LiteCraftTreeNode of(final CraftingTreeNode node, final LiteCraftTreeProc parent, long amount,
                                        PatternTimesAllocator patternTimesAllocator) {
-        return of(node, parent, amount, node.getMissing(), patternTimesAllocator,
-            new LiteCraftTreeProc.MissingAllocator());
+        var missingAllocator = patternTimesAllocator.missingAllocator();
+        var built = of(node, parent, amount, 0, patternTimesAllocator, missingAllocator);
+        // A missing seed of a cycle below shows where the cycle takes it; only the rest is missing here
+        long missing = missingAllocator.allocate(node, amount);
+        return missing == 0 ? built : new LiteCraftTreeNode(parent, built.output(), built.inputs(), missing);
     }
 
     public static LiteCraftTreeNode of(final CraftingTreeNode node, final LiteCraftTreeProc parent, long amount,
@@ -316,26 +326,65 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
         this.missingCache = true;
     }
 
+    /**
+     * Holds the crafts shown in the tree to those of the plan. A plan repaired after the calculation, see
+     * CraftingPlanCompactor, can have more crafts than the tree requested, typically around a cycle the tree only made
+     * one round of; {@link #withUnshownCrafts} gives an allocator showing those crafts too.
+     */
     public static final class PatternTimesAllocator {
+        private final Object2LongMap<IPatternDetails> patternTimes;
+        private final KeyCounter usedItems;
+        private final KeyCounter missingItems;
         private final Object2LongOpenHashMap<IPatternDetails> remainingTimes = new Object2LongOpenHashMap<>();
         private final AEKey2LongMap remainingSelfReturningInputs = new AEKey2LongMap.OpenHashMap();
+        private final Reference2LongOpenHashMap<CraftingTreeProcess> extraTimes;
+        private final Object2LongOpenHashMap<IPatternDetails> shownTimes = new Object2LongOpenHashMap<>();
+        private final Map<IPatternDetails, CraftingTreeProcess> extraTargets = new HashMap<>();
+        private final Set<IPatternDetails> cycleTargets = new HashSet<>();
 
-        private PatternTimesAllocator(Object2LongMap<IPatternDetails> patternTimes) {
+        public PatternTimesAllocator(Object2LongMap<IPatternDetails> patternTimes, KeyCounter usedItems,
+                                     KeyCounter missingItems) {
+            this(patternTimes, usedItems, missingItems, new Reference2LongOpenHashMap<>());
+        }
+
+        private PatternTimesAllocator(Object2LongMap<IPatternDetails> patternTimes, KeyCounter usedItems,
+                                      KeyCounter missingItems, Reference2LongOpenHashMap<CraftingTreeProcess> extraTimes) {
+            this.patternTimes = patternTimes;
+            this.usedItems = usedItems;
+            this.missingItems = missingItems;
+            this.extraTimes = extraTimes;
             remainingTimes.defaultReturnValue(0);
             remainingSelfReturningInputs.defaultReturnValue(0);
             for (Object2LongMap.Entry<IPatternDetails> entry : patternTimes.object2LongEntrySet()) {
                 remainingTimes.put(entry.getKey(), entry.getLongValue());
             }
-        }
-
-        public PatternTimesAllocator(Object2LongMap<IPatternDetails> patternTimes, KeyCounter usedItems,
-                                     KeyCounter missingItems) {
-            this(patternTimes);
             usedItems.forEach(remainingSelfReturningInputs::addTo);
             missingItems.forEach(remainingSelfReturningInputs::addTo);
         }
 
-        long allocate(CraftingTreeProcess process) {
+        /**
+         * How often the tree shows the process crafting.
+         *
+         * @param inCycle whether the process makes an item requested again further up, see
+         *                CraftingTreeNode#getRecursiveDisplayAmount. It shows the crafts requested for what the cycle
+         *                feeds back rather than taking them from the plan's.
+         */
+        long times(CraftingTreeProcess process, boolean inCycle) {
+            long times = inCycle ? process.getTreeRequestTimes() : allocate(process);
+            times = LongMath.saturatedAdd(times, extraTimes.getLong(process));
+            if (times > 0) {
+                IPatternDetails details = process.getDetails();
+                shownTimes.addTo(details, times);
+                // Unshown crafts go to the last process of the pattern, preferring one in a cycle
+                if (inCycle || !cycleTargets.contains(details)) {
+                    extraTargets.put(details, process);
+                    if (inCycle) cycleTargets.add(details);
+                }
+            }
+            return times;
+        }
+
+        private long allocate(CraftingTreeProcess process) {
             long requestTimes = process.getTreeRequestTimes();
             if (requestTimes <= 0) {
                 return 0;
@@ -350,6 +399,33 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
             long allocated = Math.min(requestTimes, remaining);
             remainingTimes.addTo(details, -allocated);
             return allocated;
+        }
+
+        /**
+         * Shares out the missing items of the plan, which a repair may have changed from those of the calculation.
+         */
+        LiteCraftTreeProc.MissingAllocator missingAllocator() {
+            return new LiteCraftTreeProc.MissingAllocator(missingItems);
+        }
+
+        /**
+         * After a tree was built with this allocator, returns one for building it again that also shows the crafts of
+         * the plan the tree did not, or null if it showed them all.
+         */
+        public @Nullable PatternTimesAllocator withUnshownCrafts() {
+            var extra = new Reference2LongOpenHashMap<CraftingTreeProcess>();
+            for (Object2LongMap.Entry<IPatternDetails> entry : patternTimes.object2LongEntrySet()) {
+                long unshown = entry.getLongValue() - shownTimes.getLong(entry.getKey());
+                var target = extraTargets.get(entry.getKey());
+                if (unshown > 0 && target != null) {
+                    extra.put(target, LongMath.saturatedAdd(extraTimes.getLong(target), unshown));
+                }
+            }
+            if (extra.isEmpty()) {
+                return null;
+            }
+            extraTimes.forEach(extra::putIfAbsent);
+            return new PatternTimesAllocator(patternTimes, usedItems, missingItems, extra);
         }
 
         long allocateSelfReturningInput(CraftingTreeNode node, long amount) {

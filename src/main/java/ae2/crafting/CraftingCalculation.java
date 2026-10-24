@@ -73,6 +73,8 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.management.ManagementFactory;
+import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -94,6 +96,11 @@ public class CraftingCalculation {
      * {@link #LEGACY_FALLBACK_STEPS}.
      */
     private static final int LEGACY_STEPS_PER_NODE = 32;
+    /**
+     * How many root crafts of a cycle are tried before falling back to the batch in which every craft divides evenly,
+     * see {@link #getCycleBatchRuns}.
+     */
+    private static final long MAX_CYCLE_BATCH_SEARCH = 1024;
 
     final ICraftingSimulationRequester simRequester;
     private final ICraftingService craftingService;
@@ -861,17 +868,13 @@ public class CraftingCalculation {
                 }
             }
         }
-        if (graph.getTopology().isCondensed()) {
-            for (var component : graph.getTopology().getComponents()) {
-                if (component.cyclic() && component.nodes().size() > 1) {
-                    graph.requireLegacyFallback();
-                    try {
-                        return runCraftAttempt(productionAmount, productionAmount);
-                    } finally {
-                        if (service != null) {
-                            service.putCachedGraph(this.output, graph);
-                        }
-                    }
+        if (hasUnsolvableCycle(graph)) {
+            graph.requireLegacyFallback();
+            try {
+                return runCraftAttempt(productionAmount, productionAmount);
+            } finally {
+                if (service != null) {
+                    service.putCachedGraph(this.output, graph);
                 }
             }
         }
@@ -911,13 +914,19 @@ public class CraftingCalculation {
     }
 
     private static boolean needsLegacyTree(CraftingGraph graph) {
-        if (graph.requiresLegacyFallback()) {
-            return true;
-        }
+        return graph.requiresLegacyFallback() || hasUnsolvableCycle(graph);
+    }
+
+    /**
+     * Whether a cycle of several patterns is more than a ring the graph plans natively, see
+     * DemandPropagation#ringEdges.
+     */
+    private static boolean hasUnsolvableCycle(CraftingGraph graph) {
         var topology = graph.getTopology();
         if (topology.isCondensed()) {
             for (var component : topology.getComponents()) {
-                if (component.cyclic() && component.nodes().size() > 1) {
+                if (component.cyclic() && component.nodes().size() > 1
+                    && DemandPropagation.ringEdges(topology, component) == null) {
                     return true;
                 }
             }
@@ -1249,7 +1258,11 @@ public class CraftingCalculation {
     }
 
     public boolean cycleHasNetOutput(AEKey what) {
-        return getCycleNetOutput(what) > 0;
+        if (getCycleNetOutput(what) > 0) {
+            return true;
+        }
+        int requestIndex = findRecursiveRequestIndex(what);
+        return requestIndex >= 0 && getCycleBatchRuns(what, requestIndex) != null;
     }
 
     long getCycleNetOutput(AEKey what) {
@@ -1370,9 +1383,96 @@ public class CraftingCalculation {
         }
 
         var frozenKey = this.recursiveNetLookup.freeze(this.recursiveNetKeyPool);
-        var computed = computeRecursiveNet(frozenKey);
+        var computed = computeRecursiveNet(frozenKey, null);
+        if (!computed.canResolve() && computed.netByKey().get(what) < 0) {
+            // The batch only depends on the processes, which the cache key holds.
+            long[] runs = getCycleBatchRuns(what, requestIndex);
+            if (runs != null && runs[0] > 1) {
+                computed = computeRecursiveNet(frozenKey, runs);
+            }
+        }
         this.recursiveNetCache.put(frozenKey, computed);
         return computed;
+    }
+
+    /**
+     * One craft of each process around a cycle can take more of the requested key than it makes although the cycle
+     * multiplies it: with 4 stone -> 5 bricks and 1 brick -> 2 stone, one craft each takes 4 stone to make 2. Crafting
+     * in the ratio the processes feed each other shows the gain: 5 brick crafts make 10 stone from the 5 bricks that
+     * one stone craft makes from 4 stone.
+     * <p/>
+     * Returns how often each process from {@code requestIndex} up the process stack runs in the smallest batch, by root
+     * crafts, that makes at least as much of {@code what} as it takes, or null if the cycle can never net produce it.
+     */
+    @Nullable
+    private long[] getCycleBatchRuns(AEKey what, int requestIndex) {
+        int count = this.processStack.size() - requestIndex;
+        if (count <= 0 || !what.equals(this.processStack.get(requestIndex).getRequestedKey())) {
+            return null;
+        }
+
+        // Process i crafts for its node from what process i + 1 crafts; the last one takes what itself. The keys come
+        // from the processes: not every request in between is on the request stack.
+        long[] made = new long[count];
+        long[] taken = new long[count];
+        var madeProduct = BigInteger.ONE;
+        var takenProduct = BigInteger.ONE;
+        for (int i = 0; i < count; i++) {
+            var process = this.processStack.get(requestIndex + i);
+            var input = i + 1 < count ? this.processStack.get(requestIndex + i + 1).getRequestedKey() : what;
+            var output = process.getRequestedKey();
+            if (input == null || output == null) {
+                return null;
+            }
+            made[i] = process.getOutputCount(output);
+            taken[i] = process.getInputCount(input);
+            if (made[i] <= 0 || taken[i] <= 0) {
+                return null;
+            }
+            madeProduct = madeProduct.multiply(BigInteger.valueOf(made[i]));
+            takenProduct = takenProduct.multiply(BigInteger.valueOf(taken[i]));
+        }
+        if (madeProduct.compareTo(takenProduct) <= 0) {
+            return null;
+        }
+
+        // With this many root crafts every process divides evenly into the next, so the gain is exact.
+        long evenRootRuns = 1;
+        for (int i = 1; i < count; i++) {
+            evenRootRuns = LongMath.saturatedMultiply(evenRootRuns, made[i]);
+        }
+        long[] runs = new long[count];
+        long searched = Math.min(evenRootRuns, MAX_CYCLE_BATCH_SEARCH);
+        for (long rootRuns = 1; rootRuns <= searched; rootRuns++) {
+            if (fillCycleBatchRuns(what, requestIndex, made, taken, rootRuns, runs)) {
+                return runs;
+            }
+        }
+        if (evenRootRuns > searched && evenRootRuns < Long.MAX_VALUE
+            && fillCycleBatchRuns(what, requestIndex, made, taken, evenRootRuns, runs)) {
+            return runs;
+        }
+        return null;
+    }
+
+    private boolean fillCycleBatchRuns(AEKey what, int requestIndex, long[] made, long[] taken, long rootRuns,
+                                       long[] runs) {
+        runs[0] = rootRuns;
+        for (int i = 1; i < runs.length; i++) {
+            long needed = LongMath.saturatedMultiply(runs[i - 1], taken[i - 1]);
+            runs[i] = LongMath.divide(needed, made[i], RoundingMode.CEILING);
+        }
+
+        long net = 0;
+        for (int i = 0; i < runs.length; i++) {
+            if (runs[i] == Long.MAX_VALUE) {
+                return false;
+            }
+            var process = this.processStack.get(requestIndex + i);
+            net = LongMath.saturatedAdd(net, LongMath.saturatedMultiply(runs[i], process.getOutputCount(what)));
+            net = LongMath.saturatedSubtract(net, LongMath.saturatedMultiply(runs[i], process.getInputCount(what)));
+        }
+        return net >= 0;
     }
 
     private int getProcessSuffixHash(int offset, int length) {
@@ -1390,14 +1490,17 @@ public class CraftingCalculation {
         return -1;
     }
 
-    private RecursiveNet computeRecursiveNet(RecursiveNetKey key) {
+    /**
+     * @param runs how often each process runs, see {@link #getCycleBatchRuns}, or null for once each
+     */
+    private RecursiveNet computeRecursiveNet(RecursiveNetKey key, @Nullable long[] runs) {
         recordPerformanceCount("recursive-net-analysis", 1);
         var netByKey = new KeyCounter();
         var inputKeys = new ObjectOpenHashSet<AEKey>();
         var includedPatterns = new ObjectOpenHashSet<IPatternDetails>();
         for (int i = 0; i < key.processCount(); i++) {
             var process = key.processAt(i);
-            process.accumulateNet(netByKey);
+            process.accumulateNet(netByKey, runs == null ? 1 : runs[i]);
             process.accumulateInputKeys(inputKeys);
             includedPatterns.add(process.details);
         }
@@ -1733,6 +1836,32 @@ public class CraftingCalculation {
      */
     private @Nullable CraftingPlan planGraph(CraftingGraph graph, long productionAmount,
                                              long graphCalculationStart) throws InterruptedException {
+        var plan = planGraphOnce(graph, productionAmount, graphCalculationStart);
+        if (plan == null || !hasNativeRing(graph)) {
+            return plan;
+        }
+        // The CPU runs any craft whose inputs are there, so crafts outside a ring taking what it cycles can starve it
+        // although the plan balances. Such a plan would be repaired after the calculation, leaving the graph's crafting
+        // tree behind; the legacy tree plans it instead. The graph itself is kept for other amounts.
+        if (!CraftingCpuReplay.runs(plan, this)) {
+            return null;
+        }
+        this.plansKnownToRun.add(plan);
+        return plan;
+    }
+
+    private static boolean hasNativeRing(CraftingGraph graph) {
+        var topology = graph.getTopology();
+        if (!topology.isCondensed()) return false;
+        for (var component : topology.getComponents()) {
+            var sccPlan = component.cyclic() ? graph.getSccPlan(component.id()) : null;
+            if (sccPlan != null && sccPlan.ring()) return true;
+        }
+        return false;
+    }
+
+    private @Nullable CraftingPlan planGraphOnce(CraftingGraph graph, long productionAmount,
+                                                 long graphCalculationStart) throws InterruptedException {
         recordPerformanceCount("graphNodes", graph.getNodeCount());
         recordPerformanceCount("graphEdges", graph.getEdgeCount());
         long sccUnits = 0;
@@ -2319,6 +2448,20 @@ public class CraftingCalculation {
 
     public long getIntermediateFinalOutputAmount() {
         return intermediateFinalOutputAmount;
+    }
+
+    /**
+     * How much of a crafting graph's crafted final output its crafts take back.
+     */
+    public void addGraphIntermediateFinalOutput(long amount) {
+        addIntermediateFinalOutput(amount);
+    }
+
+    /**
+     * How much of each recursive ingredient taken from storage the plan should leave there, in crafts of what takes it.
+     */
+    public long getRecursiveIngredientReserveAmount() {
+        return this.recursiveIngredientReserveAmount;
     }
 
     void addIntermediateFinalOutput(long amount) {

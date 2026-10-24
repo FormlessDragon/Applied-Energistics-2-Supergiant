@@ -34,6 +34,7 @@ public final class CraftingPlanDisplay {
         }
     }
 
+    @SuppressWarnings("unused")
     private volatile @Nullable CompletableFuture<LiteCraftTreeNode> tree;
 
     private final GenericStack output;
@@ -117,8 +118,14 @@ public final class CraftingPlanDisplay {
                     hydrateMachineInfo(builder.build()), output.amount(), missingItems));
             }
             if (legacyTree != null) {
-                return CraftingTreeCycles.annotate(LiteCraftTreeNode.of(legacyTree, null, output.amount(),
-                    new LiteCraftTreeNode.PatternTimesAllocator(patternTimes, usedItems, missingItems)));
+                var allocator = new LiteCraftTreeNode.PatternTimesAllocator(patternTimes, usedItems, missingItems);
+                var root = LiteCraftTreeNode.of(legacyTree, null, output.amount(), allocator);
+                // A repaired plan can craft more than the tree requested, see CraftingPlan#withContents
+                var withUnshown = allocator.withUnshownCrafts();
+                if (withUnshown != null) {
+                    root = LiteCraftTreeNode.of(legacyTree, null, output.amount(), withUnshown);
+                }
+                return CraftingTreeCycles.annotate(root);
             }
             throw new IllegalStateException("Crafting plan has no display source");
         } finally {

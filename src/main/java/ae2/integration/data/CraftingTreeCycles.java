@@ -45,9 +45,20 @@ public final class CraftingTreeCycles {
     private void visit(LiteCraftTreeNode node) {
         for (var proc : node.inputs()) {
             this.above.add(proc);
+            Set<AEKey> fedBack = null;
             for (var input : proc.inputs()) {
                 if (input.feedback() == LiteCraftTreeNode.FEEDBACK_PENDING) {
                     this.pending = true;
+                    if (fedBack == null) fedBack = new ObjectOpenHashSet<>();
+                    fedBack.add(input.output().what());
+                }
+            }
+            for (var input : proc.inputs()) {
+                // Beside what is marked fed back, the same item is what the craft takes from storage
+                if (fedBack != null && input.inputs().isEmpty()
+                    && input.feedback() != LiteCraftTreeNode.FEEDBACK_PENDING
+                    && fedBack.contains(input.output().what())) {
+                    continue;
                 }
                 if (input.inputs().isEmpty()) {
                     link(input);

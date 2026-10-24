@@ -1,13 +1,17 @@
 package ae2.me.service;
 
+import ae2.api.networking.IGridNode;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.util.DimensionalBlockPos;
 import ae2.core.AEConfig;
+import ae2.me.helpers.MachineSource;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldProviderSurface;
 import net.minecraft.world.WorldServer;
@@ -15,8 +19,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
+import java.lang.reflect.Proxy;
 import java.util.Deque;
 import java.util.Map;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -77,17 +83,22 @@ class IngredientFlowSnapshotTest {
         ((Map<DimensionalBlockPos, Object>) locations.get(accumulator)).put(location, flow);
     }
 
-    @Test
-    void locationTotalsFilterZeroAndDoNotReuseBucketValues() throws Exception {
-        Bootstrap.register();
+    private static WorldServer createWorld(int dimension) throws Exception {
         var unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
         unsafeField.setAccessible(true);
-        var world = (World) ((Unsafe) unsafeField.get(null)).allocateInstance(WorldServer.class);
+        var world = (WorldServer) ((Unsafe) unsafeField.get(null)).allocateInstance(WorldServer.class);
         var provider = new WorldProviderSurface();
-        provider.setDimension(7);
+        provider.setDimension(dimension);
         var providerField = World.class.getDeclaredField("provider");
         providerField.setAccessible(true);
         providerField.set(world, provider);
+        return world;
+    }
+
+    @Test
+    void locationTotalsFilterZeroAndDoNotReuseBucketValues() throws Exception {
+        Bootstrap.register();
+        var world = createWorld(7);
         var firstLocation = new DimensionalBlockPos(world, 1, 0, 0);
         var secondLocation = new DimensionalBlockPos(world, 2, 0, 0);
         var zeroLocation = new DimensionalBlockPos(world, 3, 0, 0);
@@ -103,8 +114,8 @@ class IngredientFlowSnapshotTest {
 
         var result = service.getRecentFlow(key);
         assertEquals(2, result.size());
-        var first = result.stream().filter(flow -> flow.location.equals(firstLocation)).findFirst().orElseThrow();
-        var second = result.stream().filter(flow -> flow.location.equals(secondLocation)).findFirst().orElseThrow();
+        var first = result.stream().filter(flow -> Objects.equals(flow.location, firstLocation)).findFirst().orElseThrow();
+        var second = result.stream().filter(flow -> Objects.equals(flow.location, secondLocation)).findFirst().orElseThrow();
         assertEquals(7, first.dimension);
         assertEquals(firstLocation.getPos(), first.position);
         assertEquals(7, second.dimension);
@@ -116,7 +127,7 @@ class IngredientFlowSnapshotTest {
 
         first.in = 100;
         assertEquals(9, service.getRecentFlow(key).stream()
-                               .filter(flow -> flow.location.equals(firstLocation)).findFirst().orElseThrow().in);
+                               .filter(flow -> Objects.equals(flow.location, firstLocation)).findFirst().orElseThrow().in);
         assertTrue(service.getRecentFlow(AEItemKey.of(new ItemStack(Items.STICK))).isEmpty());
     }
 
@@ -192,5 +203,37 @@ class IngredientFlowSnapshotTest {
         assertEquals(24, before.get(key).rightLong());
         service.onServerEndTick();
         assertSame(after, service.getAllRecentFlow());
+    }
+
+    @Test
+    void sourceActingThroughNodeResolvesTheNodeOwnerLocation() throws Exception {
+        boolean previousEnabled = AEConfig.GENERAL.enableIngredientFlowTracking;
+        AEConfig.GENERAL.enableIngredientFlowTracking = true;
+        try {
+            var world = createWorld(3);
+            var tile = new TileEntity() {
+            };
+            tile.setWorld(world);
+            tile.setPos(new BlockPos(4, 5, 6));
+            // Mirrors ME interfaces, whose action host is just mainNode::getNode.
+            var node = (IGridNode) Proxy.newProxyInstance(IGridNode.class.getClassLoader(),
+                    new Class<?>[]{IGridNode.class}, (proxy, method, args) -> switch (method.getName()) {
+                        case "getOwner" -> tile;
+                        case "getLevel" -> world;
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    });
+            var key = AEItemKey.of(Items.APPLE);
+            var service = new IngredientFlowService();
+            service.setTrackingEnabled(true);
+            service.recordFlow(key, 5, new MachineSource(() -> node));
+
+            var result = service.getRecentFlow(key);
+            assertEquals(1, result.size());
+            assertEquals(3, result.getFirst().dimension);
+            assertEquals(new BlockPos(4, 5, 6), result.getFirst().position);
+            assertEquals(5, result.getFirst().in);
+        } finally {
+            AEConfig.GENERAL.enableIngredientFlowTracking = previousEnabled;
+        }
     }
 }
