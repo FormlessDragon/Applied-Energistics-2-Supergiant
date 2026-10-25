@@ -255,6 +255,15 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         return new Rectangle(this.verticalToolbar.getBounds());
     }
 
+    protected final int getLeftToolbarMinimumHeight() {
+        int toolbarHeight = this.verticalToolbar.getMinimumHeight();
+        if (toolbarHeight == 0 || this.style == null
+            || this.widgets.getComposite("verticalToolbar") != this.verticalToolbar) {
+            return 0;
+        }
+        return this.style.getWidget("verticalToolbar").resolve(getBounds(false)).y() + toolbarHeight;
+    }
+
     public void setInitialFocus(GuiTextField textField) {
         textField.setFocused(true);
     }
