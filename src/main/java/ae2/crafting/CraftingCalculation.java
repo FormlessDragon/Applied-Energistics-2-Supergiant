@@ -19,8 +19,8 @@
 package ae2.crafting;
 
 import ae2.api.config.Actionable;
-import ae2.api.crafting.IPatternDetails;
 import ae2.api.crafting.IAssemblerPattern;
+import ae2.api.crafting.IPatternDetails;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.crafting.CalculationStrategy;
 import ae2.api.networking.crafting.ICraftingPlan;
@@ -243,53 +243,7 @@ public class CraftingCalculation {
 
     }
 
-    /**
-     * Snapshots the network inventory on the server thread before the job runs.
-     *
-     * <p>The snapshot only holds keys the request can consume, so it never costs more than copying the whole
-     * inventory. A requester that already knows the material closure supplies it directly; otherwise small networks
-     * are copied in full (cheap), and large networks reuse the cached graph structure of the requested output. Fuzzy
-     * groups are only expanded for the legacy tree, which substitutes ingredients: the graph executor extracts keys
-     * exactly, and an exact ingredient never consumes a variant.</p>
-     */
-    private NetworkCraftingSimulationState createNetworkInventory(IStorageService storage) {
-        // Fetch the cached network inventory exactly once: fetching may trigger an expensive full rebuild when the
-        // cache is dirty, so it must not happen once per snapshot branch.
-        var cached = storage.getCachedInventory();
-
-        var service = this.craftingService instanceof CraftingService craftingService ? craftingService : null;
-        var closure = service == null ? null : service.peekSimulationClosure(this.output);
-
-        var requestedSubset = this.simRequester.getSimulationSubset(this.output);
-        if (requestedSubset != null && !requestedSubset.isEmpty() && requestedSubset.size() < cached.size()) {
-            // Without a remembered closure the substitution behavior is unknown, so keep the whole group of each key.
-            var fuzzyKeys = closure != null ? closure.fuzzyKeysOf(requestedSubset) : Set.copyOf(requestedSubset);
-            var state = new NetworkCraftingSimulationState(cached, requestedSubset, fuzzyKeys);
-            recordPerformanceCount("inventorySnapshotKeys", state.getSnapshotEntryCount());
-            return state;
-        }
-
-        if (cached.size() > NetworkCraftingSimulationState.SNAPSHOT_SUBSET_THRESHOLD && service != null) {
-            var graph = service.peekCachedGraph(this.output);
-            // A graph built without the alternative patterns of its keys cannot tell what they read
-            if (graph != null && !graph.hasAlternatives()) {
-                var keys = graph.getSnapshotKeys();
-                // Subsetting only pays off when the graph touches fewer keys than the network holds: otherwise the
-                // subset would end up copying the whole inventory anyway, on top of one fuzzy lookup per key.
-                if (keys.size() < cached.size()) {
-                    var fuzzyKeys = new ObjectOpenHashSet<AEKey>();
-                    fuzzyKeys.addAll(keys);
-                    fuzzyKeys.retainAll(graph.getFuzzyKeys());
-                    var subset = new NetworkCraftingSimulationState(cached, keys, fuzzyKeys);
-                    recordPerformanceCount("inventorySnapshotKeys", subset.getSnapshotEntryCount());
-                    return subset;
-                }
-            }
-        }
-        var snapshot = new NetworkCraftingSimulationState(cached);
-        recordPerformanceCount("inventorySnapshotKeys", snapshot.getSnapshotEntryCount());
-        return snapshot;
-    }
+    private final Map<IAssemblerPattern, CraftingAssemblerSimulation> assemblerSimulations = new Reference2ObjectOpenHashMap<>(0);
 
     private CraftingTreeNode getOrCreateLegacyTree() {
         var result = this.tree;
@@ -470,6 +424,60 @@ public class CraftingCalculation {
     }
 
     private final Map<IPatternDetails, List<ItemStack>> defaultRemainders = new Reference2ObjectOpenHashMap<>();
+
+    /**
+     * Snapshots the network inventory on the server thread before the job runs.
+     *
+     * <p>The snapshot only holds keys the request can consume, so it never costs more than copying the whole
+     * inventory. A requester that already knows the material closure supplies it directly; otherwise small networks
+     * are copied in full (cheap), and large networks reuse the cached graph structure of the requested output. Fuzzy
+     * groups are only expanded for the legacy tree, which substitutes ingredients: the graph executor extracts keys
+     * exactly, and an exact ingredient never consumes a variant.</p>
+     */
+    private NetworkCraftingSimulationState createNetworkInventory(IStorageService storage) {
+        // Fetch the cached network inventory exactly once: fetching may trigger an expensive full rebuild when the
+        // cache is dirty, so it must not happen once per snapshot branch.
+        var cached = storage.getCachedInventory();
+
+        var service = this.craftingService instanceof CraftingService cs ? cs : null;
+        var closure = service == null ? null : service.peekSimulationClosure(this.output);
+
+        var requestedSubset = this.simRequester.getSimulationSubset(this.output);
+        if (requestedSubset != null && !requestedSubset.isEmpty() && requestedSubset.size() < cached.size()) {
+            // Without a remembered closure the substitution behavior is unknown, so keep the whole group of each key.
+            var fuzzyKeys = closure != null ? closure.fuzzyKeysOf(requestedSubset) : Set.copyOf(requestedSubset);
+            var state = new NetworkCraftingSimulationState(cached, requestedSubset, fuzzyKeys);
+            recordPerformanceCount("inventorySnapshotKeys", state.getSnapshotEntryCount());
+            return state;
+        }
+
+        if (cached.size() > NetworkCraftingSimulationState.SNAPSHOT_SUBSET_THRESHOLD && service != null) {
+            var graph = service.peekCachedGraph(this.output);
+            // A graph built without the alternative patterns of its keys cannot tell what they read
+            if (graph != null && !graph.hasAlternatives()) {
+                var keys = graph.getSnapshotKeys();
+                // Subsetting only pays off when the graph touches fewer keys than the network holds: otherwise the
+                // subset would end up copying the whole inventory anyway, on top of one fuzzy lookup per key.
+                if (keys.size() < cached.size()) {
+                    var fuzzyKeys = new ObjectOpenHashSet<AEKey>();
+                    fuzzyKeys.addAll(keys);
+                    fuzzyKeys.retainAll(graph.getFuzzyKeys());
+                    var subset = new NetworkCraftingSimulationState(cached, keys, fuzzyKeys);
+                    recordPerformanceCount("inventorySnapshotKeys", subset.getSnapshotEntryCount());
+                    return subset;
+                }
+            }
+        }
+        var snapshot = new NetworkCraftingSimulationState(cached);
+        recordPerformanceCount("inventorySnapshotKeys", snapshot.getSnapshotEntryCount());
+        return snapshot;
+    }
+
+    // Tree branches, local previews and CPU replays share deterministic recipe work, but never inventory state.
+    // Identity keys keep distinct pattern adapters separate, and each calculation owns its own cache.
+    CraftingAssemblerSimulation assemblerSimulation(IAssemblerPattern pattern) {
+        return this.assemblerSimulations.computeIfAbsent(pattern, p -> new CraftingAssemblerSimulation(p, this.level));
+    }
 
     public static List<ItemStack> defaultRemainders(IPatternDetails pattern,
                                                     Supplier<List<ItemStack>> evaluate) {
@@ -720,7 +728,7 @@ public class CraftingCalculation {
                     }
                 }
                 if (!result.contains(pattern) && pattern instanceof IAssemblerPattern assembler) {
-                    var returned = new CraftingAssemblerSimulation(assembler, this.level).defaultRemainders();
+                    var returned = assemblerSimulation(assembler).defaultRemainders();
                     if (returned != null) for (var output : returned) {
                         if (missing.get(output.getKey()) > 0) {
                             result.add(pattern);
@@ -901,7 +909,7 @@ public class CraftingCalculation {
         this.graph = graph;
         if (graph.requiresLegacyFallback()) {
             try {
-                return runCraftAttempt(productionAmount, productionAmount);
+                return runLegacyGraphAttempt(graph, productionAmount);
             } finally {
                 if (service != null) {
                     service.putCachedGraph(this.output, graph);
@@ -911,7 +919,7 @@ public class CraftingCalculation {
         if (hasUnsolvableCycle(graph)) {
             graph.requireLegacyFallback();
             try {
-                return runCraftAttempt(productionAmount, productionAmount);
+                return runLegacyGraphAttempt(graph, productionAmount);
             } finally {
                 if (service != null) {
                     service.putCachedGraph(this.output, graph);
@@ -924,6 +932,45 @@ public class CraftingCalculation {
             if (service != null) {
                 service.putCachedGraph(this.output, graph);
             }
+        }
+    }
+
+    private CraftingPlan runLegacyGraphAttempt(CraftingGraph graph, long productionAmount) throws InterruptedException {
+        var plan = runCraftAttempt(productionAmount, productionAmount);
+        if (plan != null && graph.hasAlternatives() && !plan.missingItems().isEmpty() && !this.tryingAlternatives) {
+            return tryAlternatives(plan, productionAmount, graph.getNodeCount());
+        }
+        return plan;
+    }
+
+    private CraftingPlan runLegacyWithChoices(Map<AEKey, IPatternDetails> choices, long amount)
+        throws InterruptedException {
+        var previous = new Object2ObjectOpenHashMap<AEKey, ObjectList<IPatternDetails>>();
+        var previousTree = this.tree;
+        long previousDeadline = this.fallbackDeadline;
+        int previousSteps = this.fallbackSteps;
+        try {
+            for (var choice : choices.entrySet()) {
+                var patterns = getCraftingFor(choice.getKey());
+                var reordered = new ObjectArrayList<>(patterns);
+                if (!reordered.remove(choice.getValue())) continue;
+                reordered.addFirst(choice.getValue());
+                previous.put(choice.getKey(), patterns);
+                this.patternCache.put(choice.getKey(), reordered);
+            }
+            this.tree = null;
+            // Alternative discovery is bounded even when the optional final legacy fallback is disabled.
+            this.fallbackSteps = LEGACY_FALLBACK_STEPS;
+            long limit = fallbackNanos();
+            this.fallbackDeadline = limit > 0 ? LongMath.saturatedAdd(workerTime(), limit) : Long.MAX_VALUE - 1;
+            return runCraftAttempt(amount, amount);
+        } catch (FallbackTimeout ignored) {
+            return null;
+        } finally {
+            this.patternCache.putAll(previous);
+            this.tree = previousTree;
+            this.fallbackDeadline = previousDeadline;
+            this.fallbackSteps = previousSteps;
         }
     }
 
@@ -1450,7 +1497,7 @@ public class CraftingCalculation {
             return null;
         }
 
-        // Process i crafts for its node from what process i + 1 crafts; the last one takes what itself. The keys come
+        // Process I crafts for its node from what process i + 1 crafts; the last one takes what itself. The keys come
         // from the processes: not every request in between is on the request stack.
         long[] made = new long[count];
         long[] taken = new long[count];
@@ -1886,7 +1933,7 @@ public class CraftingCalculation {
                     var graph = timed("buildAlternativeGraph",
                         () -> new GraphBuilder(this, choices).buildGraph(this.output, productionAmount));
                     this.graph = graph;
-                    alternative = needsLegacyTree(graph) ? null
+                    alternative = needsLegacyTree(graph) ? runLegacyWithChoices(choices, productionAmount)
                         : planGraph(graph, productionAmount, System.nanoTime());
                 } catch (CraftingCalculationFailure | IllegalArgumentException | IllegalStateException e) {
                     if (this.limitExceeded) throw e;
@@ -2717,7 +2764,7 @@ public class CraftingCalculation {
                 this.mainThreadTask = null;
                 task.started = true;
             }
-            // Never hold the monitor across external code. The worker awaits completion even if it is cancelled.
+            // Never hold the monitor across external code. The worker awaits completion even if it is canceled.
             task.execute();
             synchronized (this.monitor) {
                 task.completed = true;

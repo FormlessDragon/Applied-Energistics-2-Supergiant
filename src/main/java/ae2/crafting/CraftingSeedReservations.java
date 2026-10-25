@@ -1,15 +1,19 @@
 package ae2.crafting;
 
 import ae2.api.config.Actionable;
+import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.container.ContainerConstants;
 import ae2.crafting.inv.ICraftingInventory;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import net.minecraft.inventory.InventoryCrafting;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,14 +46,16 @@ public final class CraftingSeedReservations {
         for (int i = 0; i < active.size(); i++) edges.add(new IntArrayList());
         var materials = new Object2IntOpenHashMap<AEKey>();
         materials.defaultReturnValue(-1);
+        var returns = new ArrayList<KeyCounter>(active.size());
         for (int i = 0; i < active.size(); i++) {
             var pattern = active.get(i);
             for (var output : pattern.getOutputs()) edges.get(material(materials, edges, output.what())).add(i);
+            var returned = returnedInputs(pattern);
+            returns.add(returned);
+            for (var key : returned.keySet()) edges.get(material(materials, edges, key)).add(i);
             for (var input : pattern.getInputs()) {
                 for (var possible : input.possibleInputs()) {
                     edges.get(i).add(material(materials, edges, possible.what()));
-                    var container = input.getRemainingKey(possible.what());
-                    if (container != null) edges.get(material(materials, edges, container)).add(i);
                 }
             }
         }
@@ -72,12 +78,7 @@ public final class CraftingSeedReservations {
                     this.singlePatternCycles.add(pattern);
                     var returned = new KeyCounter();
                     for (var output : pattern.getOutputs()) returned.add(output.what(), output.amount());
-                    for (var input : pattern.getInputs()) {
-                        for (var possible : input.possibleInputs()) {
-                            var container = input.getRemainingKey(possible.what());
-                            if (container != null) returned.add(container, input.getMultiplier());
-                        }
-                    }
+                    returned.addAll(returns.get(i));
                     // A partially returned input shrinks on each craft. Keep enough to finish all pending crafts,
                     // including the last craft's seed, or outsiders can leave a balanced but unstartable tail.
                     for (var claim : claims) {
@@ -92,6 +93,38 @@ public final class CraftingSeedReservations {
             }
         }
         for (var seed : this.seeds.values()) seed.claims.sort(Comparator.comparingLong(Claim::amount).reversed());
+    }
+
+    private static KeyCounter returnedInputs(IPatternDetails pattern) {
+        var result = new KeyCounter();
+        if (pattern instanceof IAssemblerPattern assembler) {
+            // Containers may be stacked or returned to an originally empty slot. Slot-local probes lose both.
+            var returned = CraftingCalculation.defaultRemainders(pattern, () -> {
+                var inputs = pattern.getInputs();
+                var table = new KeyCounter[inputs.length];
+                for (int slot = 0; slot < inputs.length; slot++) {
+                    table[slot] = new KeyCounter();
+                    var possible = inputs[slot].possibleInputs();
+                    if (possible.length > 0) table[slot].add(possible[0].what(),
+                        LongMath.saturatedMultiply(possible[0].amount(), inputs[slot].getMultiplier()));
+                }
+                var grid = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, 3, 3);
+                assembler.fillCraftingGrid(table, grid::setInventorySlotContents);
+                return assembler.getRemainingItems(grid);
+            });
+            for (var stack : returned) {
+                var generic = GenericStack.fromItemStack(stack);
+                if (generic != null) result.add(generic.what(), generic.amount());
+            }
+        } else {
+            for (var input : pattern.getInputs()) {
+                for (var possible : input.possibleInputs()) {
+                    var container = input.getRemainingKey(possible.what());
+                    if (container != null) result.add(container, input.getMultiplier());
+                }
+            }
+        }
+        return result;
     }
 
     private static int material(Object2IntOpenHashMap<AEKey> materials, ArrayList<IntArrayList> edges, AEKey key) {

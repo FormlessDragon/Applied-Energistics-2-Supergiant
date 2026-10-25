@@ -14,10 +14,13 @@ import ae2.crafting.inv.NetworkCraftingSimulationState;
 import net.minecraft.init.Items;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.world.World;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Proxy;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static ae2.crafting.CraftingRemainderFixtures.Fixture;
 import static ae2.crafting.CraftingRemainderFixtures.Slot;
@@ -29,6 +32,7 @@ import static ae2.crafting.CraftingRemainderFixtures.remaining;
 import static ae2.crafting.CraftingRemainderFixtures.tool;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,6 +41,160 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Allocation contracts, search completeness, and extraction rollback, independently of planner heuristics.
  */
 class CraftingAssemblerAllocationBoundaryTest extends CraftingRecipeTestSupport {
+    private static CraftingAssemblerSimulation.Result selected(CraftingAssemblerSimulation simulation,
+                                                               ICraftingInventory inventory, boolean allowMissing) {
+        var result = simulation.select(inventory, allowMissing);
+        assertNotNull(result);
+        return result;
+    }
+
+    @Test
+    void recipeEvaluationIsSharedWithinOneCalculationButNotWithLaterCalculationsOrExecution() {
+        var f = new Fixture();
+        var returning = new AtomicBoolean(true);
+        var rule = f.rule("calculation_reuse", item(Items.CARROT), false, new Slot[]{tool()},
+            grid -> returning.get() ? at(grid, 0, damage(0)) : remaining(grid));
+        f.stock(damage(0), 1);
+        var calculation = f.net.calculation(rule.output.what(), 1);
+        materials(calculation.assemblerSimulation(rule.pattern).defaultRemainders(), damage(0), 1);
+        rule.callbacks.set(0);
+        var first = selected(calculation.assemblerSimulation(rule.pattern),
+            new NetworkCraftingSimulationState(f.net.stock), false);
+        assertFalse(calculation.assemblerSimulation(rule.pattern).hasFixedResultWithoutRemainders());
+        assertEquals(0, rule.callbacks.get(), "selection and replay validation should reuse the encoded evaluation");
+        returning.set(false);
+        var later = f.net.calculation(rule.output.what(), 1);
+        assertTrue(later.assemblerSimulation(rule.pattern).hasFixedResultWithoutRemainders());
+        assertTrue(rule.callbacks.get() > 0, "a new calculation must evaluate the recipe again");
+        materials(first.returned(), damage(0), 1);
+        rule.callbacks.set(0);
+        var returned = new KeyCounter();
+        assertNotNull(CraftingCpuHelper.extractPatternInputs(rule.pattern,
+            new NetworkCraftingSimulationState(f.net.stock), CraftingTestNetwork.world(),
+            new KeyCounter(), returned, 1));
+        assertTrue(returned.isEmpty());
+        assertTrue(rule.callbacks.get() > 0, "actual execution must evaluate current recipe behavior independently");
+    }
+
+    @Test
+    void scratchReuseResetsDestructiveAdaptersAndKeepsEarlierResultsIndependent() {
+        var f = new Fixture();
+        var rule = f.rule("destructive_adapter", item(Items.CARROT), true, new Slot[]{tool()},
+            grid -> at(grid, 0, AEItemKey.of(grid.getStackInSlot(0))));
+        var adapter = (IAssemblerPattern) Proxy.newProxyInstance(IAssemblerPattern.class.getClassLoader(),
+            new Class<?>[]{IAssemblerPattern.class}, (proxy, method, args) -> {
+                if (method.getName().equals("fillCraftingGrid")) {
+                    var table = (KeyCounter[]) args[0];
+                    assertEquals(1, CraftingTestNetwork.total(table[0]), "previous adapter consumption leaked into this grid");
+                    var key = table[0].iterator().next().getKey();
+                    ((IAssemblerPattern.CraftingGridAccessor) args[1]).set(0, ((AEItemKey) key).toStack());
+                    table[0].remove(key, 1);
+                    return null;
+                }
+                if (method.getName().equals("assemble")) {
+                    assertTrue(((InventoryCrafting) args[0]).getStackInSlot(8).isEmpty(), "an old empty-slot write survived");
+                }
+                var result = method.invoke(rule.pattern, args);
+                if (method.getName().equals("getRemainingItems")) {
+                    ((InventoryCrafting) args[0]).setInventorySlotContents(8, item(Items.STICK).toStack());
+                }
+                return result;
+            });
+        f.stock(damage(0), 1);
+        f.stock(damage(7), 1);
+        var inventory = new NetworkCraftingSimulationState(f.net.stock);
+        var simulation = new CraftingAssemblerSimulation(adapter, CraftingTestNetwork.world());
+        var first = selected(simulation, inventory, false);
+        materials(first.consumed(), damage(0), 1);
+        inventory.extract(damage(0), 1, Actionable.MODULATE);
+        inventory.insert(damage(8), 1, Actionable.MODULATE);
+        materials(selected(simulation, inventory, false).returned(), damage(7), 1);
+        materials(first.consumed(), damage(0), 1);
+        materials(first.returned(), damage(0), 1);
+        materials(first.output(), rule.output.what(), 1, damage(0), 1);
+    }
+
+    @Test
+    void repeatedSelectionTracksStockCountsNewVariantsAndMissingMode() {
+        var f = new Fixture();
+        var rule = f.jointRule("cached_pair", item(Items.CARROT), new Slot[]{tool(), tool()},
+            grid -> grid.getStackInSlot(0).getItemDamage() == grid.getStackInSlot(1).getItemDamage(), grid -> {
+                var returned = remaining(grid);
+                returned.set(0, grid.getStackInSlot(0).copy());
+                returned.set(1, grid.getStackInSlot(1).copy());
+                return returned;
+            });
+        f.stock(damage(0), 2);
+        var inventory = new NetworkCraftingSimulationState(f.net.stock);
+        var simulation = new CraftingAssemblerSimulation(rule.pattern, CraftingTestNetwork.world());
+        materials(selected(simulation, inventory, false).consumed(), damage(0), 2);
+        rule.callbacks.set(0);
+        for (int repeat = 0; repeat < 8; repeat++) {
+            materials(selected(simulation, inventory, false).consumed(), damage(0), 2);
+        }
+        assertEquals(0, rule.callbacks.get(), "an unchanged grid choice must not repeat recipe callbacks");
+        inventory.extract(damage(0), 1, Actionable.MODULATE);
+        assertNull(simulation.select(inventory, false), "the same variants with less stock cannot fill both slots");
+        materials(selected(simulation, inventory, true).consumed(), damage(0), 2);
+        assertNull(simulation.select(inventory, false), "missing-mode choices cannot supply real stock");
+        inventory.insert(damage(7), 2, Actionable.MODULATE);
+        materials(selected(simulation, inventory, false).consumed(), damage(7), 2);
+    }
+
+    @Test
+    void fullyStockedMissingModeSharesItsExhaustiveChoiceWithRealStockMode() {
+        var f = new Fixture();
+        var rule = f.jointRule("cached_stocked_choices", item(Items.CARROT), new Slot[]{tool(), tool()},
+            grid -> true, grid -> {
+                var returned = remaining(grid);
+                returned.set(0, grid.getStackInSlot(0).copy());
+                returned.set(1, grid.getStackInSlot(1).copy());
+                return returned;
+            });
+        // More grids than the per-grid result cache holds, so a second search would repeat callbacks.
+        for (int variant = 0; variant < 17; variant++) f.stock(damage(variant), 2);
+        var inventory = new NetworkCraftingSimulationState(f.net.stock);
+        var simulation = new CraftingAssemblerSimulation(rule.pattern, CraftingTestNetwork.world());
+        materials(selected(simulation, inventory, true).consumed(), damage(0), 2);
+        rule.callbacks.set(0);
+        materials(selected(simulation, inventory, false).consumed(), damage(0), 2);
+        assertEquals(0, rule.callbacks.get(), "the same fully stocked choice must not repeat an exhaustive search");
+    }
+
+    @Test
+    void missingModeTracksEncodedStockEvenWhenFuzzyEnumerationOmitsIt() {
+        var f = new Fixture();
+        var rule = f.jointRule("cached_encoded_stock", item(Items.CARROT), new Slot[]{tool(), tool()},
+            grid -> true, grid -> {
+                var returned = remaining(grid);
+                for (int slot = 0; slot < 2; slot++) {
+                    if (grid.getStackInSlot(slot).getItemDamage() == 0)
+                        returned.set(slot, grid.getStackInSlot(slot).copy());
+                }
+                return returned;
+            });
+        f.stock(damage(0), 2);
+        f.stock(damage(7), 2);
+        var inventory = new NetworkCraftingSimulationState(f.net.stock);
+        var partialEnumeration = new ICraftingInventory() {
+            public void insert(AEKey key, long amount, Actionable mode) {
+                inventory.insert(key, amount, mode);
+            }
+
+            public long extract(AEKey key, long amount, Actionable mode) {
+                return inventory.extract(key, amount, mode);
+            }
+
+            public Iterable<AEKey> findFuzzyTemplates(AEKey key) {
+                return List.of(damage(7));
+            }
+        };
+        var simulation = new CraftingAssemblerSimulation(rule.pattern, CraftingTestNetwork.world());
+        materials(selected(simulation, partialEnumeration, true).consumed(), damage(0), 2);
+        inventory.extract(damage(0), 2, Actionable.MODULATE);
+        materials(selected(simulation, partialEnumeration, true).consumed(), damage(7), 2);
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {8, 64})
     void aValidJointCombinationAtTheEndOfTheCandidateSetIsStillUsable(int alternatives) throws Exception {

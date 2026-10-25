@@ -155,7 +155,8 @@ class CraftingRealPatternPlanningTest extends CraftingRecipeTestSupport {
             {1, 1, 0, 59, 0}, {1, 1, 0, 60, 1}, {1, 1, 0, 121, 2},
             {1, 1, 57, 2, 0}, {1, 1, 57, 3, 1}, {1, 1, 57, 61, 1},
             {1, 2, 58, 2, 0}, {1, 2, 58, 3, 1},
-            {2, 2, 57, 2, 0}, {2, 2, 57, 3, 2}, {2, 2, 57, 5, 2},
+            // For three crafts, pair new C with worn A, then worn B, then worn A. Only C is missing.
+            {2, 2, 57, 2, 0}, {2, 2, 57, 3, 1}, {2, 2, 57, 5, 2},
             {2, 1, 0, 1, 1}, {2, 1, 0, 3, 1}, {8, 8, 0, 3, 0}
         };
         for (int cache : new int[]{0, 10_000}) {
@@ -268,6 +269,13 @@ class CraftingRealPatternPlanningTest extends CraftingRecipeTestSupport {
                                                                 int requested, int missing) throws Exception {
         memo(cache);
         assertEquals(59, Items.WOODEN_PICKAXE.getMaxDamage(), "fixture lifetime changed");
+        // Each physical tool can occupy at most one slot per craft. Bound both simultaneous slots and
+        // total uses independently of the planner's batching; the execution check below verifies a witness.
+        long deficit = Math.max(0, (long) slots * requested - (long) stored * Math.min(59 - damage, requested));
+        long usesPerNewTool = Math.min(59, requested);
+        long minimumMissing = Math.max(Math.max(0, slots - stored),
+            (deficit + usesPerNewTool - 1) / usesPerNewTool);
+        assertEquals(minimumMissing, missing, "incorrect fixture shortage bound");
         var net = new CraftingTestNetwork();
         var pattern = net.addPattern(returningTools(slots, true, true), 0);
         var apple = AEItemKey.of(Items.APPLE);
@@ -278,7 +286,7 @@ class CraftingRealPatternPlanningTest extends CraftingRecipeTestSupport {
             var plan = net.plan(carrot, requested);
             materials(plan.usedItems(), apple, requested, tool(damage), stored);
             materials(plan.missingItems(), tool(0), missing);
-            if (missing == 0) assertFalse(plan.simulation());
+            assertEquals(missing > 0, plan.simulation(), "only fully supplied plans can be submitted");
             assertEquals(requested, crafts(plan, pattern));
             verifyReturnedToolExecutionAndTree(plan, pattern);
         }

@@ -446,8 +446,9 @@ test {
 // Run explicitly: repeated 100k-node calculations should not add timing noise to the normal CI suite.
 tasks.register('craftingLargeTreeBenchmark', Test) {
     group = 'verification'
-    description = 'Measures cold and warm crafting calculations for the large synthetic tree and the in-game END tree.'
+    description = 'Measures large synthetic and in-game END crafting trees, and reusable-tool grid selection.'
     testClassesDirs = sourceSets.test.output.classesDirs
+    include 'ae2/crafting/*BenchmarkTest.class'
     classpath = tasks.named('test', Test).get().classpath
     javaLauncher.set(tasks.named('test', Test).flatMap { it.javaLauncher })
     maxHeapSize = '1g'

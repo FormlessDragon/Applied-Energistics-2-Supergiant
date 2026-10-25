@@ -98,15 +98,15 @@ public class CraftingTreeProcess {
     private @Nullable AEKey[] slotContainers;
     private boolean batchedSlots;
 
-    public CraftingTreeProcess(ICraftingService cc, CraftingCalculation job,
-                               IPatternDetails details,
-                               CraftingTreeNode craftingTreeNode) {
+    CraftingTreeProcess(ICraftingService cc, CraftingCalculation job,
+                        IPatternDetails details,
+                        CraftingTreeNode craftingTreeNode) {
         this.parent = craftingTreeNode;
         this.details = details;
         this.job = job;
         this.craftingService = cc;
         this.assemblerSimulation = details instanceof IAssemblerPattern assembler
-            ? new CraftingAssemblerSimulation(assembler, job.getLevel()) : null;
+            ? job.assemblerSimulation(assembler) : null;
         this.inputs = details.getInputs();
         var patternOutputs = details.getOutputs();
         this.outputs = patternOutputs instanceof RandomAccess ? patternOutputs : new ObjectArrayList<>(patternOutputs);

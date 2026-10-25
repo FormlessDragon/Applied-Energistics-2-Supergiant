@@ -71,6 +71,44 @@ final class CraftingPlanCompactor {
      * that can take the requested output itself, and leave the CPU stuck on a craft whose inputs never come.
      */
     static CraftingPlan repair(CraftingPlan plan, CraftingCalculation calculation) throws InterruptedException {
+        var repaired = repairContents(plan, calculation);
+        var minimized = removeReturnedShortages(repaired, calculation);
+        return removeUnusedReturningStock(minimized, calculation);
+    }
+
+    private static CraftingPlan removeUnusedReturningStock(CraftingPlan plan, CraftingCalculation calculation)
+        throws InterruptedException {
+        var required = plan.requiredItems();
+        // Once missing inputs arrive, substitutions can change. Keep the already staged stock in previews.
+        if (plan.simulation() || required == null || plan.remainderAllocations().isEmpty()) return plan;
+        var returnedGroups = new ObjectOpenHashSet<>();
+        for (var returns : plan.remainderAllocations().values()) {
+            for (var key : returns.keySet()) returnedGroups.add(key.getPrimaryKey());
+        }
+        var primaryOutputs = new ObjectOpenHashSet<AEKey>();
+        for (var pattern : plan.patternTimes().keySet()) {
+            for (var output : pattern.getOutputs()) primaryOutputs.add(output.what());
+        }
+        var used = new KeyCounter();
+        boolean changed = false;
+        for (var entry : plan.usedItems()) {
+            var key = entry.getKey();
+            long amount = entry.getLongValue();
+            if (returnedGroups.contains(key.getPrimaryKey()) && !primaryOutputs.contains(key)) {
+                long needed = Math.max(0, required.get(key) - plan.missingItems().get(key) - plan.emittedItems().get(key));
+                if (needed < amount) {
+                    amount = needed;
+                    changed = true;
+                }
+            }
+            if (amount > 0) used.add(key, amount);
+        }
+        if (!changed) return plan;
+        var trimmed = plan.withContents(used, plan.emittedItems(), plan.missingItems(), plan.patternTimes(), calculation);
+        return CraftingCpuReplay.runs(trimmed, calculation) ? trimmed : plan;
+    }
+
+    private static CraftingPlan repairContents(CraftingPlan plan, CraftingCalculation calculation) throws InterruptedException {
         if (plan.patternTimes().isEmpty()) {
             // The request is never taken from storage, so without crafts only an emitter makes it, or it is missing
             var output = plan.finalOutput().what();
@@ -87,7 +125,7 @@ final class CraftingPlanCompactor {
             if (CraftingCpuReplay.runs(supplied, calculation)) return supplied;
         }
         if (!craftableMissing && CraftingCpuReplay.runs(plan, calculation)) {
-            return removeReturnedShortages(plan, calculation);
+            return plan;
         }
         AELog.crafting("Repairing a crafting plan for %s the crafting CPU could not run", plan.finalOutput());
         CraftingPlan compacted;
@@ -125,9 +163,13 @@ final class CraftingPlanCompactor {
     private static CraftingPlan removeReturnedShortages(CraftingPlan plan, CraftingCalculation calculation)
         throws InterruptedException {
         if (plan.missingItems().isEmpty() || plan.remainderAllocations().isEmpty()) return plan;
-        var candidates = new ObjectOpenHashSet<AEKey>();
+        var returnedGroups = new ObjectOpenHashSet<>();
         for (var returns : plan.remainderAllocations().values()) {
-            for (var key : returns.keySet()) if (plan.missingItems().get(key) > 0) candidates.add(key);
+            for (var key : returns.keySet()) returnedGroups.add(key.getPrimaryKey());
+        }
+        var candidates = new ObjectOpenHashSet<AEKey>();
+        for (var key : plan.missingItems().keySet()) {
+            if (returnedGroups.contains(key.getPrimaryKey())) candidates.add(key);
         }
         if (candidates.isEmpty()) return plan;
         var missing = new KeyCounter();
@@ -1308,7 +1350,7 @@ final class CraftingPlanCompactor {
                 outputs.addTo(output.what(), output.amount());
             }
             if (pattern instanceof IAssemblerPattern assembler) {
-                var returned = new CraftingAssemblerSimulation(assembler, compactor.level).defaultRemainders();
+                var returned = compactor.calculation.assemblerSimulation(assembler).defaultRemainders();
                 if (returned != null) returned.forEach(entry -> outputs.addTo(entry.getKey(), entry.getLongValue()));
             }
 

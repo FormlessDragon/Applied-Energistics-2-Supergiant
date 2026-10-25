@@ -54,6 +54,34 @@ public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarri
     // Written by the calculation's successful CPU replay before publishing the plan, then read only by its display.
     private Map<IPatternDetails, KeyCounter> inputAllocations = Map.of();
     private Map<IPatternDetails, KeyCounter> remainderAllocations = Map.of();
+    private @Nullable KeyCounter requiredItems;
+
+    public CraftingPlan(GenericStack finalOutput, long bytes, boolean simulation, boolean multiplePaths,
+                        KeyCounter usedItems, KeyCounter emittedItems, KeyCounter missingItems,
+                        long intermediateFinalOutputAmount, Object2LongMap<IPatternDetails> patternTimes,
+                        @Nullable CraftingTreeNode tree, List<ICraftingProvider> temporaryProviders,
+                        @Nullable CraftingGraphDisplaySnapshot.Builder graphDisplayBuilder,
+                        CraftingAttemptMetrics attemptMetrics,
+                        @Nullable CraftingCalculation calculation) {
+        this.finalOutput = finalOutput;
+        this.bytes = bytes;
+        this.simulation = simulation || !missingItems.isEmpty();
+        this.multiplePaths = multiplePaths;
+        this.usedItems = usedItems;
+        this.emittedItems = emittedItems;
+        this.missingItems = missingItems;
+        this.intermediateFinalOutputAmount = intermediateFinalOutputAmount;
+        this.patternTimes = patternTimes;
+        this.tree = tree;
+        this.temporaryProviders = temporaryProviders;
+        this.graphDisplayBuilder = graphDisplayBuilder;
+        this.attemptMetrics = attemptMetrics;
+        this.calculation = calculation;
+    }
+
+    void recordRequiredItems(KeyCounter required) {
+        this.requiredItems = required;
+    }
 
     void recordRemainderAllocations(Map<IPatternDetails, KeyCounter> allocations) {
         this.remainderAllocations = allocations;
@@ -71,27 +99,8 @@ public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarri
         return this.inputAllocations;
     }
 
-    public CraftingPlan(GenericStack finalOutput, long bytes, boolean simulation, boolean multiplePaths,
-                        KeyCounter usedItems, KeyCounter emittedItems, KeyCounter missingItems,
-                        long intermediateFinalOutputAmount, Object2LongMap<IPatternDetails> patternTimes,
-                        @Nullable CraftingTreeNode tree, List<ICraftingProvider> temporaryProviders,
-                        @Nullable CraftingGraphDisplaySnapshot.Builder graphDisplayBuilder,
-                        CraftingAttemptMetrics attemptMetrics,
-                        @Nullable CraftingCalculation calculation) {
-        this.finalOutput = finalOutput;
-        this.bytes = bytes;
-        this.simulation = simulation;
-        this.multiplePaths = multiplePaths;
-        this.usedItems = usedItems;
-        this.emittedItems = emittedItems;
-        this.missingItems = missingItems;
-        this.intermediateFinalOutputAmount = intermediateFinalOutputAmount;
-        this.patternTimes = patternTimes;
-        this.tree = tree;
-        this.temporaryProviders = temporaryProviders;
-        this.graphDisplayBuilder = graphDisplayBuilder;
-        this.attemptMetrics = attemptMetrics;
-        this.calculation = calculation;
+    @Nullable KeyCounter requiredItems() {
+        return this.requiredItems;
     }
 
     /**

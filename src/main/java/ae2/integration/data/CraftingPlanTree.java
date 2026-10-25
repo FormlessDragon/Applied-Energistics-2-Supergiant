@@ -117,9 +117,16 @@ public final class CraftingPlanTree {
             }
         }
         builder.missing.removeZeros();
-        if (!builder.missing.isEmpty()) {
+        builder.external.removeZeros();
+        if (!builder.missing.isEmpty() || !builder.external.isEmpty()) {
             var children = new ArrayList<LiteCraftTreeNode>();
             var group = new LiteCraftTreeProc(children, List.of(), Map.of());
+            // A missing input may replace stock that discovery had already reserved. Show those withdrawals
+            // without attributing them to a recipe that the validated allocation does not actually consume.
+            for (var entry : builder.external) {
+                if (entry.getLongValue() > 0) children.add(builder.leaf(entry.getKey(), entry.getLongValue(), group,
+                    0, -1, 1));
+            }
             for (var entry : builder.missing) {
                 if (entry.getLongValue() > 0) children.add(builder.leaf(entry.getKey(), entry.getLongValue(), group,
                     entry.getLongValue(), -1, 1));
@@ -177,10 +184,17 @@ public final class CraftingPlanTree {
                     children.add(leaf(key, feedback, process, 0, LiteCraftTreeNode.FEEDBACK_PENDING, depth + 1));
                 }
             } else {
-                long returnedCredit = take(this.remainderCredit, key, amount);
+                // External inputs are physical leaves even if another recipe also returns that key.
+                // Expanding its returning producer first can turn the real bootstrap into circular feedback.
+                long stored = take(this.external, key, amount);
+                long absent = take(this.missing, key, amount - stored);
+                long seed = stored + absent;
+                if (seed > 0) children.add(leaf(key, seed, process, absent, -1, depth + 1));
+                long returnedCredit = take(this.remainderCredit, key, amount - seed);
                 if (returnedCredit > 0) children.add(leaf(key, returnedCredit, process, 0,
                     LiteCraftTreeNode.FEEDBACK_REMAINDER, depth + 1));
-                if (amount > returnedCredit) children.add(node(key, amount - returnedCredit, process, depth + 1));
+                long produced = amount - seed - returnedCredit;
+                if (produced > 0) children.add(node(key, produced, process, depth + 1));
             }
         }
         for (var output : pattern.getOutputs()) this.ancestors.remove(output.what(), 1);
@@ -191,7 +205,7 @@ public final class CraftingPlanTree {
 
     private LiteCraftTreeNode leaf(AEKey key, long amount, LiteCraftTreeProc parent, long missing, int feedback, int depth) {
         count(key, depth);
-        return new LiteCraftTreeNode(parent, new GenericStack(key, amount), List.of(), missing, feedback);
+        return new LiteCraftTreeNode(parent, new GenericStack(key, amount), new ArrayList<>(), missing, feedback);
     }
 
     private void count(AEKey key, int depth) {

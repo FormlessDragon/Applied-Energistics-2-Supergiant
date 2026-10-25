@@ -8,12 +8,15 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.container.ContainerConstants;
+import ae2.crafting.execution.CraftingCpuHelper;
 import ae2.crafting.inv.ICraftingInventory;
 import ae2.crafting.pattern.AECraftingPattern;
 import com.google.common.math.LongMath;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
@@ -31,17 +34,66 @@ public final class CraftingAssemblerSimulation {
     private static final int MAX_GRID_CHOICES = 65_536;
     private final IAssemblerPattern pattern;
     private final World level;
-    private final Map<List<List<GenericStack>>, Result> results = boundedCache();
+    private final Map<List<List<GenericStack>>, Evaluation> results = boundedCache();
     private final Map<Validity, Boolean> valid = boundedCache();
-    private @Nullable Result defaultResult;
+    private final Map<Selection, Result> selections = boundedCache();
+    private @Nullable Grid scratch;
+    private boolean defaultEvaluated;
+    private @Nullable Evaluation defaultEvaluation;
 
-    public CraftingAssemblerSimulation(IAssemblerPattern pattern, World level) {
+    CraftingAssemblerSimulation(IAssemblerPattern pattern, World level) {
         this.pattern = pattern;
         this.level = level;
     }
 
+    /**
+     * CPU execution bridge; mutable simulation state and selected results stay inside the crafting package.
+     */
+    public static KeyCounter @Nullable [] extractInputs(IAssemblerPattern assembler, ICraftingInventory source,
+                                                        World level, KeyCounter outputs, KeyCounter containers,
+                                                        int multiplier) {
+        if (multiplier <= 0) return null;
+        var simulation = new CraftingAssemblerSimulation(assembler, level);
+        // A provider receives per-slot bags, not a sequence of grids. Keep a merged push homogeneous so
+        // independently draining those bags cannot recombine two valid grids into an invalid one.
+        var scaled = new ICraftingInventory() {
+            public void insert(AEKey key, long amount, Actionable mode) {
+                throw new UnsupportedOperationException();
+            }
+
+            public long extract(AEKey key, long amount, Actionable mode) {
+                if (mode != Actionable.SIMULATE) throw new UnsupportedOperationException();
+                return Math.min(amount, source.extract(key, Long.MAX_VALUE, Actionable.SIMULATE) / multiplier);
+            }
+
+            public Iterable<AEKey> findFuzzyTemplates(AEKey key) {
+                return source.findFuzzyTemplates(key);
+            }
+        };
+        var choice = simulation.select(scaled, false);
+        if (choice == null) return null;
+        var table = new KeyCounter[assembler.getInputs().length];
+        for (int i = 0; i < table.length; i++) {
+            table[i] = new KeyCounter();
+            for (var stack : choice.inputs().get(i)) {
+                long amount = LongMath.saturatedMultiply(stack.amount(), multiplier);
+                long extracted = source.extract(stack.what(), amount, Actionable.MODULATE);
+                table[i].add(stack.what(), extracted);
+                if (extracted != amount) {
+                    CraftingCpuHelper.reinjectPatternInputs(source, table);
+                    return null;
+                }
+            }
+        }
+        choice.returned().forEach((key, amount) -> containers.add(key, LongMath.saturatedMultiply(amount, multiplier)));
+        for (var output : assembler.getOutputs())
+            outputs.add(output.what(),
+                LongMath.saturatedMultiply(output.amount(), multiplier));
+        return table;
+    }
+
     private static <K, V> Map<K, V> boundedCache() {
-        return new Object2ObjectLinkedOpenHashMap<>() {
+        return new Object2ObjectLinkedOpenHashMap<>(0) {
             @Override
             public V put(K key, V value) {
                 V previous = putAndMoveToLast(key, value);
@@ -51,18 +103,28 @@ public final class CraftingAssemblerSimulation {
         };
     }
 
-    public @Nullable Result select(ICraftingInventory inventory, boolean allowMissing) {
+    @Nullable Result select(ICraftingInventory inventory, boolean allowMissing) {
         if (CraftingCalculation.isCalculationThread()) {
             return CraftingCalculation.runOnMainThread(() -> select(inventory, allowMissing));
         }
         var inputs = pattern.getInputs();
+        long capacity = 0;
+        for (var input : inputs) {
+            long largest = 0;
+            for (var possible : input.possibleInputs()) largest = Math.max(largest, possible.amount());
+            capacity = LongMath.saturatedAdd(capacity, LongMath.saturatedMultiply(largest, input.getMultiplier()));
+        }
+        var available = new Object2LongOpenHashMap<AEKey>();
         var choices = new ObjectArrayList<List<GenericStack>>(inputs.length);
         for (var input : inputs) {
             var options = new ObjectArrayList<GenericStack>();
             var seen = new ObjectOpenHashSet<GenericStack>();
             for (var possible : input.possibleInputs()) {
                 for (var key : inventory.findFuzzyTemplates(possible.what())) {
-                    if (inventory.extract(key, possible.amount(), Actionable.SIMULATE) < possible.amount()) continue;
+                    if (!available.containsKey(key)) {
+                        available.put(key, inventory.extract(key, capacity, Actionable.SIMULATE));
+                    }
+                    if (available.getLong(key) < possible.amount()) continue;
                     var option = new GenericStack(key, possible.amount());
                     if (seen.add(option) && accepts(input, key)) options.add(option);
                 }
@@ -71,17 +133,33 @@ public final class CraftingAssemblerSimulation {
                 ? item.toStack().getItemDamage() : 0));
             if (allowMissing && input.possibleInputs().length > 0) {
                 var first = input.possibleInputs()[0];
+                if (!available.containsKey(first.what())) {
+                    available.put(first.what(), inventory.extract(first.what(), capacity, Actionable.SIMULATE));
+                }
                 if (!options.contains(first)) options.add(first);
             }
             if (options.isEmpty()) return null;
             choices.add(options);
         }
+        // Only simultaneous input capacity matters to a grid choice. Larger stock counts may change between
+        // crafts without changing this search. New variants, depleted inputs and missing-item mode remain in the key.
+        var selection = new Selection(choices, available, allowMissing);
+        if (selections.containsKey(selection)) return selections.get(selection);
         var order = new Integer[inputs.length];
         for (int i = 0; i < order.length; i++) order[i] = i;
         Arrays.sort(order, Comparator.comparingInt(i -> choices.get(i).size()));
-        var search = new Search(inventory, inputs, choices, order, allowMissing);
+        var search = new Search(available, inputs, choices, order, allowMissing);
         search.visit(0, 0);
-        return search.best;
+        var result = search.best == null ? null : result(search.bestInputs, search.best);
+        // A large search may have evicted its winning grid. Keep that evaluation for narrower replay inventories.
+        if (search.best != null) results.put(search.bestInputs, search.best);
+        selections.put(selection, result);
+        // An exhaustive missing-mode search that found a fully stocked grid also solved real-stock mode,
+        // provided that mode enumerates exactly the same choices. A truncated search cannot prove this.
+        if (allowMissing && search.bestMissing == 0 && search.completeChoices < MAX_GRID_CHOICES) {
+            selections.put(new Selection(choices, available, false), result);
+        }
+        return result;
     }
 
     private boolean accepts(IPatternDetails.IInput input, AEKey key) {
@@ -105,17 +183,17 @@ public final class CraftingAssemblerSimulation {
         return false;
     }
 
-    public long defaultRemainderAmount(AEKey key) {
+    long defaultRemainderAmount(AEKey key) {
         var remainders = defaultRemainders();
         return remainders == null ? 0 : remainders.get(key);
     }
 
-    public @Nullable KeyCounter defaultRemainders() {
+    @Nullable KeyCounter defaultRemainders() {
         if (CraftingCalculation.isCalculationThread()) {
             return CraftingCalculation.runOnMainThread(this::defaultRemainders);
         }
-        var result = defaultResult;
-        if (result == null) {
+        var result = defaultEvaluation;
+        if (!defaultEvaluated) {
             var inputs = pattern.getInputs();
             var selected = new ObjectArrayList<List<GenericStack>>(inputs.length);
             for (var input : inputs) {
@@ -125,39 +203,68 @@ public final class CraftingAssemblerSimulation {
                     LongMath.saturatedMultiply(possible[0].amount(), input.getMultiplier())));
                 selected.add(bag);
             }
-            defaultResult = result = evaluate(selected);
+            defaultEvaluation = result = evaluate(selected);
+            defaultEvaluated = true;
         }
         return result == null ? null : result.returned;
     }
 
-    private @Nullable Result evaluate(List<List<GenericStack>> inputs) {
-        var table = new KeyCounter[inputs.size()];
-        var consumed = new KeyCounter();
-        for (int i = 0; i < table.length; i++) {
-            table[i] = new KeyCounter();
-            for (var stack : inputs.get(i)) {
-                table[i].add(stack.what(), stack.amount());
-                consumed.add(stack.what(), stack.amount());
-            }
+    boolean hasFixedResultWithoutRemainders() {
+        for (var input : pattern.getInputs()) {
+            if (input.possibleInputs().length > 1) return false;
         }
-        var grid = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, 3, 3);
-        pattern.fillCraftingGrid(table, grid::setInventorySlotContents);
+        var returned = defaultRemainders();
+        return returned != null && returned.isEmpty();
+    }
+
+    private @Nullable Evaluation evaluate(List<List<GenericStack>> inputs) {
+        if (results.containsKey(inputs)) return results.get(inputs);
+        if (scratch == null) scratch = new Grid(inputs.size());
+        var evaluated = evaluateUncached(inputs, scratch);
+        results.put(inputs, evaluated);
+        return evaluated;
+    }
+
+    private @Nullable Evaluation evaluateUncached(List<List<GenericStack>> inputs, Grid scratch) {
+        // The adapter may consume its input table or write only occupied grid slots. Reset both before reuse.
+        // No scratch counter or ItemStack is retained in an evaluation or a selected result.
+        scratch.fill(inputs);
+        var grid = scratch.inventory;
+        pattern.fillCraftingGrid(scratch.table, grid::setInventorySlotContents);
         if (!pattern.getPrimaryOutput().equals(GenericStack.fromItemStack(pattern.assemble(grid, level)))) return null;
         var returns = new KeyCounter();
         for (var remaining : pattern.getRemainingItems(grid)) {
             var stack = GenericStack.fromItemStack(remaining);
             if (stack != null) returns.add(stack.what(), stack.amount());
         }
+        long reusable = 0;
+        for (var returned : returns) {
+            for (var input : pattern.getInputs()) {
+                if (accepts(input, returned.getKey())) {
+                    reusable = LongMath.saturatedAdd(reusable, returned.getLongValue());
+                    break;
+                }
+            }
+        }
+        return new Evaluation(returns, reusable);
+    }
+
+    private Result result(List<List<GenericStack>> inputs, Evaluation evaluated) {
+        // Only the selected grid needs full material accounting. Candidate evaluations retain their returns alone.
+        var consumed = new KeyCounter();
+        for (var bag : inputs) {
+            for (var stack : bag) consumed.add(stack.what(), stack.amount());
+        }
         var output = new KeyCounter();
-        output.addAll(returns);
+        output.addAll(evaluated.returned);
         for (var stack : pattern.getOutputs()) output.add(stack.what(), stack.amount());
-        return new Result(inputs, consumed, returns, output);
+        return new Result(inputs, consumed, evaluated.returned, output);
     }
 
     /**
      * Required stock before this same complete grid can execute a sequential batch.
      */
-    public long required(Result result, AEKey key, long crafts) {
+    long required(Result result, AEKey key, long crafts) {
         if (CraftingCalculation.isCalculationThread()) {
             return CraftingCalculation.runOnMainThread(() -> required(result, key, crafts));
         }
@@ -173,17 +280,9 @@ public final class CraftingAssemblerSimulation {
         return LongMath.saturatedAdd(in, LongMath.saturatedMultiply(Math.max(0, in - result.output.get(key)), crafts - 1));
     }
 
-    public record Result(List<List<GenericStack>> inputs, KeyCounter consumed, KeyCounter returned, KeyCounter output) {
-        public KeyCounter[] inputTable() {
-            var table = new KeyCounter[inputs.size()];
-            for (int i = 0; i < table.length; i++) {
-                table[i] = new KeyCounter();
-                for (var stack : inputs.get(i)) table[i].add(stack.what(), stack.amount());
-            }
-            return table;
-        }
-
-        public long batchSize(ICraftingInventory inventory, long limit) {
+    // Borrowed, read-only material accounts. The simulator never changes a published result.
+    record Result(List<List<GenericStack>> inputs, KeyCounter consumed, KeyCounter returned, KeyCounter output) {
+        long batchSize(ICraftingInventory inventory, long limit) {
             for (var entry : consumed) {
                 long held = inventory.extract(entry.getKey(), Long.MAX_VALUE, Actionable.SIMULATE);
                 if (held < entry.getLongValue()) return 0;
@@ -197,8 +296,32 @@ public final class CraftingAssemblerSimulation {
     private record Validity(IPatternDetails.IInput input, AEKey key) {
     }
 
+    private record Evaluation(KeyCounter returned, long reusable) {
+    }
+
+    private static final class Grid {
+        private final KeyCounter[] table;
+        private final InventoryCrafting inventory = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, 3, 3);
+
+        private Grid(int inputs) {
+            table = new KeyCounter[inputs];
+            Arrays.setAll(table, i -> new KeyCounter());
+        }
+
+        private void fill(List<List<GenericStack>> inputs) {
+            inventory.clear();
+            for (int i = 0; i < table.length; i++) {
+                table[i].clear();
+                for (var stack : inputs.get(i)) table[i].add(stack.what(), stack.amount());
+            }
+        }
+    }
+
+    private record Selection(List<List<GenericStack>> choices, Object2LongMap<AEKey> available, boolean allowMissing) {
+    }
+
     private final class Search {
-        final ICraftingInventory inventory;
+        final Object2LongMap<AEKey> available;
         final IPatternDetails.IInput[] inputs;
         final List<List<GenericStack>> options;
         final Integer[] order;
@@ -207,11 +330,12 @@ public final class CraftingAssemblerSimulation {
         final KeyCounter taken = new KeyCounter();
         long bestMissing = Long.MAX_VALUE;
         int completeChoices;
-        Result best;
+        Evaluation best;
+        List<List<GenericStack>> bestInputs;
 
-        Search(ICraftingInventory inventory, IPatternDetails.IInput[] inputs, List<List<GenericStack>> options,
+        Search(Object2LongMap<AEKey> available, IPatternDetails.IInput[] inputs, List<List<GenericStack>> options,
                Integer[] order, boolean allowMissing) {
-            this.inventory = inventory;
+            this.available = available;
             this.inputs = inputs;
             this.options = options;
             this.order = order;
@@ -221,7 +345,7 @@ public final class CraftingAssemblerSimulation {
         }
 
         void visit(int depth, long missing) {
-            if (missing >= bestMissing) return;
+            if (missing > bestMissing || completeChoices >= MAX_GRID_CHOICES) return;
             if (depth == order.length) {
                 if (++completeChoices > MAX_GRID_CHOICES) return;
                 var key = new ObjectArrayList<List<GenericStack>>(selected.length);
@@ -232,14 +356,12 @@ public final class CraftingAssemblerSimulation {
                     }
                     key.add(stacks);
                 }
-                Result result;
-                if (results.containsKey(key)) result = results.get(key);
-                else {
-                    result = evaluate(key);
-                    results.put(key, result);
-                }
-                if (result != null) {
+                var result = evaluate(key);
+                // Damage values and NBT are opaque recipe state. Prefer grids that return usable inputs,
+                // so a consumable alternative cannot crowd a circulating tool out of every slot.
+                if (result != null && (missing < bestMissing || best == null || result.reusable() > best.reusable())) {
                     best = result;
+                    bestInputs = key;
                     bestMissing = missing;
                 }
                 return;
@@ -249,7 +371,7 @@ public final class CraftingAssemblerSimulation {
         }
 
         private void visitUnits(int depth, int index, long units, int start, long missing) {
-            if (missing >= bestMissing) return;
+            if (missing > bestMissing || completeChoices >= MAX_GRID_CHOICES) return;
             if (units == 0) {
                 visit(depth + 1, missing);
                 return;
@@ -257,7 +379,7 @@ public final class CraftingAssemblerSimulation {
             for (int optionIndex = start; optionIndex < options.get(index).size(); optionIndex++) {
                 var option = options.get(index).get(optionIndex);
                 long count = option.amount();
-                long held = inventory.extract(option.what(), Long.MAX_VALUE, Actionable.SIMULATE);
+                long held = this.available.getLong(option.what());
                 long already = taken.get(option.what());
                 long available = Math.max(0, held - already);
                 long addedMissing = Math.max(0, count - available);
@@ -268,7 +390,6 @@ public final class CraftingAssemblerSimulation {
                 visitUnits(depth, index, units - 1, optionIndex, LongMath.saturatedAdd(missing, addedMissing));
                 selected[index].remove(option.what(), count);
                 taken.remove(option.what(), count);
-                if (bestMissing == 0) return;
             }
         }
     }

@@ -44,7 +44,7 @@ public class GraphBuilder {
 
     /**
      * For each key reachable from the output, the pattern needing the least of the scarce keys per item it makes. On a
-     * tie, the one of highest priority. Only patterns the graph can plan natively are chosen.
+     * tie, the one of highest priority. Patterns with dynamic inputs are validated by a fresh legacy attempt.
      */
     public Map<AEKey, IPatternDetails> choosePatterns(AEKey output, Object2DoubleMap<AEKey> scarcity)
         throws InterruptedException {
@@ -72,7 +72,6 @@ public class GraphBuilder {
         double best = Double.POSITIVE_INFINITY;
         for (int patternIndex = 0, patternCount = patterns.size(); patternIndex < patternCount; patternIndex++) {
             var pattern = patterns.get(patternIndex);
-            if (pattern != primary && !isNativePattern(pattern)) continue;
             long made = candidateOutputAmount(what, pattern);
             if (made <= 0) continue;
             double cost = 0;

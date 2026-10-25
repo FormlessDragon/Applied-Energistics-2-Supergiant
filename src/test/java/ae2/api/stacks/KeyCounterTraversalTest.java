@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -26,6 +27,42 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class KeyCounterTraversalTest {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void singleVariantCopiesOverflowAndLiveViewsSurviveAdditionalVariants(boolean saturating) {
+        var counter = saturating ? KeyCounter.saturating() : new KeyCounter();
+        var plain = AEItemKey.of(Items.STICK);
+        var taggedStack = new ItemStack(Items.STICK);
+        var tag = new NBTTagCompound();
+        tag.setString("variant", "second");
+        taggedStack.setTagCompound(tag);
+        var tagged = AEItemKey.of(taggedStack);
+        counter.set(plain, Long.MAX_VALUE - 1);
+        counter.add(plain, 10);
+        assertEquals(saturating ? Long.MAX_VALUE : Long.MIN_VALUE + 8, counter.get(plain));
+        var copy = saturating ? KeyCounter.saturating() : new KeyCounter();
+        copy.addAll(counter);
+        counter.remove(plain);
+        assertTrue(counter.isEmpty());
+        assertEquals(saturating ? Long.MAX_VALUE : Long.MIN_VALUE + 8, copy.get(plain));
+        counter.set(plain, Long.MIN_VALUE + 1);
+        counter.remove(plain, 10);
+        assertEquals(saturating ? Long.MIN_VALUE : Long.MAX_VALUE - 8, counter.get(plain));
+        var view = counter.findFuzzy(plain, FuzzyMode.IGNORE_ALL);
+        counter.set(tagged, -3);
+        assertEquals(2, view.size(), "a borrowed view must see newly added variants");
+        for (var entry : view) entry.setValue(7);
+        assertEquals(7, counter.get(plain));
+        assertEquals(7, counter.get(tagged));
+        counter.clear();
+        assertTrue(view.isEmpty());
+        counter.set(plain, 0);
+        assertEquals(1, view.size(), "zero amounts remain present until explicitly removed");
+        counter.removeZeros();
+        assertTrue(counter.isEmpty());
+        assertTrue(view.isEmpty());
+    }
+
     @BeforeAll
     static void bootstrap() {
         Bootstrap.register();

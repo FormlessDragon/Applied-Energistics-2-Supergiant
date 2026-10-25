@@ -8,13 +8,11 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKey2LongMap;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
-import ae2.container.ContainerConstants;
 import ae2.crafting.inv.ICraftingInventory;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
-import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
@@ -54,6 +52,9 @@ final class CraftingCpuReplay {
     private AEKey2LongMap batchDelta;
     private Object2ObjectOpenHashMap<IPatternDetails, KeyCounter> inputAllocations;
     private boolean independentCycleBatches;
+    private final KeyCounter required = new KeyCounter();
+    private final KeyCounter passRequired = new KeyCounter();
+    private AEKey2LongMap initialInventory;
 
     private CraftingCpuReplay(CraftingCalculation calculation, ICraftingPlan plan, KeyCounter extra) {
         this.calculation = calculation;
@@ -112,7 +113,7 @@ final class CraftingCpuReplay {
         for (var pattern : plan.patternTimes().keySet()) {
             if (pattern instanceof IAssemblerPattern assembler) {
                 calculation.handlePausing();
-                if (!hasFixedResultWithoutRemainders(pattern.getInputs(), assembler, calculation.getLevel())) {
+                if (!calculation.assemblerSimulation(assembler).hasFixedResultWithoutRemainders()) {
                     return false;
                 }
             }
@@ -149,30 +150,6 @@ final class CraftingCpuReplay {
         return null;
     }
 
-    private static boolean hasFixedResultWithoutRemainders(IPatternDetails.IInput[] inputs,
-                                                           IAssemblerPattern assembler, World level) {
-        if (CraftingCalculation.isCalculationThread()) {
-            return CraftingCalculation.runOnMainThread(() -> hasFixedResultWithoutRemainders(inputs, assembler, level));
-        }
-        var table = new KeyCounter[inputs.length];
-        for (int slot = 0; slot < inputs.length; slot++) {
-            var input = inputs[slot];
-            table[slot] = new KeyCounter();
-            var possible = input.possibleInputs();
-            if (possible.length == 1) {
-                table[slot].add(possible[0].what(),
-                    LongMath.saturatedMultiply(possible[0].amount(), input.getMultiplier()));
-            }
-        }
-        var grid = assemble(assembler, table, level);
-        if (grid == null) return false;
-        var remainders = assembler.getRemainingItems(grid);
-        for (int slot = 0; slot < remainders.size(); slot++) {
-            if (!remainders.get(slot).isEmpty()) return false;
-        }
-        return true;
-    }
-
     private boolean coversOutput(ICraftingPlan plan) {
         var output = plan.finalOutput();
         return this.inventory.getLong(output.what()) >= output.amount();
@@ -188,17 +165,11 @@ final class CraftingCpuReplay {
         }
     }
 
-    private static @Nullable InventoryCrafting assemble(IAssemblerPattern assembler, KeyCounter[] table, World level) {
-        var grid = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, 3, 3);
-        assembler.fillCraftingGrid(table, grid::setInventorySlotContents);
-        var result = GenericStack.fromItemStack(assembler.assemble(grid, level));
-        return assembler.getPrimaryOutput().equals(result) ? grid : null;
-    }
-
     private void recordAllocations(ICraftingPlan plan) {
         if (plan instanceof CraftingPlan concrete) {
             concrete.recordInputAllocations(this.inputAllocations == null ? Map.of() : this.inputAllocations);
             concrete.recordRemainderAllocations(this.remainderAllocations);
+            if (this.initialInventory != null) concrete.recordRequiredItems(this.required);
         }
     }
 
@@ -258,7 +229,7 @@ final class CraftingCpuReplay {
         for (int i = 0; i < this.tasks.size(); i++) {
             var task = this.tasks.get(i);
             if (task.pattern instanceof IAssemblerPattern assembler
-                && !hasFixedResultWithoutRemainders(task.inputs, assembler, this.level)) return false;
+                && !this.calculation.assemblerSimulation(assembler).hasFixedResultWithoutRemainders()) return false;
         }
         return true;
     }
@@ -271,6 +242,12 @@ final class CraftingCpuReplay {
      */
     private boolean run() throws InterruptedException {
         this.independentCycleBatches = fixedInputChoices();
+        // Stock trimming is for assembler remainders. Ordinary processing plans do not need a second inventory
+        // or a per-craft peak counter, including large legacy trees with processing cycles.
+        if (this.tasks.stream().anyMatch(task -> task.pattern instanceof IAssemblerPattern)) {
+            this.initialInventory = new AEKey2LongMap.OpenHashMap();
+            this.initialInventory.putAll(this.inventory);
+        }
         // Totals-only validation never needs replay scratch state.
         this.passDelta = new AEKey2LongMap.OpenHashMap(this.tasks.size());
         this.passTaken = new AEKey2LongMap.OpenHashMap(this.tasks.size());
@@ -289,6 +266,7 @@ final class CraftingCpuReplay {
             this.passDelta.clear();
             this.passTaken.clear();
             this.passReserve.clear();
+            this.passRequired.clear();
             boolean exact = true;
             for (int taskIndex = 0; taskIndex < this.tasks.size(); taskIndex++) {
                 this.calculation.handlePausing();
@@ -318,6 +296,7 @@ final class CraftingCpuReplay {
                             this.inputAllocations.put(task.pattern, task.consumed);
                         }
                         task.consumed.addAll(batch.consumed);
+                        batch.peak.forEach(this::require);
                         batch.delta.forEach((key, amount) -> {
                             index(key);
                             this.inventory.addTo(key, amount);
@@ -376,6 +355,11 @@ final class CraftingCpuReplay {
             if (loss > 0) repeats = Math.min(repeats, (available - required) / loss + 1);
         }
         if (repeats <= 0) return false;
+        for (var entry : taken.keys.object2LongEntrySet()) {
+            long need = LongMath.saturatedAdd(entry.getLongValue(),
+                LongMath.saturatedMultiply(Math.max(0, -delta.getLong(entry.getKey())), repeats - 1));
+            require(entry.getKey(), need);
+        }
         for (var entry : delta.object2LongEntrySet()) {
             long change = LongMath.saturatedMultiply(entry.getLongValue(), repeats);
             this.inventory.addTo(entry.getKey(), change);
@@ -441,6 +425,11 @@ final class CraftingCpuReplay {
         if (repeats <= 0 || repeats == Long.MAX_VALUE) {
             return;
         }
+        for (var entry : this.passRequired) {
+            long need = LongMath.saturatedAdd(entry.getLongValue(),
+                LongMath.saturatedMultiply(Math.max(0, -this.passDelta.getLong(entry.getKey())), repeats - 1));
+            require(entry.getKey(), need);
+        }
         for (int patternIndex = 0; patternIndex < crafted.size(); patternIndex++) {
             var task = crafted.get(patternIndex);
             task.remaining -= repeats;
@@ -495,9 +484,19 @@ final class CraftingCpuReplay {
     }
 
     private void applyTaken(AEKey key, long amount) {
+        require(key, amount);
+        if (this.initialInventory != null) this.passRequired.set(key, Math.max(this.passRequired.get(key),
+            LongMath.saturatedSubtract(amount, this.passDelta.getLong(key))));
         this.inventory.addTo(key, -amount);
         this.passDelta.addTo(key, -amount);
         this.passTaken.addTo(key, amount);
+    }
+
+    private void require(AEKey key, long amount) {
+        if (this.initialInventory == null) return;
+        long fromInitial = LongMath.saturatedAdd(amount,
+            LongMath.saturatedSubtract(this.initialInventory.getLong(key), this.inventory.getLong(key)));
+        this.required.set(key, Math.max(this.required.get(key), fromInitial));
     }
 
     private void applyContainer(AEKey key, long amount) {
@@ -518,7 +517,7 @@ final class CraftingCpuReplay {
         containers.clear();
         if (pattern instanceof IAssemblerPattern assembler) {
             if (task.assemblerSimulation == null)
-                task.assemblerSimulation = new CraftingAssemblerSimulation(assembler, this.level);
+                task.assemblerSimulation = this.calculation.assemblerSimulation(assembler);
             var result = task.assemblerSimulation.select(view(task), false);
             if (result == null) return null;
             task.lastAssemblerResult = result;
