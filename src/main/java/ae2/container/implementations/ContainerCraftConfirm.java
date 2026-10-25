@@ -53,6 +53,8 @@ import ae2.core.network.clientbound.CraftConfirmPlanPacket;
 import ae2.core.network.serverbound.SwitchGuisPacket;
 import ae2.crafting.BatchCraftingPlan;
 import ae2.crafting.CraftingCalculationFailure;
+import ae2.crafting.CraftingAmountOverflow;
+import ae2.api.stacks.AmountOverflowException;
 import ae2.crafting.TemporaryPseudoCraftingProvider;
 import ae2.crafting.execution.CraftingSubmitResult;
 import ae2.items.tools.powered.WirelessTerminals;
@@ -298,6 +300,9 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
         Throwable cause = error instanceof ExecutionException && error.getCause() != null ? error.getCause() : error;
         if (cause instanceof CraftingCalculationFailure calculationFailure) {
             return calculationFailure.getLocalizedMessageComponent();
+        }
+        if (cause instanceof AmountOverflowException overflow) {
+            return new CraftingAmountOverflow(overflow).getLocalizedMessageComponent();
         }
         return PlayerMessages.CraftingNoPlan.text();
     }

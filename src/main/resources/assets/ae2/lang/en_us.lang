@@ -139,6 +139,7 @@ chat.ae2.CraftingNoNetOutputCycle=§7  Cycle: §r%s
 chat.ae2.CraftingNoNetOutputPattern=§7  %s: %s at %s %s %s (%s)
 chat.ae2.CraftingNoNetOutputPatternUnplaced=§7  %s: no machine holds this pattern
 chat.ae2.CraftingTooLong=The crafting calculation took longer than this server allows. Request a smaller amount, or raise craftingCalculationLimitSeconds in the config.
+chat.ae2.CraftingAmountOverflow=Crafting plan cancelled: the required or crafted amount of %s (%s) exceeds the limit of %s. Request a smaller amount.
 chat.ae2.CraftingSupplierNotFound=No supplier found to highlight.
 chat.ae2.CraftingTreeScreenshotFailed=Failed to save crafting tree screenshot: %s
 chat.ae2.CraftingTreeScreenshotNoData=No crafting tree data available for screenshot.

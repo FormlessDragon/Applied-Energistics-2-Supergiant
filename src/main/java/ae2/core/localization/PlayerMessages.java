@@ -99,6 +99,7 @@ public enum PlayerMessages implements LocalizationEnum {
     CraftingNoNetOutputPattern,
     CraftingNoNetOutputPatternUnplaced,
     CraftingTooLong,
+    CraftingAmountOverflow,
     CraftingTreeScreenshotFailed,
     CraftingTreeScreenshotNoData,
     CraftingTreeScreenshotSaved,

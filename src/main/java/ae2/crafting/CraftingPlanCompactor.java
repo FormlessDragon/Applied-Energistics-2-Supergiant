@@ -3,6 +3,7 @@ package ae2.crafting;
 import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.AmountOverflowException;
 import ae2.api.stacks.AEKey2LongMap;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
@@ -89,7 +90,7 @@ final class CraftingPlanCompactor {
         for (var pattern : plan.patternTimes().keySet()) {
             for (var output : pattern.getOutputs()) primaryOutputs.add(output.what());
         }
-        var used = new KeyCounter();
+        var used = KeyCounter.checked();
         boolean changed = false;
         for (var entry : plan.usedItems()) {
             var key = entry.getKey();
@@ -121,7 +122,7 @@ final class CraftingPlanCompactor {
         if (!plan.missingItems().isEmpty() && plan.patternTimes().keySet().stream().anyMatch(IAssemblerPattern.class::isInstance)) {
             // Discovery follows dependencies in tree order. The CPU can run a returning sibling before the
             // sibling that finally consumes its tool, so prove whether the discovered shortage is real.
-            var supplied = plan.withContents(plan.usedItems(), plan.emittedItems(), new KeyCounter(), plan.patternTimes(), calculation);
+            var supplied = plan.withContents(plan.usedItems(), plan.emittedItems(), KeyCounter.checked(), plan.patternTimes(), calculation);
             if (CraftingCpuReplay.runs(supplied, calculation)) return supplied;
         }
         if (!craftableMissing && CraftingCpuReplay.runs(plan, calculation)) {
@@ -131,6 +132,8 @@ final class CraftingPlanCompactor {
         CraftingPlan compacted;
         try {
             compacted = compact(plan, calculation);
+        } catch (AmountOverflowException overflow) {
+            throw overflow;
         } catch (CraftingCalculationFailure | ArithmeticException unbalanced) {
             compacted = plan;
         }
@@ -140,6 +143,8 @@ final class CraftingPlanCompactor {
         try {
             var guarded = new CraftingPlanCompactor(calculation).repairInputChoices(plan);
             if (guarded != null) return guarded;
+        } catch (AmountOverflowException overflow) {
+            throw overflow;
         } catch (ArithmeticException overflow) {
             // A conservative bound may overflow even when a more specific allocation does not.
         }
@@ -151,7 +156,7 @@ final class CraftingPlanCompactor {
         if (lacking.isEmpty()) {
             return compacted;
         }
-        var missing = new KeyCounter();
+        var missing = KeyCounter.checked();
         missing.addAll(compacted.missingItems());
         missing.addAll(lacking);
         var result = compacted.withContents(compacted.usedItems(), compacted.emittedItems(), missing,
@@ -172,7 +177,7 @@ final class CraftingPlanCompactor {
             if (returnedGroups.contains(key.getPrimaryKey())) candidates.add(key);
         }
         if (candidates.isEmpty()) return plan;
-        var missing = new KeyCounter();
+        var missing = KeyCounter.checked();
         missing.addAll(plan.missingItems());
         for (var key : candidates) missing.remove(key, missing.get(key));
         missing.removeZeros();
@@ -183,7 +188,7 @@ final class CraftingPlanCompactor {
             long low = 0, high = plan.missingItems().get(key);
             while (low < high) {
                 long middle = low + (high - low) / 2;
-                missing = new KeyCounter();
+                missing = KeyCounter.checked();
                 missing.addAll(plan.missingItems());
                 missing.set(key, middle);
                 missing.removeZeros();
@@ -220,10 +225,14 @@ final class CraftingPlanCompactor {
                 return plan;
             }
             return compacted;
+        } catch (AmountOverflowException overflow) {
+            throw overflow;
         } catch (ArithmeticException overflow) {
             // Raising crafts without limit overflows on a cycle that consumes more than it makes
             try {
                 return compactor.repairAsIs(plan);
+            } catch (AmountOverflowException materialOverflow) {
+                throw materialOverflow;
             } catch (ArithmeticException again) {
                 return keepOrFail(plan, compactor.planBalanced);
             }
@@ -333,7 +342,7 @@ final class CraftingPlanCompactor {
         var guarded = rebuild(plan, times, taken);
         // The bound includes mutually exclusive choices. The actual CPU order may need less stock than that bound.
         if (!guarded.missingItems().isEmpty()) {
-            var supplied = guarded.withContents(guarded.usedItems(), guarded.emittedItems(), new KeyCounter(),
+            var supplied = guarded.withContents(guarded.usedItems(), guarded.emittedItems(), KeyCounter.checked(),
                 guarded.patternTimes(), this.calculation);
             if (CraftingCpuReplay.runs(supplied, this.calculation)) return supplied;
         }
@@ -678,7 +687,7 @@ final class CraftingPlanCompactor {
 
     private static CraftingPlan withMissing(CraftingPlan plan, AEKey what, long amount,
                                             CraftingCalculation calculation) {
-        final KeyCounter missing = new KeyCounter();
+        final KeyCounter missing = KeyCounter.checked();
         missing.addAll(plan.missingItems());
         missing.add(what, amount);
         return plan.withContents(plan.usedItems(), plan.emittedItems(), missing, plan.patternTimes(), calculation);
@@ -1169,7 +1178,7 @@ final class CraftingPlanCompactor {
         }
         // Take from the network first, then from emitters, and only the rest is missing
         final long[] left = taken.clone();
-        final KeyCounter used = new KeyCounter();
+        final KeyCounter used = KeyCounter.checked();
         for (int key = 0; key < left.length; key++) {
             final long amount = Math.min(left[key], key < this.stock.length ? this.stock[key] : 0);
             if (amount > 0) {
@@ -1184,7 +1193,7 @@ final class CraftingPlanCompactor {
             }
         });
         final KeyCounter emitted = take(plan.emittedItems(), left);
-        final KeyCounter missing = new KeyCounter();
+        final KeyCounter missing = KeyCounter.checked();
         plan.missingItems().forEach((entryKey, entryAmount) -> {
             if (this.keyIndex.getInt(entryKey) < 0) {
                 missing.add(entryKey, entryAmount);
@@ -1199,7 +1208,7 @@ final class CraftingPlanCompactor {
     }
 
     private KeyCounter take(KeyCounter source, long[] left) {
-        final KeyCounter result = new KeyCounter();
+        final KeyCounter result = KeyCounter.checked();
         source.forEach((entryKey, entryAmount) -> {
             final int key = this.keyIndex.getInt(entryKey);
             if (key < 0 || key >= left.length) {
@@ -1310,8 +1319,8 @@ final class CraftingPlanCompactor {
         static Recipe of(IPatternDetails pattern, long limit, CraftingPlanCompactor compactor) {
             final boolean substitutes = PseudoPatternDetails.unwrap(pattern) instanceof IAssemblerPattern assembler
                 && assembler.canSubstitute();
-            final AEKey2LongMap inputs = new AEKey2LongMap.OpenHashMap();
-            final AEKey2LongMap outputs = new AEKey2LongMap.OpenHashMap();
+            final AEKey2LongMap inputs = new AEKey2LongMap.CheckedOpenHashMap();
+            final AEKey2LongMap outputs = new AEKey2LongMap.CheckedOpenHashMap();
             final List<Slot> slots = new ArrayList<>();
             for (IPatternDetails.IInput input : pattern.getInputs()) {
                 final GenericStack[] possible = input.possibleInputs();

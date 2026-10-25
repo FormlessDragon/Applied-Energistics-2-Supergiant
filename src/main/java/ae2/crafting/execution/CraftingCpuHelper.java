@@ -27,10 +27,10 @@ import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.api.stacks.KeyAmounts;
 import ae2.crafting.CraftingAssemblerSimulation;
 import ae2.crafting.inv.ICraftingInventory;
 import ae2.crafting.inv.ListCraftingInventory;
-import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
@@ -138,7 +138,7 @@ public class CraftingCpuHelper {
                     continue;
                 }
 
-                list.add(template.key(), LongMath.saturatedMultiply(extracted, template.amount()));
+                list.add(template.key(), KeyAmounts.multiply(template.key(), extracted, template.amount()));
 
                 // Container items!
                 var containerItem = inputs[x].getRemainingKey(template.key());
@@ -166,7 +166,7 @@ public class CraftingCpuHelper {
 
         // Add pattern outputs.
         for (var output : details.getOutputs()) {
-            expectedOutputs.add(output.what(), LongMath.saturatedMultiply(output.amount(), multiplier));
+            expectedOutputs.add(output.what(), KeyAmounts.multiply(output.what(), output.amount(), multiplier));
         }
 
         return inputHolder;
@@ -310,14 +310,14 @@ public class CraftingCpuHelper {
      * Extract a whole number of templates, and return how many were extracted.
      */
     public static long extractTemplates(ICraftingInventory inv, InputTemplate template, long multiplier) {
-        long maxTotal = LongMath.saturatedMultiply(template.amount(), multiplier);
+        long maxTotal = KeyAmounts.multiply(template.key(), template.amount(), multiplier);
         // Extract as much as possible.
         var extracted = inv.extract(template.key(), maxTotal, Actionable.SIMULATE);
         if (extracted == 0)
             return 0;
         // Adjust to have a whole number of templates.
         multiplier = extracted / template.amount();
-        maxTotal = LongMath.saturatedMultiply(template.amount(), multiplier);
+        maxTotal = KeyAmounts.multiply(template.key(), template.amount(), multiplier);
         if (maxTotal == 0)
             return 0;
         extracted = inv.extract(template.key(), maxTotal, Actionable.MODULATE);

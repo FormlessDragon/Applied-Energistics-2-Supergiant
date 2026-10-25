@@ -24,6 +24,7 @@ import ae2.api.networking.crafting.ICraftingProvider;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.api.stacks.KeyAmounts;
 import ae2.crafting.graph.CraftingGraphDisplaySnapshot;
 import ae2.integration.data.LiteCraftTreeNode;
 import com.google.common.math.LongMath;
@@ -143,8 +144,8 @@ public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarri
         for (var entry : patternTimes.object2LongEntrySet()) {
             for (var output : entry.getKey().getOutputs()) {
                 if (finalOutput.matches(output)) {
-                    crafted = LongMath.saturatedAdd(crafted,
-                        LongMath.saturatedMultiply(entry.getLongValue(), output.amount()));
+                    crafted = KeyAmounts.add(finalOutput, crafted,
+                        KeyAmounts.multiply(finalOutput, entry.getLongValue(), output.amount()));
                 }
             }
         }

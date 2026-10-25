@@ -5,6 +5,7 @@ import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.networking.crafting.ICraftingProvider;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.AmountOverflowException;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.integration.data.LiteCraftTreeNode;
@@ -102,6 +103,24 @@ class BatchCraftingPlanTest {
             () -> BatchCraftingPlan.combine(new GenericStack(mainOutput, 4), List.of(simulation), List.of()));
         assertThrows(IllegalArgumentException.class,
             () -> BatchCraftingPlan.combine(new GenericStack(mainOutput, 4), List.of(), List.of()));
+    }
+
+    @Test
+    void combinedMaterialAndPatternCountsMustFitEvenWhenEachSubPlanFits() {
+        var first = new TestPlan(new GenericStack(coal, 1), 1, counter(rawMaterial, Long.MAX_VALUE), new KeyCounter());
+        var second = new TestPlan(new GenericStack(stick, 1), 1, counter(rawMaterial, 1), new KeyCounter());
+        var materialFailure = assertThrows(AmountOverflowException.class,
+            () -> BatchCraftingPlan.combine(new GenericStack(mainOutput, 1), List.of(first, second), List.of()));
+        assertEquals(rawMaterial, materialFailure.getKey());
+
+        first.usedItems.clear();
+        second.usedItems.clear();
+        var shared = new TestPattern();
+        first.patternTimes.put(shared, Long.MAX_VALUE);
+        second.patternTimes.put(shared, 1);
+        var patternFailure = assertThrows(AmountOverflowException.class,
+            () -> BatchCraftingPlan.combine(new GenericStack(mainOutput, 1), List.of(first, second), List.of()));
+        assertEquals(coal, patternFailure.getKey());
     }
 
 
@@ -223,7 +242,7 @@ class BatchCraftingPlanTest {
 
         @Override
         public List<GenericStack> getOutputs() {
-            return List.of();
+            return List.of(new GenericStack(coal, 1));
         }
 
         @Override

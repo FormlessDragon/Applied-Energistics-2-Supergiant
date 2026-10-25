@@ -2,6 +2,7 @@ package ae2.crafting.graph;
 
 import ae2.api.config.Actionable;
 import ae2.api.stacks.KeyCounter;
+import ae2.api.stacks.KeyAmounts;
 import ae2.crafting.CraftingCalculation;
 import ae2.crafting.inv.CraftingSimulationState;
 import ae2.helpers.patternprovider.PseudoPatternDetails;
@@ -68,7 +69,7 @@ public class DemandPropagation {
                 // A solved component already planned what its nodes take from each other
                 if (!edge.cycleCut() && edge.producer() != null
                     && !(cyclic && topology.getComponentId(edge.producer()) == topology.getComponentId(node))) {
-                    edge.producer().addDemandAmount(LongMath.saturatedMultiply(times, edge.amountPerCraft()));
+                    edge.producer().addDemandAmount(KeyAmounts.multiply(edge.inputKey(), times, edge.amountPerCraft()));
                 }
             }
             propagateLocalUnitBoundary(node);
@@ -162,8 +163,8 @@ public class DemandPropagation {
         // The requested output is new production: even when it is also the seed, stock cannot satisfy the request.
         long missingSeed = Math.max(0, seedRequired - stock);
         long batches = divideCeil(root ? demand : Math.max(0, demand - missingSeed), directNet);
-        long plannedOutput = LongMath.saturatedAdd(seedRequired,
-            LongMath.saturatedMultiply(batches, directNet));
+        long plannedOutput = KeyAmounts.add(node.getWhat(), seedRequired,
+            KeyAmounts.multiply(node.getWhat(), batches, directNet));
         node.setCraftTimes(batches);
         feedback.markCycleCut(seedRequired);
         feedback.setReserveDemand(directNet);
@@ -269,10 +270,10 @@ public class DemandPropagation {
             var node = nodes.get(i);
             node.setCraftTimes(runs[i]);
             craftTimes.put(node, runs[i]);
-            plannedOutput.put(node, LongMath.saturatedMultiply(node.getOutputPerCraft(), runs[i]));
+            plannedOutput.put(node, KeyAmounts.multiply(node.getWhat(), node.getOutputPerCraft(), runs[i]));
             int producer = indexes.getInt(ring[i].producer());
             if (i > producer) {
-                long taken = LongMath.saturatedMultiply(ring[i].amountPerCraft(), runs[i]);
+                long taken = KeyAmounts.multiply(ring[i].inputKey(), ring[i].amountPerCraft(), runs[i]);
                 long fromStorage = Math.min(LongMath.saturatedAdd(stock[producer], seed[producer]), taken);
                 ring[i].markCycleCut(fromStorage);
                 ring[i].setReserveDemand(0);
@@ -299,13 +300,12 @@ public class DemandPropagation {
             }
             boolean changed = false;
             for (int i = 0; i < runs.length; i++) {
-                long taken = LongMath.saturatedMultiply(ring[consumer[i]].amountPerCraft(), runs[consumer[i]]);
-                long internal = LongMath.saturatedAdd(taken, reserve[i]);
+                long taken = KeyAmounts.multiply(nodes.get(i).getWhat(), ring[consumer[i]].amountPerCraft(), runs[consumer[i]]);
+                long internal = KeyAmounts.add(nodes.get(i).getWhat(), taken, reserve[i]);
                 long supply = LongMath.saturatedAdd(stock[i], seed[i]);
                 long needed = nodes.get(i) == root
-                    ? LongMath.saturatedAdd(demand[i], Math.max(0, internal - supply))
-                    : Math.max(0, LongMath.saturatedAdd(demand[i], internal) - supply);
-                if (needed == Long.MAX_VALUE) return false;
+                    ? KeyAmounts.add(nodes.get(i).getWhat(), demand[i], Math.max(0, internal - supply))
+                    : Math.max(0, KeyAmounts.add(nodes.get(i).getWhat(), demand[i], internal) - supply);
                 long times = divideCeil(needed, nodes.get(i).getOutputPerCraft());
                 if (times != runs[i]) {
                     runs[i] = times;
@@ -354,7 +354,7 @@ public class DemandPropagation {
         if (sccPlan == null) {
             var localPlan = graph.getLocalComponentPlan(component.id());
             sccPlan = SccPlan.localPlan(component.id(), component.nodes(),
-                localPlan == null ? new KeyCounter() : localPlan.boundaryDemands());
+                localPlan == null ? KeyCounter.checked() : localPlan.boundaryDemands());
             graph.setSccPlan(component.id(), sccPlan);
         }
         sccPlan.restorePlanning();

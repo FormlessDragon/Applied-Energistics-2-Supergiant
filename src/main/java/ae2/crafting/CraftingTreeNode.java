@@ -22,6 +22,7 @@ import ae2.api.config.Actionable;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.networking.crafting.ICraftingService;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.KeyAmounts;
 import ae2.api.stacks.KeyCounter;
 import ae2.core.localization.PlayerMessages;
 import ae2.crafting.execution.CraftingCpuHelper;
@@ -263,7 +264,7 @@ public class CraftingTreeNode {
                         }
                     }
                     this.job.addIntermediateFinalOutputInput(template.key(),
-                        LongMath.saturatedMultiply(extracted, template.amount()));
+                        KeyAmounts.multiply(template.key(), extracted, template.amount()));
 
                     if (requestedAmount == 0) {
                         recordMemo(memoKey, recorder, snapshot, inv, requested);
@@ -499,7 +500,7 @@ public class CraftingTreeNode {
 
                 available = extractCraftedBranchOutput(child, totalRequestedItems);
                 if (craftedPerPattern > 0) {
-                    available = Math.min(available, LongMath.saturatedMultiply(craftedPerPattern, times));
+                    available = Math.min(available, KeyAmounts.multiply(this.what, craftedPerPattern, times));
                 }
                 if (available > 0) {
                     child.applyDiff(inv);
@@ -545,7 +546,7 @@ public class CraftingTreeNode {
                 long extracted = CraftingCpuHelper.extractTemplates(inv, template, maxAmount - available);
                 available = LongMath.saturatedAdd(available, extracted);
                 this.job.addIntermediateFinalOutputInput(template.key(),
-                    LongMath.saturatedMultiply(extracted, template.amount()));
+                    KeyAmounts.multiply(template.key(), extracted, template.amount()));
                 if (available >= maxAmount) {
                     return maxAmount;
                 }
@@ -707,14 +708,14 @@ public class CraftingTreeNode {
     }
 
     private long extractPseudoTemplates(CraftingSimulationState inv, InputTemplate template, long multiplier) {
-        long maxTotal = LongMath.saturatedMultiply(template.amount(), multiplier);
+        long maxTotal = KeyAmounts.multiply(template.key(), template.amount(), multiplier);
         long extracted = inv.extractPseudo(template.key(), maxTotal, Actionable.SIMULATE);
         if (extracted == 0) {
             return 0;
         }
 
         multiplier = extracted / template.amount();
-        maxTotal = LongMath.saturatedMultiply(template.amount(), multiplier);
+        maxTotal = KeyAmounts.multiply(template.key(), template.amount(), multiplier);
         if (maxTotal == 0) {
             return 0;
         }
@@ -739,7 +740,7 @@ public class CraftingTreeNode {
             long netOutput = !returnedAsOutput && recursiveBatch.netOutput() > 0
                 ? recursiveBatch.netOutput() : craftedPerPattern;
             long rootTimes = returnedAsOutput ? 1 : Math.max(1, recursiveBatch.rootTimes());
-            times = LongMath.saturatedMultiply(divideCeil(totalRequestedItems, netOutput), rootTimes);
+            times = KeyAmounts.multiply(this.what, divideCeil(totalRequestedItems, netOutput), rootTimes);
         }
         return pro.getTimesRequiredForSiblingRemainders(this, inventory, totalRequestedItems, times);
     }
@@ -907,7 +908,7 @@ public class CraftingTreeNode {
     }
 
     private long getTotalRequestedItems(long requestedAmount) {
-        return LongMath.saturatedMultiply(requestedAmount, this.amount);
+        return KeyAmounts.multiply(this.what, requestedAmount, this.amount);
     }
 
     private boolean isTopLevelRequestedOutput() {
@@ -926,7 +927,7 @@ public class CraftingTreeNode {
         private @Nullable KeyCounter containerItems;
 
         void recordContainerItem(AEKey key, long amount) {
-            if (this.containerItems == null) this.containerItems = new KeyCounter();
+            if (this.containerItems == null) this.containerItems = KeyCounter.checked();
             this.containerItems.add(key, amount);
         }
 
@@ -950,7 +951,7 @@ public class CraftingTreeNode {
                         Reference2LongMap<CraftingTreeNode> snapshotRecursiveDisplayRequests) {
 
         static MemoSnapshot capture(CraftingCalculation job) {
-            var snapshotMissing = new KeyCounter();
+            var snapshotMissing = KeyCounter.checked();
             snapshotMissing.addAll(job.getMissingItems());
 
             long snapshotIntermediateFinalOutput = job.getIntermediateFinalOutputMarker();

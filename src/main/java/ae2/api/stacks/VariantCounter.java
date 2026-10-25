@@ -18,15 +18,16 @@ import java.util.function.ObjLongConsumer;
  * Tallies a negative or positive amount for sub-variants of a {@link AEKey}.
  */
 abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
-    private final boolean saturating;
+    private final KeyCounter.OverflowPolicy overflowPolicy;
 
-    protected VariantCounter(boolean saturating) {
-        this.saturating = saturating;
+    protected VariantCounter(KeyCounter.OverflowPolicy overflowPolicy) {
+        this.overflowPolicy = overflowPolicy;
     }
 
-    protected final long sum(long left, long right) {
+    protected final long sum(AEKey key, long left, long right) {
+        if (overflowPolicy == KeyCounter.OverflowPolicy.REJECT) return KeyAmounts.add(key, left, right);
         long result = left + right;
-        if (saturating && ((left ^ result) & (right ^ result)) < 0) {
+        if (overflowPolicy == KeyCounter.OverflowPolicy.SATURATE && ((left ^ result) & (right ^ result)) < 0) {
             return right < 0 ? Long.MIN_VALUE : Long.MAX_VALUE;
         }
         return result;
@@ -38,18 +39,10 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
 
     public void add(AEKey key, long amount) {
         var records = getRecords();
-        if (saturating) {
-            long newAmount;
-            long left = records.getLong(key);
-            long result = left + amount;
-            if (((left ^ result) & (amount ^ result)) < 0) {
-                newAmount = result < 0 ? Long.MAX_VALUE : Long.MIN_VALUE;
-            } else {
-                newAmount = result;
-            }
-            records.put(key, newAmount);
-        } else {
+        if (overflowPolicy == KeyCounter.OverflowPolicy.WRAP) {
             records.addTo(key, amount);
+        } else {
+            records.put(key, sum(key, records.getLong(key), amount));
         }
     }
 
@@ -68,6 +61,7 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     public void removeAll(VariantCounter other) {
         other.forEachEntry((key, amount) -> {
             if (amount == Long.MIN_VALUE) {
+                if (overflowPolicy == KeyCounter.OverflowPolicy.REJECT) KeyAmounts.subtract(key, 0, amount);
                 add(key, Long.MAX_VALUE);
             } else {
                 add(key, -amount);
@@ -118,10 +112,11 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         getRecords().clear();
     }
 
-    public abstract VariantCounter copy(boolean saturating);
+    public abstract VariantCounter copy(KeyCounter.OverflowPolicy overflowPolicy);
 
     public void invert() {
-        forEachEntry((key, amount) -> set(key, amount == Long.MIN_VALUE ? Long.MAX_VALUE : -amount));
+        forEachEntry((key, amount) -> set(key, overflowPolicy == KeyCounter.OverflowPolicy.REJECT
+            ? KeyAmounts.subtract(key, 0, amount) : amount == Long.MIN_VALUE ? Long.MAX_VALUE : -amount));
     }
 
     public void removeZeros() {
@@ -145,12 +140,12 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         private @Nullable AEKey singleKey;
         private long singleAmount;
 
-        UnorderedVariantMap(boolean saturating) {
-            this(saturating, 1);
+        UnorderedVariantMap(KeyCounter.OverflowPolicy overflowPolicy) {
+            this(overflowPolicy, 1);
         }
 
-        private UnorderedVariantMap(boolean saturating, int expected) {
-            super(saturating);
+        private UnorderedVariantMap(KeyCounter.OverflowPolicy overflowPolicy, int expected) {
+            super(overflowPolicy);
             if (expected > 1) this.records = new AEKey2LongMap.OpenHashMap(expected);
         }
 
@@ -167,7 +162,7 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
                 singleKey = key;
                 singleAmount = amount;
             } else if (singleKey.equals(key)) {
-                singleAmount = sum(singleAmount, amount);
+                singleAmount = sum(key, singleAmount, amount);
             } else {
                 getRecords();
                 super.add(key, amount);
@@ -249,8 +244,8 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         }
 
         @Override
-        public VariantCounter copy(boolean saturating) {
-            var result = new UnorderedVariantMap(saturating, size());
+        public VariantCounter copy(KeyCounter.OverflowPolicy overflowPolicy) {
+            var result = new UnorderedVariantMap(overflowPolicy, size());
             forEachEntry(result::set);
             return result;
         }
@@ -263,8 +258,8 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     static class FuzzyVariantMap extends VariantCounter {
         private final AEKey2LongMap.AVLTreeMap records = FuzzySearch.createMap2Long();
 
-        FuzzyVariantMap(boolean saturating) {
-            super(saturating);
+        FuzzyVariantMap(KeyCounter.OverflowPolicy overflowPolicy) {
+            super(overflowPolicy);
         }
 
         @Override
@@ -353,8 +348,8 @@ abstract class VariantCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         }
 
         @Override
-        public VariantCounter copy(boolean saturating) {
-            var result = new FuzzyVariantMap(saturating);
+        public VariantCounter copy(KeyCounter.OverflowPolicy overflowPolicy) {
+            var result = new FuzzyVariantMap(overflowPolicy);
             result.records.putAll(records);
             return result;
         }

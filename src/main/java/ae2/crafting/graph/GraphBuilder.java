@@ -3,11 +3,11 @@ package ae2.crafting.graph;
 import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.KeyAmounts;
 import ae2.api.stacks.GenericStack;
 import ae2.crafting.CraftingCalculation;
 import ae2.crafting.pattern.AECraftingPattern;
 import ae2.helpers.patternprovider.PseudoPatternDetails;
-import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
@@ -165,7 +165,7 @@ public class GraphBuilder {
                     if (possible.amount() <= 0) {
                         continue;
                     }
-                    var amount = LongMath.saturatedMultiply(possible.amount(), input.getMultiplier());
+                    var amount = KeyAmounts.multiply(possible.what(), possible.amount(), input.getMultiplier());
                     patternInputs.put(possible.what(), Math.max(patternInputs.getLong(possible.what()), amount));
                 }
             }
@@ -216,7 +216,7 @@ public class GraphBuilder {
         long amount = 0;
         for (var output : pattern.getOutputs()) {
             if (output.amount() > 0 && output.what().equals(what)) {
-                amount = LongMath.saturatedAdd(amount, output.amount());
+                amount = KeyAmounts.add(what, amount, output.amount());
             }
         }
         return amount;
@@ -242,7 +242,7 @@ public class GraphBuilder {
                 throw invalidPattern("empty pattern output");
             }
             if (output.what().equals(what)) {
-                requestedOutputAmount = LongMath.saturatedAdd(requestedOutputAmount, output.amount());
+                requestedOutputAmount = KeyAmounts.add(what, requestedOutputAmount, output.amount());
             }
         }
         if (requestedOutputAmount <= 0) {
@@ -360,9 +360,9 @@ public class GraphBuilder {
                 while (possibleInputIndex < possibleInputs.length) {
                     var possible = possibleInputs[possibleInputIndex++];
                     if (possible.amount() > 0 && (!possible.what().equals(what) || !localUnit)) {
-                        long amount = LongMath.saturatedMultiply(possible.amount(), inputEntry.getMultiplier());
+                        long amount = KeyAmounts.multiply(possible.what(), possible.amount(), inputEntry.getMultiplier());
                         patternInputs.put(possible.what(),
-                            LongMath.saturatedAdd(patternInputs.getLong(possible.what()), amount));
+                            KeyAmounts.add(possible.what(), patternInputs.getLong(possible.what()), amount));
                         if (inputSubstitutable) {
                             graph.addFuzzyKey(possible.what());
                         }

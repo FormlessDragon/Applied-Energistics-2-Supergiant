@@ -7,6 +7,7 @@ import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.api.stacks.KeyAmounts;
 import ae2.container.ContainerConstants;
 import ae2.crafting.execution.CraftingCpuHelper;
 import ae2.crafting.inv.ICraftingInventory;
@@ -74,9 +75,9 @@ public final class CraftingAssemblerSimulation {
         if (choice == null) return null;
         var table = new KeyCounter[assembler.getInputs().length];
         for (int i = 0; i < table.length; i++) {
-            table[i] = new KeyCounter();
+            table[i] = KeyCounter.checked();
             for (var stack : choice.inputs().get(i)) {
-                long amount = LongMath.saturatedMultiply(stack.amount(), multiplier);
+                long amount = KeyAmounts.multiply(stack.what(), stack.amount(), multiplier);
                 long extracted = source.extract(stack.what(), amount, Actionable.MODULATE);
                 table[i].add(stack.what(), extracted);
                 if (extracted != amount) {
@@ -85,10 +86,10 @@ public final class CraftingAssemblerSimulation {
                 }
             }
         }
-        choice.returned().forEach((key, amount) -> containers.add(key, LongMath.saturatedMultiply(amount, multiplier)));
+        choice.returned().forEach((key, amount) -> containers.add(key, KeyAmounts.multiply(key, amount, multiplier)));
         for (var output : assembler.getOutputs())
             outputs.add(output.what(),
-                LongMath.saturatedMultiply(output.amount(), multiplier));
+                KeyAmounts.multiply(output.what(), output.amount(), multiplier));
         return table;
     }
 
@@ -200,7 +201,7 @@ public final class CraftingAssemblerSimulation {
                 var possible = input.possibleInputs();
                 var bag = new ObjectArrayList<GenericStack>(possible.length == 0 ? 0 : 1);
                 if (possible.length > 0) bag.add(new GenericStack(possible[0].what(),
-                    LongMath.saturatedMultiply(possible[0].amount(), input.getMultiplier())));
+                    KeyAmounts.multiply(possible[0].what(), possible[0].amount(), input.getMultiplier())));
                 selected.add(bag);
             }
             defaultEvaluation = result = evaluate(selected);
@@ -232,7 +233,7 @@ public final class CraftingAssemblerSimulation {
         var grid = scratch.inventory;
         pattern.fillCraftingGrid(scratch.table, grid::setInventorySlotContents);
         if (!pattern.getPrimaryOutput().equals(GenericStack.fromItemStack(pattern.assemble(grid, level)))) return null;
-        var returns = new KeyCounter();
+        var returns = KeyCounter.checked();
         for (var remaining : pattern.getRemainingItems(grid)) {
             var stack = GenericStack.fromItemStack(remaining);
             if (stack != null) returns.add(stack.what(), stack.amount());
@@ -251,11 +252,11 @@ public final class CraftingAssemblerSimulation {
 
     private Result result(List<List<GenericStack>> inputs, Evaluation evaluated) {
         // Only the selected grid needs full material accounting. Candidate evaluations retain their returns alone.
-        var consumed = new KeyCounter();
+        var consumed = KeyCounter.checked();
         for (var bag : inputs) {
             for (var stack : bag) consumed.add(stack.what(), stack.amount());
         }
-        var output = new KeyCounter();
+        var output = KeyCounter.checked();
         output.addAll(evaluated.returned);
         for (var stack : pattern.getOutputs()) output.add(stack.what(), stack.amount());
         return new Result(inputs, consumed, evaluated.returned, output);
@@ -277,7 +278,7 @@ public final class CraftingAssemblerSimulation {
                     || returned.getKey().getPrimaryKey() == key.getPrimaryKey())) return in;
             }
         }
-        return LongMath.saturatedAdd(in, LongMath.saturatedMultiply(Math.max(0, in - result.output.get(key)), crafts - 1));
+        return KeyAmounts.add(key, in, KeyAmounts.multiply(key, Math.max(0, in - result.output.get(key)), crafts - 1));
     }
 
     // Borrowed, read-only material accounts. The simulator never changes a published result.
@@ -305,7 +306,7 @@ public final class CraftingAssemblerSimulation {
 
         private Grid(int inputs) {
             table = new KeyCounter[inputs];
-            Arrays.setAll(table, i -> new KeyCounter());
+            Arrays.setAll(table, i -> KeyCounter.checked());
         }
 
         private void fill(List<List<GenericStack>> inputs) {
@@ -327,7 +328,7 @@ public final class CraftingAssemblerSimulation {
         final Integer[] order;
         final boolean allowMissing;
         final KeyCounter[] selected;
-        final KeyCounter taken = new KeyCounter();
+        final KeyCounter taken = KeyCounter.checked();
         long bestMissing = Long.MAX_VALUE;
         int completeChoices;
         Evaluation best;
@@ -341,7 +342,7 @@ public final class CraftingAssemblerSimulation {
             this.order = order;
             this.allowMissing = allowMissing;
             selected = new KeyCounter[inputs.length];
-            Arrays.setAll(selected, i -> new KeyCounter());
+            Arrays.setAll(selected, i -> KeyCounter.checked());
         }
 
         void visit(int depth, long missing) {

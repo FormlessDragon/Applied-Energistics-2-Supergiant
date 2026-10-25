@@ -8,6 +8,7 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.AEKey2LongMap;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.api.stacks.KeyAmounts;
 import ae2.crafting.inv.ICraftingInventory;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -33,7 +34,7 @@ final class CraftingCpuReplay {
 
     private final World level;
     private final CraftingCalculation calculation;
-    private final AEKey2LongMap inventory = new AEKey2LongMap.OpenHashMap();
+    private final AEKey2LongMap inventory = new AEKey2LongMap.CheckedOpenHashMap();
     // Capture the CPU map's final order once. Repeated passes only need the remaining tasks in that order.
     private final ObjectArrayList<Task> tasks;
     private final Reference2ObjectOpenHashMap<IPatternDetails.IInput, ObjectArrayList<GenericStack>> candidates =
@@ -52,8 +53,8 @@ final class CraftingCpuReplay {
     private AEKey2LongMap batchDelta;
     private Object2ObjectOpenHashMap<IPatternDetails, KeyCounter> inputAllocations;
     private boolean independentCycleBatches;
-    private final KeyCounter required = new KeyCounter();
-    private final KeyCounter passRequired = new KeyCounter();
+    private final KeyCounter required = KeyCounter.checked();
+    private final KeyCounter passRequired = KeyCounter.checked();
     private AEKey2LongMap initialInventory;
 
     private CraftingCpuReplay(CraftingCalculation calculation, ICraftingPlan plan, KeyCounter extra) {
@@ -97,7 +98,7 @@ final class CraftingCpuReplay {
      */
     static boolean runs(ICraftingPlan plan, CraftingCalculation calculation) throws InterruptedException {
         calculation.handlePausing();
-        var replay = new CraftingCpuReplay(calculation, plan, new KeyCounter());
+        var replay = new CraftingCpuReplay(calculation, plan, KeyCounter.checked());
         if (replay.orderFree()) {
             return replay.balances(plan);
         }
@@ -126,7 +127,7 @@ final class CraftingCpuReplay {
      * no craft can run, adding everything the stuck crafts lack. Null when the replay gives up.
      */
     static @Nullable KeyCounter lacking(ICraftingPlan plan, CraftingCalculation calculation) throws InterruptedException {
-        var extra = new KeyCounter();
+        var extra = KeyCounter.checked();
         for (int attempt = 0; attempt < 1024; attempt++) {
             calculation.handlePausing();
             var replay = new CraftingCpuReplay(calculation, plan, extra);
@@ -160,8 +161,8 @@ final class CraftingCpuReplay {
         for (var input : task.inputs) {
             var possible = input.possibleInputs();
             if (possible.length == 0) continue;
-            consumed.add(possible[0].what(), LongMath.saturatedMultiply(crafts,
-                LongMath.saturatedMultiply(input.getMultiplier(), possible[0].amount())));
+            consumed.add(possible[0].what(), KeyAmounts.multiply(possible[0].what(), crafts,
+                KeyAmounts.multiply(possible[0].what(), input.getMultiplier(), possible[0].amount())));
         }
     }
 
@@ -190,12 +191,12 @@ final class CraftingCpuReplay {
             for (var input : task.inputs) {
                 var possible = input.possibleInputs();
                 if (possible.length == 0) continue;
-                balance.addTo(possible[0].what(), -LongMath.saturatedMultiply(
-                    LongMath.saturatedMultiply(possible[0].amount(), input.getMultiplier()), times));
+                balance.addTo(possible[0].what(), -KeyAmounts.multiply(possible[0].what(),
+                    KeyAmounts.multiply(possible[0].what(), possible[0].amount(), input.getMultiplier()), times));
             }
             for (int outputIndex = 0; outputIndex < task.outputs.size(); outputIndex++) {
                 var output = task.outputs.get(outputIndex);
-                balance.addTo(output.what(), LongMath.saturatedMultiply(output.amount(), times));
+                balance.addTo(output.what(), KeyAmounts.multiply(output.what(), output.amount(), times));
             }
         }
         var values = balance.values().iterator();
@@ -245,20 +246,20 @@ final class CraftingCpuReplay {
         // Stock trimming is for assembler remainders. Ordinary processing plans do not need a second inventory
         // or a per-craft peak counter, including large legacy trees with processing cycles.
         if (this.tasks.stream().anyMatch(task -> task.pattern instanceof IAssemblerPattern)) {
-            this.initialInventory = new AEKey2LongMap.OpenHashMap();
+            this.initialInventory = new AEKey2LongMap.CheckedOpenHashMap();
             this.initialInventory.putAll(this.inventory);
         }
         // Totals-only validation never needs replay scratch state.
-        this.passDelta = new AEKey2LongMap.OpenHashMap(this.tasks.size());
-        this.passTaken = new AEKey2LongMap.OpenHashMap(this.tasks.size());
-        this.passReserve = new AEKey2LongMap.OpenHashMap();
-        this.batchDelta = new AEKey2LongMap.OpenHashMap();
-        this.takenKeys = new AEKey2LongMap.OpenHashMap(4);
-        this.takenContainers = new AEKey2LongMap.OpenHashMap(1);
+        this.passDelta = new AEKey2LongMap.CheckedOpenHashMap(this.tasks.size());
+        this.passTaken = new AEKey2LongMap.CheckedOpenHashMap(this.tasks.size());
+        this.passReserve = new AEKey2LongMap.CheckedOpenHashMap();
+        this.batchDelta = new AEKey2LongMap.CheckedOpenHashMap();
+        this.takenKeys = new AEKey2LongMap.CheckedOpenHashMap(4);
+        this.takenContainers = new AEKey2LongMap.CheckedOpenHashMap(1);
         this.taken = new Taken(this.takenKeys, this.takenContainers);
         var crafted = new ObjectArrayList<Task>(this.tasks.size());
         var previousCrafted = new ObjectArrayList<Task>(this.tasks.size());
-        var previousDelta = new AEKey2LongMap.OpenHashMap(this.tasks.size());
+        var previousDelta = new AEKey2LongMap.CheckedOpenHashMap(this.tasks.size());
         var idle = new ObjectArrayList<Task>();
         for (int pass = 0; pass < MAX_PASSES; pass++) {
             crafted.clear();
@@ -290,7 +291,7 @@ final class CraftingCpuReplay {
                     if (next != null) {
                         var batch = CraftingAssemblerBatch.plan(task.assemblerSimulation, next, view(task), task.remaining);
                         if (task.consumed == null) {
-                            task.consumed = new KeyCounter();
+                            task.consumed = KeyCounter.checked();
                             addEncodedInputs(task, task.consumed, task.total - task.remaining);
                             if (this.inputAllocations == null) this.inputAllocations = new Object2ObjectOpenHashMap<>();
                             this.inputAllocations.put(task.pattern, task.consumed);
@@ -302,7 +303,7 @@ final class CraftingCpuReplay {
                             this.inventory.addTo(key, amount);
                         });
                         if (!batch.returned.isEmpty())
-                            this.remainderAllocations.computeIfAbsent(task.pattern, p -> new KeyCounter())
+                            this.remainderAllocations.computeIfAbsent(task.pattern, p -> KeyCounter.checked())
                                                      .addAll(batch.returned);
                         task.remaining -= batch.crafts;
                         exact = false;
@@ -356,12 +357,12 @@ final class CraftingCpuReplay {
         }
         if (repeats <= 0) return false;
         for (var entry : taken.keys.object2LongEntrySet()) {
-            long need = LongMath.saturatedAdd(entry.getLongValue(),
-                LongMath.saturatedMultiply(Math.max(0, -delta.getLong(entry.getKey())), repeats - 1));
+            long need = KeyAmounts.add(entry.getKey(), entry.getLongValue(),
+                KeyAmounts.multiply(entry.getKey(), Math.max(0, -delta.getLong(entry.getKey())), repeats - 1));
             require(entry.getKey(), need);
         }
         for (var entry : delta.object2LongEntrySet()) {
-            long change = LongMath.saturatedMultiply(entry.getLongValue(), repeats);
+            long change = KeyAmounts.multiply(entry.getKey(), entry.getLongValue(), repeats);
             this.inventory.addTo(entry.getKey(), change);
             this.passDelta.addTo(entry.getKey(), change);
         }
@@ -416,7 +417,7 @@ final class CraftingCpuReplay {
                         - this.seeds.reserved(task.pattern, candidate.what())));
                     gained = LongMath.saturatedAdd(gained, Math.max(0, this.passDelta.getLong(candidate.what())));
                 }
-                long need = LongMath.saturatedMultiply(possible[0].amount(), input.getMultiplier());
+                long need = KeyAmounts.multiply(possible[0].what(), possible[0].amount(), input.getMultiplier());
                 if (gained > 0 && held < need) {
                     repeats = Math.min(repeats, (need - 1 - held) / gained);
                 }
@@ -426,8 +427,8 @@ final class CraftingCpuReplay {
             return;
         }
         for (var entry : this.passRequired) {
-            long need = LongMath.saturatedAdd(entry.getLongValue(),
-                LongMath.saturatedMultiply(Math.max(0, -this.passDelta.getLong(entry.getKey())), repeats - 1));
+            long need = KeyAmounts.add(entry.getKey(), entry.getLongValue(),
+                KeyAmounts.multiply(entry.getKey(), Math.max(0, -this.passDelta.getLong(entry.getKey())), repeats - 1));
             require(entry.getKey(), need);
         }
         for (int patternIndex = 0; patternIndex < crafted.size(); patternIndex++) {
@@ -437,7 +438,7 @@ final class CraftingCpuReplay {
             if (task.consumed != null) {
                 if (task.lastAssemblerResult != null) {
                     for (var input : task.lastAssemblerResult.consumed()) {
-                        task.consumed.add(input.getKey(), LongMath.saturatedMultiply(input.getLongValue(), repeats));
+                        task.consumed.add(input.getKey(), KeyAmounts.multiply(input.getKey(), input.getLongValue(), repeats));
                     }
                 } else {
                     addEncodedInputs(task, task.consumed, repeats);
@@ -445,22 +446,22 @@ final class CraftingCpuReplay {
             }
         }
         for (var entry : this.passDelta.object2LongEntrySet()) {
-            this.inventory.addTo(entry.getKey(), LongMath.saturatedMultiply(entry.getLongValue(), repeats));
+            this.inventory.addTo(entry.getKey(), KeyAmounts.multiply(entry.getKey(), entry.getLongValue(), repeats));
         }
     }
 
     private void apply(Task task, Taken taken) {
         if (!taken.containers.isEmpty()) {
-            var returned = this.remainderAllocations.computeIfAbsent(task.pattern, p -> new KeyCounter());
+            var returned = this.remainderAllocations.computeIfAbsent(task.pattern, p -> KeyCounter.checked());
             taken.containers.forEachEntry(returned::add);
-            if (task.lastReturns == null) task.lastReturns = new KeyCounter();
+            if (task.lastReturns == null) task.lastReturns = KeyCounter.checked();
             task.lastReturns.clear();
             taken.containers.forEachEntry(task.lastReturns::add);
         } else if (task.lastReturns != null) task.lastReturns.clear();
         // Store only deviations from encoded inputs, aggregated per recipe/key. Fixed-input plans need no trace,
         // and repeated passes add a count rather than one allocation record per craft.
         if (!taken.exact && task.consumed == null) {
-            task.consumed = new KeyCounter();
+            task.consumed = KeyCounter.checked();
             addEncodedInputs(task, task.consumed, task.total - task.remaining);
             if (this.inputAllocations == null) this.inputAllocations = new Object2ObjectOpenHashMap<>();
             this.inputAllocations.put(task.pattern, task.consumed);
@@ -480,13 +481,13 @@ final class CraftingCpuReplay {
     private void repeatRemainders(Task task, long repeats) {
         if (task.lastReturns == null || task.lastReturns.isEmpty()) return;
         var returned = this.remainderAllocations.get(task.pattern);
-        task.lastReturns.forEach((key, count) -> returned.add(key, LongMath.saturatedMultiply(count, repeats)));
+        task.lastReturns.forEach((key, count) -> returned.add(key, KeyAmounts.multiply(key, count, repeats)));
     }
 
     private void applyTaken(AEKey key, long amount) {
         require(key, amount);
         if (this.initialInventory != null) this.passRequired.set(key, Math.max(this.passRequired.get(key),
-            LongMath.saturatedSubtract(amount, this.passDelta.getLong(key))));
+            KeyAmounts.subtract(key, amount, this.passDelta.getLong(key))));
         this.inventory.addTo(key, -amount);
         this.passDelta.addTo(key, -amount);
         this.passTaken.addTo(key, amount);
@@ -494,8 +495,8 @@ final class CraftingCpuReplay {
 
     private void require(AEKey key, long amount) {
         if (this.initialInventory == null) return;
-        long fromInitial = LongMath.saturatedAdd(amount,
-            LongMath.saturatedSubtract(this.initialInventory.getLong(key), this.inventory.getLong(key)));
+        long fromInitial = KeyAmounts.add(key, amount,
+            KeyAmounts.subtract(key, this.initialInventory.getLong(key), this.inventory.getLong(key)));
         this.required.set(key, Math.max(this.required.get(key), fromInitial));
     }
 
@@ -587,7 +588,7 @@ final class CraftingCpuReplay {
 
     // What each planned craft that cannot run lacks for one craft, on the first possible stack of each short input
     private KeyCounter shortages() {
-        var result = new KeyCounter();
+        var result = KeyCounter.checked();
         var reserved = this.takenKeys;
         for (int i = 0; i < this.tasks.size(); i++) {
             var task = this.tasks.get(i);
@@ -619,7 +620,7 @@ final class CraftingCpuReplay {
                     if (need <= 0) break;
                 }
                 if (need > 0) {
-                    result.add(possible[0].what(), LongMath.saturatedMultiply(need, possible[0].amount()));
+                    result.add(possible[0].what(), KeyAmounts.multiply(possible[0].what(), need, possible[0].amount()));
                 }
             }
         }

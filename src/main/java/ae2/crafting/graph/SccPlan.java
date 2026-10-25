@@ -2,8 +2,8 @@ package ae2.crafting.graph;
 
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.KeyCounter;
+import ae2.api.stacks.KeyAmounts;
 import ae2.crafting.CraftingCalculation;
-import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Reference2LongMap;
 import it.unimi.dsi.fastutil.objects.Reference2LongMaps;
@@ -58,7 +58,7 @@ public final class SccPlan {
         this.craftTimes = Reference2LongMaps.unmodifiable(craftTimes);
         this.plannedOutput = Reference2LongMaps.unmodifiable(plannedOutput);
         this.seeds = Reference2ObjectMaps.unmodifiable(seeds);
-        var boundary = new KeyCounter();
+        var boundary = KeyCounter.checked();
         boundary.addAll(boundaryDemands);
         this.boundaryDemands = boundary;
     }
@@ -67,7 +67,7 @@ public final class SccPlan {
                                      Reference2LongMap<CraftingGraphNode> craftTimes,
                                      Reference2LongMap<CraftingGraphNode> plannedOutput,
                                      Reference2ObjectMap<CraftingGraphEdge, SeedLedger> seeds) {
-        return new SccPlan(componentId, false, nodes, craftTimes, plannedOutput, seeds, new KeyCounter());
+        return new SccPlan(componentId, false, nodes, craftTimes, plannedOutput, seeds, KeyCounter.checked());
     }
 
     /**
@@ -80,7 +80,7 @@ public final class SccPlan {
                                    Reference2LongMap<CraftingGraphNode> plannedOutput,
                                    Reference2ObjectMap<CraftingGraphEdge, SeedLedger> seeds,
                                    Reference2LongMap<CraftingGraphNode> takenByCycle) {
-        return new SccPlan(componentId, false, true, nodes, craftTimes, plannedOutput, seeds, new KeyCounter(),
+        return new SccPlan(componentId, false, true, nodes, craftTimes, plannedOutput, seeds, KeyCounter.checked(),
             takenByCycle);
     }
 
@@ -105,7 +105,7 @@ public final class SccPlan {
                 boolean allocatedSeed = delta.realRecursiveSeeds().contains(key);
                 if (missing <= 0 && reserve <= 0 && !allocatedSeed) continue;
                 long allocated = allocatedSeed ? edge.amountPerCraft() : 0;
-                long required = LongMath.saturatedAdd(allocated, missing);
+                long required = KeyAmounts.add(key, allocated, missing);
                 seeds.put(edge, new SeedLedger(required, allocated, missing, reserve));
                 assignedKeys.add(key);
             }
@@ -153,7 +153,7 @@ public final class SccPlan {
     }
 
     public KeyCounter boundaryDemands() {
-        var copy = new KeyCounter();
+        var copy = KeyCounter.checked();
         copy.addAll(boundaryDemands);
         return copy;
     }

@@ -2,6 +2,7 @@ package ae2.crafting.graph;
 
 import ae2.api.config.Actionable;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.KeyAmounts;
 import ae2.api.stacks.KeyCounter;
 import ae2.crafting.CraftBranchFailure;
 import ae2.crafting.CraftingCalculation;
@@ -115,7 +116,7 @@ public class GraphExecutor {
             if (entry.pattern() == null) continue;
             for (var output : entry.pattern().getOutputs()) {
                 snapshot.recordOutput(node, output.what(),
-                    LongMath.saturatedMultiply(output.amount(), entry.craftTimes()));
+                    KeyAmounts.multiply(output.what(), output.amount(), entry.craftTimes()));
             }
         }
         for (var entry : discovery.entries()) {
@@ -123,7 +124,7 @@ public class GraphExecutor {
             for (var edge : node.getInputs()) {
                 if (edge.producer() != null && topology.getComponentId(edge.producer()) == componentId) {
                     snapshot.recordInternalEdge(edge,
-                        LongMath.saturatedMultiply(edge.amountPerCraft(), entry.craftTimes()));
+                        KeyAmounts.multiply(edge.inputKey(), edge.amountPerCraft(), entry.craftTimes()));
                 }
             }
         }
@@ -191,7 +192,7 @@ public class GraphExecutor {
             snapshot.recordLocalDisplay(node, plan.displayFragment());
             for (var output : plan.pattern().getOutputs()) {
                 snapshot.recordOutput(node, output.what(),
-                    LongMath.saturatedMultiply(output.amount(), plan.craftTimes()));
+                    KeyAmounts.multiply(output.what(), output.amount(), plan.craftTimes()));
             }
         } catch (CraftBranchFailure e) {
             throw new IllegalStateException("Local crafting unit failed for " + node.getWhat(), e);
@@ -237,7 +238,7 @@ public class GraphExecutor {
             var edge = inputs.get(inputIndex);
             if (cycleCut == null && edge.cycleCut()) cycleCut = edge;
             long needed = edge.cycleCut() ? edge.seedDemand()
-                : LongMath.saturatedMultiply(edge.amountPerCraft(), times);
+                : KeyAmounts.multiply(edge.inputKey(), edge.amountPerCraft(), times);
             boolean ownsInputBytes = edge.producer() == null
                 || (edge.producer().getLocalComponentId() < 0 && !edge.producer().isLocalUnit());
             if (ownsInputBytes && !edge.cycleCut()) {
@@ -283,7 +284,7 @@ public class GraphExecutor {
         var outputs = node.getOutputs();
         for (int outputIndex = 0; outputIndex < outputs.size(); outputIndex++) {
             var output = outputs.get(outputIndex);
-            long outputAmount = LongMath.saturatedMultiply(output.amount(), times);
+            long outputAmount = KeyAmounts.multiply(output.what(), output.amount(), times);
             if (ring && output.what().equals(node.getWhat())) {
                 // A node of the ring applied before this one already took its share by a cut input
                 outputAmount = Math.max(0, outputAmount - Objects.requireNonNull(sccPlan).takenByCycle(node));
@@ -308,7 +309,7 @@ public class GraphExecutor {
 
         if ((ring || cycleCut != null) && node == graph.getRootNode()) {
             // The ring takes back what was crafted of the requested item beyond the request; the CPU keeps it
-            long crafted = LongMath.saturatedMultiply(node.getOutputPerCraft(), times);
+            long crafted = KeyAmounts.multiply(node.getWhat(), node.getOutputPerCraft(), times);
             calc.addGraphIntermediateFinalOutput(Math.max(0, crafted - node.getDemandAmount()));
         }
     }

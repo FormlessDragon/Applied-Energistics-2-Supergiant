@@ -6,9 +6,9 @@ import ae2.api.crafting.IPatternDetails;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.api.stacks.KeyAmounts;
 import ae2.container.ContainerConstants;
 import ae2.crafting.inv.ICraftingInventory;
-import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -68,7 +68,7 @@ public final class CraftingSeedReservations {
             for (var input : pattern.getInputs()) {
                 for (var possible : input.possibleInputs()) {
                     if (component[i] == component[materials.getInt(possible.what())]) {
-                        claims.add(possible.what(), LongMath.saturatedMultiply(possible.amount(), input.getMultiplier()));
+                        claims.add(possible.what(), KeyAmounts.multiply(possible.what(), possible.amount(), input.getMultiplier()));
                     }
                 }
             }
@@ -83,8 +83,8 @@ public final class CraftingSeedReservations {
                     // including the last craft's seed, or outsiders can leave a balanced but unstartable tail.
                     for (var claim : claims) {
                         long loss = Math.max(0, claim.getLongValue() - returned.get(claim.getKey()));
-                        claim.setValue(LongMath.saturatedAdd(claim.getLongValue(),
-                            LongMath.saturatedMultiply(loss, remaining.applyAsLong(pattern) - 1)));
+                        claim.setValue(KeyAmounts.add(claim.getKey(), claim.getLongValue(),
+                            KeyAmounts.multiply(claim.getKey(), loss, remaining.applyAsLong(pattern) - 1)));
                     }
                 }
                 int id = component[i];
@@ -106,7 +106,7 @@ public final class CraftingSeedReservations {
                     table[slot] = new KeyCounter();
                     var possible = inputs[slot].possibleInputs();
                     if (possible.length > 0) table[slot].add(possible[0].what(),
-                        LongMath.saturatedMultiply(possible[0].amount(), inputs[slot].getMultiplier()));
+                        KeyAmounts.multiply(possible[0].what(), possible[0].amount(), inputs[slot].getMultiplier()));
                 }
                 var grid = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, 3, 3);
                 assembler.fillCraftingGrid(table, grid::setInventorySlotContents);

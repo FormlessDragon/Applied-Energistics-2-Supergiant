@@ -2,9 +2,9 @@ package ae2.crafting.graph;
 
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.KeyAmounts;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
-import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
@@ -158,7 +158,7 @@ public class CraftingGraphNode {
     }
 
     public void addDemandAmount(long amount) {
-        this.demandAmount = LongMath.saturatedAdd(this.demandAmount, amount);
+        this.demandAmount = KeyAmounts.add(this.what, this.demandAmount, amount);
     }
 
     public long getCraftTimes() {
@@ -170,7 +170,7 @@ public class CraftingGraphNode {
     }
 
     public void setPlannedBoundaryDemands(KeyCounter demands) {
-        this.plannedBoundaryDemands = new KeyCounter();
+        this.plannedBoundaryDemands = KeyCounter.checked();
         this.plannedBoundaryDemands.addAll(demands);
     }
 
@@ -182,7 +182,7 @@ public class CraftingGraphNode {
         if (this.plannedBoundaryDemands == null) {
             return null;
         }
-        var result = new KeyCounter();
+        var result = KeyCounter.checked();
         result.addAll(this.plannedBoundaryDemands);
         return result;
     }

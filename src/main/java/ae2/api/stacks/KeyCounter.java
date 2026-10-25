@@ -49,19 +49,21 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
     private static final Reference2ObjectMap<Object, VariantCounter> EMPTY_LISTS = Reference2ObjectMaps.emptyMap();
     // First map contains a mapping from AEKey#primaryKey
     private Reference2ObjectMap<Object, VariantCounter> lists;
-    private final boolean saturating;
+    enum OverflowPolicy { WRAP, SATURATE, REJECT }
+
+    private final OverflowPolicy overflowPolicy;
 
     public KeyCounter() {
-        this(false);
+        this(OverflowPolicy.WRAP);
     }
 
-    private KeyCounter(boolean saturating) {
-        this.saturating = saturating;
+    private KeyCounter(OverflowPolicy overflowPolicy) {
+        this.overflowPolicy = overflowPolicy;
         this.lists = EMPTY_LISTS;
     }
 
-    private KeyCounter(boolean saturating, int expectedKeys) {
-        this.saturating = saturating;
+    private KeyCounter(OverflowPolicy overflowPolicy, int expectedKeys) {
+        this.overflowPolicy = overflowPolicy;
         this.lists = new Reference2ObjectOpenHashMap<>(expectedKeys);
     }
 
@@ -69,7 +71,7 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
      * Creates a counter that clamps additions to the signed long range.
      */
     public static KeyCounter saturating() {
-        return new KeyCounter(true);
+        return new KeyCounter(OverflowPolicy.SATURATE);
     }
 
     /**
@@ -77,7 +79,12 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
      * copies avoid rehashing while they fill.
      */
     public static KeyCounter saturating(int expectedKeys) {
-        return new KeyCounter(true, expectedKeys);
+        return new KeyCounter(OverflowPolicy.SATURATE, expectedKeys);
+    }
+
+    /** Creates a material counter that reports the exact key and quantity instead of wrapping or clamping. */
+    public static KeyCounter checked() {
+        return new KeyCounter(OverflowPolicy.REJECT);
     }
 
     public Collection<Object2LongMap.Entry<AEKey>> findFuzzy(AEKey key, FuzzyMode fuzzy) {
@@ -140,7 +147,7 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         other.lists.forEach((primaryKey, variants) -> {
             var ourSubIndex = lists.get(primaryKey);
             if (ourSubIndex == null) {
-                lists.put(primaryKey, variants.copy(saturating));
+                lists.put(primaryKey, variants.copy(overflowPolicy));
             } else {
                 ourSubIndex.addAll(variants);
             }
@@ -153,7 +160,7 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         other.lists.forEach((primaryKey, variants) -> {
             var ourSubIndex = lists.get(primaryKey);
             if (ourSubIndex == null) {
-                var copied = variants.copy(saturating);
+                var copied = variants.copy(overflowPolicy);
                 copied.invert();
                 lists.put(primaryKey, copied);
             } else {
@@ -172,6 +179,7 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
      */
     public void remove(AEKey key, long amount) {
         if (amount == Long.MIN_VALUE) {
+            if (overflowPolicy == OverflowPolicy.REJECT) KeyAmounts.subtract(key, 0, amount);
             add(key, Long.MAX_VALUE);
         } else {
             add(key, -amount);
@@ -220,7 +228,7 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         if (prepared == this) {
             return;
         }
-        if (this.saturating != prepared.saturating) {
+        if (this.overflowPolicy != prepared.overflowPolicy) {
             throw new IllegalArgumentException("Cannot move counters with different overflow policies");
         }
         var previous = this.lists;
@@ -283,8 +291,8 @@ public final class KeyCounter implements Iterable<Object2LongMap.Entry<AEKey>> {
         var result = lists.get(primaryKey);
         if (result != null) return result;
         ensureLists(1);
-        result = key.getFuzzySearchMaxValue() > 0 ? new VariantCounter.FuzzyVariantMap(saturating)
-            : new VariantCounter.UnorderedVariantMap(saturating);
+        result = key.getFuzzySearchMaxValue() > 0 ? new VariantCounter.FuzzyVariantMap(overflowPolicy)
+            : new VariantCounter.UnorderedVariantMap(overflowPolicy);
         lists.put(primaryKey, result);
         return result;
     }

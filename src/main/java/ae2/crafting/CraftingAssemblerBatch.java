@@ -4,6 +4,7 @@ import ae2.api.config.Actionable;
 import ae2.api.config.FuzzyMode;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.KeyCounter;
+import ae2.api.stacks.KeyAmounts;
 import ae2.crafting.inv.ICraftingInventory;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
@@ -13,11 +14,11 @@ import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
  */
 final class CraftingAssemblerBatch {
     private static final int MAX_KEYS = 4096;
-    final KeyCounter consumed = new KeyCounter();
-    final KeyCounter returned = new KeyCounter();
-    final KeyCounter output = new KeyCounter();
-    final KeyCounter peak = new KeyCounter();
-    final KeyCounter delta = new KeyCounter();
+    final KeyCounter consumed = KeyCounter.checked();
+    final KeyCounter returned = KeyCounter.checked();
+    final KeyCounter output = KeyCounter.checked();
+    final KeyCounter peak = KeyCounter.checked();
+    final KeyCounter delta = KeyCounter.checked();
     long crafts;
 
     static CraftingAssemblerBatch plan(CraftingAssemblerSimulation simulation,
@@ -54,33 +55,33 @@ final class CraftingAssemblerBatch {
 
     private void append(CraftingAssemblerSimulation.Result next, long times) {
         next.consumed().forEach((key, amount) -> {
-            long needed = LongMath.saturatedAdd(amount,
-                LongMath.saturatedMultiply(Math.max(0, amount - next.output().get(key)), times - 1));
-            peak.set(key, Math.max(peak.get(key), LongMath.saturatedSubtract(needed, delta.get(key))));
+            long needed = KeyAmounts.add(key, amount,
+                KeyAmounts.multiply(key, Math.max(0, amount - next.output().get(key)), times - 1));
+            peak.set(key, Math.max(peak.get(key), KeyAmounts.subtract(key, needed, delta.get(key))));
         });
         next.consumed().forEach((key, amount) -> {
-            consumed.add(key, LongMath.saturatedMultiply(amount, times));
-            delta.add(key, LongMath.saturatedMultiply(next.output().get(key) - amount, times));
+            consumed.add(key, KeyAmounts.multiply(key, amount, times));
+            delta.add(key, KeyAmounts.multiply(key, next.output().get(key) - amount, times));
         });
-        next.returned().forEach((key, amount) -> returned.add(key, LongMath.saturatedMultiply(amount, times)));
+        next.returned().forEach((key, amount) -> returned.add(key, KeyAmounts.multiply(key, amount, times)));
         next.output().forEach((key, amount) -> {
-            output.add(key, LongMath.saturatedMultiply(amount, times));
-            if (next.consumed().get(key) == 0) delta.add(key, LongMath.saturatedMultiply(amount, times));
+            output.add(key, KeyAmounts.multiply(key, amount, times));
+            if (next.consumed().get(key) == 0) delta.add(key, KeyAmounts.multiply(key, amount, times));
         });
-        crafts = LongMath.saturatedAdd(crafts, times);
+        crafts = Math.addExact(crafts, times);
     }
 
     private void append(CraftingAssemblerBatch next, long times) {
         next.peak.forEach((key, amount) -> {
-            long needed = LongMath.saturatedAdd(amount,
-                LongMath.saturatedMultiply(Math.max(0, -next.delta.get(key)), times - 1));
-            peak.set(key, Math.max(peak.get(key), LongMath.saturatedSubtract(needed, delta.get(key))));
+            long needed = KeyAmounts.add(key, amount,
+                KeyAmounts.multiply(key, Math.max(0, -next.delta.get(key)), times - 1));
+            peak.set(key, Math.max(peak.get(key), KeyAmounts.subtract(key, needed, delta.get(key))));
         });
-        next.consumed.forEach((key, amount) -> consumed.add(key, LongMath.saturatedMultiply(amount, times)));
-        next.returned.forEach((key, amount) -> returned.add(key, LongMath.saturatedMultiply(amount, times)));
-        next.output.forEach((key, amount) -> output.add(key, LongMath.saturatedMultiply(amount, times)));
-        next.delta.forEach((key, amount) -> delta.add(key, LongMath.saturatedMultiply(amount, times)));
-        crafts = LongMath.saturatedAdd(crafts, LongMath.saturatedMultiply(next.crafts, times));
+        next.consumed.forEach((key, amount) -> consumed.add(key, KeyAmounts.multiply(key, amount, times)));
+        next.returned.forEach((key, amount) -> returned.add(key, KeyAmounts.multiply(key, amount, times)));
+        next.output.forEach((key, amount) -> output.add(key, KeyAmounts.multiply(key, amount, times)));
+        next.delta.forEach((key, amount) -> delta.add(key, KeyAmounts.multiply(key, amount, times)));
+        crafts = Math.addExact(crafts, Math.multiplyExact(next.crafts, times));
     }
 
     long repeats(ICraftingInventory inventory, long limit) {
@@ -94,8 +95,8 @@ final class CraftingAssemblerBatch {
     }
 
     long required(AEKey key, long times) {
-        return LongMath.saturatedAdd(peak.get(key),
-            LongMath.saturatedMultiply(Math.max(0, -delta.get(key)), times - 1));
+        return KeyAmounts.add(key, peak.get(key),
+            KeyAmounts.multiply(key, Math.max(0, -delta.get(key)), times - 1));
     }
 
     CraftingAssemblerBatch repeated(long times) {
@@ -108,7 +109,7 @@ final class CraftingAssemblerBatch {
         // The peak records every intermediate grid's simultaneous requirement, including unchanged seeds.
         peak.forEach((key, amount) -> inventory.extract(key, amount, Actionable.MODULATE));
         peak.forEach((key, amount) -> {
-            if (amount > 0) inventory.insert(key, LongMath.saturatedAdd(amount, delta.get(key)), Actionable.MODULATE);
+            if (amount > 0) inventory.insert(key, KeyAmounts.add(key, amount, delta.get(key)), Actionable.MODULATE);
         });
         delta.forEach((key, amount) -> {
             if (peak.get(key) == 0) inventory.insert(key, amount, Actionable.MODULATE);

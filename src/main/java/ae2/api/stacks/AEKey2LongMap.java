@@ -120,6 +120,32 @@ public interface AEKey2LongMap extends Object2LongMap<AEKey> {
 
     }
 
+    /** Primitive material map that rejects an unrepresentable accumulation. */
+    final class CheckedOpenHashMap extends Object2LongOpenHashMap<AEKey> implements AEKey2LongMap {
+        public CheckedOpenHashMap() {
+        }
+
+        public CheckedOpenHashMap(int expected) {
+            super(expected);
+        }
+
+        @Override
+        public long addTo(AEKey key, long increment) {
+            long previous = getLong(key);
+            put(key, KeyAmounts.add(key, previous, increment));
+            return previous;
+        }
+
+        @Override
+        public void forEachEntry(ObjLongConsumer<? super AEKey> action) {
+            if (containsNullKey) action.accept(null, value[n]);
+            Object[] keys = key;
+            for (int position = n; position-- != 0; ) {
+                if (keys[position] != null) action.accept((AEKey) keys[position], value[position]);
+            }
+        }
+    }
+
     /**
      * Read-only primitive map view that preserves the AE-key-specific map contract.
      */

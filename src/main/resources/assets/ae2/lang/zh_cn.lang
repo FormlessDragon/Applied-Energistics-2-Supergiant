@@ -139,6 +139,7 @@ chat.ae2.CraftingNoNetOutputCycle=§7  循环：§r%s
 chat.ae2.CraftingNoNetOutputPattern=§7  %s：%s，位于 %s %s %s（%s）
 chat.ae2.CraftingNoNetOutputPatternUnplaced=§7  %s：没有找到存放这个样板的机器
 chat.ae2.CraftingTooLong=合成计算超出了本服务器允许的计算时间。请减少请求数量，或在配置中调高 craftingCalculationLimitSeconds。
+chat.ae2.CraftingAmountOverflow=合成计划已取消：材料 %s 的需求或合成数量（%s）超过了上限 %s。请减少请求数量。
 chat.ae2.CraftingSupplierNotFound=未找到可定位供应器
 chat.ae2.CraftingTreeScreenshotFailed=保存合成树截图失败：%s
 chat.ae2.CraftingTreeScreenshotNoData=没有可截图的合成树数据。

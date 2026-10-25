@@ -29,9 +29,11 @@ import ae2.api.networking.crafting.ICraftingService;
 import ae2.api.networking.crafting.ICraftingSimulationRequester;
 import ae2.api.networking.storage.IStorageService;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.AmountOverflowException;
 import ae2.api.stacks.AEKey2LongMap;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.api.stacks.KeyAmounts;
 import ae2.api.storage.AEKeyFilter;
 import ae2.core.AEConfig;
 import ae2.core.AELog;
@@ -92,6 +94,7 @@ public class CraftingCalculation {
     private static final ThreadLocal<CraftingCalculation> ACTIVE_CALCULATION = new ThreadLocal<>();
     private static final int MAX_LOCAL_REPLANS = 1_000_000;
     private static final int ALTERNATIVE_ROUNDS = 4;
+    private static final int PARTIAL_ALTERNATIVE_ATTEMPTS = 16;
     private static final int LEGACY_FALLBACK_STEPS = 20_000;
     /**
      * The legacy tree takes at least this many steps per node of the graph, so larger graphs cannot finish within
@@ -108,7 +111,7 @@ public class CraftingCalculation {
     private final ICraftingService craftingService;
     private final NetworkCraftingSimulationState networkInv;
     private final World level;
-    private KeyCounter missing = new KeyCounter();
+    private KeyCounter missing = KeyCounter.checked();
     private long fallbackDeadline = Long.MAX_VALUE;
     private int fallbackSteps;
     private long limitDeadline = Long.MAX_VALUE;
@@ -116,7 +119,7 @@ public class CraftingCalculation {
     private boolean limitExceeded;
     private boolean tryingAlternatives;
     private final Set<CraftingPlan> plansKnownToRun = Collections.newSetFromMap(new IdentityHashMap<>());
-    private final KeyCounter recursiveMissingSeeds = new KeyCounter();
+    private final KeyCounter recursiveMissingSeeds = KeyCounter.checked();
     private final Object monitor = new Object();
     // Published under monitor. The worker stays parked until the tick thread finishes this callback.
     private @Nullable MainThreadTask<?> mainThreadTask;
@@ -158,7 +161,7 @@ public class CraftingCalculation {
     // Whether the memo cache can hold anything at all: recording a result copies the whole simulation state
     private final boolean memoCacheEnabled;
     private final Set<AEKey> recursiveFinalOutputInputs = new ObjectOpenHashSet<>();
-    private final KeyCounter recursiveReserveCandidates = new KeyCounter();
+    private final KeyCounter recursiveReserveCandidates = KeyCounter.checked();
     private final Reference2LongOpenHashMap<CraftingTreeNode> recursiveDisplayRequests = new Reference2LongOpenHashMap<>();
     private @Nullable CraftingGraph graph;
     private final List<ICraftingProvider> temporaryProviders;
@@ -331,13 +334,13 @@ public class CraftingCalculation {
             for (int i = 0, size = outputs.size(); i < size; i++) {
                 var output = outputs.get(i);
                 if (what.matches(output)) {
-                    total = LongMath.saturatedAdd(total, output.amount());
+                    total = KeyAmounts.add(what, total, output.amount());
                 }
             }
         } else {
             for (var output : outputs) {
                 if (what.matches(output)) {
-                    total = LongMath.saturatedAdd(total, output.amount());
+                    total = KeyAmounts.add(what, total, output.amount());
                 }
             }
         }
@@ -356,8 +359,8 @@ public class CraftingCalculation {
             var possibleInputs = input.possibleInputs();
             for (var possibleInput : possibleInputs) {
                 if (what.matches(possibleInput)) {
-                    total = LongMath.saturatedAdd(total,
-                        LongMath.saturatedMultiply(possibleInput.amount(), input.getMultiplier()));
+                    total = KeyAmounts.add(what, total,
+                        KeyAmounts.multiply(what, possibleInput.amount(), input.getMultiplier()));
                     break;
                 }
             }
@@ -379,11 +382,11 @@ public class CraftingCalculation {
         if (outputs instanceof RandomAccess) {
             for (int i = 0, size = outputs.size(); i < size; i++) {
                 var output = outputs.get(i);
-                netByKey.add(output.what(), LongMath.saturatedMultiply(output.amount(), times));
+                netByKey.add(output.what(), KeyAmounts.multiply(output.what(), output.amount(), times));
             }
         } else {
             for (var output : outputs) {
-                netByKey.add(output.what(), LongMath.saturatedMultiply(output.amount(), times));
+                netByKey.add(output.what(), KeyAmounts.multiply(output.what(), output.amount(), times));
             }
         }
 
@@ -394,9 +397,9 @@ public class CraftingCalculation {
             }
             var primaryInput = possibleInputs[0];
             var inputKey = primaryInput.what();
-            long inputAmount = LongMath.saturatedMultiply(primaryInput.amount(),
-                LongMath.saturatedMultiply(input.getMultiplier(), times));
-            netByKey.add(inputKey, LongMath.saturatedSubtract(0, inputAmount));
+            long inputAmount = KeyAmounts.multiply(inputKey, primaryInput.amount(),
+                KeyAmounts.multiply(inputKey, input.getMultiplier(), times));
+            netByKey.add(inputKey, KeyAmounts.subtract(inputKey, 0, inputAmount));
             if (inputKeys != null) {
                 inputKeys.add(inputKey);
             }
@@ -641,7 +644,7 @@ public class CraftingCalculation {
     }
 
     private static KeyCounter positiveCounterDelta(KeyCounter before, KeyCounter after) {
-        var result = new KeyCounter();
+        var result = KeyCounter.checked();
         after.forEach((entryKey, entryAmount) -> {
             long delta = entryAmount - before.get(entryKey);
             if (delta > 0) {
@@ -652,7 +655,7 @@ public class CraftingCalculation {
     }
 
     private static KeyCounter increasedCounterTargets(KeyCounter before, KeyCounter after) {
-        var result = new KeyCounter();
+        var result = KeyCounter.checked();
         after.forEach((entryKey, entryAmount) -> {
             if (entryAmount > before.get(entryKey)) {
                 result.add(entryKey, entryAmount);
@@ -792,6 +795,9 @@ public class CraftingCalculation {
         if (strategy == CalculationStrategy.CRAFT_LESS) {
             this.memoReplayEnabled = false;
             var craftLessPlan = runCraftLessAttempt(requestedAmount);
+            if (hasMultiplePaths() && (craftLessPlan == null || craftLessPlan.finalOutput().amount() < requestedAmount)) {
+                return maximizeAlternativeCrafts(craftLessPlan);
+            }
             if (craftLessPlan != null) {
                 return craftLessPlan;
             }
@@ -802,13 +808,42 @@ public class CraftingCalculation {
         return runGraphBasedAttempt(requestedAmount);
     }
 
+    private CraftingPlan maximizeAlternativeCrafts(@Nullable CraftingPlan greedy) throws InterruptedException {
+        long lower = greedy == null ? 0 : greedy.finalOutput().amount();
+        long upper = requestedAmount;
+        CraftingPlan best = greedy;
+        // Priority-ordered extraction gives a feasible lower bound, not a maximum when producers share raw materials.
+        // Exact requests re-evaluate alternative recipes. The midpoint arithmetic is safe even at Long.MAX_VALUE.
+        while (lower < upper) {
+            long amount = lower + (upper - lower) / 2 + 1;
+            resetAttemptState();
+            var candidate = runGraphBasedAttempt(amount);
+            if (candidate != null && candidate.missingItems().isEmpty() && CraftingCpuReplay.runs(candidate, this)) {
+                lower = amount;
+                best = candidate;
+            } else {
+                upper = amount - 1;
+            }
+        }
+        // Rebuild the winning amount after exploratory attempts so its tree and inventory belong to that attempt.
+        resetAttemptState();
+        if (best != null) {
+            var result = runGraphBasedAttempt(lower);
+            if (result != null && result.missingItems().isEmpty()) return result;
+            var fallback = runCraftLessAttempt(lower);
+            if (fallback != null) return fallback;
+            throw new CraftingCalculationFailure(PlayerMessages.CraftingNoPlan);
+        }
+        return runGraphBasedAttempt(requestedAmount);
+    }
+
     /**
      * Starts an attempt over. The missing items are a new counter: a plan of an earlier attempt keeps its own.
      */
     private void resetAttemptState() {
         this.simulate = false;
         this.allowMissing = true;
-        this.missing = new KeyCounter();
+        this.missing = KeyCounter.checked();
         this.recursiveMissingSeeds.clear();
         for (var key : this.recursiveNetCache.keySet()) {
             this.recursiveNetKeyPool.release(key);
@@ -1302,9 +1337,11 @@ public class CraftingCalculation {
             } else {
                 plan = computePlan();
             }
+            validateAmounts(plan);
             if (plan instanceof CraftingPlan craftingPlan && !this.plansKnownToRun.contains(craftingPlan)) {
                 plan = CraftingPlanCompactor.repair(craftingPlan, this);
             }
+            validateAmounts(plan);
             this.logCraftingJob(plan);
             if (this.usedCraftingTreeTestPattern) {
                 long elapsedNanos = System.nanoTime() - calculationStart;
@@ -1324,6 +1361,10 @@ public class CraftingCalculation {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw ex;
+        } catch (AmountOverflowException overflow) {
+            AELog.error("Crafting quantity overflow: output=%s requested=%d material=%s amount=%s limit=%d",
+                this.output, this.requestedAmount, overflow.getKey(), overflow.getAmount(), Long.MAX_VALUE);
+            throw new CraftingAmountOverflow(overflow);
         } catch (CraftingCalculationFailure ex) {
             // An expected outcome the player is told about, not worth a stack trace in the log
             throw ex;
@@ -1335,6 +1376,21 @@ public class CraftingCalculation {
             this.finish();
             this.workerThread = null;
         }
+    }
+
+    /** Check final per-material totals too: separate producers may each fit while their combined output does not. */
+    static void validateAmounts(ICraftingPlan plan) {
+        var required = KeyCounter.checked();
+        required.addAll(plan.usedItems());
+        required.addAll(plan.missingItems());
+        required.addAll(plan.emittedItems());
+        KeyAmounts.add(plan.finalOutput().what(), plan.finalOutput().amount(), plan.intermediateFinalOutputAmount());
+        var crafted = KeyCounter.checked();
+        plan.patternTimes().forEach((pattern, times) -> {
+            for (var output : pattern.getOutputs()) {
+                crafted.add(output.what(), KeyAmounts.multiply(output.what(), output.amount(), times));
+            }
+        });
     }
 
     // The failure the player is told about, with where the machines of a cycle without net output are
@@ -1367,8 +1423,8 @@ public class CraftingCalculation {
         long netOutput = 0;
         for (int i = requestIndex; i < this.processStack.size(); i++) {
             var process = this.processStack.get(i);
-            netOutput = LongMath.saturatedAdd(netOutput, process.getOutputCount(what));
-            netOutput = LongMath.saturatedSubtract(netOutput, process.getInputCount(what));
+            netOutput = KeyAmounts.add(what, netOutput, process.getOutputCount(what));
+            netOutput = KeyAmounts.subtract(what, netOutput, process.getInputCount(what));
         }
         return netOutput;
     }
@@ -1581,7 +1637,7 @@ public class CraftingCalculation {
      */
     private RecursiveNet computeRecursiveNet(RecursiveNetKey key, long[] runs) {
         recordPerformanceCount("recursive-net-analysis", 1);
-        var netByKey = new KeyCounter();
+        var netByKey = KeyCounter.checked();
         var inputKeys = new ObjectOpenHashSet<AEKey>();
         var includedPatterns = new ObjectOpenHashSet<IPatternDetails>();
         for (int i = 0; i < key.processCount(); i++) {
@@ -1617,7 +1673,7 @@ public class CraftingCalculation {
             return 0;
         }
 
-        var netByKey = new KeyCounter();
+        var netByKey = KeyCounter.checked();
         var includedPatterns = new ObjectOpenHashSet<IPatternDetails>();
         includedPatterns.add(pattern);
         accumulatePatternNet(netByKey, pattern);
@@ -1637,7 +1693,7 @@ public class CraftingCalculation {
     }
 
     private boolean computeHasPositiveRecursiveNet(IPatternDetails pattern) {
-        var netByKey = new KeyCounter();
+        var netByKey = KeyCounter.checked();
         var includedPatterns = new ObjectOpenHashSet<IPatternDetails>();
         includedPatterns.add(pattern);
         accumulatePatternNet(netByKey, pattern);
@@ -1666,10 +1722,18 @@ public class CraftingCalculation {
         // root crafts can never be native (rootTimes must be 1), so scanning further is wasted work whose result is
         // ignored by the local fallback anyway.
         boolean rootConsumesTarget = getPatternInputCount(pattern, what) > 0;
-        var netByKey = new KeyCounter();
+        var netByKey = KeyCounter.checked();
         var recursiveUse = new RecursiveUse(rootConsumesTarget);
         accumulatePatternNet(netByKey, pattern, 1);
-        if (!expandRecursiveBatchNet(netByKey, what, recursiveUse)) {
+        boolean expanded;
+        try {
+            expanded = expandRecursiveBatchNet(netByKey, what, recursiveUse);
+        } catch (AmountOverflowException unavailableNativeBatch) {
+            // This is a topology probe, not requested production. A losing cycle can grow its hypothetical
+            // deficit without bound. Let the local planner determine the actual demand and report any overflow there.
+            expanded = false;
+        }
+        if (!expanded) {
             return new RecursivePatternBatch(1, directOutput);
         }
 
@@ -1869,11 +1933,11 @@ public class CraftingCalculation {
                 // a local compatibility transaction would try to acquire the same seed a second time.
                 for (var edge : node.getInputs()) {
                     if (edge == feedback) continue;
-                    long needed = LongMath.saturatedMultiply(edge.amountPerCraft(), times);
+                    long needed = KeyAmounts.multiply(edge.inputKey(), edge.amountPerCraft(), times);
                     var input = new CraftingTreeNode(this.craftingService, this, edge.inputKey(), 1, null, -1);
                     input.request(branchInv, needed, null);
                 }
-                branchInv.insert(what, LongMath.saturatedMultiply(gain, times), Actionable.MODULATE);
+                branchInv.insert(what, KeyAmounts.multiply(what, gain, times), Actionable.MODULATE);
                 branchInv.addCrafting(node.getPattern(), times);
                 branchInv.addStackBytes(what, feedback.amountPerCraft(), times);
                 branchInv.addBytes(times);
@@ -1919,6 +1983,7 @@ public class CraftingCalculation {
         var plan = best;
         var scarcity = new Object2DoubleOpenHashMap<AEKey>();
         var tried = new ObjectOpenHashSet<Map<AEKey, IPatternDetails>>();
+        var partialChoices = new ObjectArrayList<Map<AEKey, IPatternDetails>>();
         tried.add(Map.of());
         this.tryingAlternatives = true;
         try {
@@ -1926,6 +1991,13 @@ public class CraftingCalculation {
                 plan.missingItems().forEach((entryKey, entryAmount) -> scarcity.addTo(entryKey, 1));
                 var choices = timed("choosePatterns",
                     () -> new GraphBuilder(this).choosePatterns(this.output, scarcity));
+                if ((long) graphNodes * LEGACY_STEPS_PER_NODE <= LEGACY_FALLBACK_STEPS) {
+                    for (var choice : choices.entrySet()) {
+                        if (partialChoices.size() >= PARTIAL_ALTERNATIVE_ATTEMPTS) break;
+                        var partial = Map.of(choice.getKey(), choice.getValue());
+                        if (!partialChoices.contains(partial)) partialChoices.add(partial);
+                    }
+                }
                 if (!tried.add(choices)) continue;
                 resetAttemptState();
                 CraftingPlan alternative;
@@ -1943,6 +2015,24 @@ public class CraftingCalculation {
                 plan = alternative;
                 if (totalAmount(plan.missingItems()) < totalAmount(best.missingItems())) {
                     best = plan;
+                }
+            }
+            // Switching every consumer to the same scarce substitute can overshoot. Try switching one producer
+            // independently, preserving the other branches' preferred inputs. Keep this bounded on small graphs.
+            for (var choices : partialChoices) {
+                if (best.missingItems().isEmpty()) break;
+                if (!tried.add(choices)) continue;
+                resetAttemptState();
+                try {
+                    var graph = new GraphBuilder(this, choices).buildGraph(this.output, productionAmount);
+                    this.graph = graph;
+                    var alternative = needsLegacyTree(graph) ? runLegacyWithChoices(choices, productionAmount)
+                        : planGraph(graph, productionAmount, System.nanoTime());
+                    if (alternative != null && totalAmount(alternative.missingItems()) < totalAmount(best.missingItems())) {
+                        best = alternative;
+                    }
+                } catch (CraftingCalculationFailure | IllegalArgumentException | IllegalStateException failedChoice) {
+                    if (this.limitExceeded) throw failedChoice;
                 }
             }
         } finally {
@@ -2226,7 +2316,7 @@ public class CraftingCalculation {
         if (marker.reserveProtectedMissingSeeds() == null) {
             this.reserveProtectedMissingSeeds = null;
         } else {
-            this.reserveProtectedMissingSeeds = new KeyCounter();
+            this.reserveProtectedMissingSeeds = KeyCounter.checked();
             this.reserveProtectedMissingSeeds.addAll(marker.reserveProtectedMissingSeeds());
         }
         this.missingSuppression = marker.missingSuppression();
@@ -2240,11 +2330,11 @@ public class CraftingCalculation {
      */
     public CalculationMarker createCalculationMarker() {
         var recursiveFinalOutputInputs = snapshotSet(this.recursiveFinalOutputInputs);
-        var recursiveReserveCandidates = new KeyCounter();
+        var recursiveReserveCandidates = KeyCounter.checked();
         recursiveReserveCandidates.addAll(this.recursiveReserveCandidates);
         KeyCounter reserveProtectedMissingSeeds = null;
         if (this.reserveProtectedMissingSeeds != null) {
-            reserveProtectedMissingSeeds = new KeyCounter();
+            reserveProtectedMissingSeeds = KeyCounter.checked();
             reserveProtectedMissingSeeds.addAll(this.reserveProtectedMissingSeeds);
         }
         return new CalculationMarker(
@@ -2293,7 +2383,7 @@ public class CraftingCalculation {
         boolean memoReplayEnabled = this.memoReplayEnabled;
         this.localUnitMode = true;
         this.localUnitScope = Set.copyOf(scope);
-        this.localBoundaryDemands = new KeyCounter();
+        this.localBoundaryDemands = KeyCounter.checked();
         this.memoReplayEnabled = false;
         return new LocalUnitContext(this, createCalculationMarker(), memoReplayEnabled);
     }
@@ -2367,7 +2457,7 @@ public class CraftingCalculation {
         if (!this.localUnitMode || this.localBoundaryDemands == null) {
             throw new IllegalStateException("No local crafting unit is active");
         }
-        var result = new KeyCounter();
+        var result = KeyCounter.checked();
         result.addAll(this.localBoundaryDemands);
         this.localUnitMode = false;
         this.localUnitScope = null;
@@ -2604,11 +2694,11 @@ public class CraftingCalculation {
     }
 
     void addIntermediateFinalOutput(long amount) {
-        this.intermediateFinalOutputAmount = LongMath.saturatedAdd(this.intermediateFinalOutputAmount, amount);
+        this.intermediateFinalOutputAmount = KeyAmounts.add(this.output, this.intermediateFinalOutputAmount, amount);
     }
 
     void addRecursiveIntermediateFinalOutput(long amount) {
-        this.intermediateFinalOutputAmount = LongMath.saturatedAdd(this.intermediateFinalOutputAmount, amount);
+        this.intermediateFinalOutputAmount = KeyAmounts.add(this.output, this.intermediateFinalOutputAmount, amount);
     }
 
     void addRecursiveFinalOutputInput(AEKey what) {
@@ -2616,11 +2706,8 @@ public class CraftingCalculation {
     }
 
     void addRecursiveDisplayRequest(CraftingTreeNode node, long amount) {
-        long oldValue = this.recursiveDisplayRequests.addTo(node, amount);
-        long newValue = oldValue + amount;
-        if (newValue < oldValue) {
-            this.recursiveDisplayRequests.put(node, Long.MAX_VALUE);
-        }
+        this.recursiveDisplayRequests.put(node,
+            KeyAmounts.add(node.getWhat(), this.recursiveDisplayRequests.getLong(node), amount));
     }
 
     long getRecursiveDisplayRequest(CraftingTreeNode node) {
@@ -2665,7 +2752,7 @@ public class CraftingCalculation {
     }
 
     KeyCounter getRecursiveMissingSeedsMarker() {
-        var marker = new KeyCounter();
+        var marker = KeyCounter.checked();
         marker.addAll(this.recursiveMissingSeeds);
         return marker;
     }
@@ -2817,7 +2904,7 @@ public class CraftingCalculation {
     }
 
     KeyCounter getMissingItemsMarker() {
-        var marker = new KeyCounter();
+        var marker = KeyCounter.checked();
         marker.addAll(this.missing);
         return marker;
     }
@@ -3198,14 +3285,14 @@ public class CraftingCalculation {
             if (this.closed || this.calculation.localBoundaryDemands == null) {
                 throw new IllegalStateException("Local crafting unit is already closed");
             }
-            var result = new KeyCounter();
+            var result = KeyCounter.checked();
             result.addAll(this.calculation.localBoundaryDemands);
             return result;
         }
 
         public KeyCounter missingDelta() {
             if (this.closed) throw new IllegalStateException("Local crafting unit is already closed");
-            var result = new KeyCounter();
+            var result = KeyCounter.checked();
             this.calculation.missing.forEach((entryKey, entryAmount) -> {
                 long delta = entryAmount - this.marker.missingItems().get(entryKey);
                 if (delta > 0) result.add(entryKey, delta);

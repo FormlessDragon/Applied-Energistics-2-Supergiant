@@ -23,6 +23,7 @@ import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.networking.crafting.ICraftingProvider;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.api.stacks.KeyAmounts;
 import ae2.integration.data.LiteCraftTreeNode;
 import ae2.integration.data.LiteCraftTreeProc;
 import com.google.common.math.LongMath;
@@ -88,9 +89,9 @@ public final class BatchCraftingPlan implements ICraftingPlan, TemporaryProvider
             throw new IllegalArgumentException("A batch plan needs at least one sub-plan");
         }
 
-        var usedItems = new KeyCounter();
-        var emittedItems = new KeyCounter();
-        var missingItems = new KeyCounter();
+        var usedItems = KeyCounter.checked();
+        var emittedItems = KeyCounter.checked();
+        var missingItems = KeyCounter.checked();
         var patternTimes = new Object2LongLinkedOpenHashMap<IPatternDetails>();
         long bytes = 0;
         long intermediateFinalOutputAmount = 0;
@@ -104,10 +105,12 @@ public final class BatchCraftingPlan implements ICraftingPlan, TemporaryProvider
             emittedItems.addAll(subPlan.emittedItems());
             missingItems.addAll(subPlan.missingItems());
             for (var entry : subPlan.patternTimes().object2LongEntrySet()) {
-                patternTimes.addTo(entry.getKey(), entry.getLongValue());
+                var pattern = entry.getKey();
+                patternTimes.put(pattern, KeyAmounts.add(pattern.getPrimaryOutput().what(),
+                    patternTimes.getLong(pattern), entry.getLongValue()));
             }
             bytes = LongMath.saturatedAdd(bytes, subPlan.bytes());
-            intermediateFinalOutputAmount = LongMath.saturatedAdd(intermediateFinalOutputAmount,
+            intermediateFinalOutputAmount = KeyAmounts.add(finalOutput.what(), intermediateFinalOutputAmount,
                 subPlan.intermediateFinalOutputAmount());
             multiplePaths |= subPlan.multiplePaths();
         }
@@ -115,13 +118,16 @@ public final class BatchCraftingPlan implements ICraftingPlan, TemporaryProvider
         // only needed while it is pushed, they are returned to the CPU afterwards, so the sub-plans stay their owners.
         for (var provider : temporaryProviders) {
             for (var pattern : provider.getAvailablePatterns()) {
-                patternTimes.addTo(pattern, 1);
+                patternTimes.put(pattern, KeyAmounts.add(pattern.getPrimaryOutput().what(),
+                    patternTimes.getLong(pattern), 1));
             }
         }
         bytes = LongMath.saturatedAdd(bytes, 8);
 
-        return new BatchCraftingPlan(finalOutput, bytes, multiplePaths, usedItems, emittedItems, missingItems,
+        var combined = new BatchCraftingPlan(finalOutput, bytes, multiplePaths, usedItems, emittedItems, missingItems,
             intermediateFinalOutputAmount, patternTimes, List.copyOf(temporaryProviders), List.copyOf(subPlans));
+        CraftingCalculation.validateAmounts(combined);
+        return combined;
     }
 
     /**
