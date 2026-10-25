@@ -46,11 +46,6 @@ public class AECraftingPattern implements IAssemblerPattern {
     private final boolean canSubstituteFluids;
     private final IRecipe recipe;
     private final List<GenericStack> sparseInputs;
-    /**
-     * Remaining-items result for the pattern's default inputs. Graph building probes every input via isNativePattern,
-     * so caching this avoids rebuilding the crafting inventory and re-running the recipe per slot.
-     */
-    private volatile List<ItemStack> cachedRemainingItems;
     private final int[] sparseToCompressed = new int[9];
     private final Input[] inputs;
     private final ItemStack output;
@@ -84,21 +79,17 @@ public class AECraftingPattern implements IAssemblerPattern {
         }
         this.outputsArray = Collections.singletonList(Objects.requireNonNull(GenericStack.fromItemStack(this.output)));
 
-        var condensedInputs = AEPatternHelper.condenseStacks(sparseInputs);
-        this.inputs = new Input[condensedInputs.size()];
+        // A recipe may distinguish equal items by slot, both for substitution and for its remainders. Keep the
+        // occupied slots separate; there are at most nine. Merging by item identity loses that recipe information.
+        var slotInputs = new ObjectArrayList<Input>();
         Arrays.fill(this.sparseToCompressed, -1);
-        for (int j = 0; j < condensedInputs.size(); ++j) {
-            var condensedInput = condensedInputs.get(j);
-
-            for (int i = 0; i < 9; ++i) {
-                if (sparseInputs.get(i) != null && sparseInputs.get(i).what().equals(condensedInput.what())) {
-                    if (inputs[j] == null) {
-                        inputs[j] = new Input(i, condensedInput);
-                    }
-                    sparseToCompressed[i] = j;
-                }
-            }
+        for (int i = 0; i < 9; ++i) {
+            var input = sparseInputs.get(i);
+            if (input == null) continue;
+            sparseToCompressed[i] = slotInputs.size();
+            slotInputs.add(new Input(i, input));
         }
+        this.inputs = slotInputs.toArray(new Input[0]);
     }
 
     public static void encode(ItemStack result, IRecipe recipe, ItemStack[] sparseInputs, ItemStack output,
@@ -356,6 +347,13 @@ public class AECraftingPattern implements IAssemblerPattern {
         return sparseInputs.get(slot) != null;
     }
 
+    /**
+     * Candidate filtering for joint allocation; a single replacement need not match against the encoded grid.
+     */
+    public boolean isInputCandidate(IInput input, AEKey key) {
+        return key.matches(input.possibleInputs()[0]) || canSubstitute && key instanceof AEItemKey;
+    }
+
     @Override
     public void fillCraftingGrid(KeyCounter[] table, CraftingGridAccessor gridAccessor) {
         for (int sparseIndex = 0; sparseIndex < CRAFTING_GRID_SLOTS; sparseIndex++) {
@@ -468,7 +466,7 @@ public class AECraftingPattern implements IAssemblerPattern {
 
         var adjustedInput = copyCraftingInventory(input);
         var slotsToClear = new boolean[input.getSizeInventory()];
-        for (int i = 0; i < input.getSizeInventory(); i++) {
+        for (int i = 0; i < slotsToClear.length; i++) {
             var validFluid = getValidFluid(i);
             if (validFluid != null) {
                 var stack = GenericStack.unwrapItemStack(input.getStackInSlot(i));
@@ -513,16 +511,12 @@ public class AECraftingPattern implements IAssemblerPattern {
         return ItemStack.EMPTY;
     }
 
+    public boolean hasRemainders() {
+        return getDefaultRemainingItems().stream().anyMatch(stack -> !stack.isEmpty());
+    }
+
     private List<ItemStack> getDefaultRemainingItems() {
-        var cached = this.cachedRemainingItems;
-        if (cached == null) {
-            if (CraftingCalculation.isCalculationThread()) {
-                return CraftingCalculation.runOnMainThread(this::getDefaultRemainingItems);
-            }
-            cached = this.recipe.getRemainingItems(makeCraftingInventory());
-            this.cachedRemainingItems = cached;
-        }
-        return cached;
+        return CraftingCalculation.defaultRemainders(this, () -> this.recipe.getRemainingItems(makeCraftingInventory()));
     }
 
     private GenericStack getItemOrFluidInput(int slot, GenericStack item) {

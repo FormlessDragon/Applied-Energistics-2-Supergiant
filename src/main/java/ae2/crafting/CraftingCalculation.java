@@ -20,6 +20,7 @@ package ae2.crafting;
 
 import ae2.api.config.Actionable;
 import ae2.api.crafting.IPatternDetails;
+import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.crafting.CalculationStrategy;
 import ae2.api.networking.crafting.ICraftingPlan;
@@ -69,6 +70,7 @@ import it.unimi.dsi.fastutil.objects.Reference2LongMap;
 import it.unimi.dsi.fastutil.objects.Reference2LongMaps;
 import it.unimi.dsi.fastutil.objects.Reference2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
@@ -467,6 +469,15 @@ public class CraftingCalculation {
         return ACTIVE_CALCULATION.get() != null;
     }
 
+    private final Map<IPatternDetails, List<ItemStack>> defaultRemainders = new Reference2ObjectOpenHashMap<>();
+
+    public static List<ItemStack> defaultRemainders(IPatternDetails pattern,
+                                                    Supplier<List<ItemStack>> evaluate) {
+        var calculation = ACTIVE_CALCULATION.get();
+        return calculation == null ? evaluate.get()
+            : calculation.defaultRemainders.computeIfAbsent(pattern, ignored -> runOnMainThread(evaluate));
+    }
+
     public boolean canEmitFor(AEKey what) {
         return this.craftingService.canEmitFor(what);
     }
@@ -691,6 +702,35 @@ public class CraftingCalculation {
             }
             return patterns;
         });
+    }
+
+    Set<IPatternDetails> getMissingProducers(KeyCounter missing) {
+        var result = new ObjectOpenHashSet<IPatternDetails>();
+        for (var entry : missing) {
+            if (entry.getLongValue() > 0) result.addAll(getCraftingFor(entry.getKey()));
+        }
+        // Providers index primary outputs. Reuse the recipes already visited in this request's material closure
+        // to find useful byproducts, including a producer skipped because its primary output was in stock.
+        for (var patterns : this.patternCache.values()) {
+            for (var pattern : patterns) {
+                for (var output : pattern.getOutputs()) {
+                    if (missing.get(output.what()) > 0) {
+                        result.add(pattern);
+                        break;
+                    }
+                }
+                if (!result.contains(pattern) && pattern instanceof IAssemblerPattern assembler) {
+                    var returned = new CraftingAssemblerSimulation(assembler, this.level).defaultRemainders();
+                    if (returned != null) for (var output : returned) {
+                        if (missing.get(output.getKey()) > 0) {
+                            result.add(pattern);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return result;
     }
 
     CraftingTreeProcess.MachineInfo getMachineInfo(ICraftingService craftingService, IPatternDetails pattern) {
@@ -1404,7 +1444,6 @@ public class CraftingCalculation {
      * Returns how often each process from {@code requestIndex} up the process stack runs in the smallest batch, by root
      * crafts, that makes at least as much of {@code what} as it takes, or null if the cycle can never net produce it.
      */
-    @Nullable
     private long[] getCycleBatchRuns(AEKey what, int requestIndex) {
         int count = this.processStack.size() - requestIndex;
         if (count <= 0 || !what.equals(this.processStack.get(requestIndex).getRequestedKey())) {
@@ -1493,7 +1532,7 @@ public class CraftingCalculation {
     /**
      * @param runs how often each process runs, see {@link #getCycleBatchRuns}, or null for once each
      */
-    private RecursiveNet computeRecursiveNet(RecursiveNetKey key, @Nullable long[] runs) {
+    private RecursiveNet computeRecursiveNet(RecursiveNetKey key, long[] runs) {
         recordPerformanceCount("recursive-net-analysis", 1);
         var netByKey = new KeyCounter();
         var inputKeys = new ObjectOpenHashSet<AEKey>();
@@ -1692,6 +1731,39 @@ public class CraftingCalculation {
         }
     }
 
+    /**
+     * Try another producer only for the bootstrap material, retaining the growing recipe for bulk production.
+     */
+    public void craftGraphSeed(AEKey what, long amount, IPatternDetails growingPattern, CraftingSimulationState inventory)
+        throws InterruptedException {
+        for (var pattern : getCraftingFor(what)) {
+            if (pattern == growingPattern) continue;
+            long output = getPatternOutputCount(pattern, what);
+            if (output <= 0) continue;
+            var marker = createCalculationMarker();
+            var child = new ChildCraftingSimulationState(inventory);
+            var root = new CraftingTreeNode(this.craftingService, this, what, 1, null, -1);
+            var process = new CraftingTreeProcess(this.craftingService, this, pattern, root);
+            try {
+                process.request(child, divideCeil(amount, output));
+                boolean addedMissing = false;
+                for (var entry : this.missing) {
+                    if (entry.getLongValue() > marker.missingItems().get(entry.getKey())) addedMissing = true;
+                }
+                for (var entry : this.recursiveMissingSeeds) {
+                    if (entry.getLongValue() > marker.recursiveMissingSeeds().get(entry.getKey())) addedMissing = true;
+                }
+                if (!addedMissing && child.getAvailableAmount(what) >= amount) {
+                    child.applyDiff(inventory);
+                    return;
+                }
+            } catch (CraftBranchFailure ignored) {
+                // This candidate cannot provide a real seed; try the next without changing the plan.
+            }
+            restoreCalculationMarker(marker);
+        }
+    }
+
     private void clearRecursiveMissingSeed(AEKey what) {
         this.recursiveMissingSeeds.remove(what);
         this.missing.remove(what);
@@ -1741,6 +1813,26 @@ public class CraftingCalculation {
         throws InterruptedException, CraftBranchFailure {
         var graph = this.graph;
         var node = graph == null ? null : graph.getNodeFor(what);
+        if (node != null && !node.isLocalUnit() && node.getLocalComponentId() < 0) {
+            var feedback = node.getInputs().stream().filter(edge -> edge.producer() == node).findFirst().orElse(null);
+            long gain = feedback == null ? 0 : node.getOutputPerCraft() - feedback.amountPerCraft();
+            if (gain > 0 && this.realSeededRecursiveKeys.contains(what)) {
+                long times = divideCeil(deficit, gain);
+                // The main plan already bootstrapped this loop. Plan its extra net production directly;
+                // a local compatibility transaction would try to acquire the same seed a second time.
+                for (var edge : node.getInputs()) {
+                    if (edge == feedback) continue;
+                    long needed = LongMath.saturatedMultiply(edge.amountPerCraft(), times);
+                    var input = new CraftingTreeNode(this.craftingService, this, edge.inputKey(), 1, null, -1);
+                    input.request(branchInv, needed, null);
+                }
+                branchInv.insert(what, LongMath.saturatedMultiply(gain, times), Actionable.MODULATE);
+                branchInv.addCrafting(node.getPattern(), times);
+                branchInv.addStackBytes(what, feedback.amountPerCraft(), times);
+                branchInv.addBytes(times);
+                return;
+            }
+        }
         if (node != null && node.getLocalComponentId() >= 0) {
             var component = graph.getTopology().getComponents().get(node.getLocalComponentId());
             recordLocalReplan();

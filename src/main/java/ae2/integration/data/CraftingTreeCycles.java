@@ -2,6 +2,7 @@ package ae2.integration.data;
 
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.KeyCounter;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
@@ -27,6 +28,8 @@ public final class CraftingTreeCycles {
     private final Reference2IntOpenHashMap<LiteCraftTreeProc> numbers = new Reference2IntOpenHashMap<>();
     private final Map<IPatternDetails, Set<AEKey>> outputs = new Reference2ObjectOpenHashMap<>();
     private boolean pending;
+    private Map<IPatternDetails, KeyCounter> remainders = Map.of();
+    private boolean explicitFeedback;
 
     private CraftingTreeCycles() {
         this.numbers.defaultReturnValue(-1);
@@ -34,6 +37,22 @@ public final class CraftingTreeCycles {
 
     public static LiteCraftTreeNode annotate(LiteCraftTreeNode root) {
         var cycles = new CraftingTreeCycles();
+        return cycles.annotateTree(root);
+    }
+
+    /**
+     * Final plans explicitly distinguish seed stock from the actual returns captured during replay.
+     */
+    public static LiteCraftTreeNode annotate(LiteCraftTreeNode root, Map<IPatternDetails, KeyCounter> remainders) {
+        if (remainders.isEmpty()) return annotate(root);
+        var cycles = new CraftingTreeCycles();
+        cycles.remainders = remainders;
+        cycles.explicitFeedback = true;
+        return cycles.annotateTree(root);
+    }
+
+    private LiteCraftTreeNode annotateTree(LiteCraftTreeNode root) {
+        var cycles = this;
         cycles.visit(root);
         if (cycles.feedback.isEmpty() && !cycles.pending) {
             return root;
@@ -71,6 +90,7 @@ public final class CraftingTreeCycles {
     }
 
     private void link(LiteCraftTreeNode input) {
+        if (this.explicitFeedback && input.feedback() != LiteCraftTreeNode.FEEDBACK_PENDING) return;
         var what = input.output().what();
         int taking = this.above.size() - 1;
         for (int i = taking; i >= 0; i--) {
@@ -90,6 +110,8 @@ public final class CraftingTreeCycles {
         return this.outputs.computeIfAbsent(pattern, p -> {
             Set<AEKey> keys = new ObjectOpenHashSet<>();
             for (var output : p.getOutputs()) keys.add(output.what());
+            var returned = this.remainders.get(p);
+            if (returned != null) keys.addAll(returned.keySet());
             return keys;
         }).contains(what);
     }
@@ -139,7 +161,8 @@ public final class CraftingTreeCycles {
             }
             if (!inputs.isEmpty()) procs.add(copied);
         }
-        return new LiteCraftTreeNode(parent, node.output(), procs, node.missing(),
-            linked ? this.feedback.getInt(node) : -1);
+        int feedback = node.feedback() == LiteCraftTreeNode.FEEDBACK_REMAINDER
+            ? LiteCraftTreeNode.FEEDBACK_REMAINDER : linked ? this.feedback.getInt(node) : -1;
+        return new LiteCraftTreeNode(parent, node.output(), procs, node.missing(), feedback);
     }
 }

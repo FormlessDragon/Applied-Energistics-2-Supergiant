@@ -6,6 +6,7 @@ import ae2.api.stacks.KeyCounter;
 import ae2.crafting.graph.CraftingGraphDisplaySnapshot;
 import ae2.crafting.graph.LocalDisplayFragment;
 import ae2.integration.data.CraftingGraphDisplayTreeConverter;
+import ae2.integration.data.CraftingPlanTree;
 import ae2.integration.data.CraftingTreeCycles;
 import ae2.integration.data.LiteCraftTreeNode;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
@@ -14,6 +15,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -40,11 +42,14 @@ public final class CraftingPlanDisplay {
     private final GenericStack output;
     private final Object2LongMap<IPatternDetails> patternTimes;
     private final KeyCounter usedItems;
+    private final KeyCounter emittedItems;
     private final KeyCounter missingItems;
     private final @Nullable CraftingTreeNode legacyTree;
     private final @Nullable CraftingGraphDisplaySnapshot.Builder graphDisplayBuilder;
     private final CraftingAttemptMetrics attemptMetrics;
     private final @Nullable CraftingCalculation calculation;
+    private final Map<IPatternDetails, KeyCounter> inputAllocations;
+    private final Map<IPatternDetails, KeyCounter> remainderAllocations;
 
     private static @Nullable LocalDisplayFragment hydrateMachineInfo(@Nullable LocalDisplayFragment fragment,
                                                                      CraftingCalculation calculation) {
@@ -78,14 +83,28 @@ public final class CraftingPlanDisplay {
                                @Nullable CraftingGraphDisplaySnapshot.Builder graphDisplayBuilder,
                                CraftingAttemptMetrics attemptMetrics,
                                @Nullable CraftingCalculation calculation) {
+        this(output, patternTimes, usedItems, new KeyCounter(), missingItems, legacyTree, graphDisplayBuilder,
+            attemptMetrics, calculation, Map.of(), Map.of());
+    }
+
+    public CraftingPlanDisplay(GenericStack output, Object2LongMap<IPatternDetails> patternTimes,
+                               KeyCounter usedItems, KeyCounter emittedItems, KeyCounter missingItems,
+                               @Nullable CraftingTreeNode legacyTree,
+                               @Nullable CraftingGraphDisplaySnapshot.Builder graphDisplayBuilder,
+                               CraftingAttemptMetrics attemptMetrics, @Nullable CraftingCalculation calculation,
+                               Map<IPatternDetails, KeyCounter> inputAllocations,
+                               Map<IPatternDetails, KeyCounter> remainderAllocations) {
         this.output = output;
         this.patternTimes = patternTimes;
         this.usedItems = usedItems;
+        this.emittedItems = emittedItems;
         this.missingItems = missingItems;
         this.legacyTree = legacyTree;
         this.graphDisplayBuilder = graphDisplayBuilder;
         this.attemptMetrics = attemptMetrics;
         this.calculation = calculation;
+        this.inputAllocations = inputAllocations;
+        this.remainderAllocations = remainderAllocations;
     }
 
     public CompletableFuture<LiteCraftTreeNode> requestTree() {
@@ -111,6 +130,10 @@ public final class CraftingPlanDisplay {
     private LiteCraftTreeNode materialize() {
         long start = System.nanoTime();
         try {
+            if (this.calculation != null) {
+                return CraftingPlanTree.build(output, patternTimes, usedItems, emittedItems, missingItems, calculation,
+                    inputAllocations, remainderAllocations);
+            }
             var builder = this.graphDisplayBuilder;
             if (builder != null) {
                 // Build the immutable graph snapshot lazily on first GUI open, then hydrate machine info.

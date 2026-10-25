@@ -339,10 +339,8 @@ public final class CraftingGraphDisplayTreeConverter {
             }
             if (isFeedback(edge) && craftTimes > 0) {
                 long fedBack = LongMath.saturatedMultiply(edge.amountPerCraft(), craftTimes);
-                if (edge.producerIndex() != nodeIndex) {
-                    // Around a ring, what comes from storage or is missing is shown as such below, not fed back
-                    fedBack = Math.max(0, fedBack - edge.seedRequired());
-                }
+                // The seed is shown separately below, including for a single-pattern loop.
+                fedBack = Math.max(0, fedBack - edge.seedRequired());
                 if (fedBack > 0) {
                     children.add(new LiteCraftTreeNode(process, new GenericStack(edge.inputKey(), fedBack), List.of(),
                         0, LiteCraftTreeNode.FEEDBACK_PENDING));

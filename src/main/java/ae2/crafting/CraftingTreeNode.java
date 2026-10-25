@@ -54,6 +54,7 @@ public class CraftingTreeNode {
     private final CraftingCalculation job;
     // parent node.
     private final CraftingTreeProcess parent;
+    private final int parentSlot;
     private final World level;
     /**
      * "Template" of the item this node is making. For top-level node: the count is always 1. For child nodes: the count
@@ -68,10 +69,14 @@ public class CraftingTreeNode {
     private ObjectArrayList<CraftingTreeProcess> nodes = null;
     private Boolean selfReturningRemainderInput;
     private boolean recursiveDisplayNodesInitialized;
+    private @Nullable CraftingTreeProcess remainderRequestOwner;
+    private int remainderRequestSlot = -1;
+    private boolean remainderRequestIncludesSiblingInputs;
 
     public CraftingTreeNode(ICraftingService cc, CraftingCalculation job, AEKey what, long amount,
                             CraftingTreeProcess par, int slot) {
         this.parent = par;
+        this.parentSlot = slot;
         this.parentInput = slot == -1 ? null : par.details.getInputs()[slot];
         this.level = job.getLevel();
         this.job = job;
@@ -382,7 +387,7 @@ public class CraftingTreeNode {
         var recursiveBatch = this.job.getRecursivePatternBatch(pro.details, this.what);
 
         while (totalRequestedItems > 0) {
-            long times = getRequestedPatternTimes(pro, totalRequestedItems, craftedPerPattern, recursiveBatch);
+            long times = getRequestedPatternTimes(inv, pro, totalRequestedItems, craftedPerPattern, recursiveBatch);
             var marker = this.job.createCalculationMarker();
             var child = new ChildCraftingSimulationState(inv);
             try {
@@ -447,7 +452,7 @@ public class CraftingTreeNode {
         var craftedPerPattern = getEffectiveOutputCount(pro);
         while (totalRequestedItems > 0) {
             var recursiveBatch = this.job.getRecursivePatternBatch(pro.details, this.what);
-            long requestedTimes = getRequestedPatternTimes(pro, totalRequestedItems, craftedPerPattern, recursiveBatch);
+            long requestedTimes = getRequestedPatternTimes(inv, pro, totalRequestedItems, craftedPerPattern, recursiveBatch);
             long times;
             if (this.job.isPerformanceTrackingEnabled()) {
                 times = this.job.timed("max-craftable " + this.what,
@@ -593,7 +598,7 @@ public class CraftingTreeNode {
             }
             long craftedPerPattern = getEffectiveOutputCount(pro);
             var recursiveBatch = this.job.getRecursivePatternBatch(pro.details, this.what);
-            long requestedTimes = getRequestedPatternTimes(pro, totalRequestedItems, craftedPerPattern, recursiveBatch);
+            long requestedTimes = getRequestedPatternTimes(inv, pro, totalRequestedItems, craftedPerPattern, recursiveBatch);
             long times;
             if (this.job.isPerformanceTrackingEnabled()) {
                 times = this.job.timed("max-craftable-for-input " + this.what,
@@ -677,17 +682,22 @@ public class CraftingTreeNode {
         if (usesFinalOutputAsIntermediateInput(pro)) {
             return pro.getOutputCount(this.what);
         }
-        long recursiveNetOutput = this.job.getCycleNetOutput(this.what);
-        if (recursiveNetOutput > 0) {
-            return recursiveNetOutput;
+        boolean returnedAsOutput = pro.hasReturnedPrimaryOutput(this.what);
+        if (!returnedAsOutput) {
+            long recursiveNetOutput = this.job.getCycleNetOutput(this.what);
+            if (recursiveNetOutput > 0) {
+                return recursiveNetOutput;
+            }
+            var recursiveBatch = this.job.getRecursivePatternBatch(pro.details, this.what);
+            if (recursiveBatch.netOutput() > 0) {
+                return recursiveBatch.netOutput();
+            }
         }
-        var recursiveBatch = this.job.getRecursivePatternBatch(pro.details, this.what);
-        if (recursiveBatch.netOutput() > 0) {
-            return recursiveBatch.netOutput();
-        }
-        long expandedPatternNetOutput = this.job.getExpandedPatternNetOutput(pro.details, this.what);
-        if (expandedPatternNetOutput > 0) {
-            return expandedPatternNetOutput;
+        if (!pro.batchesAssemblerStates()) {
+            long expandedPatternNetOutput = this.job.getExpandedPatternNetOutput(pro.details, this.what);
+            if (expandedPatternNetOutput > 0) {
+                return expandedPatternNetOutput;
+            }
         }
         return pro.getEffectiveOutputCount(this.what);
     }
@@ -716,17 +726,41 @@ public class CraftingTreeNode {
         return multiplier;
     }
 
-    private long getRequestedPatternTimes(CraftingTreeProcess pro, long totalRequestedItems, long craftedPerPattern,
+    private long getRequestedPatternTimes(CraftingSimulationState inventory, CraftingTreeProcess pro,
+                                          long totalRequestedItems, long craftedPerPattern,
                                           CraftingCalculation.RecursivePatternBatch recursiveBatch) {
-        if (pro.limitsQuantity()) {
-            return 1;
+        long times;
+        if (pro.limitsQuantity() && !pro.batchesAssemblerStates()) {
+            times = 1;
+        } else if (usesFinalOutputAsIntermediateInput(pro)) {
+            times = divideCeil(totalRequestedItems, craftedPerPattern);
+        } else {
+            boolean returnedAsOutput = pro.hasReturnedPrimaryOutput(this.what);
+            long netOutput = !returnedAsOutput && recursiveBatch.netOutput() > 0
+                ? recursiveBatch.netOutput() : craftedPerPattern;
+            long rootTimes = returnedAsOutput ? 1 : Math.max(1, recursiveBatch.rootTimes());
+            times = LongMath.saturatedMultiply(divideCeil(totalRequestedItems, netOutput), rootTimes);
         }
-        if (usesFinalOutputAsIntermediateInput(pro)) {
-            return divideCeil(totalRequestedItems, craftedPerPattern);
-        }
-        long netOutput = recursiveBatch.netOutput() > 0 ? recursiveBatch.netOutput() : craftedPerPattern;
-        long rootTimes = Math.max(1, recursiveBatch.rootTimes());
-        return LongMath.saturatedMultiply(divideCeil(totalRequestedItems, netOutput), rootTimes);
+        return pro.getTimesRequiredForSiblingRemainders(this, inventory, totalRequestedItems, times);
+    }
+
+    @Nullable
+    CraftingTreeProcess getParentProcess() {
+        return this.remainderRequestOwner != null ? this.remainderRequestOwner : this.parent;
+    }
+
+    int getParentSlot() {
+        return this.remainderRequestSlot >= 0 ? this.remainderRequestSlot : this.parentSlot;
+    }
+
+    boolean remainderRequestIncludesSiblingInputs() {
+        return this.remainderRequestIncludesSiblingInputs;
+    }
+
+    void setRemainderRequestContext(CraftingTreeProcess owner, int slot, boolean includesSiblingInputs) {
+        this.remainderRequestOwner = owner;
+        this.remainderRequestSlot = slot;
+        this.remainderRequestIncludesSiblingInputs = includesSiblingInputs;
     }
 
     int getDepth() {

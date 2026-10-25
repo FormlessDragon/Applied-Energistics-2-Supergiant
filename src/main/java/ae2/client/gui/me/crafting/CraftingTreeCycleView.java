@@ -114,14 +114,14 @@ public final class CraftingTreeCycleView {
             var proc = pending.removeFirst();
             procs.add(proc);
             for (var input : proc.inputs()) {
-                boolean inCycle = input.feedback() >= 0;
+                boolean inCycle = LiteCraftTreeNode.isCycleFeedback(input.feedback());
                 for (var below : input.inputs()) inCycle |= below.cycle() == cycle;
                 if (!inCycle) {
                     outside.add(input);
                     continue;
                 }
                 inner.add(input);
-                if (input.feedback() >= 0) feedbacks++;
+                if (LiteCraftTreeNode.isCycleFeedback(input.feedback())) feedbacks++;
                 for (var below : input.inputs()) {
                     if (below.cycle() == cycle) {
                         pending.add(below);
@@ -191,7 +191,7 @@ public final class CraftingTreeCycleView {
         pending.add(region.entry());
         while (!pending.isEmpty()) {
             var node = pending.pop();
-            if (node.feedback() >= 0) {
+            if (LiteCraftTreeNode.isCycleFeedback(node.feedback())) {
                 for (var step = node; step != null; step = parents.get(step)) found.add(step);
                 return found;
             }
@@ -252,7 +252,7 @@ public final class CraftingTreeCycleView {
                 if (LiteCraftTreeNode.isMissing(node)) leaf.markMissing();
                 return leaf;
             }
-            if (node.feedback() >= 0) {
+            if (LiteCraftTreeNode.isCycleFeedback(node.feedback())) {
                 var leaf = new LiteCraftTreeNode(parent, node.output(), List.of(), node.missing(), node.feedback());
                 int maker = this.above.size() - 1 - node.feedback();
                 if (maker >= 0) this.feedback.put(leaf, this.above.get(maker));

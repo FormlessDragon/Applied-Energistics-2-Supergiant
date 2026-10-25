@@ -102,6 +102,97 @@ final class CraftingTestNetwork {
         return world;
     }
 
+    /**
+     * Replays the plan like a crafting CPU: starting from the used, emitted and missing items, the CPU visits its tasks
+     * in turn, in the order of ExecutingCraftingJob#tasks, and pushes one craft per visit whose inputs are there, until
+     * every planned craft ran. An input takes its possible stacks in order until it has enough, see
+     * CraftingCpuHelper#extractPatternInputs. A plan without cycles, input choices or containers runs in any order, so
+     * its crafts are run many at a time. Returns null if the plan runs and covers the request, else why not.
+     */
+    static @Nullable String replay(ICraftingPlan plan) {
+        Map<AEKey, Long> inventory = new LinkedHashMap<>();
+        for (var counter : List.of(plan.usedItems(), plan.emittedItems(), plan.missingItems())) {
+            for (var entry : counter) {
+                inventory.merge(entry.getKey(), entry.getLongValue(), Long::sum);
+            }
+        }
+        // The tasks of the executing job are an Object2ObjectOpenHashMap filled in the order of the plan
+        var left = new Object2ObjectOpenHashMap<IPatternDetails, long[]>();
+        plan.patternTimes().forEach((pattern, times) -> left.put(pattern, new long[]{times}));
+        var seeds = new CraftingSeedReservations(left.keySet(), pattern -> left.get(pattern)[0]);
+        boolean anyOrder = runsInAnyOrder(plan);
+        boolean progress = true;
+        long visits = 0;
+        while (progress) {
+            progress = false;
+            for (var entry : left.entrySet()) {
+                var times = entry.getValue();
+                if (times[0] <= 0) continue;
+                long done = runCrafts(entry.getKey(), inventory, anyOrder ? times[0] : 1, seeds);
+                if (done > 0) {
+                    times[0] -= done;
+                    progress = true;
+                }
+                if (++visits > 50_000_000) {
+                    return "replay gave up";
+                }
+            }
+        }
+        for (var entry : left.entrySet()) {
+            if (entry.getValue()[0] > 0) {
+                return "stuck: " + entry.getKey() + " x" + entry.getValue()[0] + " left";
+            }
+        }
+        var output = plan.finalOutput();
+        if (inventory.getOrDefault(output.what(), 0L) < output.amount()) {
+            return "short of the requested output: " + inventory.getOrDefault(output.what(), 0L);
+        }
+        return null;
+    }
+
+    /*
+     * Runs crafts one after another while their inputs are there. Crafts that would take the same stacks are run k at a
+     * time when the inventory holds k times what one takes, which changes nothing about the order.
+     */
+    private static long runCrafts(IPatternDetails pattern, Map<AEKey, Long> inventory, long wanted,
+                                  CraftingSeedReservations seeds) {
+        long done = 0;
+        while (done < wanted) {
+            var taken = new HashMap<AEKey, Long>();
+            boolean[] exact = {true};
+            if (!take(pattern, inventory, taken, exact, seeds)) {
+                break;
+            }
+            long times = 1;
+            if (exact[0]) {
+                times = wanted - done;
+                for (var entry : taken.entrySet()) {
+                    times = Math.min(times, Math.max(0, inventory.getOrDefault(entry.getKey(), 0L)
+                        - seeds.reserved(pattern, entry.getKey())) / entry.getValue());
+                }
+                times = Math.max(1, times);
+            }
+            for (var entry : taken.entrySet()) {
+                inventory.merge(entry.getKey(), -entry.getValue() * times, Long::sum);
+            }
+            for (var input : pattern.getInputs()) {
+                for (var possible : input.possibleInputs()) {
+                    var remaining = input.getRemainingKey(possible.what());
+                    long amount = taken.getOrDefault(possible.what(), 0L);
+                    if (remaining != null && amount > 0) {
+                        // One container per stack taken
+                        inventory.merge(remaining, amount / possible.amount() * times, Long::sum);
+                    }
+                }
+            }
+            for (var output : pattern.getOutputs()) {
+                inventory.merge(output.what(), output.amount() * times, Long::sum);
+            }
+            done += times;
+        }
+        return done;
+    }
+
     static synchronized void bootstrap() {
         if (bootstrapped) {
             return;
@@ -288,51 +379,31 @@ final class CraftingTestNetwork {
         return plan.missingItems().get(key(what));
     }
 
-    /**
-     * Replays the plan like a crafting CPU: starting from the used, emitted and missing items, the CPU visits its tasks
-     * in turn, in the order of ExecutingCraftingJob#tasks, and pushes one craft per visit whose inputs are there, until
-     * every planned craft ran. An input takes its possible stacks in order until it has enough, see
-     * CraftingCpuHelper#extractPatternInputs. A plan without cycles, input choices or containers runs in any order, so
-     * its crafts are run many at a time. Returns null if the plan runs and covers the request, else why not.
+    /*
+     * What one craft takes, without taking it. Like CraftingCpuHelper#extractPatternInputs, an input is taken in whole
+     * stacks of its possible inputs, in order. Exact when every input was covered by its first possible stack alone, so
+     * further crafts take the same until that stack runs out.
      */
-    static @Nullable String replay(ICraftingPlan plan) {
-        Map<AEKey, Long> inventory = new LinkedHashMap<>();
-        for (var counter : List.of(plan.usedItems(), plan.emittedItems(), plan.missingItems())) {
-            for (var entry : counter) {
-                inventory.merge(entry.getKey(), entry.getLongValue(), Long::sum);
+    private static boolean take(IPatternDetails pattern, Map<AEKey, Long> inventory, Map<AEKey, Long> taken,
+                                boolean[] exact, CraftingSeedReservations seeds) {
+        for (var input : pattern.getInputs()) {
+            long need = input.getMultiplier();
+            var first = input.possibleInputs()[0].what();
+            for (var possible : input.possibleInputs()) {
+                long available = inventory.getOrDefault(possible.what(), 0L) - taken.getOrDefault(possible.what(), 0L)
+                    - seeds.reserved(pattern, possible.what());
+                long stacks = Math.min(need, Math.max(0, available) / possible.amount());
+                if (stacks <= 0) continue;
+                if (possible.what() != first || stacks < need) exact[0] = false;
+                taken.merge(possible.what(), stacks * possible.amount(), Long::sum);
+                need -= stacks;
+                if (need == 0) break;
+            }
+            if (need > 0) {
+                return false;
             }
         }
-        // The tasks of the executing job are an Object2ObjectOpenHashMap filled in the order of the plan
-        var left = new Object2ObjectOpenHashMap<IPatternDetails, long[]>();
-        plan.patternTimes().forEach((pattern, times) -> left.put(pattern, new long[]{times}));
-        boolean anyOrder = runsInAnyOrder(plan);
-        boolean progress = true;
-        long visits = 0;
-        while (progress) {
-            progress = false;
-            for (var entry : left.entrySet()) {
-                var times = entry.getValue();
-                if (times[0] <= 0) continue;
-                long done = runCrafts(entry.getKey(), inventory, anyOrder ? times[0] : 1);
-                if (done > 0) {
-                    times[0] -= done;
-                    progress = true;
-                }
-                if (++visits > 50_000_000) {
-                    return "replay gave up";
-                }
-            }
-        }
-        for (var entry : left.entrySet()) {
-            if (entry.getValue()[0] > 0) {
-                return "stuck: " + entry.getKey() + " x" + entry.getValue()[0] + " left";
-            }
-        }
-        var output = plan.finalOutput();
-        if (inventory.getOrDefault(output.what(), 0L) < output.amount()) {
-            return "short of the requested output: " + inventory.getOrDefault(output.what(), 0L);
-        }
-        return null;
+        return true;
     }
 
     private static boolean runsInAnyOrder(ICraftingPlan plan) {
@@ -370,71 +441,12 @@ final class CraftingTestNetwork {
         return false;
     }
 
-    /*
-     * Runs crafts one after another while their inputs are there. Crafts that would take the same stacks are run k at a
-     * time when the inventory holds k times what one takes, which changes nothing about the order.
-     */
-    private static long runCrafts(IPatternDetails pattern, Map<AEKey, Long> inventory, long wanted) {
-        long done = 0;
-        while (done < wanted) {
-            var taken = new HashMap<AEKey, Long>();
-            boolean[] exact = {true};
-            if (!take(pattern, inventory, taken, exact)) {
-                break;
-            }
-            long times = 1;
-            if (exact[0]) {
-                times = wanted - done;
-                for (var entry : taken.entrySet()) {
-                    times = Math.min(times, inventory.getOrDefault(entry.getKey(), 0L) / entry.getValue());
-                }
-                times = Math.max(1, times);
-            }
-            for (var entry : taken.entrySet()) {
-                inventory.merge(entry.getKey(), -entry.getValue() * times, Long::sum);
-            }
-            for (var input : pattern.getInputs()) {
-                for (var possible : input.possibleInputs()) {
-                    var remaining = input.getRemainingKey(possible.what());
-                    long amount = taken.getOrDefault(possible.what(), 0L);
-                    if (remaining != null && amount > 0) {
-                        // One container per stack taken
-                        inventory.merge(remaining, amount / possible.amount() * times, Long::sum);
-                    }
-                }
-            }
-            for (var output : pattern.getOutputs()) {
-                inventory.merge(output.what(), output.amount() * times, Long::sum);
-            }
-            done += times;
-        }
-        return done;
+    IGrid grid() {
+        return this.grid;
     }
 
-    /*
-     * What one craft takes, without taking it. Like CraftingCpuHelper#extractPatternInputs, an input is taken in whole
-     * stacks of its possible inputs, in order. Exact when every input was covered by its first possible stack alone, so
-     * further crafts take the same until that stack runs out.
-     */
-    private static boolean take(IPatternDetails pattern, Map<AEKey, Long> inventory, Map<AEKey, Long> taken,
-                                boolean[] exact) {
-        for (var input : pattern.getInputs()) {
-            long need = input.getMultiplier();
-            var first = input.possibleInputs()[0].what();
-            for (var possible : input.possibleInputs()) {
-                long available = inventory.getOrDefault(possible.what(), 0L) - taken.getOrDefault(possible.what(), 0L);
-                long stacks = Math.min(need, Math.max(0, available) / possible.amount());
-                if (stacks <= 0) continue;
-                if (possible.what() != first || stacks < need) exact[0] = false;
-                taken.merge(possible.what(), stacks * possible.amount(), Long::sum);
-                need -= stacks;
-                if (need == 0) break;
-            }
-            if (need > 0) {
-                return false;
-            }
-        }
-        return true;
+    void recursiveReserve(long amount) {
+        this.service.setRecursiveIngredientReserveAmount(amount);
     }
 
     @SuppressWarnings("unchecked")

@@ -2,8 +2,10 @@ package ae2.crafting;
 
 import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.core.AEConfig;
+import com.sun.management.ThreadMXBean;
 import org.junit.jupiter.api.Test;
 
+import java.lang.management.ManagementFactory;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Random;
@@ -107,6 +109,38 @@ class CraftingCalculationPerformanceTest {
 
         assertEquals(1, used(plan, "x"));
         assertTrue(ms(large[0]) < 2_000, () -> "took " + ms(large[0]) + " ms");
+    }
+
+    private static long craftingAllocatedBytes() {
+        if (!(ManagementFactory.getThreadMXBean() instanceof ThreadMXBean threads)
+            || !threads.isThreadAllocatedMemorySupported()) return 0;
+        if (!threads.isThreadAllocatedMemoryEnabled()) threads.setThreadAllocatedMemoryEnabled(true);
+        long bytes = 0, driver = Thread.currentThread().threadId();
+        for (var thread : threads.getThreadInfo(threads.getAllThreadIds())) {
+            if (thread != null && (thread.getThreadId() == driver || thread.getThreadName().equals("AE Crafting Calculator"))) {
+                bytes += Math.max(0, threads.getThreadAllocatedBytes(thread.getThreadId()));
+            }
+        }
+        return bytes;
+    }
+
+    @Test
+    void amplificationFeedingAConsumerDoesNotIterateOverBillionsOfCrafts() {
+        var net = new CraftingTestNetwork();
+        net.pattern("grow", of("stone", 1), of("stone", 2));
+        net.pattern("bricks", of("stone", 3), of("bricks", 4));
+        net.store("stone", 1);
+        net.plan("bricks", 1000);
+        var elapsed = new long[1];
+        long allocated = craftingAllocatedBytes();
+        var plan = timed("amplification x4294967296", elapsed, () -> net.plan("bricks", 4_294_967_296L));
+        allocated = craftingAllocatedBytes() - allocated;
+        System.out.printf("amplification x4294967296 allocated: %.3f MiB%n", allocated / 1048576.0);
+        assertEquals(0, total(plan.missingItems()));
+        assertEquals(1, used(plan, "stone"));
+        assertEquals(2, plan.patternTimes().size(), "keep aggregate tasks, not a schedule per craft");
+        assertTrue(ms(elapsed[0]) < 2000, () -> "took " + ms(elapsed[0]) + " ms");
+        assertTrue(allocated < 16 * 1024 * 1024, "tiny recipe graph allocated " + allocated + " bytes");
     }
 
     /**

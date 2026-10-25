@@ -32,6 +32,7 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
      * An input a cycle cut off from what makes it, until {@link CraftingTreeCycles} finds that above it.
      */
     public static final int FEEDBACK_PENDING = Integer.MAX_VALUE;
+    public static final int FEEDBACK_REMAINDER = Integer.MAX_VALUE - 1;
 
     private final LiteCraftTreeProc parent;
     private final GenericStack output;
@@ -316,6 +317,10 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
 
     public int feedback() {
         return feedback;
+    }
+
+    public static boolean isCycleFeedback(int feedback) {
+        return feedback >= 0 && feedback != FEEDBACK_PENDING && feedback != FEEDBACK_REMAINDER;
     }
 
     /**

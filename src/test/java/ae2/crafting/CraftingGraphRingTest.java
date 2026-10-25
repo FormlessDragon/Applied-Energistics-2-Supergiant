@@ -129,14 +129,14 @@ class CraftingGraphRingTest {
     }
 
     @Test
-    void aRingStarvedByCraftsOutsideItIsLeftToTheLegacyTree() throws Exception {
-        // The CPU runs any craft whose inputs are there, so the walls take the stone the brick crafts wait for
+    void aRingRetainsItsSeedsWhenCraftsOutsideItCompeteForThem() throws Exception {
+        // Walls must leave the seed needed by the still-pending brick crafts.
         var net = stoneBrickRing(0, 0);
         net.pattern("wall", of("stone", 2, "brick", 1), of("wall", 1));
 
         var plan = net.plan("wall", 300);
 
-        assertNull(((CraftingPlan) plan).graphDisplayBuilder(), "planned by the legacy tree");
+        assertPlannedNatively(plan, "seed reservations protect the ring from downstream consumers");
         assertNull(replay(plan));
         var root = tree(plan);
         assertEquals(new Object2LongOpenHashMap<>(plan.patternTimes()), shownCrafts(root), () -> describe(root, ""));

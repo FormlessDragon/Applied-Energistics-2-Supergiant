@@ -13,11 +13,13 @@ import ae2.core.AEConfig;
 import ae2.crafting.CraftingAttemptMetrics;
 import ae2.crafting.CraftingLink;
 import ae2.crafting.CraftingPlan;
+import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.me.cluster.implementations.CraftingCPUCluster;
 import ae2.me.service.CraftingService;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.init.Items;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraftforge.fml.common.FMLCommonHandler;
@@ -26,6 +28,8 @@ import net.minecraftforge.fml.relauncher.Side;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.lang.reflect.Proxy;
 import java.math.BigInteger;
@@ -370,6 +374,149 @@ class CraftingDispatchBudgetTest {
         assertEquals(0, cpu.run(1, new Energy(), provider));
         assertTrue(provider.busyCalls <= 16);
         assertNotEquals(firstCursor, cpu.job.schedulingCursor, "blocked work still advances the fair cursor");
+    }
+
+    private static IPatternDetails processing(AEKey input, long in, AEKey output, long out) {
+        var stack = new ItemStack(Items.PAPER);
+        AEProcessingPattern.encode(stack, List.of(new GenericStack(input, in)), List.of(new GenericStack(output, out)));
+        return new AEProcessingPattern(AEItemKey.of(stack));
+    }
+
+    private static CraftingPlan plan(Object2LongOpenHashMap<IPatternDetails> times, long amount) {
+        return new CraftingPlan(new GenericStack(carrot, amount), 128, false, false,
+            new KeyCounter(), new KeyCounter(), new KeyCounter(), 0, times, null, List.of(), null,
+            new CraftingAttemptMetrics(), null);
+    }
+
+    private static Cpu cyclicCpu(Object2LongOpenHashMap<IPatternDetails> times, long amount) {
+        var cluster = new CraftingCPUCluster(BlockPos.ORIGIN, BlockPos.ORIGIN);
+        var logic = cluster.craftingLogic;
+        var link = new CraftingLink(CraftingCpuHelper.generateLinkData(UUID.randomUUID(), true, false), cluster);
+        var job = new ExecutingCraftingJob(plan(times, amount), key -> {
+        }, link, null, CraftingJobOptions.DEFAULT);
+        setJob(logic, job);
+        return new Cpu(logic, job);
+    }
+
+    private static ICraftingProvider returningProvider(boolean merge, KeyCounter pending) {
+        return new ICraftingProvider() {
+            public List<IPatternDetails> getAvailablePatterns() {
+                return List.of();
+            }
+
+            public boolean isBusy() {
+                return false;
+            }
+
+            public boolean canMergePatternPush(IPatternDetails pattern) {
+                return merge;
+            }
+
+            public int getMaxPatternPushMultiplier(IPatternDetails pattern, int max) {
+                return max;
+            }
+
+            public boolean pushPattern(IPatternDetails pattern, KeyCounter[] inputs, int multiplier) {
+                for (int i = 0; i < inputs.length; i++) {
+                    var expected = pattern.getInputs()[i].possibleInputs()[0];
+                    assertEquals(expected.amount() * pattern.getInputs()[i].getMultiplier() * multiplier,
+                        inputs[i].get(expected.what()));
+                }
+                for (var output : pattern.getOutputs()) pending.add(output.what(), output.amount() * multiplier);
+                return true;
+            }
+        };
+    }
+
+    @ParameterizedTest
+    @CsvSource({"1,1,false", "1,7,true", "1,100,true", "3,1,false", "3,7,true", "5,100,true"})
+    void downstreamDispatchCannotSpendTheLastAmplificationSeed(int seed, int budget, boolean merge) {
+        var grow = processing(apple, seed, apple, seed + 1);
+        var finish = processing(apple, 3, carrot, 4);
+        var times = new Object2LongOpenHashMap<IPatternDetails>();
+        times.put(grow, 750 - seed);
+        times.put(finish, 250);
+        var cpu = cyclicCpu(times, 1000);
+        cpu.logic.getInventory().insert(apple, seed, Actionable.MODULATE);
+        // Force the dangerous order even when the pattern map happens to put the amplifier first.
+        cpu.job.schedulingCursor = new ArrayList<>(cpu.job.tasks.keySet()).indexOf(finish);
+        var pending = new KeyCounter();
+        var energy = new Energy();
+        long[] produced = {0};
+        var provider = returningProvider(merge, pending);
+        int tick = 0;
+        while (cpu.job.tasks.values().stream().anyMatch(p -> p.value > 0)) {
+            assertTrue(++tick < 10_000, "CPU deadlocked after consuming a seed");
+            cpu.logic.executeCraftingWithProviderLookup(budget, energy.service, null, p -> List.of(provider));
+            // Real asynchronous returns: the CPU must also protect a seed while its replacement is in a machine.
+            if (tick % 3 == 0) {
+                long stone = pending.get(apple);
+                if (stone > 0) assertEquals(stone, cpu.logic.insert(apple, stone, Actionable.MODULATE));
+                produced[0] += pending.get(carrot);
+                pending.clear();
+            }
+        }
+        produced[0] += pending.get(carrot);
+        assertEquals(1000, produced[0]);
+        assertEquals(0, cpu.logic.getStored(apple));
+        assertEquals(2, cpu.job.tasks.values().stream().filter(p -> p.value == 0).count());
+        assertEquals(1000, cpu.job.waitingFor.extract(carrot, Long.MAX_VALUE, Actionable.SIMULATE));
+    }
+
+    @Test
+    void mergingMoreGrowthReinstatesAReleasedSeedReservation() {
+        var grow = processing(apple, 1, apple, 2);
+        var finish = processing(apple, 3, carrot, 4);
+        var times = new Object2LongOpenHashMap<IPatternDetails>();
+        times.put(grow, 1);
+        times.put(finish, 1);
+        var cpu = cyclicCpu(times, 4);
+        assertEquals(1, cpu.job.seedReservations().reserved(finish, apple));
+        cpu.job.tasks.get(grow).value = 0;
+        assertEquals(0, cpu.job.seedReservations().reserved(finish, apple));
+        var more = new Object2LongOpenHashMap<IPatternDetails>();
+        more.put(grow, 2);
+        cpu.job.merge(plan(more, 4), new KeyCounter(), 0);
+        cpu.logic.getInventory().insert(apple, 3, Actionable.MODULATE);
+        cpu.job.schedulingCursor = new ArrayList<>(cpu.job.tasks.keySet()).indexOf(finish);
+        var pending = new KeyCounter();
+        assertEquals(1, cpu.logic.executeCraftingWithProviderLookup(1, new Energy().service, null,
+            p -> List.of(returningProvider(false, pending))));
+        assertEquals(1, cpu.job.tasks.get(finish).value, "the merged job still needs its seed");
+        assertEquals(1, cpu.job.tasks.get(grow).value);
+    }
+
+    @Test
+    void aTwoPatternRingKeepsCirculatingWhileItsConsumerUsesBothMaterials() {
+        var potato = AEItemKey.of(Items.POTATO);
+        var forward = processing(apple, 1, potato, 2);
+        var back = processing(potato, 1, apple, 2);
+        var encoded = new ItemStack(Items.PAPER);
+        AEProcessingPattern.encode(encoded, List.of(new GenericStack(apple, 2), new GenericStack(potato, 1)),
+            List.of(new GenericStack(carrot, 1)));
+        var finish = new AEProcessingPattern(AEItemKey.of(encoded));
+        var times = new Object2LongOpenHashMap<IPatternDetails>();
+        times.put(forward, 200);
+        times.put(back, 200);
+        times.put(finish, 100);
+        var cpu = cyclicCpu(times, 100);
+        cpu.logic.getInventory().insert(apple, 1, Actionable.MODULATE);
+        var pending = new KeyCounter();
+        var provider = returningProvider(true, pending);
+        var energy = new Energy();
+        for (int tick = 0; tick < 1000 && cpu.job.tasks.values().stream().anyMatch(p -> p.value > 0); tick++) {
+            cpu.logic.executeCraftingWithProviderLookup(13, energy.service, null, p -> List.of(provider));
+            if (tick % 3 != 0) continue;
+            for (var key : List.of(apple, potato)) {
+                long returned = pending.get(key);
+                if (returned > 0) assertEquals(returned, cpu.logic.insert(key, returned, Actionable.MODULATE));
+                pending.remove(key);
+            }
+        }
+        assertTrue(cpu.job.tasks.values().stream().allMatch(p -> p.value == 0));
+        assertEquals(100, pending.get(carrot));
+        assertEquals(1, cpu.logic.getStored(apple) + pending.get(apple));
+        assertEquals(100, cpu.logic.getStored(potato) + pending.get(potato));
     }
 
     private record Cpu(CraftingCpuLogic logic, ExecutingCraftingJob job) {

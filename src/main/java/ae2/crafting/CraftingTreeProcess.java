@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.RandomAccess;
 import java.util.Set;
 
@@ -71,6 +72,8 @@ public class CraftingTreeProcess {
     private @Nullable MachineInfo machineInfo;
     private final CraftingTreeNode parent;
     private final CraftingCalculation job;
+    private final ICraftingService craftingService;
+    private final @Nullable CraftingAssemblerSimulation assemblerSimulation;
     private final IPatternDetails.IInput[] inputs;
     private final List<GenericStack> outputs;
     // Planning uses slotNodes directly; only display consumers need a keyed, ordered view.
@@ -80,6 +83,7 @@ public class CraftingTreeProcess {
     private boolean containerItems;
     private Preview reusablePreview;
     private long treeRequestTimes;
+    private long activeRequestTimes;
     /**
      * If true, we perform this pattern by 1 at the time. This ensures that container items or outputs get reused when
      * possible.
@@ -100,6 +104,9 @@ public class CraftingTreeProcess {
         this.parent = craftingTreeNode;
         this.details = details;
         this.job = job;
+        this.craftingService = cc;
+        this.assemblerSimulation = details instanceof IAssemblerPattern assembler
+            ? new CraftingAssemblerSimulation(assembler, job.getLevel()) : null;
         this.inputs = details.getInputs();
         var patternOutputs = details.getOutputs();
         this.outputs = patternOutputs instanceof RandomAccess ? patternOutputs : new ObjectArrayList<>(patternOutputs);
@@ -111,7 +118,8 @@ public class CraftingTreeProcess {
             var node = new CraftingTreeNode(cc, job, firstInput.what(), firstInput.amount(), this, x);
             this.slotNodes[x] = node;
         }
-        updateLimitQty();
+        if (this.assemblerSimulation != null) this.limitQty = true;
+        else updateLimitQty();
     }
 
     static MachineInfo collectMachineInfo(CraftingCalculation calculation, ICraftingService craftingService,
@@ -325,6 +333,18 @@ public class CraftingTreeProcess {
         return this.limitQty;
     }
 
+    boolean batchesAssemblerStates() {
+        return this.assemblerSimulation != null;
+    }
+
+    boolean hasReturnedPrimaryOutput(AEKey key) {
+        if (this.assemblerSimulation == null || this.assemblerSimulation.defaultRemainderAmount(key) <= 0) return false;
+        for (int i = 0; i < this.outputs.size(); i++) {
+            if (this.outputs.get(i).what().equals(key)) return true;
+        }
+        return false;
+    }
+
     boolean canReusePreview() {
         return !this.job.isLocalUnitMode() && !this.limitQty && !this.containerItems && !this.batchedSlots;
     }
@@ -333,6 +353,8 @@ public class CraftingTreeProcess {
         throws InterruptedException {
         this.job.handlePausing();
 
+        long previousRequestTimes = this.activeRequestTimes;
+        this.activeRequestTimes = maxTimes;
         boolean trackPerformance = this.job.isPerformanceTrackingEnabled();
         long start = trackPerformance ? System.nanoTime() : 0;
         long intermediateFinalOutputMarker = this.job.getIntermediateFinalOutputMarker();
@@ -345,6 +367,18 @@ public class CraftingTreeProcess {
         this.job.pushProcess(this);
         try {
             this.reusablePreview = null;
+            if (this.assemblerSimulation != null) {
+                var marker = this.job.createCalculationMarker();
+                this.job.pushMissingSuppression();
+                try {
+                    return requestAssembler(sharedInputs, maxTimes, true);
+                } catch (CraftBranchFailure impossible) {
+                    return 0;
+                } finally {
+                    this.job.popMissingSuppression();
+                    this.job.restoreCalculationMarker(marker);
+                }
+            }
             long craftableTimes = maxTimes;
             if (canReusePreview() && this.slotNodes.length == 1) {
                 long requiredPerPattern = this.inputs[0].getMultiplier();
@@ -389,6 +423,7 @@ public class CraftingTreeProcess {
             }
             return craftableTimes;
         } finally {
+            this.activeRequestTimes = previousRequestTimes;
             this.job.popProcess();
             this.job.restoreIntermediateFinalOutputMarker(intermediateFinalOutputMarker);
             this.job.restoreRecursiveMissingSeedsMarker(recursiveMissingSeedsMarker);
@@ -504,8 +539,14 @@ public class CraftingTreeProcess {
         throws CraftBranchFailure, InterruptedException {
         this.job.handlePausing();
 
+        long previousRequestTimes = this.activeRequestTimes;
+        this.activeRequestTimes = times;
         this.job.pushProcess(this);
         try {
+            if (this.assemblerSimulation != null) {
+                requestAssembler(inv, times, false);
+                return;
+            }
             var containerItems = this.containerItems ? new KeyCounter() : null;
             long intermediateFinalOutputMarker = this.job.getIntermediateFinalOutputMarker();
             var credited = creditContainers(inv, times);
@@ -551,7 +592,166 @@ public class CraftingTreeProcess {
                 this.job.getIntermediateFinalOutputMarker() - intermediateFinalOutputMarker);
         } finally {
             this.job.popProcess();
+            this.activeRequestTimes = previousRequestTimes;
         }
+    }
+
+    long getTimesRequiredForSiblingRemainders(CraftingTreeNode outputNode, CraftingSimulationState inventory,
+                                               long requestedItems, long times) {
+        if (this.assemblerSimulation == null || times <= 0) return times;
+        var remainders = this.assemblerSimulation.defaultRemainders();
+        if (remainders == null || remainders.isEmpty()) return times;
+
+        var requestingProcess = outputNode.getParentProcess();
+        if (requestingProcess == null || requestingProcess.activeRequestTimes <= 0) return times;
+
+        long requestingTimes = requestingProcess.activeRequestTimes;
+        int requestedSlot = outputNode.getParentSlot();
+        for (int slot = 0; slot < requestingProcess.slotNodes.length; slot++) {
+            var sibling = requestingProcess.slotNodes[slot];
+            if (slot == requestedSlot) continue;
+
+            var key = sibling.getWhat();
+            boolean seen = false;
+            for (int previous = 0; previous < slot; previous++) {
+                var previousSibling = requestingProcess.slotNodes[previous];
+                if (previous != requestedSlot && previousSibling.getWhat().equals(key)) {
+                    seen = true;
+                    break;
+                }
+            }
+            if (seen) continue;
+            if (remainders.get(key) <= 0) continue;
+            long netOutput = getEffectiveOutputCount(key);
+            if (netOutput <= 0) continue;
+
+            long required = 0;
+            for (int matchingSlot = slot; matchingSlot < requestingProcess.slotNodes.length; matchingSlot++) {
+                var matchingSibling = requestingProcess.slotNodes[matchingSlot];
+                if (matchingSlot == requestedSlot || !matchingSibling.getWhat().equals(key)) continue;
+                long units = requestingProcess.slotUnits(matchingSlot,
+                    requestingProcess.inputs[matchingSlot].getMultiplier(), requestingTimes);
+                required = LongMath.saturatedAdd(required,
+                    LongMath.saturatedMultiply(matchingSibling.getTemplateAmount(), units));
+            }
+            long missing = Math.max(0, required - inventory.getAvailableAmount(key));
+            if (missing == 0) continue;
+            if (key.equals(outputNode.getWhat())) {
+                if (outputNode.remainderRequestIncludesSiblingInputs()) continue;
+                missing = LongMath.saturatedAdd(missing, requestedItems);
+            }
+
+            long requiredTimes = missing / netOutput;
+            if (missing % netOutput != 0) requiredTimes++;
+            times = Math.max(times, requiredTimes);
+        }
+        return times;
+    }
+
+    /**
+     * Plan transitions between complete grids, batching every repeated grid up to its actual resource boundary.
+     */
+    private long requestAssembler(CraftingSimulationState inventory, long requested, boolean partial)
+        throws InterruptedException, CraftBranchFailure {
+        long done = 0;
+        while (done < requested) {
+            this.job.handlePausing();
+            var marker = this.job.createCalculationMarker();
+            var step = new ChildCraftingSimulationState(inventory);
+            try {
+                var result = Objects.requireNonNull(this.assemblerSimulation).select(step, true);
+                if (result == null) throw new CraftBranchFailure(this.parent.getWhat(), requested - done);
+                var acquisitions = new ObjectArrayList<>(result.consumed().keySet());
+                acquisitions.sort(Comparator.comparingInt(key -> this.job.getCraftingFor(key).isEmpty() ? 1 : 0));
+                for (var key : acquisitions) {
+                    if (step.getAvailableAmount(key) >= result.consumed().get(key)) continue;
+                    long amount = this.assemblerSimulation.required(result, key, requested - done);
+                    var node = new CraftingTreeNode(this.craftingService, this.job, key, 1, null, -1);
+                    int inputSlot = findSelectedInputSlot(result, key);
+                    if (inputSlot >= 0) node.setRemainderRequestContext(this, inputSlot, true);
+                    boolean boundary = this.job.interceptLocalBoundaryAvailability(key);
+                    node.request(step, amount, null);
+                    if (!boundary) step.insert(key, amount, Actionable.MODULATE);
+                }
+                result = this.assemblerSimulation.select(step, false);
+                if (result == null) throw new CraftBranchFailure(this.parent.getWhat(), requested - done);
+                var batch = CraftingAssemblerBatch.plan(this.assemblerSimulation, result, step, requested - done);
+                batch = extendAssemblerLifetime(step, batch, result, requested - done);
+                long times = batch.crafts;
+                if (times <= 0) throw new CraftBranchFailure(this.parent.getWhat(), requested - done);
+                batch.apply(step);
+                batch.consumed.forEach((key, amount) -> step.addStackBytes(key, amount, 1));
+                step.addCrafting(this.details, times);
+                step.addBytes(times);
+                step.applyDiff(inventory);
+                done += times;
+            } catch (CraftBranchFailure failure) {
+                this.job.restoreCalculationMarker(marker);
+                if (partial) return done;
+                throw failure;
+            }
+        }
+        return done;
+    }
+
+    private int findSelectedInputSlot(CraftingAssemblerSimulation.Result result, AEKey key) {
+        for (int slot = 0; slot < result.inputs().size(); slot++) {
+            for (var input : result.inputs().get(slot)) {
+                if (input.what().equals(key)) return slot;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Repeat a fully observed tool lifetime, acquiring replacements in bulk instead of rediscovering it per tool.
+     */
+    private CraftingAssemblerBatch extendAssemblerLifetime(CraftingSimulationState inventory, CraftingAssemblerBatch batch,
+                                                           CraftingAssemblerSimulation.Result first, long limit)
+        throws InterruptedException {
+        if (batch.crafts <= 0 || limit / batch.crafts < 2 || batch.returned.isEmpty()) return batch;
+        boolean wearsOut = false;
+        for (var peak : batch.peak) {
+            if (peak.getLongValue() <= 0) continue;
+            var key = peak.getKey();
+            if (first.consumed().get(key) == 0) return batch; // The observed run mixed different initial states.
+            if (batch.delta.get(key) >= 0) continue;
+            boolean encoded = false;
+            for (var input : this.inputs) if (input.possibleInputs()[0].what().equals(key)) encoded = true;
+            if (!encoded) return batch;
+            for (var returned : batch.returned) {
+                if (returned.getKey().getPrimaryKey() == key.getPrimaryKey()
+                    || Objects.requireNonNull(this.assemblerSimulation).acceptsReplacement(key, returned.getKey())) {
+                    // A still-usable (or rechargeable) remainder means this is only a lifetime prefix.
+                    if (batch.delta.get(returned.getKey()) > 0) return batch;
+                    wearsOut = true;
+                }
+            }
+        }
+        if (!wearsOut) return batch;
+        long repeats = limit / batch.crafts;
+        var marker = this.job.createCalculationMarker();
+        var expanded = new ChildCraftingSimulationState(inventory);
+        try {
+            var keys = new ObjectArrayList<>(batch.peak.keySet());
+            keys.sort(Comparator.comparingInt(key -> this.job.getCraftingFor(key).isEmpty() ? 1 : 0));
+            for (var key : keys) {
+                long amount = batch.required(key, repeats);
+                if (expanded.getAvailableAmount(key) >= amount) continue;
+                var node = new CraftingTreeNode(this.craftingService, this.job, key, 1, null, -1);
+                boolean boundary = this.job.interceptLocalBoundaryAvailability(key);
+                node.request(expanded, amount, null);
+                if (!boundary) expanded.insert(key, amount, Actionable.MODULATE);
+            }
+            if (batch.repeats(expanded, repeats) == repeats) {
+                expanded.applyDiff(inventory);
+                return batch.repeated(repeats);
+            }
+        } catch (CraftBranchFailure failure) {
+            // The original batch is still feasible, including when CRAFT_LESS reaches a real resource limit.
+        }
+        this.job.restoreCalculationMarker(marker);
+        return batch;
     }
 
     /**
@@ -703,6 +903,9 @@ public class CraftingTreeProcess {
             if (what.matches(output)) {
                 tot += output.amount();
             }
+        }
+        if (this.assemblerSimulation != null) {
+            tot = LongMath.saturatedAdd(tot, this.assemblerSimulation.defaultRemainderAmount(what));
         }
 
         return tot;

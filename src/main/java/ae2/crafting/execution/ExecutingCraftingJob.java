@@ -29,6 +29,7 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.crafting.CraftingLink;
+import ae2.crafting.CraftingSeedReservations;
 import ae2.crafting.TemporaryProviderCarrier;
 import ae2.crafting.TemporaryPseudoCraftingProvider;
 import ae2.crafting.inv.ListCraftingInventory;
@@ -78,6 +79,7 @@ public class ExecutingCraftingJob {
     final ElapsedTimeTracker timeTracker;
     GenericStack finalOutput;
     int schedulingTaskCount;
+    private CraftingSeedReservations seedReservations;
     long totalFinalOutputAmount;
     long remainingAmount;
     long pendingRequesterOutput;
@@ -87,6 +89,13 @@ public class ExecutingCraftingJob {
     boolean suspended;
     int priority;
     boolean subscribed;
+
+    CraftingSeedReservations seedReservations() {
+        if (seedReservations == null) {
+            seedReservations = new CraftingSeedReservations(tasks.keySet(), pattern -> tasks.get(pattern).value);
+        }
+        return seedReservations;
+    }
 
     ExecutingCraftingJob(ICraftingPlan plan, CraftingDifferenceListener postCraftingDifference, CraftingLink link,
                          @Nullable Integer playerId, KeyCounter remainingMissingItems, CraftingJobOptions options) {
@@ -297,6 +306,7 @@ public class ExecutingCraftingJob {
     }
 
     private void addTasks(ICraftingPlan plan) {
+        seedReservations = null;
         for (Object2LongMap.Entry<IPatternDetails> entry : plan.patternTimes().object2LongEntrySet()) {
             var progress = tasks.computeIfAbsent(entry.getKey(), ignored -> new TaskProgress());
             progress.value = LongMath.saturatedAdd(progress.value, entry.getLongValue());

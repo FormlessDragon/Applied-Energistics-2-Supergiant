@@ -13,6 +13,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 public class GraphExecutor {
@@ -218,7 +219,7 @@ public class GraphExecutor {
     }
 
     private void applyNode(CraftingGraphNode node, CraftingSimulationState inv,
-                           CraftingGraphDisplaySnapshot.Builder snapshot) {
+                           CraftingGraphDisplaySnapshot.Builder snapshot) throws InterruptedException {
         long times = node.getCraftTimes();
         var pattern = node.getPattern();
 
@@ -245,6 +246,10 @@ public class GraphExecutor {
             if (edge.cycleCut() && needed == 0) {
                 snapshot.recordEdge(edge, 0, 0);
                 continue;
+            }
+            long stockedSeed = edge.cycleCut() ? inv.extract(edge.inputKey(), needed, Actionable.SIMULATE) : 0;
+            if (edge.cycleCut() && !ring && stockedSeed < needed) {
+                calc.craftGraphSeed(edge.inputKey(), needed - stockedSeed, pattern, inv);
             }
             long got = inv.extract(edge.inputKey(), needed, Actionable.MODULATE);
             if (edge.pseudoLane() && got < needed) {
@@ -281,14 +286,12 @@ public class GraphExecutor {
             long outputAmount = LongMath.saturatedMultiply(output.amount(), times);
             if (ring && output.what().equals(node.getWhat())) {
                 // A node of the ring applied before this one already took its share by a cut input
-                outputAmount = Math.max(0, outputAmount - sccPlan.takenByCycle(node));
+                outputAmount = Math.max(0, outputAmount - Objects.requireNonNull(sccPlan).takenByCycle(node));
             } else if (cycleCut != null && output.what().equals(node.getWhat())) {
                 if (sccPlan != null) {
-                    // Replace the planned seed portion with the amount actually allocated. Missing seeds must not
-                    // become synthetic output; the remaining planned amount is the real net gain of crafted batches.
-                    long planned = sccPlan.plannedOutput(node);
-                    long netGain = Math.max(0, planned - cycleCut.seedRequired());
-                    outputAmount = LongMath.saturatedAdd(cycleCut.seedAllocated(), netGain);
+                    // Missing seed is already recorded separately. As with other missing inputs, downstream
+                    // accounting assumes it will be supplied; otherwise the same shortage is charged twice.
+                    outputAmount = sccPlan.plannedOutput(node);
                 }
             }
             if (PseudoPatternDetails.isPseudo(pattern) && output.what().equals(calc.getOutput())) {
@@ -303,7 +306,7 @@ public class GraphExecutor {
 
         inv.addBytes(times);
 
-        if (ring && node == graph.getRootNode()) {
+        if ((ring || cycleCut != null) && node == graph.getRootNode()) {
             // The ring takes back what was crafted of the requested item beyond the request; the CPU keeps it
             long crafted = LongMath.saturatedMultiply(node.getOutputPerCraft(), times);
             calc.addGraphIntermediateFinalOutput(Math.max(0, crafted - node.getDemandAmount()));

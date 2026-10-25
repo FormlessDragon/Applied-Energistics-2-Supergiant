@@ -1,11 +1,17 @@
 package ae2.crafting;
 
+import ae2.api.config.Actionable;
+import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.stacks.AEFluidKey;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.GenericStack;
+import ae2.api.stacks.KeyCounter;
 import ae2.container.ContainerConstants;
+import ae2.crafting.execution.CraftingCpuHelper;
+import ae2.crafting.inv.ListCraftingInventory;
 import ae2.crafting.pattern.AECraftingPattern;
 import ae2.crafting.pattern.AEProcessingPattern;
+import com.sun.management.ThreadMXBean;
 import net.minecraft.init.Items;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
@@ -15,34 +21,35 @@ import net.minecraft.item.crafting.ShapelessRecipes;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.NonNullList;
 import net.minecraft.world.World;
-import net.minecraft.world.WorldProviderSurface;
-import net.minecraftforge.common.util.FakePlayer;
 import net.minecraftforge.fluids.FluidRegistry;
 import net.minecraftforge.fml.common.registry.ForgeRegistries;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import net.minecraftforge.oredict.OreDictionary;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import sun.misc.Unsafe;
 
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static ae2.crafting.CraftingTestNetwork.crafts;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class CraftingRealPatternPlanningTest extends CraftingPlanningTestSupport {
+class CraftingRealPatternPlanningTest extends CraftingRecipeTestSupport {
     private static final AtomicInteger RECIPE_IDS = new AtomicInteger();
-    private Object previousSimulatedWorld;
-    private Object previousSimulatedPlayer;
 
     private static AEProcessingPattern processing(List<GenericStack> inputs, List<GenericStack> outputs) {
         var encoded = new ItemStack(Items.PAPER);
@@ -66,35 +73,288 @@ class CraftingRealPatternPlanningTest extends CraftingPlanningTestSupport {
         return new AECraftingPattern(AEItemKey.of(encoded), CraftingTestNetwork.world());
     }
 
-    @BeforeEach
-    void prepareRecipeValidationContext() throws Exception {
-        // Recipe substitution validates the crafting result. Supply an inert context for those hooks: the fixture's
-        // allocated WorldServer has no server/save data from which a real simulated world could be constructed.
-        var worldField = CraftingEventSimulation.class.getDeclaredField("simulatedWorld");
-        var playerField = CraftingEventSimulation.class.getDeclaredField("simulatedPlayer");
-        worldField.setAccessible(true);
-        playerField.setAccessible(true);
-        previousSimulatedWorld = worldField.get(null);
-        previousSimulatedPlayer = playerField.get(null);
-        var unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-        unsafeField.setAccessible(true);
-        var unsafe = (Unsafe) unsafeField.get(null);
-        var world = (SimulatedCraftingWorld) unsafe.allocateInstance(SimulatedCraftingWorld.class);
-        var provider = World.class.getDeclaredField("provider");
-        provider.setAccessible(true);
-        provider.set(world, new WorldProviderSurface());
-        worldField.set(null, world);
-        playerField.set(null, unsafe.allocateInstance(FakePlayer.class));
+    private static AEItemKey tool(int damage) {
+        return AEItemKey.of(new ItemStack(Items.WOODEN_PICKAXE, 1, damage));
     }
 
-    @AfterEach
-    void restoreRecipeValidationContext() throws Exception {
-        var worldField = CraftingEventSimulation.class.getDeclaredField("simulatedWorld");
-        var playerField = CraftingEventSimulation.class.getDeclaredField("simulatedPlayer");
-        worldField.setAccessible(true);
-        playerField.setAccessible(true);
-        worldField.set(null, previousSimulatedWorld);
-        playerField.set(null, previousSimulatedPlayer);
+    /**
+     * Real encoded assembler recipe: every occupied tool slot needs its own item before any slot returns it.
+     */
+    private static AECraftingPattern returningTools(int slots, boolean wears, boolean substitutes) {
+        return returningTools(slots, wears, substitutes, new AtomicInteger());
+    }
+
+    private static AECraftingPattern returningTools(int slots, boolean wears, boolean substitutes,
+                                                    AtomicInteger callbacks) {
+        var ingredients = NonNullList.<Ingredient>create();
+        ingredients.add(Ingredient.fromItems(Items.APPLE));
+        for (int i = 0; i < slots; i++)
+            ingredients.add(Ingredient.fromStacks(
+                new ItemStack(Items.WOODEN_PICKAXE, 1, OreDictionary.WILDCARD_VALUE)));
+        var recipe = new ShapelessRecipes("", new ItemStack(Items.CARROT), ingredients) {
+            @Override
+            public boolean matches(InventoryCrafting input, World world) {
+                callbacks.incrementAndGet();
+                return super.matches(input, world);
+            }
+
+            @Override
+            public NonNullList<ItemStack> getRemainingItems(InventoryCrafting input) {
+                callbacks.incrementAndGet();
+                var result = NonNullList.withSize(input.getSizeInventory(), ItemStack.EMPTY);
+                for (int slot = 0; slot < input.getSizeInventory(); slot++) {
+                    var stack = input.getStackInSlot(slot);
+                    if (stack.getItem() != Items.WOODEN_PICKAXE) continue;
+                    // This recipe uses exactly maxDamage times, then destroys the tool.
+                    int damage = stack.getItemDamage() + (wears ? 1 : 0);
+                    if (damage < stack.getMaxDamage()) {
+                        var remaining = stack.copy();
+                        remaining.setCount(1);
+                        remaining.setItemDamage(damage);
+                        result.set(slot, remaining);
+                    }
+                }
+                return result;
+            }
+        };
+        recipe.setRegistryName("ae2_planning_test", "returning_tools_" + RECIPE_IDS.getAndIncrement());
+        ForgeRegistries.RECIPES.register(recipe);
+        var grid = new ItemStack[9];
+        Arrays.fill(grid, ItemStack.EMPTY);
+        grid[0] = new ItemStack(Items.APPLE);
+        for (int i = 1; i <= slots; i++) grid[i] = tool(0).toStack();
+        var encoded = new ItemStack(Items.PAPER);
+        AECraftingPattern.encode(encoded, recipe, grid, new ItemStack(Items.CARROT), substitutes, false);
+        var pattern = new AECraftingPattern(AEItemKey.of(encoded), CraftingTestNetwork.world());
+        assertEquals(slots, Arrays.stream(pattern.getInputs())
+                                  .filter(input -> input.possibleInputs()[0].what().equals(tool(0)))
+                                  .mapToLong(input -> input.getMultiplier() * input.possibleInputs()[0].amount()).sum(),
+            "fixture lost simultaneous tool slots");
+        return pattern;
+    }
+
+    static Stream<Arguments> reusableToolCases() {
+        var cases = new ArrayList<Arguments>();
+        for (int cache : new int[]{0, 10_000}) {
+            for (boolean substitutes : new boolean[]{false, true}) {
+                for (int slots : new int[]{1, 2, 8}) {
+                    for (int stored : IntStream.of(0, 1, slots).distinct().toArray()) {
+                        cases.add(Arguments.of(cache, substitutes, slots, stored));
+                    }
+                }
+            }
+        }
+        return cases.stream();
+    }
+
+    static Stream<Arguments> wearingToolCases() {
+        var cases = new ArrayList<Arguments>();
+        // slots, stored, initial damage, crafts, additional NEW tools. Wooden pickaxes have 59 uses here.
+        int[][] rows = {
+            {1, 1, 0, 1, 0}, {1, 1, 0, 2, 0}, {1, 1, 0, 3, 0}, {1, 1, 0, 9, 0},
+            {1, 1, 0, 59, 0}, {1, 1, 0, 60, 1}, {1, 1, 0, 121, 2},
+            {1, 1, 57, 2, 0}, {1, 1, 57, 3, 1}, {1, 1, 57, 61, 1},
+            {1, 2, 58, 2, 0}, {1, 2, 58, 3, 1},
+            {2, 2, 57, 2, 0}, {2, 2, 57, 3, 2}, {2, 2, 57, 5, 2},
+            {2, 1, 0, 1, 1}, {2, 1, 0, 3, 1}, {8, 8, 0, 3, 0}
+        };
+        for (int cache : new int[]{0, 10_000}) {
+            for (var row : rows) cases.add(Arguments.of(cache, row[0], row[1], row[2], row[3], row[4]));
+        }
+        return cases.stream();
+    }
+
+    static long craftingAllocatedBytes() {
+        if (!(ManagementFactory.getThreadMXBean() instanceof ThreadMXBean threads)
+            || !threads.isThreadAllocatedMemorySupported()) return 0;
+        if (!threads.isThreadAllocatedMemoryEnabled()) threads.setThreadAllocatedMemoryEnabled(true);
+        long bytes = 0, driver = Thread.currentThread().threadId();
+        for (var thread : threads.getThreadInfo(threads.getAllThreadIds())) {
+            if (thread != null && (thread.getThreadId() == driver || thread.getThreadName().equals("AE Crafting Calculator"))) {
+                bytes += Math.max(0, threads.getThreadAllocatedBytes(thread.getThreadId()));
+            }
+        }
+        return bytes;
+    }
+
+    /**
+     * Validate real CPU extraction and assembler callbacks; the old test replay only considers encoded variants.
+     */
+    private static void verifyReturnedToolExecutionAndTree(ICraftingPlan plan, AECraftingPattern pattern)
+        throws Exception {
+        var inventory = new ListCraftingInventory(key -> {
+        });
+        inventory.list.addAll(plan.usedItems());
+        inventory.list.addAll(plan.missingItems());
+        var consumed = new KeyCounter();
+        for (long craft = 0; craft < crafts(plan, pattern); craft++) {
+            var expectedOutputs = new KeyCounter();
+            var expectedContainers = new KeyCounter();
+            var inputs = CraftingCpuHelper.extractPatternInputs(pattern, inventory, CraftingTestNetwork.world(),
+                expectedOutputs, expectedContainers, 1);
+            assertNotNull(inputs, "actual CPU cannot extract the complete grid for craft " + craft);
+            for (var input : inputs) consumed.addAll(input);
+            var grid = new InventoryCrafting(ContainerConstants.EMPTY_CONTAINER, 3, 3);
+            pattern.fillCraftingGrid(inputs, grid::setInventorySlotContents);
+            assertEquals(pattern.getPrimaryOutput(), GenericStack.fromItemStack(pattern.assemble(grid,
+                CraftingTestNetwork.world())));
+            var actualContainers = new KeyCounter();
+            for (var stack : pattern.getRemainingItems(grid)) {
+                var remaining = GenericStack.fromItemStack(stack);
+                if (remaining != null) actualContainers.add(remaining.what(), remaining.amount());
+            }
+            assertEquals(amounts(expectedContainers), amounts(actualContainers), "CPU expected wrong durability state");
+            actualContainers.forEach((key, count) -> inventory.insert(key, count, Actionable.MODULATE));
+            expectedOutputs.forEach((key, count) -> inventory.insert(key, count, Actionable.MODULATE));
+        }
+        assertEquals(plan.finalOutput().amount(), inventory.list.get(plan.finalOutput().what()));
+        var tree = CraftingTreeCyclesTest.tree(plan);
+        var displayed = new KeyCounter();
+        CraftingTreeAudit.walk(tree, n -> {
+        }, proc -> {
+            if (proc.pattern() == pattern) for (var input : proc.inputs()) {
+                displayed.add(input.output().what(), input.output().amount());
+            }
+        });
+        // Damaged stock and newly supplied tools may be selected in either legal order. Check the entire displayed
+        // durability flow, rather than requiring this one replay's arbitrary ordering of fuzzy candidates.
+        assertEquals(consumed.get(AEItemKey.of(Items.APPLE)), displayed.get(AEItemKey.of(Items.APPLE)));
+        long toolUses = 0;
+        boolean wears = !tool(0).equals(Arrays.stream(pattern.getInputs())
+                                              .filter(i -> i.possibleInputs()[0].what().equals(tool(0))).findFirst().orElseThrow().getRemainingKey(tool(0)));
+        for (int damage = 0; damage < Items.WOODEN_PICKAXE.getMaxDamage(); damage++) {
+            long uses = displayed.get(tool(damage));
+            long initial = plan.usedItems().get(tool(damage)) + plan.missingItems().get(tool(damage));
+            long returned = wears && damage > 0 ? displayed.get(tool(damage - 1)) : 0;
+            if (wears) assertTrue(uses <= initial + returned, "tree consumes unavailable tool damage " + damage);
+            else if (uses > 0) assertTrue(initial > 0, "tree invented an unchanged tool seed");
+            toolUses += uses;
+        }
+        long expectedUses = 0;
+        for (var entry : consumed)
+            if (entry.getKey() instanceof AEItemKey item && item.getItem() == Items.WOODEN_PICKAXE) {
+                expectedUses += entry.getLongValue();
+            }
+        assertEquals(expectedUses, toolUses, "tree must retain every tool slot of every craft");
+        assertEquals(amounts(plan.missingItems()), amounts(CraftingTreeAudit.missing(tree)));
+        CraftingTreeAudit.roundTrip(tree);
+    }
+
+    @ParameterizedTest(name = "memo={0}, substitutes={1}, slots={2}, stock={3}")
+    @MethodSource("reusableToolCases")
+    void returnedToolsCannotFillOtherSlotsOfTheSameCraft(int cache, boolean substitutes, int slots, int stored)
+        throws Exception {
+        memo(cache);
+        var net = new CraftingTestNetwork();
+        var pattern = net.addPattern(returningTools(slots, false, substitutes), 0);
+        var apple = AEItemKey.of(Items.APPLE);
+        var carrot = AEItemKey.of(Items.CARROT);
+        net.store(apple, 19);
+        net.store(tool(0), stored);
+        // Same cached pattern, changing requested quantities, and cold/warm calculations.
+        for (int requested : new int[]{1, 7, 19, 7}) {
+            var plan = net.plan(carrot, requested);
+            materials(plan.usedItems(), apple, requested, tool(0), Math.min(slots, stored));
+            materials(plan.missingItems(), tool(0), Math.max(0, slots - stored));
+            if (stored >= slots) assertFalse(plan.simulation());
+            assertEquals(requested, crafts(plan, pattern));
+            verifyReturnedToolExecutionAndTree(plan, pattern);
+        }
+    }
+
+    @ParameterizedTest(name = "memo={0}, slots={1}, stock={2}, damage={3}, crafts={4}, missing={5}")
+    @MethodSource("wearingToolCases")
+    void toolsAreReusedAcrossDamageStatesUntilTheyActuallyBreak(int cache, int slots, int stored, int damage,
+                                                                int requested, int missing) throws Exception {
+        memo(cache);
+        assertEquals(59, Items.WOODEN_PICKAXE.getMaxDamage(), "fixture lifetime changed");
+        var net = new CraftingTestNetwork();
+        var pattern = net.addPattern(returningTools(slots, true, true), 0);
+        var apple = AEItemKey.of(Items.APPLE);
+        var carrot = AEItemKey.of(Items.CARROT);
+        net.store(apple, requested);
+        net.store(tool(damage), stored);
+        for (int attempt = 0; attempt < 2; attempt++) {
+            var plan = net.plan(carrot, requested);
+            materials(plan.usedItems(), apple, requested, tool(damage), stored);
+            materials(plan.missingItems(), tool(0), missing);
+            if (missing == 0) assertFalse(plan.simulation());
+            assertEquals(requested, crafts(plan, pattern));
+            verifyReturnedToolExecutionAndTree(plan, pattern);
+        }
+    }
+
+    @ParameterizedTest(name = "memo={0}, crafts={1}")
+    @CsvSource({"0, 2", "0, 3", "10000, 2", "10000, 3"})
+    void disabledSubstitutionCannotReuseADifferentDamageState(int cache, int requested) throws Exception {
+        memo(cache);
+        var net = new CraftingTestNetwork();
+        var pattern = net.addPattern(returningTools(2, true, false), 0);
+        var apple = AEItemKey.of(Items.APPLE);
+        var carrot = AEItemKey.of(Items.CARROT);
+        net.store(apple, requested);
+        net.store(tool(0), 2);
+        for (int attempt = 0; attempt < 2; attempt++) {
+            var plan = net.plan(carrot, requested);
+            materials(plan.usedItems(), apple, requested, tool(0), 2);
+            materials(plan.missingItems(), tool(0), 2L * (requested - 1));
+            assertEquals(requested, crafts(plan, pattern));
+            verifyReturnedToolExecutionAndTree(plan, pattern);
+        }
+    }
+
+    @ParameterizedTest(name = "memo={0}, substitutes={1}")
+    @CsvSource({"0, false", "0, true", "10000, false", "10000, true"})
+    void unchangedRemaindersKeepPlanningBatched(int cache, boolean substitutes) {
+        memo(cache);
+        var callbacks = new AtomicInteger();
+        var net = new CraftingTestNetwork();
+        var pattern = net.addPattern(returningTools(1, false, substitutes, callbacks), 0);
+        var carrot = AEItemKey.of(Items.CARROT);
+        net.store(AEItemKey.of(Items.APPLE), 4096);
+        net.store(tool(0), 1);
+        net.plan(carrot, 32); // Exclude recipe initialization and calculator thread startup.
+        long allocated = 0;
+        for (int requested : new int[]{128, 4096}) {
+            callbacks.set(0);
+            long before = craftingAllocatedBytes();
+            long start = System.nanoTime();
+            var plan = net.plan(carrot, requested);
+            allocated = craftingAllocatedBytes() - before;
+            System.out.printf("unchanged-tool memo=%d substitutes=%s requested=%d callbacks=%d allocated=%.3fMiB elapsed=%.3fms%n",
+                cache, substitutes, requested, callbacks.get(), allocated / 1048576.0,
+                (System.nanoTime() - start) / 1_000_000.0);
+            complete(net, plan, carrot, requested);
+            assertEquals(requested, crafts(plan, pattern));
+            materials(plan.usedItems(), AEItemKey.of(Items.APPLE), requested, tool(0), 1);
+        }
+        assertTrue(allocated < 16L * 1024 * 1024,
+            "one unchanged tool and one recipe must not allocate per craft: " + allocated + " bytes");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 10_000})
+    void durabilityValidationDoesNotRepeatedlyReplayTheWholePrefix(int cache) {
+        memo(cache);
+        var callbacks = new AtomicInteger();
+        var net = new CraftingTestNetwork();
+        net.addPattern(returningTools(1, true, true, callbacks), 0);
+        var carrot = AEItemKey.of(Items.CARROT);
+        net.store(AEItemKey.of(Items.APPLE), 256);
+        net.store(tool(0), 5); // 295 uses: enough for both requests, with only 59 distinct durability states.
+        ICraftingPlan last = null;
+        for (int requested : new int[]{32, 256}) {
+            callbacks.set(0);
+            long start = System.nanoTime();
+            last = net.plan(carrot, requested);
+            System.out.printf("wearing-tool memo=%d requested=%d callbacks=%d elapsed=%.3fms missing=%s%n",
+                cache, requested, callbacks.get(), (System.nanoTime() - start) / 1_000_000.0,
+                amounts(last.missingItems()));
+        }
+        var plan = last;
+        assertAll(
+            () -> complete(net, plan, carrot, 256),
+            () -> assertTrue(callbacks.get() < 5000, "repeated prefix validation: " + callbacks.get() + " callbacks"));
     }
 
     @ParameterizedTest
@@ -189,7 +449,7 @@ class CraftingRealPatternPlanningTest extends CraftingPlanningTestSupport {
             var apple = AEItemKey.of(Items.APPLE);
             var golden = AEItemKey.of(Items.GOLDEN_APPLE);
             var carrot = AEItemKey.of(Items.CARROT);
-            assertEquals(2, pattern.getInputs()[0].getMultiplier());
+            assertEquals(2, Arrays.stream(pattern.getInputs()).mapToLong(input -> input.getMultiplier()).sum());
             if (substitutes) assertTrue(pattern.getInputs()[0].isValid(golden, CraftingTestNetwork.world()));
             net.store(apple, substitutes ? 3 : 8);
             net.store(golden, 5);

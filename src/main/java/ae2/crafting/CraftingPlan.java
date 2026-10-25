@@ -21,16 +21,18 @@ package ae2.crafting;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.networking.crafting.ICraftingProvider;
+import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.crafting.graph.CraftingGraphDisplaySnapshot;
 import ae2.integration.data.LiteCraftTreeNode;
-import ae2.api.stacks.AEKey;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarrier, CraftingPlanDisplaySource {
@@ -49,6 +51,25 @@ public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarri
     private final @Nullable CraftingCalculation calculation;
     private volatile @Nullable CraftingPlanDisplay display;
     private final CraftingAttemptMetrics attemptMetrics;
+    // Written by the calculation's successful CPU replay before publishing the plan, then read only by its display.
+    private Map<IPatternDetails, KeyCounter> inputAllocations = Map.of();
+    private Map<IPatternDetails, KeyCounter> remainderAllocations = Map.of();
+
+    void recordRemainderAllocations(Map<IPatternDetails, KeyCounter> allocations) {
+        this.remainderAllocations = allocations;
+    }
+
+    Map<IPatternDetails, KeyCounter> remainderAllocations() {
+        return Collections.unmodifiableMap(this.remainderAllocations);
+    }
+
+    void recordInputAllocations(Map<IPatternDetails, KeyCounter> allocations) {
+        this.inputAllocations = allocations;
+    }
+
+    Map<IPatternDetails, KeyCounter> inputAllocations() {
+        return this.inputAllocations;
+    }
 
     public CraftingPlan(GenericStack finalOutput, long bytes, boolean simulation, boolean multiplePaths,
                         KeyCounter usedItems, KeyCounter emittedItems, KeyCounter missingItems,
@@ -74,9 +95,7 @@ public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarri
     }
 
     /**
-     * The same plan with other contents, for a plan repaired after the calculation. Its crafting tree is still the one
-     * calculated: the tree screen shows the crafts the way they were found, its amounts held to the repaired ones
-     * where the tree is allocated by them.
+     * The same plan with repaired contents. Display materialization uses these final counts, not the discovery tree.
      */
     CraftingPlan withContents(KeyCounter usedItems, KeyCounter emittedItems, KeyCounter missingItems,
                               Object2LongMap<IPatternDetails> patternTimes, CraftingCalculation calculation) {
@@ -96,9 +115,14 @@ public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarri
         long repairedBytes = LongMath.saturatedAdd(bytes, (long) Math.ceil(additionalBytes));
         long intermediate = patternTimes.equals(this.patternTimes) ? this.intermediateFinalOutputAmount
             : Math.max(0, getFinalOutputCrafted(finalOutput.what(), patternTimes) - finalOutput.amount());
-        return new CraftingPlan(finalOutput, repairedBytes, simulation, multiplePaths, usedItems, emittedItems, missingItems,
+        var result = new CraftingPlan(finalOutput, repairedBytes, !missingItems.isEmpty(), multiplePaths, usedItems, emittedItems, missingItems,
             intermediate, patternTimes, tree, temporaryProviders, graphDisplayBuilder, attemptMetrics,
             calculation);
+        if (patternTimes.equals(this.patternTimes)) {
+            result.inputAllocations = this.inputAllocations;
+            result.remainderAllocations = this.remainderAllocations;
+        }
+        return result;
     }
 
     /**
@@ -178,8 +202,8 @@ public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarri
             synchronized (this) {
                 display = this.display;
                 if (display == null) {
-                    this.display = display = new CraftingPlanDisplay(finalOutput, patternTimes, usedItems, missingItems,
-                        tree, graphDisplayBuilder, attemptMetrics, calculation);
+                    this.display = display = new CraftingPlanDisplay(finalOutput, patternTimes, usedItems, emittedItems, missingItems,
+                        tree, graphDisplayBuilder, attemptMetrics, calculation, inputAllocations, remainderAllocations);
                 }
             }
         }

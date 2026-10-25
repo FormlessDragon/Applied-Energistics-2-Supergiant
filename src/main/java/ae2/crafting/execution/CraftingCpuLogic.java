@@ -688,9 +688,10 @@ public class CraftingCpuLogic {
             return 0;
         }
         maxMultiplier = Math.clamp(providerLimit, 0, maxMultiplier);
+        ICraftingInventory protectedInventory = job.seedReservations().protect(details, inventory);
         ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
-            ? new RealInputTrackingInventoryView(inventory)
-            : inventory;
+            ? new RealInputTrackingInventoryView(protectedInventory)
+            : protectedInventory;
         maxMultiplier = CraftingCpuHelper.getMaxExtractablePatternMultiplier(details, taskInventory, level,
             maxMultiplier);
         if (maxMultiplier <= 0) {
@@ -723,9 +724,10 @@ public class CraftingCpuLogic {
         }
         var expectedOutputs = new KeyCounter();
         var expectedContainerItems = new KeyCounter();
+        ICraftingInventory protectedInventory = job.seedReservations().protect(details, inventory);
         ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
-            ? new RealInputTrackingInventoryView(inventory)
-            : inventory;
+            ? new RealInputTrackingInventoryView(protectedInventory)
+            : protectedInventory;
         @Nullable
         var craftingContainer = CraftingCpuHelper.extractPatternInputs(details, taskInventory, level,
             expectedOutputs, expectedContainerItems, multiplier);
@@ -1621,10 +1623,10 @@ public class CraftingCpuLogic {
     }
 
     private static final class RealInputTrackingInventoryView implements RealInputTrackingInventory {
-        private final ListCraftingInventory realInventory;
+        private final ICraftingInventory realInventory;
         private final KeyCounter realExtracted = new KeyCounter();
 
-        private RealInputTrackingInventoryView(ListCraftingInventory realInventory) {
+        private RealInputTrackingInventoryView(ICraftingInventory realInventory) {
             this.realInventory = realInventory;
         }
 

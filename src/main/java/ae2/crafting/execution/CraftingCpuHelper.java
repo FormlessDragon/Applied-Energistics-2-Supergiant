@@ -19,6 +19,7 @@
 package ae2.crafting.execution;
 
 import ae2.api.config.Actionable;
+import ae2.api.crafting.IAssemblerPattern;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.crafting.ICraftingPlan;
@@ -26,6 +27,7 @@ import ae2.api.networking.security.IActionSource;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
+import ae2.crafting.CraftingAssemblerSimulation;
 import ae2.crafting.inv.ICraftingInventory;
 import ae2.crafting.inv.ListCraftingInventory;
 import com.google.common.math.LongMath;
@@ -118,6 +120,10 @@ public class CraftingCpuHelper {
         KeyCounter expectedContainerItems,
         int multiplier) {
 
+        if (details instanceof IAssemblerPattern assembler) {
+            return extractAssemblerInputs(assembler, sourceInv, level, expectedOutputs, expectedContainerItems, multiplier);
+        }
+
         // Extract inputs into the container.
         var inputs = details.getInputs();
         KeyCounter[] inputHolder = new KeyCounter[inputs.length];
@@ -198,6 +204,9 @@ public class CraftingCpuHelper {
     private static boolean canExtractPatternInputs(IPatternDetails details, ICraftingInventory sourceInv,
                                                    World level, int multiplier) {
         var simulatedInv = new SimulatedExtractionInventory(sourceInv);
+        if (details instanceof IAssemblerPattern assembler) {
+            return extractAssemblerInputs(assembler, simulatedInv, level, new KeyCounter(), new KeyCounter(), multiplier) != null;
+        }
         for (var input : details.getInputs()) {
             long remainingMultiplier = input.getMultiplier() * multiplier;
             for (var template : getValidItemTemplates(simulatedInv, input, level)) {
@@ -217,6 +226,49 @@ public class CraftingCpuHelper {
             }
         }
         return true;
+    }
+
+    private static KeyCounter @Nullable [] extractAssemblerInputs(IAssemblerPattern assembler, ICraftingInventory source,
+                                                                  World level, KeyCounter outputs, KeyCounter containers,
+                                                                  int multiplier) {
+        var simulation = new CraftingAssemblerSimulation(assembler, level);
+        if (multiplier <= 0) return null;
+        // A provider receives per-slot bags, not a sequence of grids. Keep a merged push homogeneous so
+        // independently draining those bags cannot recombine two valid grids into an invalid one.
+        var scaled = new ICraftingInventory() {
+            public void insert(AEKey key, long amount, Actionable mode) {
+                throw new UnsupportedOperationException();
+            }
+
+            public long extract(AEKey key, long amount, Actionable mode) {
+                if (mode != Actionable.SIMULATE) throw new UnsupportedOperationException();
+                return Math.min(amount, source.extract(key, Long.MAX_VALUE, Actionable.SIMULATE) / multiplier);
+            }
+
+            public Iterable<AEKey> findFuzzyTemplates(AEKey key) {
+                return source.findFuzzyTemplates(key);
+            }
+        };
+        var choice = simulation.select(scaled, false);
+        if (choice == null) return null;
+        var table = new KeyCounter[assembler.getInputs().length];
+        for (int i = 0; i < table.length; i++) {
+            table[i] = new KeyCounter();
+            for (var stack : choice.inputs().get(i)) {
+                long amount = LongMath.saturatedMultiply(stack.amount(), multiplier);
+                long extracted = source.extract(stack.what(), amount, Actionable.MODULATE);
+                table[i].add(stack.what(), extracted);
+                if (extracted != amount) {
+                    reinjectPatternInputs(source, table);
+                    return null;
+                }
+            }
+        }
+        choice.returned().forEach((key, amount) -> containers.add(key, LongMath.saturatedMultiply(amount, multiplier)));
+        for (var output : assembler.getOutputs())
+            outputs.add(output.what(),
+                LongMath.saturatedMultiply(output.amount(), multiplier));
+        return table;
     }
 
     public static void reinjectPatternInputs(ICraftingInventory sourceInv,

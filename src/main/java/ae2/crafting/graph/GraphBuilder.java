@@ -5,6 +5,7 @@ import ae2.api.crafting.IPatternDetails;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.crafting.CraftingCalculation;
+import ae2.crafting.pattern.AECraftingPattern;
 import ae2.helpers.patternprovider.PseudoPatternDetails;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
@@ -95,6 +96,20 @@ public class GraphBuilder {
         return result;
     }
 
+    private static boolean isNativePattern(IPatternDetails pattern) {
+        if (PseudoPatternDetails.isPseudo(pattern)) return true;
+        if (pattern instanceof AECraftingPattern assembler && assembler.hasRemainders()) return false;
+        if (pattern.getOutputs().size() != 1) return false;
+        for (var input : pattern.getInputs()) {
+            var possible = input.possibleInputs();
+            if (possible.length != 1 || possible[0].amount() <= 0 || input.getMultiplier() <= 0
+                || input.getRemainingKey(possible[0].what()) != null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public CraftingGraph buildGraph(AEKey output, long requestedAmount) throws InterruptedException {
         long start = this.trackPerformance ? System.nanoTime() : 0;
         this.patternLookupNanos = 0;
@@ -104,7 +119,7 @@ public class GraphBuilder {
         var graph = new CraftingGraph();
         var requestStack = new ObjectOpenHashSet<AEKey>();
 
-        var rootNode = buildNodeRecursive(output, graph, requestStack, true);
+        var rootNode = buildNodeRecursive(output, graph, requestStack, true, false);
         if (rootNode == null) throw new IllegalStateException("Graph root was not created");
         graph.setRootNode(rootNode);
         rootNode.setDemandAmount(requestedAmount);
@@ -118,166 +133,6 @@ public class GraphBuilder {
                 Math.max(0, total - patternLookupNanos - emitLookupNanos));
         }
         return graph;
-    }
-
-    private CraftingGraphNode buildNodeRecursive(
-        AEKey what,
-        CraftingGraph graph,
-        Set<AEKey> requestStack,
-        boolean root
-    ) throws InterruptedException {
-        long emitStart = this.trackPerformance ? System.nanoTime() : 0;
-        boolean canEmit = calc.canEmitFor(what);
-        if (this.trackPerformance) {
-            this.emitLookupNanos += System.nanoTime() - emitStart;
-        }
-        if (canEmit) {
-            var nodeKey = new CraftingGraph.NodeKey(what, null);
-            var existing = graph.getNode(nodeKey);
-            if (existing != null) {
-                return existing;
-            }
-            graph.addClosureNode(what, MaterialClosure.Node.EMITTER);
-            var emitter = new CraftingGraphNode(what, null, List.of(new GenericStack(what, 1)), 1);
-            graph.putNode(nodeKey, emitter);
-            this.nodeCount++;
-            return emitter;
-        }
-
-        long patternStart = this.trackPerformance ? System.nanoTime() : 0;
-        var patterns = calc.getCraftingFor(what);
-        if (this.trackPerformance) {
-            this.patternLookupNanos += System.nanoTime() - patternStart;
-        }
-        if (patterns.isEmpty()) {
-            var substitute = root ? null : calc.getFuzzyCraftable(what);
-            if (substitute != null) {
-                graph.requireLegacyFallback();
-                collectSubstituteClosure(substitute, graph);
-            }
-            graph.addClosureNode(what, new MaterialClosure.Node(false, substitute, List.of(), List.of()));
-            if (root) {
-                var nodeKey = new CraftingGraph.NodeKey(what, null);
-                var leaf = new CraftingGraphNode(what, null, List.of(), 1, false, true);
-                graph.putNode(nodeKey, leaf);
-                this.nodeCount++;
-                return leaf;
-            }
-            return null;
-        }
-        // With several patterns, the graph is planned with the one of highest priority first, see
-        // CraftingCalculation#tryAlternatives
-        boolean localUnit = false;
-        String localReason = null;
-        if (patterns.size() != 1) {
-            graph.markAlternatives();
-        }
-
-        var primaryPattern = this.choices.getOrDefault(what, patterns.getFirst());
-        for (int patternIndex = 0, patternCount = patterns.size(); patternIndex < patternCount; patternIndex++) {
-            var pattern = patterns.get(patternIndex);
-            graph.recordPatternDefinition(pattern.getDefinition());
-        }
-        var nodeKey = new CraftingGraph.NodeKey(what, primaryPattern);
-
-        var existing = graph.getNode(nodeKey);
-        if (existing != null) {
-            return existing;
-        }
-
-        if (requestStack.contains(what)) {
-            graph.markRecursion();
-            return graph.getNode(nodeKey);
-        }
-
-        long outputAmount = getRequestedOutputAmount(what, primaryPattern);
-        if (outputAmount <= 0) {
-            throw invalidPattern("mismatched pattern outputs");
-        }
-        if (!localUnit && !isNativePattern(primaryPattern)) {
-            localUnit = true;
-            localReason = "unsupported-pattern-semantics";
-        }
-        if (localUnit || PseudoPatternDetails.isPseudo(primaryPattern)) {
-            graph.requireLegacyFallback();
-        }
-        var node = new CraftingGraphNode(what, primaryPattern, patterns, primaryPattern.getOutputs(), outputAmount,
-            localUnit, false, localReason);
-        graph.putNode(nodeKey, node);
-        this.nodeCount++;
-
-        requestStack.add(what);
-        calc.handlePausing();
-
-        var graphInputs = new Object2LongLinkedOpenHashMap<AEKey>();
-        // The closure keeps the inputs of every candidate, the graph only those of the patterns it plans with
-        var closureInputs = new Object2LongLinkedOpenHashMap<AEKey>();
-        var candidates = new ObjectArrayList<MaterialClosure.Candidate>(patterns.size());
-        for (int patternIndex = 0, patternCount = patterns.size(); patternIndex < patternCount; patternIndex++) {
-            var pattern = patterns.get(patternIndex);
-            boolean planned = localUnit || pattern == primaryPattern;
-            var patternInputs = new Object2LongLinkedOpenHashMap<AEKey>();
-            for (var inputEntry : pattern.getInputs()) {
-                var possibleInputs = inputEntry.possibleInputs();
-                if (possibleInputs.length == 0 || inputEntry.getMultiplier() <= 0) continue;
-                // Fuzzy variants are only consumed by ingredient substitution, an assembler-pattern feature, so gate
-                // on the pattern type instead of inferring it from the input list. Pseudo patterns wrap the real one.
-                boolean substitutable = PseudoPatternDetails.unwrap(pattern) instanceof IAssemblerPattern assembler
-                    && assembler.canSubstitute();
-                int possibleInputIndex = 0;
-                while (possibleInputIndex < possibleInputs.length) {
-                    var possible = possibleInputs[possibleInputIndex++];
-                    if (possible.amount() > 0 && (!possible.what().equals(what) || !localUnit)) {
-                        long amount = LongMath.saturatedMultiply(possible.amount(), inputEntry.getMultiplier());
-                        patternInputs.put(possible.what(),
-                            LongMath.saturatedAdd(patternInputs.getLong(possible.what()), amount));
-                        if (substitutable) {
-                            graph.addFuzzyKey(possible.what());
-                        }
-                    }
-                }
-            }
-            // A local unit is previewed with one selected pattern. Keep the largest per-key demand
-            // across candidates, while still summing repeated slots within the same candidate.
-            for (var input : patternInputs.object2LongEntrySet()) {
-                closureInputs.put(input.getKey(),
-                    Math.max(closureInputs.getLong(input.getKey()), input.getLongValue()));
-                if (planned) {
-                    graphInputs.put(input.getKey(),
-                        Math.max(graphInputs.getLong(input.getKey()), input.getLongValue()));
-                }
-            }
-            long candidateOutput = pattern == primaryPattern ? outputAmount : candidateOutputAmount(what, pattern);
-            if (candidateOutput > 0) {
-                candidates.add(new MaterialClosure.Candidate(candidateOutput, copyInputs(patternInputs)));
-            }
-        }
-        graph.addClosureNode(what, new MaterialClosure.Node(false, null, copyInputs(closureInputs), candidates));
-
-        for (var graphInput : graphInputs.object2LongEntrySet()) {
-            var inputKey = graphInput.getKey();
-            long inputAmount = graphInput.getLongValue();
-
-            var childNode = buildNodeRecursive(inputKey, graph, requestStack, false);
-
-            var edge = new CraftingGraphEdge(inputKey, inputAmount, childNode,
-                PseudoPatternDetails.isPseudo(primaryPattern));
-            node.addInput(edge);
-
-            if (childNode != null) {
-                childNode.addParent(node);
-            }
-        }
-
-        // Material only the other patterns take still belongs in the snapshot and the closure, without nodes
-        for (var closureInput : closureInputs.keySet()) {
-            if (!graphInputs.containsKey(closureInput) && !graph.getClosureNodes().containsKey(closureInput)) {
-                collectSubstituteClosure(closureInput, graph);
-            }
-        }
-
-        requestStack.remove(what);
-        return node;
     }
 
     /**
@@ -397,17 +252,167 @@ public class GraphBuilder {
         return requestedOutputAmount;
     }
 
-    private static boolean isNativePattern(IPatternDetails pattern) {
-        if (PseudoPatternDetails.isPseudo(pattern)) return true;
-        if (pattern.getOutputs().size() != 1) return false;
-        for (var input : pattern.getInputs()) {
-            var possible = input.possibleInputs();
-            if (possible.length != 1 || possible[0].amount() <= 0 || input.getMultiplier() <= 0
-                || input.getRemainingKey(possible[0].what()) != null) {
-                return false;
+    private CraftingGraphNode buildNodeRecursive(
+        AEKey what,
+        CraftingGraph graph,
+        Set<AEKey> requestStack,
+        boolean root,
+        boolean substitutable
+    ) throws InterruptedException {
+        long emitStart = this.trackPerformance ? System.nanoTime() : 0;
+        boolean canEmit = calc.canEmitFor(what);
+        if (this.trackPerformance) {
+            this.emitLookupNanos += System.nanoTime() - emitStart;
+        }
+        if (canEmit) {
+            var nodeKey = new CraftingGraph.NodeKey(what, null);
+            var existing = graph.getNode(nodeKey);
+            if (existing != null) {
+                return existing;
+            }
+            graph.addClosureNode(what, MaterialClosure.Node.EMITTER);
+            var emitter = new CraftingGraphNode(what, null, List.of(new GenericStack(what, 1)), 1);
+            graph.putNode(nodeKey, emitter);
+            this.nodeCount++;
+            return emitter;
+        }
+
+        long patternStart = this.trackPerformance ? System.nanoTime() : 0;
+        var patterns = calc.getCraftingFor(what);
+        if (this.trackPerformance) {
+            this.patternLookupNanos += System.nanoTime() - patternStart;
+        }
+        if (patterns.isEmpty()) {
+            var substitute = substitutable ? calc.getFuzzyCraftable(what) : null;
+            if (substitute != null) {
+                graph.requireLegacyFallback();
+                collectSubstituteClosure(substitute, graph);
+            }
+            graph.addClosureNode(what, new MaterialClosure.Node(false, substitute, List.of(), List.of()));
+            if (root) {
+                var nodeKey = new CraftingGraph.NodeKey(what, null);
+                var leaf = new CraftingGraphNode(what, null, List.of(), 1, false, true);
+                graph.putNode(nodeKey, leaf);
+                this.nodeCount++;
+                return leaf;
+            }
+            return null;
+        }
+        // With several patterns, the graph is planned with the one of highest priority first, see
+        // CraftingCalculation#tryAlternatives
+        boolean localUnit = false;
+        String localReason = null;
+        if (patterns.size() != 1) {
+            graph.markAlternatives();
+        }
+
+        var primaryPattern = this.choices.getOrDefault(what, patterns.getFirst());
+        for (int patternIndex = 0, patternCount = patterns.size(); patternIndex < patternCount; patternIndex++) {
+            var pattern = patterns.get(patternIndex);
+            graph.recordPatternDefinition(pattern.getDefinition());
+        }
+        var nodeKey = new CraftingGraph.NodeKey(what, primaryPattern);
+
+        var existing = graph.getNode(nodeKey);
+        if (existing != null) {
+            return existing;
+        }
+
+        if (requestStack.contains(what)) {
+            graph.markRecursion();
+            return graph.getNode(nodeKey);
+        }
+
+        long outputAmount = getRequestedOutputAmount(what, primaryPattern);
+        if (outputAmount <= 0) {
+            throw invalidPattern("mismatched pattern outputs");
+        }
+        if (!localUnit && !isNativePattern(primaryPattern)) {
+            localUnit = true;
+            localReason = "unsupported-pattern-semantics";
+        }
+        if (localUnit || PseudoPatternDetails.isPseudo(primaryPattern)) {
+            graph.requireLegacyFallback();
+        }
+        var node = new CraftingGraphNode(what, primaryPattern, patterns, primaryPattern.getOutputs(), outputAmount,
+            localUnit, false, localReason);
+        graph.putNode(nodeKey, node);
+        this.nodeCount++;
+
+        requestStack.add(what);
+        calc.handlePausing();
+
+        var graphInputs = new Object2LongLinkedOpenHashMap<AEKey>();
+        // The closure keeps the inputs of every candidate, the graph only those of the patterns it plans with
+        var closureInputs = new Object2LongLinkedOpenHashMap<AEKey>();
+        var candidates = new ObjectArrayList<MaterialClosure.Candidate>(patterns.size());
+        for (int patternIndex = 0, patternCount = patterns.size(); patternIndex < patternCount; patternIndex++) {
+            var pattern = patterns.get(patternIndex);
+            boolean planned = localUnit || pattern == primaryPattern;
+            var patternInputs = new Object2LongLinkedOpenHashMap<AEKey>();
+            for (var inputEntry : pattern.getInputs()) {
+                var possibleInputs = inputEntry.possibleInputs();
+                if (possibleInputs.length == 0 || inputEntry.getMultiplier() <= 0) continue;
+                // Fuzzy variants are only consumed by ingredient substitution, an assembler-pattern feature, so gate
+                // on the pattern type instead of inferring it from the input list. Pseudo patterns wrap the real one.
+                boolean inputSubstitutable = PseudoPatternDetails.unwrap(pattern) instanceof IAssemblerPattern assembler
+                    && assembler.canSubstitute();
+                int possibleInputIndex = 0;
+                while (possibleInputIndex < possibleInputs.length) {
+                    var possible = possibleInputs[possibleInputIndex++];
+                    if (possible.amount() > 0 && (!possible.what().equals(what) || !localUnit)) {
+                        long amount = LongMath.saturatedMultiply(possible.amount(), inputEntry.getMultiplier());
+                        patternInputs.put(possible.what(),
+                            LongMath.saturatedAdd(patternInputs.getLong(possible.what()), amount));
+                        if (inputSubstitutable) {
+                            graph.addFuzzyKey(possible.what());
+                        }
+                    }
+                }
+            }
+            // A local unit is previewed with one selected pattern. Keep the largest per-key demand
+            // across candidates, while still summing repeated slots within the same candidate.
+            for (var input : patternInputs.object2LongEntrySet()) {
+                closureInputs.put(input.getKey(),
+                    Math.max(closureInputs.getLong(input.getKey()), input.getLongValue()));
+                if (planned) {
+                    graphInputs.put(input.getKey(),
+                        Math.max(graphInputs.getLong(input.getKey()), input.getLongValue()));
+                }
+            }
+            long candidateOutput = pattern == primaryPattern ? outputAmount : candidateOutputAmount(what, pattern);
+            if (candidateOutput > 0) {
+                candidates.add(new MaterialClosure.Candidate(candidateOutput, copyInputs(patternInputs)));
             }
         }
-        return true;
+        graph.addClosureNode(what, new MaterialClosure.Node(false, null, copyInputs(closureInputs), candidates));
+
+        for (var graphInput : graphInputs.object2LongEntrySet()) {
+            var inputKey = graphInput.getKey();
+            long inputAmount = graphInput.getLongValue();
+
+            boolean inputSubstitutable = PseudoPatternDetails.unwrap(primaryPattern) instanceof IAssemblerPattern assembler
+                && assembler.canSubstitute();
+            var childNode = buildNodeRecursive(inputKey, graph, requestStack, false, inputSubstitutable);
+
+            var edge = new CraftingGraphEdge(inputKey, inputAmount, childNode,
+                PseudoPatternDetails.isPseudo(primaryPattern));
+            node.addInput(edge);
+
+            if (childNode != null) {
+                childNode.addParent(node);
+            }
+        }
+
+        // Material only the other patterns take still belongs in the snapshot and the closure, without nodes
+        for (var closureInput : closureInputs.keySet()) {
+            if (!graphInputs.containsKey(closureInput) && !graph.getClosureNodes().containsKey(closureInput)) {
+                collectSubstituteClosure(closureInput, graph);
+            }
+        }
+
+        requestStack.remove(what);
+        return node;
     }
 
     private static IllegalArgumentException invalidPattern(String reason) {

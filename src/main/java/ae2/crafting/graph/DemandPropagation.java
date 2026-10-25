@@ -111,7 +111,9 @@ public class DemandPropagation {
             return;
         }
 
-        long demand = Math.max(0, node.getDemandAmount());
+        long totalDemand = Math.max(0, node.getDemandAmount());
+        long demand = totalDemand;
+        long stock = inventory == null ? 0 : inventory.extract(node.getWhat(), Long.MAX_VALUE, Actionable.SIMULATE);
         if (inventory != null && node != graph.getRootNode()) {
             long available = inventory.extract(node.getWhat(), demand, Actionable.MODULATE);
             demand = Math.max(0, demand - available);
@@ -133,10 +135,13 @@ public class DemandPropagation {
         // transaction; execution records the actually allocated/missing seed amounts.
         if (expandedNet <= 0 && !calculation.hasPositiveRecursiveNet(pattern)) {
             node.setCraftTimes(0);
-            feedback.markCycleCut(demand);
-            long reserve = Math.max(1, feedback.amountPerCraft());
+            // Intermediate demand can use stock directly. A root request must be newly produced; a zero-gain
+            // loop cannot fulfill it from stock. An empty root plan is reported missing by final validation.
+            long seedDemand = node == graph.getRootNode() ? 0 : totalDemand;
+            feedback.markCycleCut(seedDemand);
+            long reserve = seedDemand == 0 ? 0 : Math.max(1, feedback.amountPerCraft());
             feedback.setReserveDemand(reserve);
-            graph.setSccPlan(component.id(), nativePlan(component, node, feedback, demand, 0, 0, reserve));
+            graph.setSccPlan(component.id(), nativePlan(component, node, feedback, seedDemand, 0, seedDemand, reserve));
             return;
         }
 
@@ -151,9 +156,13 @@ public class DemandPropagation {
         // From here on the direct net is positive: non-positive nets never pass the expanded/batch guard above,
         // because getRecursivePatternBatch falls back to a positive direct output for them.
         long seedCapacity = feedback.amountPerCraft();
-        long seedRequired = Math.min(demand, seedCapacity);
-        long batches = divideCeil(demand - seedRequired, directNet);
-        long plannedOutput = batches == 0 ? 0 : LongMath.saturatedAdd(seedRequired,
+        boolean root = node == graph.getRootNode();
+        long seedRequired = root ? seedCapacity : Math.min(totalDemand, seedCapacity);
+        // Stock already includes the seed. Only a seed we must supply externally reduces the deficit again.
+        // The requested output is new production: even when it is also the seed, stock cannot satisfy the request.
+        long missingSeed = Math.max(0, seedRequired - stock);
+        long batches = divideCeil(root ? demand : Math.max(0, demand - missingSeed), directNet);
+        long plannedOutput = LongMath.saturatedAdd(seedRequired,
             LongMath.saturatedMultiply(batches, directNet));
         node.setCraftTimes(batches);
         feedback.markCycleCut(seedRequired);

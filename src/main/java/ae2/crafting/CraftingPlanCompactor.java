@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
@@ -77,8 +78,16 @@ final class CraftingPlanCompactor {
                 - plan.missingItems().get(output);
             return lacking <= 0 ? plan : withMissing(plan, output, lacking, calculation);
         }
-        if (CraftingCpuReplay.runs(plan, calculation)) {
-            return plan;
+        boolean craftableMissing = !plan.missingItems().isEmpty()
+            && !calculation.getMissingProducers(plan.missingItems()).isEmpty();
+        if (!plan.missingItems().isEmpty() && plan.patternTimes().keySet().stream().anyMatch(IAssemblerPattern.class::isInstance)) {
+            // Discovery follows dependencies in tree order. The CPU can run a returning sibling before the
+            // sibling that finally consumes its tool, so prove whether the discovered shortage is real.
+            var supplied = plan.withContents(plan.usedItems(), plan.emittedItems(), new KeyCounter(), plan.patternTimes(), calculation);
+            if (CraftingCpuReplay.runs(supplied, calculation)) return supplied;
+        }
+        if (!craftableMissing && CraftingCpuReplay.runs(plan, calculation)) {
+            return removeReturnedShortages(plan, calculation);
         }
         AELog.crafting("Repairing a crafting plan for %s the crafting CPU could not run", plan.finalOutput());
         CraftingPlan compacted;
@@ -107,8 +116,43 @@ final class CraftingPlanCompactor {
         var missing = new KeyCounter();
         missing.addAll(compacted.missingItems());
         missing.addAll(lacking);
-        return compacted.withContents(compacted.usedItems(), compacted.emittedItems(), missing,
+        var result = compacted.withContents(compacted.usedItems(), compacted.emittedItems(), missing,
             compacted.patternTimes(), calculation);
+        result.recordInputAllocations(compacted.inputAllocations());
+        return result;
+    }
+
+    private static CraftingPlan removeReturnedShortages(CraftingPlan plan, CraftingCalculation calculation)
+        throws InterruptedException {
+        if (plan.missingItems().isEmpty() || plan.remainderAllocations().isEmpty()) return plan;
+        var candidates = new ObjectOpenHashSet<AEKey>();
+        for (var returns : plan.remainderAllocations().values()) {
+            for (var key : returns.keySet()) if (plan.missingItems().get(key) > 0) candidates.add(key);
+        }
+        if (candidates.isEmpty()) return plan;
+        var missing = new KeyCounter();
+        missing.addAll(plan.missingItems());
+        for (var key : candidates) missing.remove(key, missing.get(key));
+        missing.removeZeros();
+        var supplied = plan.withContents(plan.usedItems(), plan.emittedItems(), missing, plan.patternTimes(), calculation);
+        if (CraftingCpuReplay.runs(supplied, calculation)) return supplied;
+        // Some simultaneous seeds really are missing. Find their minimum without iterating over item counts.
+        for (var key : candidates) {
+            long low = 0, high = plan.missingItems().get(key);
+            while (low < high) {
+                long middle = low + (high - low) / 2;
+                missing = new KeyCounter();
+                missing.addAll(plan.missingItems());
+                missing.set(key, middle);
+                missing.removeZeros();
+                supplied = plan.withContents(plan.usedItems(), plan.emittedItems(), missing, plan.patternTimes(), calculation);
+                if (CraftingCpuReplay.runs(supplied, calculation)) {
+                    high = middle;
+                    plan = supplied;
+                } else low = middle + 1;
+            }
+        }
+        return plan;
     }
 
     static CraftingPlan compact(CraftingPlan plan, CraftingCalculation calculation) throws InterruptedException {
@@ -258,6 +302,7 @@ final class CraftingPlanCompactor {
      * @return false when a pattern of the plan cannot be modelled, and the plan is kept as it is
      */
     private boolean prepare(CraftingPlan plan) {
+        var included = new ObjectOpenHashSet<IPatternDetails>();
         for (Object2LongMap.Entry<IPatternDetails> entry : plan.patternTimes()
                                                                .object2LongEntrySet()) {
             if (entry.getLongValue() <= 0) continue;
@@ -266,7 +311,20 @@ final class CraftingPlanCompactor {
                 return false;
             }
             this.recipes.add(recipe);
+            included.add(entry.getKey());
             this.flexible |= recipe.slots.length > 0;
+        }
+        // A returned byproduct may have been declared missing before its producer was ever scheduled.
+        // Admit only direct producers of the reported shortages; do not expand the whole network recipe catalog.
+        if (!plan.missingItems().isEmpty()) {
+            for (var pattern : this.calculation.getMissingProducers(plan.missingItems())) {
+                if (!included.add(pattern)) continue;
+                if (included.size() > MAX_STEPS) return false;
+                var recipe = Recipe.of(pattern, 0, this);
+                if (recipe == null) return false;
+                this.recipes.add(recipe);
+                this.flexible |= recipe.slots.length > 0;
+            }
         }
         return true;
     }
@@ -919,6 +977,11 @@ final class CraftingPlanCompactor {
         final long[] lowest = supply.clone();
         int borrows = 0;
         final long[] left = times.clone();
+        var byPattern = new Object2ObjectOpenHashMap<IPatternDetails, Recipe>();
+        for (var recipe : this.recipes) byPattern.put(recipe.pattern, recipe);
+        var seeds = new CraftingSeedReservations(byPattern.keySet(), pattern -> left[byPattern.get(pattern).index]);
+        var reserved = new long[inventory.length];
+        var masked = new IntArrayList();
         final List<Int2LongLinkedOpenHashMap[]> allocations = new ArrayList<>(this.recipes.size());
         long remaining = 0;
         for (Recipe recipe : this.recipes) {
@@ -937,8 +1000,19 @@ final class CraftingPlanCompactor {
             for (Recipe recipe : this.recipes) {
                 final Int2LongLinkedOpenHashMap[] allocation = allocations.get(recipe.index);
                 while (left[recipe.index] > 0) {
+                    // Hide only this recipe's protected inputs, using reusable scratch space rather than copying
+                    // the entire inventory for every recipe/pass. Restore before recording actual consumption.
+                    for (int key : recipe.keys) maskSeed(recipe, key, seeds, inventory, reserved, masked);
+                    for (var slot : allocation) {
+                        for (int key : slot.keySet()) maskSeed(recipe, key, seeds, inventory, reserved, masked);
+                    }
                     final long crafts = recipe.slots.length == 0 ? recipe.runnable(inventory, left[recipe.index])
                         : prepareBatch(recipe, allocation, inventory, left[recipe.index], batch);
+                    for (int key : masked) {
+                        inventory[key] += reserved[key];
+                        reserved[key] = 0;
+                    }
+                    masked.clear();
                     if (crafts <= 0) break;
                     if (recipe.slots.length == 0) {
                         recipe.run(inventory, lowest, crafts);
@@ -964,6 +1038,17 @@ final class CraftingPlanCompactor {
             if (inventory[key] < demand[key]) return null;
         }
         return lowest;
+    }
+
+    private void maskSeed(Recipe recipe, int key, CraftingSeedReservations seeds, long[] inventory,
+                          long[] reserved, IntArrayList masked) {
+        if (reserved[key] != 0) return;
+        long amount = seeds.reserved(recipe.pattern, this.keys.get(key));
+        if (amount > 0) {
+            reserved[key] = amount;
+            inventory[key] -= amount;
+            masked.add(key);
+        }
     }
 
     private boolean borrowFor(List<Int2LongLinkedOpenHashMap[]> allocations, long[] left, long[] inventory,
@@ -1221,6 +1306,10 @@ final class CraftingPlanCompactor {
                     return null;
                 }
                 outputs.addTo(output.what(), output.amount());
+            }
+            if (pattern instanceof IAssemblerPattern assembler) {
+                var returned = new CraftingAssemblerSimulation(assembler, compactor.level).defaultRemainders();
+                if (returned != null) returned.forEach(entry -> outputs.addTo(entry.getKey(), entry.getLongValue()));
             }
 
             final List<AEKey> order = new ArrayList<>(inputs.keySet());

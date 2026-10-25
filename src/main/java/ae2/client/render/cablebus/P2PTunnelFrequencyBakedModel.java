@@ -30,6 +30,7 @@ import net.minecraft.client.renderer.block.model.ItemOverrideList;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.util.EnumFacing;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Collections;
 import java.util.List;
@@ -61,7 +62,7 @@ public class P2PTunnelFrequencyBakedModel implements IBakedModel, IPartBakedMode
     }
 
     @Override
-    public List<BakedQuad> getQuads(IBlockState state, EnumFacing side, long rand) {
+    public @NonNull List<BakedQuad> getQuads(IBlockState state, EnumFacing side, long rand) {
         if (side != null) {
             return Collections.emptyList();
         }
@@ -113,12 +114,12 @@ public class P2PTunnelFrequencyBakedModel implements IBakedModel, IPartBakedMode
     }
 
     @Override
-    public TextureAtlasSprite getParticleTexture() {
+    public @NonNull TextureAtlasSprite getParticleTexture() {
         return this.texture;
     }
 
     @Override
-    public ItemOverrideList getOverrides() {
+    public @NonNull ItemOverrideList getOverrides() {
         return ItemOverrideList.NONE;
     }
 }
