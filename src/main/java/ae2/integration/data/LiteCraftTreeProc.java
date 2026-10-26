@@ -24,12 +24,20 @@ import java.util.RandomAccess;
 /**
  * @param pattern the pattern crafting it, known only where the tree is built and not sent to clients
  * @param cycle   the crafting cycle it belongs to, numbered within its tree, or -1, see {@link CraftingTreeCycles}
+ * @param sourceId stable producer identity for shared references, preserved when the client sorts or folds the tree
  */
 public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
                                 List<PatternContainerGroup> machines,
                                 Map<PatternContainerGroup, List<CraftingSupplierLocation>> machineLocations,
                                 @Nullable IPatternDetails pattern,
-                                int cycle) implements Comparable<LiteCraftTreeProc> {
+                                int cycle,
+                                int sourceId) implements Comparable<LiteCraftTreeProc> {
+
+    public LiteCraftTreeProc(List<LiteCraftTreeNode> inputs, List<PatternContainerGroup> machines,
+                             Map<PatternContainerGroup, List<CraftingSupplierLocation>> machineLocations,
+                             @Nullable IPatternDetails pattern, int cycle) {
+        this(inputs, machines, machineLocations, pattern, cycle, -1);
+    }
 
     @SuppressWarnings("unused")
     public LiteCraftTreeProc(List<LiteCraftTreeNode> inputs, List<PatternContainerGroup> machines) {
@@ -107,6 +115,10 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
         int size = packetBuffer.readVarInt();
         limits.checkProcessChildCount(size);
         int cycle = packetBuffer.readVarInt() - 1;
+        int sourceId = packetBuffer.readVarInt() - 1;
+        if (sourceId < -1 || sourceId >= CraftingTreeStackRegistry.MAX_TREE_PROCESSES) {
+            throw new IllegalArgumentException("Invalid crafting tree source id: " + sourceId);
+        }
         int machineCount = packetBuffer.readVarInt();
         limits.checkMachineCount(machineCount);
         List<PatternContainerGroup> machines = new ArrayList<>(machineCount);
@@ -126,7 +138,7 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
             }
         }
         List<LiteCraftTreeNode> inputs = new ArrayList<>(size);
-        LiteCraftTreeProc proc = new LiteCraftTreeProc(inputs, machines, machineLocations, null, cycle);
+        LiteCraftTreeProc proc = new LiteCraftTreeProc(inputs, machines, machineLocations, null, cycle, sourceId);
         for (int i = 0; i < size; i++) {
             inputs.add(LiteCraftTreeNode.fromBuffer(buf, stackSet, proc, limits, depth));
         }
@@ -146,6 +158,7 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
         var packetBuffer = new PacketBuffer(buf);
         packetBuffer.writeVarInt(inputs.size());
         packetBuffer.writeVarInt(cycle + 1);
+        packetBuffer.writeVarInt(sourceId + 1);
         packetBuffer.writeVarInt(machines.size());
         if (machines instanceof RandomAccess) {
             for (int machineIndex = 0, machineCount = machines.size(); machineIndex < machineCount; machineIndex++) {
@@ -233,21 +246,22 @@ public record LiteCraftTreeProc(List<LiteCraftTreeNode> inputs,
 
     public LiteCraftTreeProc withMissingOnly() {
         List<LiteCraftTreeNode> missingInputs = new ArrayList<>(inputs.size());
+        var copy = new LiteCraftTreeProc(missingInputs, machines, machineLocations, pattern, cycle, sourceId);
         if (inputs instanceof RandomAccess) {
             for (int inputIndex = 0, inputCount = inputs.size(); inputIndex < inputCount; inputIndex++) {
                 LiteCraftTreeNode input = inputs.get(inputIndex);
                 if (LiteCraftTreeNode.isMissing(input)) {
-                    missingInputs.add(input.withMissingOnly());
+                    missingInputs.add(input.withMissingOnly(copy));
                 }
             }
         } else {
             for (LiteCraftTreeNode input : inputs) {
                 if (LiteCraftTreeNode.isMissing(input)) {
-                    missingInputs.add(input.withMissingOnly());
+                    missingInputs.add(input.withMissingOnly(copy));
                 }
             }
         }
-        return new LiteCraftTreeProc(missingInputs, machines, machineLocations, pattern, cycle);
+        return copy;
     }
 
     public void sort() {

@@ -31,6 +31,7 @@ import ae2.api.stacks.KeyAmounts;
 import ae2.crafting.CraftingAssemblerSimulation;
 import ae2.crafting.inv.ICraftingInventory;
 import ae2.crafting.inv.ListCraftingInventory;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
@@ -132,7 +133,10 @@ public class CraftingCpuHelper {
         for (int x = 0; x < inputs.length; x++) {
             var list = inputHolder[x] = new KeyCounter();
             long remainingMultiplier = inputs[x].getMultiplier() * multiplier;
-            for (var template : getValidItemTemplates(sourceInv, inputs[x], level)) {
+            // Extraction can remove the last stack of a key and rehash the backing fuzzy inventory index.
+            // Finish traversing that index before mutating it, including unsuccessful partial extractions.
+            var templates = new ObjectArrayList<>(getValidItemTemplates(sourceInv, inputs[x], level).iterator());
+            for (var template : templates) {
                 long extracted = extractTemplates(sourceInv, template, remainingMultiplier);
                 if (extracted <= 0) {
                     continue;

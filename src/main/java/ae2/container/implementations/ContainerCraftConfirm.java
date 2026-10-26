@@ -78,9 +78,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -220,6 +223,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             }
         } catch (Throwable e) {
             AELog.info(e);
+            player.sendMessage(PlayerMessages.CraftingJobError.text(getCraftingErrorText(e)));
         }
     }
 
@@ -265,6 +269,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
             }
         } catch (Throwable e) {
             AELog.info(e);
+            player.sendMessage(PlayerMessages.CraftingJobError.text(getCraftingErrorText(e)));
             if (player.openContainer instanceof ContainerCraftConfirm && returnToContainerOverride != null) {
                 SwitchGuisPacket.restoreExternalGui(player);
             }
@@ -297,14 +302,26 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     }
 
     private static ITextComponent getCraftingErrorText(Throwable error) {
-        Throwable cause = error instanceof ExecutionException && error.getCause() != null ? error.getCause() : error;
-        if (cause instanceof CraftingCalculationFailure calculationFailure) {
-            return calculationFailure.getLocalizedMessageComponent();
+        var seen = Collections.newSetFromMap(new IdentityHashMap<Throwable, Boolean>());
+        Throwable cause = error;
+        while (seen.add(cause)) {
+            if (cause instanceof CraftingCalculationFailure calculationFailure) {
+                return calculationFailure.getLocalizedMessageComponent();
+            }
+            if (cause instanceof AmountOverflowException overflow) {
+                return new CraftingAmountOverflow(overflow).getLocalizedMessageComponent();
+            }
+            if (cause instanceof CancellationException || cause instanceof InterruptedException) {
+                return PlayerMessages.CraftingCalculationCancelled.text();
+            }
+            if (cause.getCause() == null || seen.contains(cause.getCause())) break;
+            cause = cause.getCause();
         }
-        if (cause instanceof AmountOverflowException overflow) {
-            return new CraftingAmountOverflow(overflow).getLocalizedMessageComponent();
-        }
-        return PlayerMessages.CraftingNoPlan.text();
+        String detail = cause.getMessage();
+        var trace = cause.getStackTrace();
+        String location = trace.length == 0 ? cause.getClass().getName() : trace[0].toString();
+        return PlayerMessages.CraftingUnexpectedError.text(cause.getClass().getName(),
+            detail == null || detail.isBlank() ? location : detail + " (" + location + ")");
     }
 
     private static boolean hasUsableWirelessTerminal(EntityPlayer player) {

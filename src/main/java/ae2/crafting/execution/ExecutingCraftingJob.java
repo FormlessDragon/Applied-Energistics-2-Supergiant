@@ -29,13 +29,16 @@ import ae2.api.stacks.AEKey;
 import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.crafting.CraftingLink;
+import ae2.crafting.CraftingDispatchOrder;
 import ae2.crafting.CraftingSeedReservations;
 import ae2.crafting.TemporaryProviderCarrier;
 import ae2.crafting.TemporaryPseudoCraftingProvider;
 import ae2.crafting.inv.ListCraftingInventory;
+import ae2.crafting.inv.ICraftingInventory;
 import ae2.helpers.patternprovider.PseudoPatternDetails;
 import com.google.common.math.LongMath;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -44,6 +47,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.math.BigInteger;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 
 public class ExecutingCraftingJob {
@@ -60,6 +64,7 @@ public class ExecutingCraftingJob {
     private static final String NBT_PLAN_BYTES = "planBytes";
     private static final String NBT_TOTAL_FINAL_OUTPUT_AMOUNT = "totalFinalOutputAmount";
     private static final String NBT_TASKS = "tasks";
+    private static final String NBT_DISPATCH_ORDER = "dispatchOrder";
     private static final String NBT_TASK_PSEUDO = "pseudo";
     private static final String NBT_TEMPORARY_PATTERNS = "temporaryPatterns";
     private static final String NBT_SUSPENDED = "suspended";
@@ -80,6 +85,7 @@ public class ExecutingCraftingJob {
     GenericStack finalOutput;
     int schedulingTaskCount;
     private CraftingSeedReservations seedReservations;
+    private CraftingDispatchOrder dispatchOrder;
     long totalFinalOutputAmount;
     long remainingAmount;
     long pendingRequesterOutput;
@@ -95,6 +101,18 @@ public class ExecutingCraftingJob {
             seedReservations = new CraftingSeedReservations(tasks.keySet(), pattern -> tasks.get(pattern).value);
         }
         return seedReservations;
+    }
+
+    int dispatchLimit(IPatternDetails pattern, int maximum) {
+        return this.dispatchOrder == null ? maximum : this.dispatchOrder.limit(pattern, maximum);
+    }
+
+    ICraftingInventory protectInputs(IPatternDetails pattern, ICraftingInventory inventory) {
+        return this.dispatchOrder == null ? seedReservations().protect(pattern, inventory) : this.dispatchOrder.protect(pattern, inventory);
+    }
+
+    void acceptedDispatch(IPatternDetails pattern, int count) {
+        if (this.dispatchOrder != null) this.dispatchOrder.accepted(pattern, count);
     }
 
     ExecutingCraftingJob(ICraftingPlan plan, CraftingDifferenceListener postCraftingDifference, CraftingLink link,
@@ -127,6 +145,8 @@ public class ExecutingCraftingJob {
                 timeTracker.addMaxItems(amount, output.what().getType());
             }
         }
+        var order = CraftingDispatchOrder.forPlan(plan);
+        if (!order.isEmpty()) this.dispatchOrder = new CraftingDispatchOrder(order);
         this.link = link;
         this.playerId = playerId;
         this.suspended = false;
@@ -163,6 +183,7 @@ public class ExecutingCraftingJob {
         }
 
         NBTTagList tasksTag = CraftingCpuLogic.savedList(data, NBT_TASKS);
+        var savedPatterns = new ArrayList<IPatternDetails>();
         for (int i = 0; i < tasksTag.tagCount(); ++i) {
             final NBTTagCompound item = tasksTag.getCompoundTagAt(i);
             var pattern = AEItemKey.fromTag(item);
@@ -176,6 +197,11 @@ public class ExecutingCraftingJob {
             final TaskProgress tp = new TaskProgress();
             tp.value = item.getLong(NBT_CRAFTING_PROGRESS);
             this.tasks.put(details, tp);
+            savedPatterns.add(details);
+        }
+        if (data.hasKey(NBT_DISPATCH_ORDER)) {
+            this.dispatchOrder = CraftingDispatchOrder.readFromNBT(CraftingCpuLogic.savedList(data, NBT_DISPATCH_ORDER), savedPatterns,
+                p -> this.tasks.get(p).value);
         }
         NBTTagList temporaryPatternsTag = CraftingCpuLogic.savedList(data, NBT_TEMPORARY_PATTERNS);
         for (int i = 0; i < temporaryPatternsTag.tagCount(); i++) {
@@ -214,13 +240,17 @@ public class ExecutingCraftingJob {
         data.setTag(NBT_TIME_TRACKER, timeTracker.writeToNBT());
 
         final NBTTagList list = new NBTTagList();
+        var patternIndices = new Object2IntOpenHashMap<IPatternDetails>();
+        patternIndices.defaultReturnValue(-1);
         for (var e : this.tasks.entrySet()) {
+            patternIndices.put(e.getKey(), patternIndices.size());
             var item = e.getKey().getDefinition().toTag();
             item.setLong(NBT_CRAFTING_PROGRESS, e.getValue().value);
             item.setBoolean(NBT_TASK_PSEUDO, PseudoPatternDetails.isPseudo(e.getKey()));
             list.appendTag(item);
         }
         data.setTag(NBT_TASKS, list);
+        if (this.dispatchOrder != null) data.setTag(NBT_DISPATCH_ORDER, this.dispatchOrder.writeToNBT(patternIndices::getInt));
 
         final NBTTagList temporaryPatterns = new NBTTagList();
         for (var provider : this.temporaryProviders.values()) {
@@ -269,6 +299,11 @@ public class ExecutingCraftingJob {
         if (!this.finalOutput.what().equals(planFinalOutput.what())) {
             throw new IllegalArgumentException("Cannot merge crafting jobs with different final outputs");
         }
+
+        if (this.dispatchOrder == null && !CraftingDispatchOrder.forPlan(plan).isEmpty()) {
+            this.dispatchOrder = new CraftingDispatchOrder(CraftingDispatchOrder.unordered(this.tasks.keySet(), p -> this.tasks.get(p).value));
+        }
+        if (this.dispatchOrder != null) this.dispatchOrder.append(plan);
 
         this.remainingAmount = LongMath.saturatedAdd(this.remainingAmount, planFinalOutput.amount());
         this.totalFinalOutputAmount = LongMath.saturatedAdd(this.totalFinalOutputAmount, planFinalOutput.amount());

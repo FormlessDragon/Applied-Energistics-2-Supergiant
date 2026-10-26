@@ -251,7 +251,8 @@ class CraftingTreeCyclesTest {
             net.pattern("p" + i, of("i" + (i + 1), 1), outputs);
         }
         net.store("i" + length, 1);
-        var root = tree(net.plan("i0", 1));
+        // Two rounds actually consume the returned seed; a single round only withdraws the initial stock.
+        var root = tree(net.plan("i0", 2));
         var contracted = CraftingTreeCycleView.contract(root);
         assertEquals(1, contracted.cycles().size());
         var region = contracted.cycles().values().iterator().next();

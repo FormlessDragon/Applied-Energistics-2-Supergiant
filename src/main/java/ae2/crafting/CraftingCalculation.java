@@ -795,20 +795,22 @@ public class CraftingCalculation {
         if (strategy == CalculationStrategy.CRAFT_LESS) {
             this.memoReplayEnabled = false;
             var craftLessPlan = runCraftLessAttempt(requestedAmount);
-            if (hasMultiplePaths() && (craftLessPlan == null || craftLessPlan.finalOutput().amount() < requestedAmount)) {
+            // Even with one producer per material, stock conversions can require another execution order.
+            // A greedy availability probe is only a lower bound; validate exact requests before declaring a maximum.
+            if (craftLessPlan == null || craftLessPlan.finalOutput().amount() < requestedAmount) {
                 return maximizeAlternativeCrafts(craftLessPlan);
             }
-            if (craftLessPlan != null) {
-                return craftLessPlan;
-            }
-
-            return runCraftAttempt(requestedAmount, requestedAmount);
+            return craftLessPlan;
         }
 
         return runGraphBasedAttempt(requestedAmount);
     }
 
     private CraftingPlan maximizeAlternativeCrafts(@Nullable CraftingPlan greedy) throws InterruptedException {
+        if (greedy != null) {
+            greedy = repairPlan(greedy);
+            if (!greedy.missingItems().isEmpty()) greedy = null;
+        }
         long lower = greedy == null ? 0 : greedy.finalOutput().amount();
         long upper = requestedAmount;
         CraftingPlan best = greedy;
@@ -818,7 +820,8 @@ public class CraftingCalculation {
             long amount = lower + (upper - lower) / 2 + 1;
             resetAttemptState();
             var candidate = runGraphBasedAttempt(amount);
-            if (candidate != null && candidate.missingItems().isEmpty() && CraftingCpuReplay.runs(candidate, this)) {
+            if (candidate != null) candidate = repairPlan(candidate);
+            if (candidate != null && candidate.missingItems().isEmpty()) {
                 lower = amount;
                 best = candidate;
             } else {
@@ -829,10 +832,12 @@ public class CraftingCalculation {
         resetAttemptState();
         if (best != null) {
             var result = runGraphBasedAttempt(lower);
+            if (result != null) result = repairPlan(result);
             if (result != null && result.missingItems().isEmpty()) return result;
             var fallback = runCraftLessAttempt(lower);
             if (fallback != null) return fallback;
-            throw new CraftingCalculationFailure(PlayerMessages.CraftingNoPlan);
+            throw CraftingCalculationFailure.withDetails(PlayerMessages.CraftingPlanRebuildFailed,
+                this.output.getDisplayName().createCopy(), Long.toString(lower));
         }
         return runGraphBasedAttempt(requestedAmount);
     }
@@ -1337,11 +1342,9 @@ public class CraftingCalculation {
             } else {
                 plan = computePlan();
             }
-            validateAmounts(plan);
-            if (plan instanceof CraftingPlan craftingPlan && !this.plansKnownToRun.contains(craftingPlan)) {
-                plan = CraftingPlanCompactor.repair(craftingPlan, this);
-            }
-            validateAmounts(plan);
+            if (plan instanceof CraftingPlan craftingPlan) {
+                plan = repairPlan(craftingPlan);
+            } else validateAmounts(plan);
             this.logCraftingJob(plan);
             if (this.usedCraftingTreeTestPattern) {
                 long elapsedNanos = System.nanoTime() - calculationStart;
@@ -1378,6 +1381,26 @@ public class CraftingCalculation {
         }
     }
 
+    private CraftingPlan repairPlan(CraftingPlan plan) throws InterruptedException {
+        validateAmounts(plan);
+        if (!this.plansKnownToRun.contains(plan)) {
+            plan = CraftingPlanCompactor.repair(plan, this);
+            validateAmounts(plan);
+            if (plan.missingItems().isEmpty()) this.plansKnownToRun.add(plan);
+        }
+        return plan;
+    }
+
+    /** Required stock at the end of a conversion search, using the same policy as reserve planning. */
+    KeyCounter recursiveReserveTargets() {
+        var targets = KeyCounter.checked();
+        if (this.recursiveIngredientReserveAmount > 0) {
+            this.recursiveReserveCandidates.forEach((key, amount) -> targets.add(key,
+                Math.min(getNetworkAmount(key), LongMath.saturatedMultiply(this.recursiveIngredientReserveAmount, amount))));
+        }
+        return targets;
+    }
+
     /** Check final per-material totals too: separate producers may each fit while their combined output does not. */
     static void validateAmounts(ICraftingPlan plan) {
         var required = KeyCounter.checked();
@@ -1395,6 +1418,10 @@ public class CraftingCalculation {
 
     // The failure the player is told about, with where the machines of a cycle without net output are
     private CraftingCalculationFailure reported(CraftBranchFailure failure) {
+        if (!failure.hasExplicitMessageKey()) {
+            return CraftingCalculationFailure.withDetails(PlayerMessages.CraftingMissingIngredient,
+                failure.getWhat().getDisplayName().createCopy(), Long.toString(failure.getMissingAmount()));
+        }
         var cycle = failure.getCycle();
         return new CraftingCalculationFailure(failure.getLocalizedMessageKey(),
             cycle == null ? null : cycle.locate(this::getMachineInfo));

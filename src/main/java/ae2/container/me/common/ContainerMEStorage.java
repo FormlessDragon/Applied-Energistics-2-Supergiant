@@ -1029,7 +1029,8 @@ public class ContainerMEStorage extends AEBaseContainer
             this.flowTrackingActive = active;
         }
 
-        if (!active && this.serverCM.getSetting(Settings.VIEW_MODE) == ViewItems.FLOWING) {
+        if (!active && this.serverCM.hasSetting(Settings.VIEW_MODE)
+            && this.serverCM.getSetting(Settings.VIEW_MODE) == ViewItems.FLOWING) {
             this.serverCM.putSetting(Settings.VIEW_MODE, ViewItems.ALL);
         }
     }

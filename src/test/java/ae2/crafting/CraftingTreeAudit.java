@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -64,13 +65,30 @@ final class CraftingTreeAudit {
 
     static void structure(LiteCraftTreeNode node, LiteCraftTreeProc parent, List<LiteCraftTreeProc> ancestors,
                           Map<IPatternDetails, KeyCounter> remainders) {
+        var sources = new HashMap<Integer, LiteCraftTreeProc>();
+        walk(node, ignored -> {
+        }, proc -> {
+            if (proc.sourceId() >= 0) assertNull(sources.put(proc.sourceId(), proc), "duplicate producer identity");
+        });
+        structure(node, parent, ancestors, remainders, sources);
+    }
+
+    private static void structure(LiteCraftTreeNode node, LiteCraftTreeProc parent, List<LiteCraftTreeProc> ancestors,
+                                  Map<IPatternDetails, KeyCounter> remainders, Map<Integer, LiteCraftTreeProc> sources) {
         assertSame(parent, node.parent(), "child must refer to its owning process");
         assertTrue(node.output().amount() > 0, "zero/negative tree amount");
         assertTrue(node.missing() >= 0 && node.missing() <= node.output().amount(), "missing exceeds node amount");
         if (LiteCraftTreeNode.isCycleFeedback(node.feedback())) {
             assertTrue(node.inputs().isEmpty(), "feedback must be a finite leaf");
-            assertTrue(node.feedback() < ancestors.size(), "unresolved or out-of-range feedback distance");
-            var producer = ancestors.get(ancestors.size() - 1 - node.feedback());
+            int sourceId = LiteCraftTreeNode.feedbackSourceId(node.feedback());
+            LiteCraftTreeProc producer;
+            if (sourceId >= 0) {
+                producer = sources.get(sourceId);
+                assertNotNull(producer, "shared producer must exist in the same tree");
+            } else {
+                assertTrue(node.feedback() < ancestors.size(), "unresolved or out-of-range feedback distance");
+                producer = ancestors.get(ancestors.size() - 1 - node.feedback());
+            }
             assertNotNull(parent);
             assertTrue(parent.cycle() >= 0);
             assertEquals(parent.cycle(), producer.cycle(), "feedback crosses unrelated cycle groups");
@@ -83,7 +101,7 @@ final class CraftingTreeAudit {
         for (var proc : node.inputs()) {
             assertFalse(proc.inputs().isEmpty(), "empty displayed process");
             ancestors.add(proc);
-            for (var input : proc.inputs()) structure(input, proc, ancestors, remainders);
+            for (var input : proc.inputs()) structure(input, proc, ancestors, remainders, sources);
             ancestors.removeLast();
         }
     }
@@ -142,7 +160,7 @@ final class CraftingTreeAudit {
         var children = new ArrayList<>();
         // An absent location entry and a present empty list encode the same empty location list on the wire.
         for (var proc : node.inputs())
-            children.add(List.of(proc.cycle(), proc.machines(),
+            children.add(List.of(proc.cycle(), proc.sourceId(), proc.machines(),
                 proc.machines().stream().map(proc::machineLocations).toList(),
                 proc.inputs().stream().map(CraftingTreeAudit::wireData).toList()));
         return List.of(node.output(), node.missing(), node.feedback(), children);

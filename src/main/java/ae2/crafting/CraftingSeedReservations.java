@@ -197,6 +197,10 @@ public final class CraftingSeedReservations {
         return !this.seeds.isEmpty();
     }
 
+    boolean hasMultiPatternCycles() {
+        return this.components.size() > this.singlePatternCycles.size();
+    }
+
     boolean isSinglePatternCycle(IPatternDetails pattern) {
         return this.singlePatternCycles.contains(pattern);
     }

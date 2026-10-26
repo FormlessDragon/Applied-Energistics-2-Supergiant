@@ -629,6 +629,7 @@ public class CraftingCpuLogic {
             }
 
             var details = task.getKey();
+            if (job.dispatchLimit(details, 1) == 0) continue;
             var finalOutputPseudoPattern = isFinalOutputPseudoPattern(job, details);
             // Try to push to each provider.
             for (var provider : providersForPattern.apply(details)) {
@@ -675,6 +676,7 @@ public class CraftingCpuLogic {
                                          boolean finalOutputPseudoPattern, IEnergyService energyService, World level,
                                          ExecutingCraftingJob.TaskProgress progress,
                                          int remainingPatternBudget, boolean mergePush) {
+        remainingPatternBudget = job.dispatchLimit(details, remainingPatternBudget);
         if (remainingPatternBudget <= 0) {
             return 0;
         }
@@ -688,7 +690,7 @@ public class CraftingCpuLogic {
             return 0;
         }
         maxMultiplier = Math.clamp(providerLimit, 0, maxMultiplier);
-        ICraftingInventory protectedInventory = job.seedReservations().protect(details, inventory);
+        ICraftingInventory protectedInventory = job.protectInputs(details, inventory);
         ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
             ? new RealInputTrackingInventoryView(protectedInventory)
             : protectedInventory;
@@ -724,7 +726,7 @@ public class CraftingCpuLogic {
         }
         var expectedOutputs = new KeyCounter();
         var expectedContainerItems = new KeyCounter();
-        ICraftingInventory protectedInventory = job.seedReservations().protect(details, inventory);
+        ICraftingInventory protectedInventory = job.protectInputs(details, inventory);
         ICraftingInventory taskInventory = finalOutputPseudoPattern && job.isTemporaryPattern(details)
             ? new RealInputTrackingInventoryView(protectedInventory)
             : protectedInventory;
@@ -756,6 +758,7 @@ public class CraftingCpuLogic {
         cluster.markDirty();
 
         progress.value -= multiplier;
+        job.acceptedDispatch(details, multiplier);
         invalidatePendingOutputSnapshot();
         if (finalOutputPseudoPattern) {
             completePseudoOutputs(job, expectedOutputs);

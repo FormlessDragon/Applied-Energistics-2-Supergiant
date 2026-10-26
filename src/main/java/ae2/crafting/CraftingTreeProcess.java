@@ -195,8 +195,8 @@ public class CraftingTreeProcess {
      *
      * <p>The catalyst of a precise input, which the pattern gives back, and the container a precise input leaves are
      * batched instead, see {@link #slotUnits}: one craft at a time, the calculation costs as much as the requested
-     * amount. What the request itself is made of, and inputs with several possible stacks, whose choice decides what
-     * comes back, are still crafted one at a time.</p>
+     * amount. A precise growing input can also be the requested output: only the first craft needs its seed.
+     * Inputs with several possible stacks, whose choice decides what comes back, are still crafted one at a time.</p>
      */
     private void updateLimitQty() {
         var requested = this.parent == null ? null : this.parent.getWhat();
@@ -228,7 +228,8 @@ public class CraftingTreeProcess {
             }
 
             if (returned > 0) {
-                if (precise && container == null && !key.equals(requested) && countSlots(key) == 1) {
+                boolean grows = returned > KeyAmounts.multiply(key, primaryInput.amount(), input.getMultiplier());
+                if (precise && container == null && (!key.equals(requested) || grows) && countSlots(key) == 1) {
                     if (this.catalystReturns == null) this.catalystReturns = new long[this.inputs.length];
                     this.catalystReturns[x] = returned;
                     this.batchedSlots = true;
@@ -800,6 +801,9 @@ public class CraftingTreeProcess {
 
     private void requestIntermediateFinalOutputReplacements(CraftingSimulationState inv, long intermediateAmount)
         throws CraftBranchFailure, InterruptedException {
+        // A batched growing output already accounts for its returned seed and delivers the net gain.
+        // Charging another craft for that seed can exceed the very fuel bound established by the preview.
+        if (isCatalyst(this.job.getOutput())) return;
         long outputCount = getOutputCount(this.job.getOutput());
         if (intermediateAmount <= 0 || outputCount <= 0 || !this.parent.getWhat().equals(this.job.getOutput())) {
             return;

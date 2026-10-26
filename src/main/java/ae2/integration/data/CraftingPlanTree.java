@@ -24,6 +24,7 @@ public final class CraftingPlanTree {
     private final Object2ObjectOpenHashMap<AEKey, List<IPatternDetails>> producers = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectOpenHashMap<IPatternDetails, KeyCounter> inputs = new Object2ObjectOpenHashMap<>();
     private final Set<IPatternDetails> expanded = new ObjectOpenHashSet<>();
+    private final Map<AEKey, LiteCraftTreeProc> expandedProducers = new Object2ObjectOpenHashMap<>();
     private final KeyCounter totalInputs = new KeyCounter();
     private final KeyCounter remainderCredit = new KeyCounter();
     private final KeyCounter external = new KeyCounter();
@@ -155,7 +156,10 @@ public final class CraftingPlanTree {
         this.limits.checkNodeChildCount(processes.size());
         long absent = processes.isEmpty() ? take(this.missing, key, amount) : 0;
         if (processes.isEmpty()) take(this.external, key, amount - absent);
-        return new LiteCraftTreeNode(parent, new GenericStack(key, amount), processes, absent);
+        var source = this.expandedProducers.get(key);
+        int feedback = processes.isEmpty() && source != null && absent == 0
+            ? LiteCraftTreeNode.sourceFeedback(source.sourceId()) : -1;
+        return new LiteCraftTreeNode(parent, new GenericStack(key, amount), processes, absent, feedback);
     }
 
     private void process(IPatternDetails pattern, List<LiteCraftTreeProc> processes, int depth) {
@@ -165,8 +169,11 @@ public final class CraftingPlanTree {
         this.limits.checkMachineCount(info.groups().size());
         for (var locations : info.locations().values()) this.limits.addMachineLocations(locations.size());
         var children = new ArrayList<LiteCraftTreeNode>();
-        var process = new LiteCraftTreeProc(children, info.groups(), info.locations(), pattern, -1);
-        for (var output : pattern.getOutputs()) this.ancestors.add(output.what(), 1);
+        var process = new LiteCraftTreeProc(children, info.groups(), info.locations(), pattern, -1, this.expanded.size() - 1);
+        for (var output : pattern.getOutputs()) {
+            this.ancestors.add(output.what(), 1);
+            this.expandedProducers.putIfAbsent(output.what(), process);
+        }
         var returned = this.remainders.get(pattern);
         if (returned != null) for (var key : returned.keySet()) this.ancestors.add(key, 1);
         for (var input : this.inputs.get(pattern)) {

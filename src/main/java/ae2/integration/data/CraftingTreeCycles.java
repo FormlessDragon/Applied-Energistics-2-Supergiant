@@ -3,105 +3,108 @@ package ae2.integration.data;
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.KeyCounter;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Marks the crafting cycles of a display tree, for the crafting tree screen to show each as one node and as the ring
- * it is. An input with nothing under it that a craft above it makes is fed back around a cycle: it is linked to that
- * craft, and the crafts from that one down to the one taking it are one cycle, merged with any cycle sharing a craft.
- * Inputs a cycle cut off that turn out to have no such craft above them are left out.
- */
+/** Marks strongly connected recipe groups, including references to producers on sibling branches. */
 public final class CraftingTreeCycles {
     private final ObjectArrayList<LiteCraftTreeProc> above = new ObjectArrayList<>();
-    private final Reference2IntOpenHashMap<LiteCraftTreeNode> feedback = new Reference2IntOpenHashMap<>();
-    // Union-find over the crafts of cycles
-    private final Reference2ObjectOpenHashMap<LiteCraftTreeProc, LiteCraftTreeProc> joined =
-        new Reference2ObjectOpenHashMap<>();
-    private final Reference2IntOpenHashMap<LiteCraftTreeProc> numbers = new Reference2IntOpenHashMap<>();
+    private final ObjectArrayList<LiteCraftTreeProc> processes = new ObjectArrayList<>();
+    private final Reference2IntOpenHashMap<LiteCraftTreeProc> indices = new Reference2IntOpenHashMap<>();
+    private final Int2ObjectOpenHashMap<LiteCraftTreeProc> sources = new Int2ObjectOpenHashMap<>();
+    private final ObjectArrayList<IntArrayList> edges = new ObjectArrayList<>();
+    private final Reference2ObjectOpenHashMap<LiteCraftTreeNode, Link> links = new Reference2ObjectOpenHashMap<>();
     private final Map<IPatternDetails, Set<AEKey>> outputs = new Reference2ObjectOpenHashMap<>();
-    private boolean pending;
-    private Map<IPatternDetails, KeyCounter> remainders = Map.of();
-    private boolean explicitFeedback;
+    private final Map<IPatternDetails, KeyCounter> remainders;
+    private final boolean explicitFeedback;
+    private int[] cycles;
 
-    private CraftingTreeCycles() {
-        this.numbers.defaultReturnValue(-1);
+    private CraftingTreeCycles(Map<IPatternDetails, KeyCounter> remainders, boolean explicitFeedback) {
+        this.remainders = remainders;
+        this.explicitFeedback = explicitFeedback;
     }
 
     public static LiteCraftTreeNode annotate(LiteCraftTreeNode root) {
-        var cycles = new CraftingTreeCycles();
-        return cycles.annotateTree(root);
+        return new CraftingTreeCycles(Map.of(), false).annotateTree(root);
     }
 
-    /**
-     * Final plans explicitly distinguish seed stock from the actual returns captured during replay.
-     */
+    /** Final-plan inputs distinguish physical stock from circulating materials, even without remainders. */
     public static LiteCraftTreeNode annotate(LiteCraftTreeNode root, Map<IPatternDetails, KeyCounter> remainders) {
-        if (remainders.isEmpty()) return annotate(root);
-        var cycles = new CraftingTreeCycles();
-        cycles.remainders = remainders;
-        cycles.explicitFeedback = true;
-        return cycles.annotateTree(root);
+        return new CraftingTreeCycles(remainders, true).annotateTree(root);
     }
 
     private LiteCraftTreeNode annotateTree(LiteCraftTreeNode root) {
-        var cycles = this;
-        cycles.visit(root);
-        if (cycles.feedback.isEmpty() && !cycles.pending) {
-            return root;
+        index(root);
+        visit(root);
+        this.cycles = components();
+        var copy = copy(root, null);
+        return copy == null ? root : copy;
+    }
+
+    private void index(LiteCraftTreeNode node) {
+        for (var proc : node.inputs()) {
+            this.indices.put(proc, this.processes.size());
+            this.processes.add(proc);
+            this.edges.add(new IntArrayList());
+            if (proc.sourceId() >= 0) this.sources.put(proc.sourceId(), proc);
+            for (var input : proc.inputs()) index(input);
         }
-        var copy = cycles.copy(root, null);
-        return copy != null ? copy : root;
     }
 
     private void visit(LiteCraftTreeNode node) {
         for (var proc : node.inputs()) {
             this.above.add(proc);
-            Set<AEKey> fedBack = null;
+            Set<AEKey> fedBack = new ObjectOpenHashSet<>();
             for (var input : proc.inputs()) {
-                if (input.feedback() == LiteCraftTreeNode.FEEDBACK_PENDING) {
-                    this.pending = true;
-                    if (fedBack == null) fedBack = new ObjectOpenHashSet<>();
-                    fedBack.add(input.output().what());
-                }
+                if (input.feedback() == LiteCraftTreeNode.FEEDBACK_PENDING) fedBack.add(input.output().what());
             }
             for (var input : proc.inputs()) {
-                // Beside what is marked fed back, the same item is what the craft takes from storage
-                if (fedBack != null && input.inputs().isEmpty()
-                    && input.feedback() != LiteCraftTreeNode.FEEDBACK_PENDING
-                    && fedBack.contains(input.output().what())) {
-                    continue;
+                for (var producer : input.inputs()) {
+                    this.edges.get(this.indices.getInt(proc)).add(this.indices.getInt(producer));
                 }
-                if (input.inputs().isEmpty()) {
-                    link(input);
-                } else {
+                if (!input.inputs().isEmpty()) {
                     visit(input);
+                } else if (!fedBack.contains(input.output().what())
+                    || input.feedback() == LiteCraftTreeNode.FEEDBACK_PENDING) {
+                    link(input, proc);
                 }
             }
             this.above.removeLast();
         }
     }
 
-    private void link(LiteCraftTreeNode input) {
-        if (this.explicitFeedback && input.feedback() != LiteCraftTreeNode.FEEDBACK_PENDING) return;
-        var what = input.output().what();
-        int taking = this.above.size() - 1;
-        for (int i = taking; i >= 0; i--) {
-            if (!makes(this.above.get(i), what)) continue;
-            this.feedback.put(input, taking - i);
-            for (int j = i + 1; j <= taking; j++) {
-                union(this.above.get(i), this.above.get(j));
-            }
-            find(this.above.get(i));
+    private void link(LiteCraftTreeNode input, LiteCraftTreeProc consumer) {
+        int sourceId = LiteCraftTreeNode.feedbackSourceId(input.feedback());
+        if (sourceId >= 0) {
+            var source = this.sources.get(sourceId);
+            if (source != null) addLink(input, consumer, source, input.feedback());
             return;
         }
+        if (input.feedback() == LiteCraftTreeNode.FEEDBACK_REMAINDER
+            || this.explicitFeedback && input.feedback() != LiteCraftTreeNode.FEEDBACK_PENDING) return;
+        int taking = this.above.size() - 1;
+        for (int i = taking; i >= 0; i--) {
+            var source = this.above.get(i);
+            if (makes(source, input.output().what())) {
+                addLink(input, consumer, source, taking - i);
+                return;
+            }
+        }
+    }
+
+    private void addLink(LiteCraftTreeNode input, LiteCraftTreeProc consumer, LiteCraftTreeProc source, int feedback) {
+        this.links.put(input, new Link(source, feedback));
+        this.edges.get(this.indices.getInt(consumer)).add(this.indices.getInt(source));
     }
 
     private boolean makes(LiteCraftTreeProc proc, AEKey what) {
@@ -116,53 +119,80 @@ public final class CraftingTreeCycles {
         }).contains(what);
     }
 
-    private LiteCraftTreeProc find(LiteCraftTreeProc proc) {
-        var parent = this.joined.get(proc);
-        if (parent == null) {
-            this.joined.put(proc, proc);
-            return proc;
+    // Iterative Tarjan: display size, rather than Java stack depth or requested quantity, bounds the work.
+    private int[] components() {
+        int size = this.processes.size();
+        int[] index = new int[size], low = new int[size], component = new int[size], next = new int[size];
+        Arrays.fill(index, -1);
+        Arrays.fill(component, -1);
+        var path = new IntArrayList();
+        var stack = new IntArrayList();
+        int serial = 0, id = 0;
+        for (int root = 0; root < size; root++) {
+            if (index[root] >= 0) continue;
+            path.add(root);
+            stack.add(root);
+            index[root] = low[root] = serial++;
+            while (!path.isEmpty()) {
+                int node = path.getInt(path.size() - 1);
+                var inputs = this.edges.get(node);
+                if (next[node] < inputs.size()) {
+                    int child = inputs.getInt(next[node]++);
+                    if (index[child] < 0) {
+                        path.add(child);
+                        stack.add(child);
+                        index[child] = low[child] = serial++;
+                    } else if (component[child] < 0) low[node] = Math.min(low[node], index[child]);
+                } else {
+                    path.removeInt(path.size() - 1);
+                    if (!path.isEmpty()) {
+                        int parent = path.getInt(path.size() - 1);
+                        low[parent] = Math.min(low[parent], low[node]);
+                    }
+                    if (low[node] == index[node]) {
+                        int member;
+                        do {
+                            member = stack.removeInt(stack.size() - 1);
+                            component[member] = id;
+                        } while (member != node);
+                        id++;
+                    }
+                }
+            }
         }
-        if (parent == proc) return proc;
-        var root = find(parent);
-        this.joined.put(proc, root);
-        return root;
+        int[] counts = new int[id];
+        for (int value : component) counts[value]++;
+        for (int i = 0; i < size; i++) {
+            if (counts[component[i]] == 1 && !this.edges.get(i).contains(i)) component[i] = -1;
+        }
+        return component;
     }
 
-    private void union(LiteCraftTreeProc a, LiteCraftTreeProc b) {
-        var rootA = find(a);
-        var rootB = find(b);
-        if (rootA != rootB) this.joined.put(rootB, rootA);
-    }
-
-    private int number(LiteCraftTreeProc proc) {
-        if (!this.joined.containsKey(proc)) return -1;
-        var root = find(proc);
-        int number = this.numbers.getInt(root);
-        if (number < 0) {
-            number = this.numbers.size();
-            this.numbers.put(root, number);
-        }
-        return number;
+    private int cycle(LiteCraftTreeProc proc) {
+        return this.cycles[this.indices.getInt(proc)];
     }
 
     private @Nullable LiteCraftTreeNode copy(LiteCraftTreeNode node, @Nullable LiteCraftTreeProc parent) {
-        boolean linked = this.feedback.containsKey(node);
-        if (node.feedback() == LiteCraftTreeNode.FEEDBACK_PENDING && !linked) {
-            return null;
-        }
+        var link = this.links.get(node);
+        if (node.feedback() == LiteCraftTreeNode.FEEDBACK_PENDING && link == null) return null;
         List<LiteCraftTreeProc> procs = new ObjectArrayList<>(node.inputs().size());
         for (var proc : node.inputs()) {
             List<LiteCraftTreeNode> inputs = new ObjectArrayList<>(proc.inputs().size());
             var copied = new LiteCraftTreeProc(inputs, proc.machines(), proc.machineLocations(), proc.pattern(),
-                number(proc));
+                cycle(proc), proc.sourceId());
             for (var input : proc.inputs()) {
                 var child = copy(input, copied);
                 if (child != null) inputs.add(child);
             }
             if (!inputs.isEmpty()) procs.add(copied);
         }
-        int feedback = node.feedback() == LiteCraftTreeNode.FEEDBACK_REMAINDER
-            ? LiteCraftTreeNode.FEEDBACK_REMAINDER : linked ? this.feedback.getInt(node) : -1;
+        int feedback = node.feedback() == LiteCraftTreeNode.FEEDBACK_REMAINDER ? node.feedback() : -1;
+        if (link != null && parent != null && parent.cycle() >= 0 && parent.cycle() == cycle(link.source())) {
+            feedback = link.feedback();
+        }
         return new LiteCraftTreeNode(parent, node.output(), procs, node.missing(), feedback);
+    }
+
+    private record Link(LiteCraftTreeProc source, int feedback) {
     }
 }

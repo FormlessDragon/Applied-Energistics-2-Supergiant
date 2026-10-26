@@ -498,10 +498,12 @@ public class CraftingTreeNode {
                     this.job.popMissingSuppression();
                 }
 
-                available = extractCraftedBranchOutput(child, totalRequestedItems);
-                if (craftedPerPattern > 0) {
-                    available = Math.min(available, KeyAmounts.multiply(this.what, craftedPerPattern, times));
-                }
+                // Apply the net-output bound before extracting. Taking the entire gross output first would
+                // discard a returning seed even though only the net gain counts toward this request.
+                long branchOutput = craftedPerPattern > 0
+                    ? Math.min(totalRequestedItems, KeyAmounts.multiply(this.what, craftedPerPattern, times))
+                    : totalRequestedItems;
+                available = extractCraftedBranchOutput(child, branchOutput);
                 if (available > 0) {
                     child.applyDiff(inv);
                 } else {

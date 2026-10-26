@@ -74,8 +74,12 @@ public class CraftingTreeWidget implements ICompositeWidget {
     private static final int LINE_SHADOW_COLOR = 0xFF4D4D67;
     private static final int MISSING_LINE_COLOR = 0xFFEE6363;
     private static final int MISSING_LINE_SHADOW_COLOR = 0xFF8B3A3A;
-    private static final int FEEDBACK_LINE_COLOR = 0xFFF2B33D;
-    private static final int FEEDBACK_LINE_SHADOW_COLOR = 0xFF7A4E12;
+    private static final int[] FEEDBACK_LINE_COLORS = {
+        0xFFF2B33D, 0xFF51E1E8, 0xFFEE7FB5, 0xFFB3DE69,
+        0xFFB29AFF, 0xFFF58D62, 0xFF7DBDFF, 0xFFE8E377
+    };
+    private static final int FEEDBACK_LINE_SHADOW_COLOR = 0xFF30303F;
+    private static final int FEEDBACK_ROW_LANE = 3;
     // Between the lines a ring's inputs are fed back along, left of its first column
     private static final int FEEDBACK_LANE = 4;
 
@@ -663,6 +667,19 @@ public class CraftingTreeWidget implements ICompositeWidget {
             addNodeRecursive(treeRoot, 0);
         }
         alignJunctionsToRowBottom();
+        if (ring != null) {
+            ring.foldedSources().forEach((proc, node) -> {
+                var anchor = nodeWidgets.get(node);
+                if (anchor != null) procAnchors.put(proc, anchor);
+            });
+            for (var entry : ring.feedback().entrySet()) {
+                var target = nodeWidgets.get(entry.getKey());
+                var maker = procAnchors.get(entry.getValue());
+                if (target == null || maker == null) continue;
+                if (!target.isLeftmost()) target.row.feedbackLanes++;
+                if (!maker.isLeftmost()) maker.row.feedbackLanes++;
+            }
+        }
         computeTotalSize();
 
         TreeNode restoredSelection = findNodeByOutput(selectedOutput);
@@ -889,17 +906,31 @@ public class CraftingTreeWidget implements ICompositeWidget {
     }
 
     private void renderFeedbackLines() {
+        for (var line : layoutFeedbackLines()) renderFeedbackLine(line.points(), line.color());
+    }
+
+    record FeedbackLine(List<Point> points, int color) {
+    }
+
+    List<FeedbackLine> layoutFeedbackLines() {
+        return layoutFeedbackLines(offsetX, offsetY);
+    }
+
+    List<FeedbackLine> layoutFeedbackLines(int originX, int originY) {
         var ring = currentRing();
         if (ring == null || ring.feedback().isEmpty()) {
-            return;
+            return List.of();
         }
+        var lines = new ObjectArrayList<FeedbackLine>();
         var rowTops = new Reference2IntOpenHashMap<TreeRow>();
-        int y = offsetY;
+        var rowLanes = new Reference2IntOpenHashMap<TreeRow>();
+        var ports = new Reference2IntOpenHashMap<TreeNode>();
+        int y = originY;
         for (TreeRow row : rows) {
             rowTops.put(row, y);
             y += row.getHeight();
         }
-        int rowX = offsetX + lanePadding;
+        int rowX = originX + lanePadding;
         int lane = 0;
         for (var entry : ring.feedback().entrySet()) {
             TreeNode target = nodeWidgets.get(entry.getKey());
@@ -907,38 +938,46 @@ public class CraftingTreeWidget implements ICompositeWidget {
             if (target == null || maker == null) {
                 continue;
             }
+            int color = FEEDBACK_LINE_COLORS[lane % FEEDBACK_LINE_COLORS.length];
             int laneX = rowX + NODE_MARGIN_LEFT - 3 - FEEDBACK_LANE * lane++;
             int makerX = rowX + maker.getPos() + NODE_MARGIN_LEFT;
             int makerY = rowTops.getInt(maker.row) + maker.marginTop + LINE_HEIGHT;
             int targetX = rowX + target.getPos() + NODE_MARGIN_LEFT;
             int targetY = rowTops.getInt(target.row) + target.marginTop + LINE_HEIGHT;
+            int makerPort = 3 + 2 * (ports.addTo(maker, 1) % 8);
+            int targetPort = 3 + 2 * (ports.addTo(target, 1) % 8);
             var points = new ObjectArrayList<Point>();
             // Out of the side when nothing is left of it in its row, else from under it
             if (maker.isLeftmost()) {
-                points.add(new Point(makerX - 2, makerY + NODE_HEIGHT / 2));
-                points.add(new Point(laneX, makerY + NODE_HEIGHT / 2));
+                points.add(new Point(makerX - 2, makerY + makerPort));
+                points.add(new Point(laneX, makerY + makerPort));
             } else {
-                points.add(new Point(makerX + 3, makerY + NODE_HEIGHT));
-                points.add(new Point(makerX + 3, makerY + NODE_HEIGHT + 1));
-                points.add(new Point(laneX, makerY + NODE_HEIGHT + 1));
+                int underY = rowTops.getInt(maker.row) + maker.row.height
+                    + FEEDBACK_ROW_LANE * rowLanes.addTo(maker.row, 1);
+                points.add(new Point(makerX + makerPort, makerY + NODE_HEIGHT));
+                points.add(new Point(makerX + makerPort, underY));
+                points.add(new Point(laneX, underY));
             }
             // Into the side the same way, or up into it from under it as what it takes comes in
             if (target.isLeftmost()) {
-                points.add(new Point(laneX, targetY + NODE_HEIGHT / 2));
-                points.add(new Point(targetX - 2, targetY + NODE_HEIGHT / 2));
+                points.add(new Point(laneX, targetY + targetPort));
+                points.add(new Point(targetX - 2, targetY + targetPort));
             } else {
-                points.add(new Point(laneX, targetY + NODE_HEIGHT + 1));
-                points.add(new Point(targetX + 3, targetY + NODE_HEIGHT + 1));
-                points.add(new Point(targetX + 3, targetY + NODE_HEIGHT));
+                int underY = rowTops.getInt(target.row) + target.row.height
+                    + FEEDBACK_ROW_LANE * rowLanes.addTo(target.row, 1);
+                points.add(new Point(laneX, underY));
+                points.add(new Point(targetX + targetPort, underY));
+                points.add(new Point(targetX + targetPort, targetY + NODE_HEIGHT));
             }
-            renderFeedbackLine(points);
+            lines.add(new FeedbackLine(List.copyOf(points), color));
         }
+        return lines;
     }
 
-    private static void renderFeedbackLine(List<Point> points) {
+    private static void renderFeedbackLine(List<Point> points, int lineColor) {
         GlStateManager.disableDepth();
         for (int pass = 0; pass < 2; pass++) {
-            int color = pass == 0 ? FEEDBACK_LINE_SHADOW_COLOR : FEEDBACK_LINE_COLOR;
+            int color = pass == 0 ? FEEDBACK_LINE_SHADOW_COLOR : lineColor;
             int shift = pass == 0 ? 1 : 0;
             for (int i = 0; i + 1 < points.size(); i++) {
                 Point from = points.get(i);
@@ -1108,6 +1147,10 @@ public class CraftingTreeWidget implements ICompositeWidget {
                     break;
                 }
             }
+            framebuffer.bind(false);
+            for (var line : layoutFeedbackLines(-tileX, -tileY)) {
+                renderFeedbackLine(line.points(), line.color());
+            }
         } finally {
             GlStateManager.matrixMode(GL11.GL_MODELVIEW);
             GlStateManager.popMatrix();
@@ -1242,6 +1285,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
         private final List<RowElement> widgets = new ObjectArrayList<>();
         private int width;
         private int height;
+        private int feedbackLanes;
 
         private void render(Point rowPosition, int renderWidth, Point mouse) {
             render(rowPosition, renderWidth, mouse, true);
@@ -1294,7 +1338,7 @@ public class CraftingTreeWidget implements ICompositeWidget {
         }
 
         private int getHeight() {
-            return height;
+            return height + feedbackLanes * FEEDBACK_ROW_LANE;
         }
 
         private void addWidget(RowElement element) {
@@ -1708,6 +1752,16 @@ public class CraftingTreeWidget implements ICompositeWidget {
             List<ITextComponent> lines = AEKeyRendering.getTooltip(output.what());
             int keyLines = lines.size();
             lines.add(Tooltips.getAmountTooltip(ButtonToolTips.Amount, output));
+            var ring = currentRing();
+            var amounts = ring == null ? null : ring.amounts().get(node);
+            if (amounts != null) {
+                if (amounts.stored() > 0) lines.add(GuiText.CraftingTreeInputStored.text(
+                    output.what().formatAmount(amounts.stored(), AmountFormat.FULL)));
+                if (amounts.crafted() > 0) lines.add(GuiText.CraftingTreeInputCrafted.text(
+                    output.what().formatAmount(amounts.crafted(), AmountFormat.FULL)));
+                if (amounts.returned() > 0) lines.add(GuiText.CraftingTreeInputReturned.text(
+                    output.what().formatAmount(amounts.returned(), AmountFormat.FULL)));
+            }
             if (missing) {
                 lines.add(new TextComponentString(node.missing() > 0
                     ? GuiText.CraftingTreeMissing.getLocal(CraftingTreeNumberFormat.formatDecimal(node.missing()))

@@ -303,6 +303,11 @@ public class GraphBuilder {
         String localReason = null;
         if (patterns.size() != 1) {
             graph.markAlternatives();
+            // A native node commits to one producer. Recursive alternatives may have to share the request
+            // when each has a different finite fuel supply; choosing either one alone invents a shortage.
+            localUnit = patterns.stream().anyMatch(pattern -> java.util.Arrays.stream(pattern.getInputs())
+                .anyMatch(input -> java.util.Arrays.stream(input.possibleInputs()).anyMatch(stack -> stack.what().equals(what))));
+            if (localUnit) localReason = "recursive-alternatives";
         }
 
         var primaryPattern = this.choices.getOrDefault(what, patterns.getFirst());

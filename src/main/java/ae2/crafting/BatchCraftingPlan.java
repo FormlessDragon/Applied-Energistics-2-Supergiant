@@ -32,6 +32,7 @@ import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
@@ -140,6 +141,19 @@ public final class BatchCraftingPlan implements ICraftingPlan, TemporaryProvider
             targets.add(subPlan.finalOutput());
         }
         return Collections.unmodifiableList(targets);
+    }
+
+    public List<CraftingDispatchOrder.Batch> dispatchOrder() {
+        if (this.subPlans.stream().allMatch(plan -> CraftingDispatchOrder.forPlan(plan).isEmpty())) return List.of();
+        var result = new ArrayList<CraftingDispatchOrder.Batch>();
+        for (var plan : this.subPlans) {
+            var order = CraftingDispatchOrder.forPlan(plan);
+            result.addAll(order.isEmpty() ? CraftingDispatchOrder.unordered(plan.patternTimes().keySet(), plan.patternTimes()::getLong) : order);
+        }
+        for (var provider : this.temporaryProviders) {
+            result.addAll(CraftingDispatchOrder.unordered(provider.getAvailablePatterns(), pattern -> 1));
+        }
+        return List.copyOf(result);
     }
 
     @Override

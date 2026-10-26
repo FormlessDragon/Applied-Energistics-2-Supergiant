@@ -22,6 +22,7 @@ import ae2.crafting.graph.CraftingGraph;
 import ae2.hooks.ticking.TickHandler;
 import ae2.me.service.CraftingService;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
@@ -115,6 +116,26 @@ final class CraftingTestNetwork {
             for (var entry : counter) {
                 inventory.merge(entry.getKey(), entry.getLongValue(), Long::sum);
             }
+        }
+        var order = CraftingDispatchOrder.forPlan(plan);
+        if (!order.isEmpty()) {
+            var counts = new Object2LongOpenHashMap<IPatternDetails>();
+            var noReservations = new CraftingSeedReservations(List.of(), ignored -> 0);
+            long visits = 0;
+            for (var batch : order) {
+                if (!batch.ordered()) return "test replay expects an ordered certificate";
+                for (long repeat = 0; repeat < batch.repetitions(); repeat++) {
+                    for (var step : batch.steps()) {
+                        if (++visits > 50_000_000) return "ordered replay gave up";
+                        long done = runCrafts(step.pattern(), inventory, step.crafts(), noReservations);
+                        if (done != step.crafts()) return "stuck in certificate: " + step.pattern();
+                        counts.addTo(step.pattern(), done);
+                    }
+                }
+            }
+            if (!counts.equals(plan.patternTimes())) return "certificate does not match tasks";
+            return inventory.getOrDefault(plan.finalOutput().what(), 0L) >= plan.finalOutput().amount()
+                ? null : "certificate did not produce the requested output";
         }
         // The tasks of the executing job are an Object2ObjectOpenHashMap filled in the order of the plan
         var left = new Object2ObjectOpenHashMap<IPatternDetails, long[]>();

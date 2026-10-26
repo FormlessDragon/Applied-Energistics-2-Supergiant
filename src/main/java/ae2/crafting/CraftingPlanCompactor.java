@@ -27,6 +27,7 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -54,6 +55,8 @@ final class CraftingPlanCompactor {
     private final Map<Object, IntArrayList> groups = new Object2ObjectOpenHashMap<>();
     private boolean flexible;
     private boolean planBalanced = true;
+    private int unbalancedKey = -1;
+    private long unbalancedAmount;
     private int steps;
     private long[] balance = new long[0];
     private long[] shortfall = new long[0];
@@ -73,6 +76,10 @@ final class CraftingPlanCompactor {
      */
     static CraftingPlan repair(CraftingPlan plan, CraftingCalculation calculation) throws InterruptedException {
         var repaired = repairContents(plan, calculation);
+        if (!repaired.missingItems().isEmpty()) {
+            var converted = CraftingStockConversion.tryPlan(repaired, calculation);
+            if (converted != null) repaired = converted;
+        }
         var minimized = removeReturnedShortages(repaired, calculation);
         return removeUnusedReturningStock(minimized, calculation);
     }
@@ -150,9 +157,6 @@ final class CraftingPlanCompactor {
         }
         // Whatever the CPU would still lack is reported missing, rather than leaving it stuck on a craft
         var lacking = CraftingCpuReplay.lacking(compacted, calculation);
-        if (lacking == null) {
-            return keepOrFail(compacted, false);
-        }
         if (lacking.isEmpty()) {
             return compacted;
         }
@@ -234,7 +238,7 @@ final class CraftingPlanCompactor {
             } catch (AmountOverflowException materialOverflow) {
                 throw materialOverflow;
             } catch (ArithmeticException again) {
-                return keepOrFail(plan, compactor.planBalanced);
+                return compactor.keepOrFail(plan);
             }
         }
     }
@@ -428,9 +432,11 @@ final class CraftingPlanCompactor {
             for (Recipe recipe : this.recipes) {
                 recipe.apply(planBalance, recipe.limit);
             }
-            for (long value : planBalance) {
-                if (value < 0) {
+            for (int key = 0; key < planBalance.length; key++) {
+                if (planBalance[key] < 0) {
                     this.planBalanced = false;
+                    this.unbalancedKey = key;
+                    this.unbalancedAmount = planBalance[key];
                     break;
                 }
             }
@@ -467,6 +473,18 @@ final class CraftingPlanCompactor {
         final long[] grownSupply = Arrays.copyOf(available, this.keys.size());
         for (int key = 0; key < grownSupply.length; key++) {
             grownSupply[key] = Math.addExact(grownSupply[key], this.shortfall[key]);
+        }
+        if (!this.flexible) {
+            // Running one recipe to exhaustion can consume the seeds its siblings need to return its inputs.
+            // First try the balanced counts in CPU order, which interleaves mutually growing recipes.
+            var balanced = rebuild(plan, times, grownSupply);
+            var required = CraftingCpuReplay.requiredStock(balanced, this.calculation);
+            if (required != null) {
+                var taken = new long[grownSupply.length];
+                addAll(taken, required);
+                var trimmed = rebuild(plan, times, taken);
+                return CraftingCpuReplay.runs(trimmed, this.calculation) ? trimmed : balanced;
+            }
         }
         final long[] demand = new long[this.keys.size()];
         demand[finalKey] = plan.finalOutput()
@@ -514,7 +532,7 @@ final class CraftingPlanCompactor {
             plan.finalOutput()
                 .what());
         if (finalKey < 0 || this.recipes.isEmpty()) {
-            return keepOrFail(plan, this.planBalanced);
+            return keepOrFail(plan);
         }
         final long[] times = new long[this.recipes.size()];
         for (Recipe recipe : this.recipes) {
@@ -534,7 +552,7 @@ final class CraftingPlanCompactor {
                                .amount();
         final long[] borrowed = new long[this.keys.size()];
         if (replayGreedy(times, supply, demand, borrowed, finalKey) != Replay.DONE) {
-            return keepOrFail(plan, this.planBalanced);
+            return keepOrFail(plan);
         }
         final long[] taken = Arrays.copyOf(supply, this.keys.size());
         for (int key = 0; key < taken.length; key++) {
@@ -701,12 +719,15 @@ final class CraftingPlanCompactor {
         return total;
     }
 
-    private static CraftingPlan keepOrFail(CraftingPlan plan, boolean planBalanced) {
-        if (planBalanced) {
+    private CraftingPlan keepOrFail(CraftingPlan plan) {
+        if (this.planBalanced) {
             return plan;
         }
         AELog.info("Refusing an unbalanced crafting plan for %s", plan.finalOutput());
-        throw new CraftingCalculationFailure(PlayerMessages.CraftingNoPlan);
+        throw CraftingCalculationFailure.withDetails(PlayerMessages.CraftingPlanUnbalanced,
+            plan.finalOutput().what().getDisplayName().createCopy(), Long.toString(plan.finalOutput().amount()),
+            this.keys.get(this.unbalancedKey).getDisplayName().createCopy(),
+            BigInteger.valueOf(this.unbalancedAmount).negate().toString());
     }
 
     private void addAll(long[] target, KeyCounter counter) {

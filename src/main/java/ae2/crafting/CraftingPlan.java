@@ -56,6 +56,8 @@ public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarri
     private Map<IPatternDetails, KeyCounter> inputAllocations = Map.of();
     private Map<IPatternDetails, KeyCounter> remainderAllocations = Map.of();
     private @Nullable KeyCounter requiredItems;
+    private KeyCounter recursiveReserveTargets;
+    private List<CraftingDispatchOrder.Batch> dispatchOrder = List.of();
 
     public CraftingPlan(GenericStack finalOutput, long bytes, boolean simulation, boolean multiplePaths,
                         KeyCounter usedItems, KeyCounter emittedItems, KeyCounter missingItems,
@@ -78,10 +80,19 @@ public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarri
         this.graphDisplayBuilder = graphDisplayBuilder;
         this.attemptMetrics = attemptMetrics;
         this.calculation = calculation;
+        this.recursiveReserveTargets = calculation == null ? KeyCounter.checked() : calculation.recursiveReserveTargets();
     }
 
     void recordRequiredItems(KeyCounter required) {
         this.requiredItems = required;
+    }
+
+    void recordDispatchOrder(List<CraftingDispatchOrder.Batch> order) {
+        this.dispatchOrder = List.copyOf(order);
+    }
+
+    public List<CraftingDispatchOrder.Batch> dispatchOrder() {
+        return this.dispatchOrder;
     }
 
     void recordRemainderAllocations(Map<IPatternDetails, KeyCounter> allocations) {
@@ -102,6 +113,10 @@ public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarri
 
     @Nullable KeyCounter requiredItems() {
         return this.requiredItems;
+    }
+
+    KeyCounter recursiveReserveTargets() {
+        return this.recursiveReserveTargets;
     }
 
     /**
@@ -128,6 +143,8 @@ public final class CraftingPlan implements ICraftingPlan, TemporaryProviderCarri
         var result = new CraftingPlan(finalOutput, repairedBytes, !missingItems.isEmpty(), multiplePaths, usedItems, emittedItems, missingItems,
             intermediate, patternTimes, tree, temporaryProviders, graphDisplayBuilder, attemptMetrics,
             calculation);
+        // Later alternative attempts may have different cycle reserves. Keep the policy of this plan's attempt.
+        result.recursiveReserveTargets = this.recursiveReserveTargets;
         if (patternTimes.equals(this.patternTimes)) {
             result.inputAllocations = this.inputAllocations;
             result.remainderAllocations = this.remainderAllocations;

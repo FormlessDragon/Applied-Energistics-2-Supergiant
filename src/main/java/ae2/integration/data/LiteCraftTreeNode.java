@@ -33,6 +33,20 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
      */
     public static final int FEEDBACK_PENDING = Integer.MAX_VALUE;
     public static final int FEEDBACK_REMAINDER = Integer.MAX_VALUE - 1;
+    // Absolute producer references allow a cycle to share a producer across sibling branches.
+    private static final int FEEDBACK_SOURCE_BASE = 1 << 30;
+
+    public static int sourceFeedback(int sourceId) {
+        if (sourceId < 0 || sourceId >= CraftingTreeStackRegistry.MAX_TREE_PROCESSES) {
+            throw new IllegalArgumentException("Invalid crafting tree source id: " + sourceId);
+        }
+        return FEEDBACK_SOURCE_BASE + sourceId;
+    }
+
+    public static int feedbackSourceId(int feedback) {
+        return feedback >= FEEDBACK_SOURCE_BASE && feedback < FEEDBACK_SOURCE_BASE + CraftingTreeStackRegistry.MAX_TREE_PROCESSES
+            ? feedback - FEEDBACK_SOURCE_BASE : -1;
+    }
 
     private final LiteCraftTreeProc parent;
     private final GenericStack output;
@@ -49,7 +63,8 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
 
     /**
      * @param feedback for an input fed back around a crafting cycle, how many crafts above the one taking it the one
-     *                 making it is, 0 for the same; -1 for any other node
+     *                 making it is, 0 for the same; a value from {@link #sourceFeedback} for a shared producer;
+     *                 -1 for any other node
      */
     public LiteCraftTreeNode(final LiteCraftTreeProc parent, GenericStack output, List<LiteCraftTreeProc> inputs,
                              long missing, int feedback) {
@@ -273,6 +288,10 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
     }
 
     public LiteCraftTreeNode withMissingOnly() {
+        return withMissingOnly(this.parent);
+    }
+
+    LiteCraftTreeNode withMissingOnly(@Nullable LiteCraftTreeProc filteredParent) {
         if (!isMissing(this)) {
             return null;
         }
@@ -293,7 +312,7 @@ public final class LiteCraftTreeNode implements Comparable<LiteCraftTreeNode> {
             }
         }
 
-        LiteCraftTreeNode node = new LiteCraftTreeNode(parent, output, missingInputs, missing, feedback);
+        LiteCraftTreeNode node = new LiteCraftTreeNode(filteredParent, output, missingInputs, missing, feedback);
         node.missingCached = true;
         node.missingCache = true;
         return node;
