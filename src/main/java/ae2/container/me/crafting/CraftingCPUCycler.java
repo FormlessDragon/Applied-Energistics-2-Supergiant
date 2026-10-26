@@ -47,6 +47,7 @@ public class CraftingCPUCycler {
     private IGrid activeNetwork;
     private int selectedCpu = -1;
     private int nextCpuSerial = 1;
+    private long changeRevision;
     private boolean initialDataSent;
     private boolean allowNoSelection;
 
@@ -155,6 +156,14 @@ public class CraftingCPUCycler {
         return this.cpus.get(this.selectedCpu).getSerial();
     }
 
+    /**
+     * Changes whenever the filtered CPU records or the selected CPU changes.
+     * Containers can use this to avoid rebuilding their serialized CPU view every tick.
+     */
+    public long getChangeRevision() {
+        return this.changeRevision;
+    }
+
     public void selectCpu(int serial) {
         if (serial == -1 && this.allowNoSelection) {
             this.selectedCpu = -1;
@@ -176,6 +185,7 @@ public class CraftingCPUCycler {
     }
 
     private void notifyListener() {
+        this.changeRevision++;
         if (this.selectedCpu >= this.cpus.size()) {
             this.selectedCpu = -1;
         }

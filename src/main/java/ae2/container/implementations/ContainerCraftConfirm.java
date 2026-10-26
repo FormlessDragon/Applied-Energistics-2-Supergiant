@@ -156,6 +156,10 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     private long cachedMergeCpuStateChangeTick = Long.MIN_VALUE;
     @GuiSync(10)
     public CraftConfirmCpuList cpuList = CraftConfirmCpuList.EMPTY;
+    private long cpuListRevision = Long.MIN_VALUE;
+    private long cpuListPlanStateRevision = Long.MIN_VALUE;
+    @Nullable
+    private ICraftingPlan cpuListPlan;
     @GuiSync(11)
     public int taskPriority;
     @GuiSync(12)
@@ -720,6 +724,17 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
 
     private void syncCpuList(IGrid grid) {
         ensureMergeableCpuCache(grid);
+        long cpuStateRevision = grid.getCraftingService().getCraftingCpuStateChangeTick();
+        ICraftingPlan currentResult = this.result;
+        long cpuRevision = this.cpuCycler.getChangeRevision();
+        if (this.cpuListRevision == cpuRevision
+            && this.cpuListPlanStateRevision == cpuStateRevision
+            && this.cpuListPlan == currentResult) {
+            return;
+        }
+        this.cpuListRevision = cpuRevision;
+        this.cpuListPlanStateRevision = cpuStateRevision;
+        this.cpuListPlan = currentResult;
         this.cpuList = CraftConfirmCpuList.fromRecords(
             this.cpuCycler.cpus(),
             this.cpuCycler.getSelectedCpuSerial(),
