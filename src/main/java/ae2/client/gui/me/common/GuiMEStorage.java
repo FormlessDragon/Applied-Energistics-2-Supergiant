@@ -310,9 +310,11 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
     }
 
     private int getConfiguredRows() {
+        int minimumRows = Math.max(MIN_ROWS,
+            this.terminalStyle.getMinimumRows(getLeftToolbarMinimumHeight()));
         int availableHeight = Math.max(this.height, this.ySize) - 2 * AEConfig.instance().getTerminalMargin();
-        int possibleRows = Math.max(MIN_ROWS, this.terminalStyle.getPossibleRows(availableHeight));
-        return Math.max(MIN_ROWS, AEConfig.instance().getTerminalStyle().getRows(possibleRows));
+        int possibleRows = Math.max(minimumRows, this.terminalStyle.getPossibleRows(availableHeight));
+        return Math.max(minimumRows, AEConfig.instance().getTerminalStyle().getRows(possibleRows));
     }
 
     private static void addColoredQuad(BufferBuilder buffer, int left, int top, int right, int bottom,

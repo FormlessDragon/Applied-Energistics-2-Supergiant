@@ -51,6 +51,17 @@ public class VerticalButtonBar implements ICompositeWidget {
         buttons.add(button);
     }
 
+    public int getMinimumHeight() {
+        int height = 0;
+        for (GuiButton button : buttons) {
+            if (button.visible) {
+                height += button.height + VERTICAL_SPACING;
+            }
+        }
+        // Include the background padding and leave the screen one pixel taller.
+        return height == 0 ? 0 : MARGIN + height + BACKGROUND_BOTTOM_BORDER;
+    }
+
     @Override
     public void setPosition(Point position) {
         this.position = position;

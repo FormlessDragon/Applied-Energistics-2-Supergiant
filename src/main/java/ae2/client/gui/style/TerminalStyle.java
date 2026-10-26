@@ -130,6 +130,11 @@ public class TerminalStyle {
         return result;
     }
 
+    public int getMinimumRows(int minimumHeight) {
+        int extraHeight = Math.max(0, minimumHeight - getScreenHeight(2));
+        return 2 + Math.ceilDiv(extraHeight, row.getSrcHeight());
+    }
+
     public boolean isSupportsAutoCrafting() {
         return supportsAutoCrafting;
     }
