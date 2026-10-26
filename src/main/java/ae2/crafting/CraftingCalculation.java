@@ -779,16 +779,7 @@ public class CraftingCalculation {
     }
 
     private ICraftingPlan computePlan() throws InterruptedException {
-        if (!isPerformanceTrackingEnabled()) {
-            return computePlanUnmeasured();
-        }
-
-        long calculationStart = System.nanoTime();
-        try {
-            return computePlanUnmeasured();
-        } finally {
-            finishPerformanceListener(System.nanoTime() - calculationStart);
-        }
+        return computePlanUnmeasured();
     }
 
     private ICraftingPlan computePlanUnmeasured() throws InterruptedException {
@@ -1337,10 +1328,17 @@ public class CraftingCalculation {
             this.handlePausing();
 
             ICraftingPlan plan;
-            if (isPerformanceTrackingEnabled()) {
-                plan = timed("compute-plan", this::computePlan);
-            } else {
-                plan = computePlan();
+            long computeStart = System.nanoTime();
+            try {
+                if (isPerformanceTrackingEnabled()) {
+                    plan = timed("compute-plan", this::computePlan);
+                } else {
+                    plan = computePlan();
+                }
+            } finally {
+                // The performance listener buffers its events and writes them after this timing scope. Logging must not
+                // become part of the measured planning work, or a tiny graph appears slower than a large one.
+                finishPerformanceListener(System.nanoTime() - computeStart);
             }
             if (plan instanceof CraftingPlan craftingPlan) {
                 plan = repairPlan(craftingPlan);
