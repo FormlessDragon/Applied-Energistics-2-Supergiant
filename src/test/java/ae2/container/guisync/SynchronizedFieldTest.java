@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SynchronizedFieldTest {
     @BeforeAll
     static void registerCustomField() {
-        SynchronizedField.register(CustomValue.class, CustomValueField::new);
+        SynchronizedField.register(CustomValue.class, (source, varHandle, _) -> new CustomValueField(source, varHandle));
     }
 
     @Test

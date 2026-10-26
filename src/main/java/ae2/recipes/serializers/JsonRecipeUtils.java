@@ -21,6 +21,7 @@ import net.minecraftforge.oredict.OreDictionary;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public final class JsonRecipeUtils {
@@ -288,10 +289,32 @@ public final class JsonRecipeUtils {
             return json;
         }
 
-        JsonObject normalized = json.deepCopy();
+        JsonObject normalized = copyObject(json);
         normalized.addProperty("item", JsonUtils.getString(json, "id"));
         normalized.remove("id");
         return normalized;
+    }
+
+    public static JsonObject copyObject(JsonObject source) {
+        return copyElement(source).getAsJsonObject();
+    }
+
+    private static JsonElement copyElement(JsonElement element) {
+        if (element.isJsonObject()) {
+            JsonObject copy = new JsonObject();
+            for (Map.Entry<String, JsonElement> entry : element.getAsJsonObject().entrySet()) {
+                copy.add(entry.getKey(), copyElement(entry.getValue()));
+            }
+            return copy;
+        }
+        if (element.isJsonArray()) {
+            JsonArray copy = new JsonArray();
+            for (JsonElement child : element.getAsJsonArray()) {
+                copy.add(copyElement(child));
+            }
+            return copy;
+        }
+        return element;
     }
 
     private static ResourceLocation parseId(String id) {

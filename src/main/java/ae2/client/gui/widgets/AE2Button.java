@@ -81,7 +81,7 @@ public class AE2Button extends GuiButton {
 
     private static void withScissor(int minX, int minY, int maxX, int maxY, Runnable action) {
         boolean wasEnabled = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
-        IntBuffer previousBox = BufferUtils.createIntBuffer(4);
+        IntBuffer previousBox = BufferUtils.createIntBuffer(16);
         GL11.glGetInteger(GL11.GL_SCISSOR_BOX, previousBox);
 
         Minecraft minecraft = Minecraft.getMinecraft();

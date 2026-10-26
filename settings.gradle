@@ -39,9 +39,14 @@ buildscript {
                 excludeGroup('org.apache.logging.log4j')
             }
         }
+        maven {
+            url = 'https://maven.wagyourtail.xyz/releases'
+        }
+        mavenCentral()
     }
     dependencies {
         classpath 'net.darkhax.curseforgegradle:CurseForgeGradle:1.3.33'
+        classpath 'xyz.wagyourtail.jvmdowngrader:gradle-plugin:2.0.1'
     }
 }
 

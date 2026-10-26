@@ -38,7 +38,6 @@ import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.BiFunction;
 
 /**
  * Synchronizes one field of a container to its client.
@@ -54,18 +53,18 @@ public abstract class SynchronizedField {
     private static final Map<Class<?>, Factory> FACTORIES = new Reference2ObjectOpenHashMap<>();
 
     static {
-        register(String.class, StringField::new);
-        register(int.class, IntegerField::new);
-        register(Integer.class, BoxedIntegerField::new);
-        register(long.class, LongField::new);
-        register(Long.class, BoxedLongField::new);
-        register(double.class, DoubleField::new);
-        register(Double.class, BoxedDoubleField::new);
-        register(boolean.class, BooleanField::new);
-        register(Boolean.class, BoxedBooleanField::new);
-        register(ITextComponent.class, TextComponentField::new);
-        register(GenericStack.class, GenericStackField::new);
-        register(ResourceLocation.class, ResourceLocationField::new);
+        register(String.class, (source, varHandle, _) -> new StringField(source, varHandle));
+        register(int.class, (source, varHandle, _) -> new IntegerField(source, varHandle));
+        register(Integer.class, (source, varHandle, _) -> new BoxedIntegerField(source, varHandle));
+        register(long.class, (source, varHandle, _) -> new LongField(source, varHandle));
+        register(Long.class, (source, varHandle, _) -> new BoxedLongField(source, varHandle));
+        register(double.class, (source, varHandle, _) -> new DoubleField(source, varHandle));
+        register(Double.class, (source, varHandle, _) -> new BoxedDoubleField(source, varHandle));
+        register(boolean.class, (source, varHandle, _) -> new BooleanField(source, varHandle));
+        register(Boolean.class, (source, varHandle, _) -> new BoxedBooleanField(source, varHandle));
+        register(ITextComponent.class, (source, varHandle, _) -> new TextComponentField(source, varHandle));
+        register(GenericStack.class, (source, varHandle, _) -> new GenericStackField(source, varHandle));
+        register(ResourceLocation.class, (source, varHandle, _) -> new ResourceLocationField(source, varHandle));
         register(PacketWritable.class, CustomField::new);
         register(Enum.class, EnumField::new);
     }
@@ -79,7 +78,7 @@ public abstract class SynchronizedField {
      *
      * <p>This constructor is protected so integrations can provide their own
      * synchronized field implementation and register it with
-     * {@link #register(Class, BiFunction)}.</p>
+     * {@link #register(Class, Factory)}.</p>
      */
     protected SynchronizedField(Object source, VarHandle varHandle) {
         this.source = Objects.requireNonNull(source, "source");
@@ -98,11 +97,10 @@ public abstract class SynchronizedField {
      * @param factory   creates a field wrapper for the object and its VarHandle
      * @throws IllegalArgumentException if the type already has a registration
      */
-    public static synchronized void register(Class<?> fieldType,
-                                              BiFunction<Object, VarHandle, ? extends SynchronizedField> factory) {
+    public static synchronized void register(Class<?> fieldType, Factory factory) {
         Objects.requireNonNull(fieldType, "fieldType");
         Objects.requireNonNull(factory, "factory");
-        Factory previous = FACTORIES.putIfAbsent(fieldType, factory::apply);
+        Factory previous = FACTORIES.putIfAbsent(fieldType, factory);
         if (previous != null) {
             throw new IllegalArgumentException("A synchronized field factory is already registered for " + fieldType);
         }
@@ -122,7 +120,7 @@ public abstract class SynchronizedField {
             throw new IllegalArgumentException("Cannot synchronize field " + field);
         }
 
-        return Objects.requireNonNull(factory.create(source, varHandle),
+        return Objects.requireNonNull(factory.create(source, varHandle, field.getType()),
                 "synchronized field factory returned null");
     }
 
@@ -540,9 +538,9 @@ public abstract class SynchronizedField {
     private static final class EnumField extends SynchronizedField {
         private final Enum<?>[] values;
 
-        private EnumField(Object source, VarHandle varHandle) {
+        private EnumField(Object source, VarHandle varHandle, Class<?> fieldType) {
             super(source, varHandle);
-            this.values = (Enum<?>[]) varHandle.varType().asSubclass(Enum.class).getEnumConstants();
+            this.values = (Enum<?>[]) fieldType.asSubclass(Enum.class).getEnumConstants();
         }
 
         @Override
@@ -564,9 +562,9 @@ public abstract class SynchronizedField {
 
         private final Class<?> fieldType;
 
-        private CustomField(Object source, VarHandle varHandle) {
+        private CustomField(Object source, VarHandle varHandle, Class<?> fieldType) {
             super(source, varHandle);
-            this.fieldType = varHandle.varType();
+            this.fieldType = fieldType;
             Preconditions.checkArgument(PacketWritable.class.isAssignableFrom(this.fieldType));
         }
 
@@ -607,12 +605,7 @@ public abstract class SynchronizedField {
     }
 
     @FunctionalInterface
-    public interface Factory extends BiFunction<Object, VarHandle, SynchronizedField> {
-        SynchronizedField create(Object source, VarHandle varHandle);
-
-        @Override
-        default SynchronizedField apply(Object source, VarHandle varHandle) {
-            return create(source, varHandle);
-        }
+    public interface Factory {
+        SynchronizedField create(Object source, VarHandle varHandle, Class<?> fieldType);
     }
 }
