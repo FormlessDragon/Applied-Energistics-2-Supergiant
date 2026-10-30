@@ -471,3 +471,4 @@ tasks.withType(JavaCompile).configureEach {
 
 apply from: 'gradle/scripts/publishing.gradle'
 apply from: 'gradle/scripts/extra.gradle'
+apply from: 'gradle/scripts/downgrade.gradle'

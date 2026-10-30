@@ -21,7 +21,7 @@ public final class IngredientConverters {
                 return;
             }
         }
-        converters = ImmutableList.<IngredientConverter<?>>builderWithExpectedSize(converters.size() + 1)
+        converters = ImmutableList.<IngredientConverter<?>>builder()
                                   .addAll(converters)
                                   .add(converter)
                                   .build();

@@ -139,7 +139,7 @@ public class GuiStyle {
 
         @Override
         public JsonElement serialize(ITextComponent src, Type typeOfSrc, JsonSerializationContext context) {
-            return JsonParser.parseString(ITextComponent.Serializer.componentToJson(src));
+            return new JsonParser().parse(ITextComponent.Serializer.componentToJson(src));
         }
     }
 }

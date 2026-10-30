@@ -61,7 +61,7 @@ public class CrystalAssemblerRecipeSerializer implements IAERecipeFactory {
             }
             return new CrystalAssemblerRecipe.SizedFluidIngredient(key, amount);
         }
-        JsonObject normalized = fluidObject.deepCopy();
+        JsonObject normalized = JsonRecipeUtils.copyObject(fluidObject);
         normalized.addProperty("amount", amount);
         FluidStack stack = FluidUtil.getFluidContained(JsonRecipeUtils.readItemStack(normalized, ctx));
         if (stack == null) {

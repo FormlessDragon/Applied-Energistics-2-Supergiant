@@ -51,7 +51,7 @@ public record CraftingStatus(boolean fullStatus, long elapsedTime, long remainin
             throw new IllegalArgumentException("Invalid crafting status entry count: " + size);
         }
 
-        var entries = ImmutableList.<CraftingStatusEntry>builderWithExpectedSize(size);
+        var entries = ImmutableList.<CraftingStatusEntry>builder();
         for (int i = 0; i < size; i++) {
             entries.add(CraftingStatusEntry.read(buffer));
         }

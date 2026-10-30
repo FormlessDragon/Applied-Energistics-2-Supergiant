@@ -1,0 +1,358 @@
+import xyz.wagyourtail.jvmdg.gradle.task.DowngradeJar
+import xyz.wagyourtail.jvmdg.gradle.task.ShadeJar
+
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
+
+apply plugin: 'xyz.wagyourtail.jvmdowngrader'
+
+if (propertyBool('enable_downgrade')) {
+    tasks.named('downgradeJar') {
+        enabled = false
+    }
+    tasks.named('shadeDowngradedApi') {
+        enabled = false
+    }
+
+    def shadedRoot = propertyString('root_package') + '.shaded.'
+
+    def relocations = [
+        'it.unimi.dsi.fastutil': shadedRoot + 'fastutil',
+        'org.apache.commons.lang3.mutable': shadedRoot + 'lang3.mutable',
+    ]
+
+    def minifyRules = [
+        'fastutil': ['it/unimi/dsi/fastutil/'],
+        'commons-lang3': ['org/apache/commons/lang3/mutable/']
+    ]
+
+    configurations {
+        bundledLibs {
+            transitive = false
+        }
+    }
+
+    dependencies {
+        bundledLibs 'it.unimi.dsi:fastutil:8.5.18'
+        bundledLibs 'org.apache.commons:commons-lang3:3.20.0'
+        bundledLibs 'org.slf4j:slf4j-api:2.0.18'
+    }
+
+    def mcProvidedPackages = [
+        'commons-lang3': 'org/apache/commons/lang3/',
+        'guava': 'com/google/common/',
+        'gson': 'com/google/gson/',
+        'fastutil': 'it/unimi/dsi/fastutil/',
+        'asm': 'org/objectweb/asm/',
+        'log4j-api': 'org/apache/logging/log4j/',
+        'netty-all': 'io/netty/',
+        'lwjgl': 'org/lwjgl/',
+        'vecmath': 'javax/vecmath/',
+        'commons-io': 'org/apache/commons/io/',
+        'commons-codec': 'org/apache/commons/codec/',
+        'jopt-simple': 'joptsimple/',
+        'httpclient': 'org/apache/http/',
+        'httpcore': 'org/apache/http/',
+        'authlib': 'com/mojang/authlib/',
+        'brigadier': 'com/mojang/brigadier/',
+    ]
+
+    def relocatedPackages = relocations.keySet().collect { it.replace('.', '/') + '/' }
+
+    configurations.bundledLibs.dependencies.each { dep ->
+        def provided = mcProvidedPackages[dep.name]
+        if (provided != null && !relocatedPackages.any { it.startsWith(provided) }) {
+            throw new GradleException("bundleLib ${dep.group}:${dep.name}:${dep.version} would be shadowed by the " +
+                "Minecraft/Forge launch classpath (parent-first); add it to relocations or make the source " +
+                "compatible with the version the game ships")
+        }
+    }
+    def reobfTask = tasks.named('reobfJar').get()
+
+    def downgrade = tasks.register('downgrade', DowngradeJar) {
+        group = 'jvmdg'
+        description = 'downgrade the reobf jar to java 8'
+        inputFile.set(reobfTask.archiveFile)
+        classpath = sourceSets.main.compileClasspath
+        downgradeTo.set(JavaVersion.VERSION_1_8)
+        archiveClassifier.set('downgraded')
+        destinationDirectory.set(layout.buildDirectory.dir('libs'))
+    }
+
+    def shadedJar = tasks.register('shadeApi', ShadeJar) {
+        group = 'jvmdg'
+        description = 'inline the jvmdg api stubs'
+        inputFile.set(downgrade.flatMap { it.archiveFile })
+        downgradeTo.set(JavaVersion.VERSION_1_8)
+        shadeInlining.set(false)
+        shadePath('jvmdgapi')
+        archiveClassifier.set('downgraded-shaded')
+        destinationDirectory.set(layout.buildDirectory.dir('libs'))
+    }
+
+    def u2 = { byte[] b, int[] p ->
+        int v = ((b[p[0]] & 0xFF) << 8) | (b[p[0] + 1] & 0xFF)
+        p[0] += 2
+        return v
+    }
+
+    def u4 = { byte[] b, int[] p ->
+        int v = ((b[p[0]] & 0xFF) << 24) | ((b[p[0] + 1] & 0xFF) << 16) | ((b[p[0] + 2] & 0xFF) << 8) | (b[p[0] + 3] & 0xFF)
+        p[0] += 4
+        return v
+    }
+
+    def refsUnder = { byte[] b, List<String> prefixes ->
+        Set<String> out = new LinkedHashSet<String>()
+        int[] p = [0]
+        u4(b, p)
+        u2(b, p)
+        u2(b, p)
+        int cp = u2(b, p)
+        for (int i = 1; i < cp; i++) {
+            int t = b[p[0]++] & 0xFF
+            if (t == 1) {
+                int len = u2(b, p)
+                String s = new String(b, p[0], len, 'UTF-8')
+                p[0] += len
+                for (String prefix : prefixes) {
+                    int at = s.indexOf(prefix)
+                    while (at >= 0) {
+                        int end = at
+                        while (end < s.length() && ';)]<'.indexOf((int) s.charAt(end)) < 0) {
+                            end++
+                        }
+                        if (end > at + prefix.length()) {
+                            out.add(s.substring(at, end))
+                        }
+                        at = s.indexOf(prefix, Math.max(end, at + 1))
+                    }
+                }
+            } else if (t == 3 || t == 4) {
+                p[0] += 4
+            } else if (t == 5 || t == 6) {
+                p[0] += 8
+                i++
+            } else if (t == 7 || t == 8 || t == 16 || t == 19 || t == 20) {
+                p[0] += 2
+            } else if (t == 9 || t == 10 || t == 11 || t == 12 || t == 17 || t == 18) {
+                p[0] += 4
+            } else if (t == 15) {
+                p[0] += 3
+            } else {
+                break
+            }
+        }
+        return out
+    }
+
+    def prepareLibs = tasks.register('prepareBundledLibs') {
+        group = 'jvmdg'
+        description = 'minify or copy the libraries bundled into the java 8 artifact'
+        def srcJarProvider = downgrade.flatMap { it.archiveFile }
+        def libFiles = configurations.bundledLibs
+        def outDirProvider = layout.buildDirectory.dir('jvmdg/bundled')
+        inputs.file(srcJarProvider)
+        inputs.files(libFiles)
+        inputs.property('minifyRules', minifyRules.keySet().toList())
+        outputs.dir(outDirProvider)
+        doLast {
+            File srcJar = srcJarProvider.get().asFile
+            File outDir = outDirProvider.get().asFile
+            outDir.deleteDir()
+            outDir.mkdirs()
+
+            for (File lib in libFiles.files) {
+                def minifyRule = minifyRules.find { key, value -> lib.name.contains(key) }
+                if (minifyRule == null) {
+                    new File(outDir, lib.name).bytes = lib.bytes
+                    logger.lifecycle("bundleLib: ${lib.name} -> copied")
+                    continue
+                }
+
+                List<String> prefixes = minifyRule.value
+                Map<String, byte[]> pool = new LinkedHashMap<String, byte[]>()
+                Map<String, byte[]> extra = new LinkedHashMap<String, byte[]>()
+                new ZipFile(lib).withCloseable { zf ->
+                    for (def e : zf.entries()) {
+                        if (e.directory) continue
+                        if (e.name.endsWith('.class')) {
+                            pool.put(e.name.substring(0, e.name.length() - 6), zf.getInputStream(e).bytes)
+                        } else if (e.name.startsWith('META-INF/') && !e.name.endsWith('MANIFEST.MF')
+                            && (e.name.contains('LICENSE') || e.name.contains('NOTICE'))) {
+                            extra.put(e.name, zf.getInputStream(e).bytes)
+                        }
+                    }
+                }
+
+                Set<String> seeds = new LinkedHashSet<String>()
+                new ZipFile(srcJar).withCloseable { zf ->
+                    for (def e : zf.entries()) {
+                        if (e.name.endsWith('.class')) {
+                            seeds.addAll(refsUnder(zf.getInputStream(e).bytes, prefixes))
+                        }
+                    }
+                }
+
+                Deque<String> todo = new ArrayDeque<String>(seeds)
+                Set<String> seen = new TreeSet<String>()
+                while (!todo.isEmpty()) {
+                    String cn = todo.poll()
+                    if (cn == null || !seen.add(cn)) continue
+                    byte[] bytes = pool.get(cn)
+                    if (bytes == null) continue
+                    todo.addAll(refsUnder(bytes, prefixes))
+                }
+
+                File outFile = new File(outDir, lib.name)
+                new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(outFile))).withCloseable { zos ->
+                    for (def e : extra.entrySet()) {
+                        zos.putNextEntry(new ZipEntry(e.key))
+                        zos.write(e.value)
+                        zos.closeEntry()
+                    }
+                    for (String cn : seen) {
+                        byte[] bytes = pool.get(cn)
+                        if (bytes == null) continue
+                        zos.putNextEntry(new ZipEntry(cn + '.class'))
+                        zos.write(bytes)
+                        zos.closeEntry()
+                    }
+                }
+                logger.lifecycle("bundleLib: ${lib.name} -> ${seen.size()} classes")
+            }
+        }
+    }
+
+    def shadowType = tasks.named('shadowJar').get().getClass()
+    while (shadowType.name.contains('_Decorated')) {
+        shadowType = shadowType.superclass
+    }
+
+    def rebundle = tasks.register('rebundle', shadowType) {
+        group = 'jvmdg'
+        description = 'merge relocated libraries into the java 8 artifact'
+    }
+
+    def bundledTrees = prepareLibs.map { task ->
+        task.outputs.files.files.collectMany { f ->
+            f.isDirectory()
+                ? (f.listFiles()?.findAll { it.name.endsWith('.jar') }?.collect { project.zipTree(it) } ?: [])
+                : [project.zipTree(f)]
+        }
+    }
+    rebundle.configure {
+        dependsOn(prepareLibs)
+        configurations.set([])
+        from(shadedJar.map { project.zipTree(it.archiveFile.get().asFile) })
+        from(bundledTrees)
+        relocations.each { orig, target -> relocate(orig, target) }
+        exclude 'META-INF/MANIFEST.MF', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA',
+                'module-info.class', '**/module-info.class', 'META-INF/versions/**', 'META-INF/maven/**'
+        archiveClassifier.set('java8')
+        destinationDirectory.set(layout.buildDirectory.dir('libs'))
+    }
+
+    def patchJava8Jar = { File jar, File manifestSourceJar ->
+        String base = new ZipFile(manifestSourceJar).withCloseable { z ->
+            def e = z.getEntry('META-INF/MANIFEST.MF')
+            if (e == null) throw new GradleException("no manifest in ${manifestSourceJar}")
+            new String(z.getInputStream(e).bytes, 'UTF-8')
+        }
+        base = base.replaceAll(/(?m)^(ModType|ContainedDeps|NonModDeps):[^\r\n]*(\r?\n)?/, '')
+        base = base.replaceAll(/(\r?\n)+$/, '')
+        String manifest = base + '\r\nModType: FML\r\n\r\n'
+
+        def tmp = new File(jar.parentFile, jar.name + '.tmp')
+        boolean manifestWritten = false
+        new ZipFile(jar).withCloseable { zf ->
+            new ZipOutputStream(new FileOutputStream(tmp)).withCloseable { zos ->
+                for (def entry : zf.entries()) {
+                    if (entry.directory) continue
+                    byte[] bytes = zf.getInputStream(entry).bytes
+                    if (entry.name == 'META-INF/MANIFEST.MF') {
+                        bytes = manifest.getBytes('UTF-8')
+                        manifestWritten = true
+                    } else if (entry.name.startsWith('ae2.') && entry.name.endsWith('.mixins.json')) {
+                        String text = new String(bytes, 'UTF-8')
+                        text = text.replaceAll('"compatibilityLevel"\\s*:\\s*"JAVA_\\d+"', '"compatibilityLevel": "JAVA_8"')
+                        bytes = text.getBytes('UTF-8')
+                    }
+                    zos.putNextEntry(new ZipEntry(entry.name))
+                    zos.write(bytes)
+                    zos.closeEntry()
+                }
+                if (!manifestWritten) {
+                    zos.putNextEntry(new ZipEntry('META-INF/MANIFEST.MF'))
+                    zos.write(manifest.getBytes('UTF-8'))
+                    zos.closeEntry()
+                }
+            }
+        }
+        if (!jar.delete() || !tmp.renameTo(jar)) {
+            throw new GradleException("rewrite failed: ${jar}")
+        }
+
+        String finalManifest = new ZipFile(jar).withCloseable { z ->
+            new String(z.getInputStream(z.getEntry('META-INF/MANIFEST.MF')).bytes, 'UTF-8')
+        }
+        if (!finalManifest.contains('ModType: FML')) {
+            throw new GradleException("manifest ModType is not FML: ${jar}")
+        }
+        if (finalManifest.contains('ContainedDeps:')) {
+            throw new GradleException("manifest still has ContainedDeps: ${jar}")
+        }
+        if (!finalManifest.contains('FMLCorePlugin: ae2.core.mixins.AE2Core')) {
+            throw new GradleException("manifest lost FMLCorePlugin: ${jar}")
+        }
+
+        new ZipFile(jar).withCloseable { z ->
+            ['ae2.default.mixins.json', 'ae2.mod.mixins.json'].each { n ->
+                def e = z.getEntry(n)
+                if (e == null) throw new GradleException("missing mixin config ${n}: ${jar}")
+                String t = new String(z.getInputStream(e).bytes, 'UTF-8')
+                if (!t.contains('"JAVA_8"')) throw new GradleException("compatibilityLevel of ${n} is not JAVA_8: ${jar}")
+            }
+
+            List<String> names = z.entries().collect { it.name }
+            List<String> relocatedPrefixes = relocations.values().collect { it.replace('.', '/') + '/' }
+            relocations.each { orig, target ->
+                String origPath = orig.replace('.', '/') + '/'
+                String targetPath = target.replace('.', '/') + '/'
+                if (!names.any { it.startsWith(targetPath) }) {
+                    throw new GradleException("missing relocated classes for ${orig}: ${jar}")
+                }
+                if (names.any { it.startsWith(origPath) }) {
+                    throw new GradleException("original package still present: ${orig}: ${jar}")
+                }
+            }
+
+            for (def e : z.entries()) {
+                if (!e.name.endsWith('.class') || relocatedPrefixes.any { e.name.startsWith(it) }) continue
+                String ascii = new String(z.getInputStream(e).bytes, 'ISO-8859-1')
+                relocations.each { orig, target ->
+                    if (ascii.contains(orig.replace('.', '/'))) {
+                        throw new GradleException("class still references ${orig}: ${e.name} in ${jar}")
+                    }
+                }
+            }
+        }
+    }
+
+    rebundle.configure {
+        doLast {
+            patchJava8Jar(archiveFile.get().asFile, shadedJar.get().archiveFile.get().asFile)
+        }
+    }
+
+    tasks.register('downgradedJar') {
+        group = 'jvmdg'
+        description = 'java 8 artifact (downgraded + api inlined + libraries relocated)'
+        dependsOn(rebundle)
+    }
+
+    tasks.named('assemble') {
+        dependsOn('downgradedJar')
+    }
+}
