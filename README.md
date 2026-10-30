@@ -77,7 +77,7 @@ repositories {
 }
 
 dependencies {
-    implementation "com.github.FormlessDragon:Applied-Energistics-2-Supergiant:v1.0.15:dev"
+    implementation "com.github.FormlessDragon:Applied-Energistics-2-Supergiant:v1.1.0:dev"
 }
 ```
 
