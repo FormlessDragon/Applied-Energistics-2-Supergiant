@@ -109,7 +109,7 @@ public class GuiCraftingCPU<T extends ContainerCraftingCPU> extends AEBaseGui<T>
 
         this.table = new CraftingStatusTableRenderer(this, 9, 19);
         this.scrollbar = widgets.addScrollBar("scrollbar", Scrollbar.BIG);
-        this.searchField = widgets.addTextField("search");
+        this.searchField = widgets.addSearchField("search");
         this.searchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.searchField.setTooltipMessage(Arrays.asList(
             GuiText.SearchTooltip.text(),

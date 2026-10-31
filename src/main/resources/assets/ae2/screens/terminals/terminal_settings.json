@@ -134,9 +134,14 @@
       "top": 89,
       "width": 150
     },
-    "syncWithExternalCheckbox": {
+    "searchHistoryCheckbox": {
       "left": 10,
       "top": 111,
+      "width": 150
+    },
+    "syncWithExternalCheckbox": {
+      "left": 10,
+      "top": 133,
       "width": 150
     },
     "clearExternalCheckbox": {

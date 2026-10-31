@@ -131,7 +131,8 @@ public class AE2Button extends GuiButton {
         GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
         GlStateManager.enableDepth();
 
-        renderNineSlice(getButtonBlitter());
+        renderButtonBackground(this.x, this.y, this.width, this.height, this.enabled,
+            this.forceHighlighted || this.enabled && this.hovered);
 
         int color;
         int yOffset;
@@ -168,55 +169,58 @@ public class AE2Button extends GuiButton {
         this.forceHighlighted = forceHighlighted;
     }
 
-    protected Blitter getButtonBlitter() {
-        if (!this.enabled) {
-            return this.forceHighlighted
-                ? Blitter.texture(BUTTON_HIGHLIGHTED, 200, 20)
-                : Blitter.texture(BUTTON_DISABLED, 200, 20);
-        } else if (this.hovered || this.forceHighlighted) {
-            return Blitter.texture(BUTTON_HIGHLIGHTED, 200, 20);
+    /**
+     * Renders the standard AE2 button background as a nine-slice, which allows custom widgets to match the
+     * appearance of regular buttons without using {@link GuiButton} itself.
+     */
+    public static void renderButtonBackground(int x, int y, int width, int height, boolean enabled,
+                                              boolean highlighted) {
+        Blitter texture;
+        if (!enabled) {
+            texture = Blitter.texture(highlighted ? BUTTON_HIGHLIGHTED : BUTTON_DISABLED, 200, 20);
+        } else if (highlighted) {
+            texture = Blitter.texture(BUTTON_HIGHLIGHTED, 200, 20);
+        } else {
+            texture = Blitter.texture(BUTTON, 200, 20);
         }
-        return Blitter.texture(BUTTON, 200, 20);
+
+        int left = Math.min(3, width / 2);
+        int right = Math.min(3, width - left);
+        int top = Math.min(3, height / 2);
+        int bottom = Math.min(3, height - top);
+        int centerWidth = Math.max(0, width - left - right);
+        int centerHeight = Math.max(0, height - top - bottom);
+
+        if (left > 0 && top > 0) {
+            texture.copy().src(0, 0, 3, 3).dest(x, y, left, top).blit();
+        }
+        if (centerWidth > 0 && top > 0) {
+            texture.copy().src(3, 0, 194, 3).dest(x + left, y, centerWidth, top).blit();
+        }
+        if (right > 0 && top > 0) {
+            texture.copy().src(197, 0, 3, 3).dest(x + width - right, y, right, top).blit();
+        }
+        if (left > 0 && centerHeight > 0) {
+            texture.copy().src(0, 3, 3, 14).dest(x, y + top, left, centerHeight).blit();
+        }
+        if (centerWidth > 0 && centerHeight > 0) {
+            texture.copy().src(3, 3, 194, 14).dest(x + left, y + top, centerWidth, centerHeight).blit();
+        }
+        if (right > 0 && centerHeight > 0) {
+            texture.copy().src(197, 3, 3, 14).dest(x + width - right, y + top, right, centerHeight).blit();
+        }
+        if (left > 0 && bottom > 0) {
+            texture.copy().src(0, 17, 3, 3).dest(x, y + height - bottom, left, bottom).blit();
+        }
+        if (centerWidth > 0 && bottom > 0) {
+            texture.copy().src(3, 17, 194, 3).dest(x + left, y + height - bottom, centerWidth, bottom).blit();
+        }
+        if (right > 0 && bottom > 0) {
+            texture.copy().src(197, 17, 3, 3).dest(x + width - right, y + height - bottom, right, bottom).blit();
+        }
     }
 
     private int applyAlpha(int color) {
         return color | MathHelper.ceil(this.alpha * 255.0F) << 24;
-    }
-
-    private void renderNineSlice(Blitter texture) {
-        int left = Math.min(3, this.width / 2);
-        int right = Math.min(3, this.width - left);
-        int top = Math.min(3, this.height / 2);
-        int bottom = Math.min(3, this.height - top);
-        int centerWidth = Math.max(0, this.width - left - right);
-        int centerHeight = Math.max(0, this.height - top - bottom);
-
-        if (left > 0 && top > 0) {
-            texture.copy().src(0, 0, 3, 3).dest(this.x, this.y, left, top).blit();
-        }
-        if (centerWidth > 0 && top > 0) {
-            texture.copy().src(3, 0, 194, 3).dest(this.x + left, this.y, centerWidth, top).blit();
-        }
-        if (right > 0 && top > 0) {
-            texture.copy().src(197, 0, 3, 3).dest(this.x + this.width - right, this.y, right, top).blit();
-        }
-        if (left > 0 && centerHeight > 0) {
-            texture.copy().src(0, 3, 3, 14).dest(this.x, this.y + top, left, centerHeight).blit();
-        }
-        if (centerWidth > 0 && centerHeight > 0) {
-            texture.copy().src(3, 3, 194, 14).dest(this.x + left, this.y + top, centerWidth, centerHeight).blit();
-        }
-        if (right > 0 && centerHeight > 0) {
-            texture.copy().src(197, 3, 3, 14).dest(this.x + this.width - right, this.y + top, right, centerHeight).blit();
-        }
-        if (left > 0 && bottom > 0) {
-            texture.copy().src(0, 17, 3, 3).dest(this.x, this.y + this.height - bottom, left, bottom).blit();
-        }
-        if (centerWidth > 0 && bottom > 0) {
-            texture.copy().src(3, 17, 194, 3).dest(this.x + left, this.y + this.height - bottom, centerWidth, bottom).blit();
-        }
-        if (right > 0 && bottom > 0) {
-            texture.copy().src(197, 17, 3, 3).dest(this.x + this.width - right, this.y + this.height - bottom, right, bottom).blit();
-        }
     }
 }

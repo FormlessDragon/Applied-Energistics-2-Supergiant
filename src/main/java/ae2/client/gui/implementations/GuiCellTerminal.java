@@ -306,7 +306,7 @@ public class GuiCellTerminal extends AEBaseGui<ContainerCellTerminal> implements
         this.xSize = WIDTH;
         this.ySize = configuredHeight();
 
-        this.searchField = this.widgets.addTextField("search");
+        this.searchField = this.widgets.addSearchField("search");
         this.searchField.setMaxStringLength(SEARCH_MAX_LENGTH);
         this.searchField.setPlaceholder(tr("search.placeholder"));
         this.searchField.setTooltipMessage(searchTooltip());
@@ -3670,6 +3670,9 @@ public class GuiCellTerminal extends AEBaseGui<ContainerCellTerminal> implements
             }
         }
         if (this.searchOverlay != null && this.searchOverlay.handleKeyTyped(typedChar, keyCode, this.searchAssist)) {
+            return;
+        }
+        if (this.searchField.onSearchHistoryKey(keyCode)) {
             return;
         }
         if (InlineRenameManager.getInstance().handleKey(typedChar, keyCode)) {

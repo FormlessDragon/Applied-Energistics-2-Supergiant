@@ -35,6 +35,7 @@ import ae2.client.gui.widgets.Scrollbar;
 import ae2.client.gui.widgets.TabButton;
 import ae2.client.gui.widgets.TooltipButton;
 import ae2.container.GuiIds;
+import ae2.core.AEConfig;
 import ae2.core.localization.GuiText;
 import ae2.core.network.InitNetwork;
 import ae2.core.network.ServerboundPacket;
@@ -51,8 +52,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.awt.Rectangle;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -69,6 +72,7 @@ public class WidgetContainer {
     private final GuiStyle style;
     private final Object2ObjectLinkedOpenHashMap<String, GuiButton> widgets = new Object2ObjectLinkedOpenHashMap<>();
     private final Object2ObjectLinkedOpenHashMap<String, AETextField> textFields = new Object2ObjectLinkedOpenHashMap<>();
+    private final Set<String> searchFieldIds = new LinkedHashSet<>();
     private final Object2ObjectLinkedOpenHashMap<String, ICompositeWidget> compositeWidgets = new Object2ObjectLinkedOpenHashMap<>();
     private final Object2ObjectLinkedOpenHashMap<String, Point> manualWidgetPositions = new Object2ObjectLinkedOpenHashMap<>();
     private final Object2ObjectLinkedOpenHashMap<String, Point> manualTextFieldPositions = new Object2ObjectLinkedOpenHashMap<>();
@@ -424,6 +428,53 @@ public class WidgetContainer {
     }
 
     /**
+     * Stores any search term that was typed but not confirmed yet.
+     */
+    public void commitSearchHistory() {
+        for (AETextField textField : textFields.values()) {
+            textField.commitSearchHistoryEntry();
+        }
+    }
+
+    /**
+     * Draws the search history dropdowns on top of everything else, including item listings.
+     * <p>
+     * Must be called with the GUI layer that uses absolute screen coordinates as its origin.
+     */
+    public void drawSearchHistory(Rectangle bounds, int mouseX, int mouseY) {
+        for (AETextField textField : textFields.values()) {
+            if (textField.getVisible()) {
+                textField.drawSearchHistory(bounds, mouseX, mouseY);
+            }
+        }
+    }
+
+    /**
+     * Lets an open search history dropdown consume the mouse click before any other widget or slot sees it.
+     */
+    public boolean onSearchHistoryMouseDown(Point mousePos, int btn) {
+        int mouseX = currentBounds.x + mousePos.x();
+        int mouseY = currentBounds.y + mousePos.y();
+
+        for (AETextField textField : textFields.values()) {
+            if (!textField.getVisible() || !textField.onSearchHistoryMouseDown(mouseX, mouseY, btn)) {
+                continue;
+            }
+
+            // The click was consumed before the regular mouse handling, so the other fields have to be
+            // unfocused here to keep a single focused field.
+            for (AETextField other : textFields.values()) {
+                if (other != textField) {
+                    other.setFocused(false);
+                }
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * @see ICompositeWidget#onMouseDown(Point, int)
      */
     public boolean onMouseDown(Point mousePos, int btn) {
@@ -565,6 +616,12 @@ public class WidgetContainer {
     }
 
     public boolean onKeyTyped(char typedChar, int keyCode) {
+        for (AETextField textField : textFields.values()) {
+            if (textField.getVisible() && textField.onSearchHistoryKey(keyCode)) {
+                return true;
+            }
+        }
+
         for (ICompositeWidget widget : compositeWidgets.values()) {
             if (widget.isVisible() && widget.onKeyTyped(typedChar, keyCode)) {
                 return true;
@@ -676,14 +733,65 @@ public class WidgetContainer {
     }
 
     public AETextField addTextField(String id) {
-        AETextField searchField = new AETextField(requireStyle(), Minecraft.getMinecraft().fontRenderer,
-            0, 0, 0, 0);
-        searchField.setEnableBackgroundDrawing(false);
-        searchField.setMaxStringLength(25);
-        searchField.setTextColor(0xFFFFFF);
-        searchField.setVisible(true);
-        add(id, searchField);
+        return addTextField(id, false);
+    }
+
+    /**
+     * Adds a text field that is used to search a screen, including the recent search history dropdown.
+     */
+    public AETextField addSearchField(String id) {
+        AETextField searchField = addTextField(id, AEConfig.instance().isSearchHistoryEnabled());
+        this.searchFieldIds.add(id);
         return searchField;
+    }
+
+    /**
+     * Applies the current search history setting to search fields that are already part of this screen.
+     */
+    public void refreshSearchHistory() {
+        if (this.style == null) {
+            return;
+        }
+
+        boolean enabled = AEConfig.instance().isSearchHistoryEnabled();
+        for (String id : this.searchFieldIds) {
+            AETextField textField = this.textFields.get(id);
+            if (textField == null) {
+                continue;
+            }
+
+            WidgetStyle widgetStyle = this.style.getWidget(id);
+            textField.setSearchHistoryEnabled(enabled);
+            int width = widgetStyle.getWidth();
+            int height = widgetStyle.getHeight();
+            if (width != 0 && height != 0) {
+                textField.resize(width, height);
+            }
+
+            if (this.currentBounds.width <= 0 || this.currentBounds.height <= 0) {
+                continue;
+            }
+
+            Point manualPosition = this.manualTextFieldPositions.get(id);
+            if (manualPosition != null) {
+                textField.move(this.currentBounds.x + manualPosition.x(), this.currentBounds.y + manualPosition.y());
+            } else {
+                textField.move(widgetStyle.resolve(this.currentBounds));
+            }
+        }
+    }
+
+    private AETextField addTextField(String id, boolean searchHistory) {
+        AETextField textField = new AETextField(requireStyle(), Minecraft.getMinecraft().fontRenderer,
+            0, 0, 0, 0);
+        // The dropdown reserves space inside the field, so it has to be enabled before the field is sized.
+        textField.setSearchHistoryEnabled(searchHistory);
+        textField.setEnableBackgroundDrawing(false);
+        textField.setMaxStringLength(25);
+        textField.setTextColor(0xFFFFFF);
+        textField.setVisible(true);
+        add(id, textField);
+        return textField;
     }
 
     private Rectangle toRelative(Rectangle area) {

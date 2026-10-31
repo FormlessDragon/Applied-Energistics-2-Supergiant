@@ -110,7 +110,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> implements
         this.table = new CraftConfirmTableRenderer(this, 9, 19);
 
         this.scrollbar = widgets.addScrollBar("scrollbar", Scrollbar.BIG);
-        this.searchField = widgets.addTextField("search");
+        this.searchField = widgets.addSearchField("search");
         this.searchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.searchField.setTooltipMessage(Arrays.asList(
             GuiText.SearchTooltip.text(),
@@ -429,6 +429,9 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> implements
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        if (this.searchField.onSearchHistoryKey(keyCode)) {
+            return;
+        }
         if (keyCode == Keyboard.KEY_ESCAPE && this.searchField.isFocused()) {
             this.searchField.setFocused(false);
             return;

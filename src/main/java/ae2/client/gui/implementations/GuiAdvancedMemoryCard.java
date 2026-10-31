@@ -158,7 +158,7 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
         this.entryPositionStyle = style.getWidget(WIDGET_ENTRY_POSITION);
         this.bindButtonStyle = style.getWidget(WIDGET_BIND_BUTTON);
         this.scrollbarStyle = style.getWidget(WIDGET_SCROLLBAR);
-        this.searchField = this.widgets.addTextField(WIDGET_SEARCH);
+        this.searchField = this.widgets.addSearchField(WIDGET_SEARCH);
         this.searchField.setResponder(this::onSearchChanged);
         this.searchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.searchField.setTooltipMessage(List.of(GuiText.AdvancedMemoryCardSearchTooltip.text()));

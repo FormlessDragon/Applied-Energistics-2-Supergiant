@@ -101,6 +101,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
     private final AECheckbox useExternalSearchRadio;
     private final AECheckbox rememberCheckbox;
     private final AECheckbox autoFocusCheckbox;
+    private final AECheckbox searchHistoryCheckbox;
     private final AECheckbox syncWithExternalCheckbox;
     private final AECheckbox clearExternalCheckbox;
     private final AETextField recursiveReserveField;
@@ -195,6 +196,8 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
             this::save);
         this.autoFocusCheckbox = widgets.addCheckbox("autoFocusCheckbox", GuiText.SearchSettingsAutoFocus.text(),
             this::save);
+        this.searchHistoryCheckbox = widgets.addCheckbox("searchHistoryCheckbox",
+            GuiText.SearchSettingsHistory.text(), this::save);
         this.syncWithExternalCheckbox = widgets.addCheckbox("syncWithExternalCheckbox",
             GuiText.SearchSettingsSyncWithExternal.text(externalSearchName), this::save);
         this.clearExternalCheckbox = widgets.addCheckbox("clearExternalCheckbox",
@@ -384,6 +387,11 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         config.setUseExternalSearch(hasExternalSearch() && this.useExternalSearchRadio.isSelected());
         config.setRememberLastSearch(this.rememberCheckbox.isSelected());
         config.setAutoFocusSearch(this.autoFocusCheckbox.isSelected());
+        boolean searchHistoryEnabled = this.searchHistoryCheckbox.isSelected();
+        if (config.isSearchHistoryEnabled() != searchHistoryEnabled) {
+            config.setSearchHistoryEnabled(searchHistoryEnabled);
+            this.parent.getWidgets().refreshSearchHistory();
+        }
         config.setSyncWithExternalSearch(this.syncWithExternalCheckbox.isSelected());
         config.setClearExternalSearchOnOpen(this.clearExternalCheckbox.isSelected());
         saveWirelessSettings();
@@ -447,12 +455,14 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         this.useExternalSearchRadio.enabled = hasExternalSearch;
         this.rememberCheckbox.setSelected(config.isRememberLastSearch());
         this.autoFocusCheckbox.setSelected(config.isAutoFocusSearch());
+        this.searchHistoryCheckbox.setSelected(config.isSearchHistoryEnabled());
         this.syncWithExternalCheckbox.setSelected(config.isSyncWithExternalSearch());
         this.syncWithExternalCheckbox.enabled = hasExternalSearch;
         this.clearExternalCheckbox.setSelected(config.isClearExternalSearchOnOpen());
         this.clearExternalCheckbox.enabled = hasExternalSearch;
         this.rememberCheckbox.visible = this.useInternalSearchRadio.isSelected();
         this.autoFocusCheckbox.visible = this.useInternalSearchRadio.isSelected();
+        this.searchHistoryCheckbox.visible = this.useInternalSearchRadio.isSelected();
         this.syncWithExternalCheckbox.visible = this.useInternalSearchRadio.isSelected();
         this.clearExternalCheckbox.visible = this.useExternalSearchRadio.isSelected();
         updateWirelessState();
@@ -617,6 +627,7 @@ public class GuiTerminalSettings extends AEBaseGui<AEBaseContainer> {
         this.useExternalSearchRadio.visible = search;
         this.rememberCheckbox.visible = search && this.useInternalSearchRadio.isSelected();
         this.autoFocusCheckbox.visible = search && this.useInternalSearchRadio.isSelected();
+        this.searchHistoryCheckbox.visible = search && this.useInternalSearchRadio.isSelected();
         this.syncWithExternalCheckbox.visible = search && this.useInternalSearchRadio.isSelected();
         this.clearExternalCheckbox.visible = search && this.useExternalSearchRadio.isSelected();
         setTextHidden("recursive_reserve_label",

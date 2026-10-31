@@ -22,6 +22,7 @@ import ae2.client.Point;
 import ae2.client.gui.style.Blitter;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.PaletteColor;
+import ae2.core.localization.GuiText;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiTextField;
@@ -55,6 +56,8 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
     private final FontRenderer fontRenderer;
     private final int fontPad;
     private final GuiStyle style;
+    @Nullable
+    private SearchHistoryDropdown searchHistory;
     private boolean enabled = true;
     private int textColor;
     private int disabledTextColor;
@@ -113,6 +116,10 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
 
     @Override
     public boolean mouseClicked(int mouseX, int mouseY, int button) {
+        if (this.searchHistory != null && this.searchHistory.mouseDown(mouseX, mouseY, button)) {
+            return true;
+        }
+
         if (this.isMouseOver(mouseX, mouseY)) {
             mouseX = MathHelper.clamp(mouseX, this.x, this.x + this.width - 1);
             mouseY = MathHelper.clamp(mouseY, this.y, this.y + this.height - 1);
@@ -122,6 +129,10 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
 
     @Override
     public boolean textboxKeyTyped(char typedChar, int keyCode) {
+        if (this.searchHistory != null && this.searchHistory.keyTyped(keyCode)) {
+            return true;
+        }
+
         if (this.keyFilter != null && !this.keyFilter.test(typedChar, keyCode)) {
             return this.isFocused() && this.canConsumeInput()
                 && keyCode != Keyboard.KEY_TAB && keyCode != Keyboard.KEY_ESCAPE;
@@ -129,6 +140,7 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
 
         if (super.textboxKeyTyped(typedChar, keyCode)) {
             this.armKeyRepeat(typedChar, keyCode);
+            this.notifySearchHistoryEdited();
             if (this.responder != null) {
                 this.responder.accept(this.getText());
             }
@@ -183,11 +195,60 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
         this.setSelectionPos(0);
     }
 
+    /**
+     * Enables the search history dropdown and the button that opens it next to this text field.
+     * <p>
+     * The dropdown reserves space inside the field, so this has to be called before the field is moved and resized.
+     */
+    public void setSearchHistoryEnabled(boolean enabled) {
+        if (enabled && this.searchHistory == null) {
+            this.searchHistory = new SearchHistoryDropdown(this);
+        }
+        if (this.searchHistory != null) {
+            this.searchHistory.setEnabled(enabled);
+        }
+    }
+
+    public void drawSearchHistory(Rectangle guiBounds, int mouseX, int mouseY) {
+        if (this.searchHistory != null) {
+            this.searchHistory.draw(guiBounds, mouseX, mouseY);
+        }
+    }
+
+    public boolean onSearchHistoryKey(int keyCode) {
+        return this.searchHistory != null && this.searchHistory.keyTyped(keyCode);
+    }
+
+    public boolean onSearchHistoryMouseDown(int mouseX, int mouseY, int button) {
+        return this.searchHistory != null && this.searchHistory.mouseDown(mouseX, mouseY, button);
+    }
+
+    public void commitSearchHistoryEntry() {
+        if (this.searchHistory != null) {
+            this.searchHistory.commitPendingEntry();
+        }
+    }
+
+    @Override
+    public void setText(String text) {
+        super.setText(text);
+        this.notifySearchHistoryEdited();
+    }
+
     public void setTextFromClient(String text) {
         String oldValue = this.getText();
         super.setText(text);
-        if (!oldValue.equals(this.getText()) && this.responder != null) {
-            this.responder.accept(this.getText());
+        if (!oldValue.equals(this.getText())) {
+            this.notifySearchHistoryEdited();
+            if (this.responder != null) {
+                this.responder.accept(this.getText());
+            }
+        }
+    }
+
+    private void notifySearchHistoryEdited() {
+        if (this.searchHistory != null) {
+            this.searchHistory.onTextEdited();
         }
     }
 
@@ -201,14 +262,20 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
 
     @Override
     public void move(int x, int y) {
-        this.x = x + PADDING;
+        this.x = x + PADDING + getSearchHistoryReservedWidth();
         this.y = y + PADDING;
     }
 
     @Override
     public void resize(int width, int height) {
-        this.width = width - 2 * PADDING - this.fontPad;
+        this.width = width - 2 * PADDING - this.fontPad - getSearchHistoryReservedWidth();
         this.height = height - 2 * PADDING;
+    }
+
+    private int getSearchHistoryReservedWidth() {
+        return this.searchHistory != null && this.searchHistory.isEnabled()
+            ? SearchHistoryDropdown.RESERVED_WIDTH
+            : 0;
     }
 
     @Override
@@ -285,10 +352,16 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
 
     @Override
     public Rectangle getTooltipArea() {
+        int left = this.x - PADDING;
+        int width = this.width + 2 * PADDING + this.fontPad;
+        if (this.searchHistory != null && this.searchHistory.isEnabled()) {
+            left -= SearchHistoryDropdown.RESERVED_WIDTH;
+            width += SearchHistoryDropdown.RESERVED_WIDTH;
+        }
         return new Rectangle(
-            this.x - PADDING,
+            left,
             this.y - PADDING,
-            this.width + 2 * PADDING + this.fontPad,
+            width,
             this.height + 2 * PADDING);
     }
 
@@ -299,6 +372,9 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
 
     @Override
     public @NotNull List<ITextComponent> getTooltipMessage() {
+        if (this.searchHistory != null && this.searchHistory.isButtonHovered()) {
+            return List.of(GuiText.SearchHistoryTooltip.text());
+        }
         return this.tooltipMessage;
     }
 
@@ -310,16 +386,7 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
         return this.enabled;
     }
 
-    @Override
-    public void setEnabled(boolean enabled) {
-        super.setEnabled(enabled);
-        this.enabled = enabled;
-        if (!enabled) {
-            this.clearKeyRepeat();
-        }
-    }
-
-    private Rectangle getVisualBounds() {
+    Rectangle getVisualBounds() {
         int left = this.x - PADDING;
         int top = this.y - PADDING;
         return new Rectangle(
@@ -354,6 +421,9 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
         super.setFocused(focused);
         if (!focused) {
             this.clearKeyRepeat();
+            if (this.searchHistory != null) {
+                this.searchHistory.onFocusLost();
+            }
         }
     }
 
@@ -362,6 +432,21 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
         super.setVisible(visible);
         if (!visible) {
             this.clearKeyRepeat();
+            if (this.searchHistory != null) {
+                this.searchHistory.onHidden();
+            }
+        }
+    }
+
+    @Override
+    public void setEnabled(boolean enabled) {
+        super.setEnabled(enabled);
+        this.enabled = enabled;
+        if (!enabled) {
+            this.clearKeyRepeat();
+            if (this.searchHistory != null) {
+                this.searchHistory.onDisabled();
+            }
         }
     }
 
@@ -395,8 +480,11 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
             return this.getCursorPosition() != oldCursor || this.getSelectionEnd() != oldSelection;
         }
 
-        if (this.responder != null && !oldValue.equals(this.getText())) {
-            this.responder.accept(this.getText());
+        if (!oldValue.equals(this.getText())) {
+            this.notifySearchHistoryEdited();
+            if (this.responder != null) {
+                this.responder.accept(this.getText());
+            }
         }
         return true;
     }
