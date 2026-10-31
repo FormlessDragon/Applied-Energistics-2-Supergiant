@@ -1,25 +1,8 @@
-/*
- * This file is part of Applied Energistics 2.
- * Copyright (c) 2021, TeamAppliedEnergistics, All rights reserved.
- *
- * Applied Energistics 2 is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Applied Energistics 2 is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Applied Energistics 2.  If not, see <http://www.gnu.org/licenses/lgpl>.
- */
-
 package ae2.client.gui.widgets;
 
 import ae2.client.gui.Icon;
 import ae2.client.gui.style.PaletteColor;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -31,14 +14,13 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
 import java.awt.Rectangle;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 /**
  * Dropdown button and popup that shows the most recent search terms of an {@link AETextField}.
  * <p>
- * The button occupies the left edge of the text field's assigned area, which keeps it from overlapping neighbouring
+ * The button occupies the left edge of the text field's assigned area, which keeps it from overlapping neighboring
  * widgets. The popup is rendered by the {@link ae2.client.gui.WidgetContainer} after all other layers so that it stays
  * on top of item listings and scroll bars.
  */
@@ -56,7 +38,7 @@ public class SearchHistoryDropdown {
     private static final int ROW_SELECTED = 0x60FFFFFF;
 
     private final AETextField field;
-    private final List<String> rows = new ArrayList<>();
+    private final List<String> rows = new ObjectArrayList<>();
 
     private boolean enabled;
     private boolean open;
@@ -160,33 +142,25 @@ public class SearchHistoryDropdown {
             return false;
         }
 
-        switch (keyCode) {
-            case Keyboard.KEY_UP:
-                return moveSelection(-1);
-            case Keyboard.KEY_DOWN:
-                return moveSelection(1);
-            case Keyboard.KEY_W:
-                return moveSelectionWithLetter(-1);
-            case Keyboard.KEY_S:
-                return moveSelectionWithLetter(1);
-            case Keyboard.KEY_TAB:
+        return switch (keyCode) {
+            case Keyboard.KEY_UP -> moveSelection(-1);
+            case Keyboard.KEY_DOWN -> moveSelection(1);
+            case Keyboard.KEY_W -> moveSelectionWithLetter(-1);
+            case Keyboard.KEY_S -> moveSelectionWithLetter(1);
+            case Keyboard.KEY_TAB -> {
                 if (this.rows.isEmpty()) {
-                    return false;
+                    yield false;
                 }
-                apply(this.selected >= 0 ? this.selected : 0);
-                return true;
-            case Keyboard.KEY_ESCAPE:
+                apply(Math.max(this.selected, 0));
+                yield true;
+            }
+            case Keyboard.KEY_ESCAPE, Keyboard.KEY_RETURN, Keyboard.KEY_NUMPADENTER -> {
                 commitPendingEntry();
                 close();
-                return true;
-            case Keyboard.KEY_RETURN:
-            case Keyboard.KEY_NUMPADENTER:
-                commitPendingEntry();
-                close();
-                return true;
-            default:
-                return false;
-        }
+                yield true;
+            }
+            default -> false;
+        };
     }
 
     public boolean mouseDown(int mouseX, int mouseY, int button) {

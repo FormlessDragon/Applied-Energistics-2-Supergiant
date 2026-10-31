@@ -1,24 +1,7 @@
-/*
- * This file is part of Applied Energistics 2.
- * Copyright (c) 2021, TeamAppliedEnergistics, All rights reserved.
- *
- * Applied Energistics 2 is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Applied Energistics 2 is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Applied Energistics 2.  If not, see <http://www.gnu.org/licenses/lgpl>.
- */
-
 package ae2.client.gui.widgets;
 
 import ae2.core.AELog;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -29,7 +12,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -47,7 +30,7 @@ public final class SearchHistoryStore {
     private static final String DATA_DIR = "ae2";
     private static final String DATA_FILE = "search_history.txt";
 
-    private static final List<String> ENTRIES = new ArrayList<>();
+    private static final ObjectArrayList<String> ENTRIES = new ObjectArrayList<>();
     private static boolean loaded;
 
     private SearchHistoryStore() {
@@ -56,9 +39,11 @@ public final class SearchHistoryStore {
     /**
      * @return The stored terms, most recent first. The returned list is an immutable snapshot.
      */
-    public static synchronized List<String> getEntries() {
-        load();
-        return List.copyOf(ENTRIES);
+    public static List<String> getEntries() {
+        if (!loaded) {
+            load();
+        }
+        return Collections.unmodifiableList(ENTRIES);
     }
 
     /**
@@ -66,12 +51,16 @@ public final class SearchHistoryStore {
      */
     public static List<String> filter(String searchText) {
         String needle = searchText == null ? "" : searchText.trim().toLowerCase(Locale.ROOT);
+        var entries = getEntries();
+
         if (needle.isEmpty()) {
-            return getEntries();
+            return entries;
         }
 
-        List<String> matches = new ArrayList<>(MAX_ENTRIES);
-        for (String entry : getEntries()) {
+        List<String> matches = new ObjectArrayList<>(MAX_ENTRIES);
+
+        for (var i = 0; i < entries.size(); i++) {
+            String entry = entries.get(i);
             if (entry.toLowerCase(Locale.ROOT).contains(needle)) {
                 matches.add(entry);
             }
@@ -82,22 +71,23 @@ public final class SearchHistoryStore {
     /**
      * Moves the given term to the front of the history, dropping the oldest term if the list is full.
      */
-    public static synchronized void record(String searchText) {
+    public static void record(String searchText) {
         String value = searchText == null ? "" : searchText.trim();
         if (value.isEmpty() || value.length() > MAX_LENGTH) {
             return;
         }
-
-        load();
+        if (!loaded) {
+            load();
+        }
         ENTRIES.removeIf(entry -> entry.equalsIgnoreCase(value));
         ENTRIES.add(0, value);
         while (ENTRIES.size() > MAX_ENTRIES) {
-            ENTRIES.remove(ENTRIES.size() - 1);
+            ENTRIES.removeLast();
         }
         save();
     }
 
-    private static void load() {
+    private synchronized static void load() {
         if (loaded) {
             return;
         }

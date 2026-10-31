@@ -44,6 +44,8 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiTextField;
@@ -52,10 +54,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.awt.Rectangle;
 import java.util.Collection;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -72,7 +72,7 @@ public class WidgetContainer {
     private final GuiStyle style;
     private final Object2ObjectLinkedOpenHashMap<String, GuiButton> widgets = new Object2ObjectLinkedOpenHashMap<>();
     private final Object2ObjectLinkedOpenHashMap<String, AETextField> textFields = new Object2ObjectLinkedOpenHashMap<>();
-    private final Set<String> searchFieldIds = new LinkedHashSet<>();
+    private final ObjectSet<String> searchFieldIds = new ObjectOpenHashSet<>();
     private final Object2ObjectLinkedOpenHashMap<String, ICompositeWidget> compositeWidgets = new Object2ObjectLinkedOpenHashMap<>();
     private final Object2ObjectLinkedOpenHashMap<String, Point> manualWidgetPositions = new Object2ObjectLinkedOpenHashMap<>();
     private final Object2ObjectLinkedOpenHashMap<String, Point> manualTextFieldPositions = new Object2ObjectLinkedOpenHashMap<>();
