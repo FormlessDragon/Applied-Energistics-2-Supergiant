@@ -244,7 +244,7 @@ public class GuiMEStorage<C extends ContainerMEStorage> extends AEBaseGui<C> imp
         addPortableCellPickupFilterButton();
         addWirelessUniversalTerminalButton();
 
-        this.searchField = this.widgets.addTextField("search");
+        this.searchField = this.widgets.addSearchField("search");
         this.searchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.searchField.setTooltipMessage(Arrays.asList(
             GuiText.SearchTooltip.text(),

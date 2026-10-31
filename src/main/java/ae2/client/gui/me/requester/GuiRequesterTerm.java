@@ -69,7 +69,7 @@ public class GuiRequesterTerm extends AbstractGuiRequester<ContainerRequesterTer
         }
         addWirelessUniversalTerminalButton();
 
-        this.searchField = this.widgets.addTextField("search");
+        this.searchField = this.widgets.addSearchField("search");
         this.searchField.setResponder(ignored -> refreshList());
         this.searchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.searchField.setTooltipMessage(Collections.singletonList(GuiText.SearchTooltip.text()));

@@ -1097,6 +1097,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
                 ? getMousePoint(baseMouseX, baseMouseY)
                 : getMousePoint(this.modalSelectionPopupMouseX, this.modalSelectionPopupMouseY);
             widgets.drawTextFields(mouse, this.mouseInteractionBlocker);
+            widgets.drawSearchHistory(getBounds(true), baseMouseX, baseMouseY);
         } finally {
             GlStateManager.popMatrix();
         }
@@ -1191,6 +1192,10 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
         Point mousePos = getMousePoint(mouseX, mouseY);
 
         if (handleSelectionPopupMouseClicked(mouseX, mouseY)) {
+            return;
+        }
+
+        if (widgets.onSearchHistoryMouseDown(mousePos, mouseButton)) {
             return;
         }
 
@@ -1770,6 +1775,7 @@ public abstract class AEBaseGui<T extends AEBaseContainer> extends GuiContainer 
 
     @Override
     public void onGuiClosed() {
+        this.widgets.commitSearchHistory();
         super.onGuiClosed();
     }
 

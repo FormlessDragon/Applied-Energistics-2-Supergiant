@@ -85,7 +85,7 @@ public class GuiCraftConfirmCpuList extends AEBaseGui<ContainerCraftConfirm> imp
 
         this.widgets.add("back", new TabButton(Icon.BACK, GuiText.ReturnToPreviousGui.text(),
             this::returnToParent));
-        this.searchField = this.widgets.addTextField("search");
+        this.searchField = this.widgets.addSearchField("search");
         this.searchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.searchField.setTooltipMessage(List.of(
             GuiText.CraftingCpuListSearchTooltip.text(),
@@ -268,6 +268,9 @@ public class GuiCraftConfirmCpuList extends AEBaseGui<ContainerCraftConfirm> imp
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        if (this.searchField.onSearchHistoryKey(keyCode)) {
+            return;
+        }
         if (keyCode == Keyboard.KEY_ESCAPE && this.searchField.isFocused()) {
             this.searchField.setFocused(false);
             return;

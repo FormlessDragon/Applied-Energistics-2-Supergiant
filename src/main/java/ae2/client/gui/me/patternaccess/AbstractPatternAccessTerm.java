@@ -149,15 +149,15 @@ public abstract class AbstractPatternAccessTerm<C extends AEBaseContainer & IPat
         this.footerHeight = footerHeight;
 
         this.scrollbar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
-        this.groupSearchField = this.widgets.addTextField("search");
+        this.groupSearchField = this.widgets.addSearchField("search");
         this.groupSearchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.groupSearchField.setTooltipMessage(Collections.singletonList(
             GuiText.PatternAccessTerminalProviderSearchTooltip.text()));
-        this.inputSearchField = this.widgets.addTextField("inputSearch");
+        this.inputSearchField = this.widgets.addSearchField("inputSearch");
         this.inputSearchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.inputSearchField.setTooltipMessage(Collections.singletonList(
             GuiText.PatternAccessTerminalSearchTooltipInput.text()));
-        this.outputSearchField = this.widgets.addTextField("outputSearch");
+        this.outputSearchField = this.widgets.addSearchField("outputSearch");
         this.outputSearchField.setPlaceholder(GuiText.SearchPlaceholder.getLocal());
         this.outputSearchField.setTooltipMessage(Collections.singletonList(
             GuiText.PatternAccessTerminalSearchTooltipOutput.text()));
