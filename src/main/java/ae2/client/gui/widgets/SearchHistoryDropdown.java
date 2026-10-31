@@ -63,6 +63,7 @@ public class SearchHistoryDropdown {
     private boolean openedByButton;
     private boolean applying;
     private boolean commitPending;
+    private boolean buttonHovered;
     private int selected = -1;
     private String lastText;
     @Nullable
@@ -75,6 +76,13 @@ public class SearchHistoryDropdown {
 
     public boolean isEnabled() {
         return this.enabled;
+    }
+
+    /**
+     * @return Whether the mouse was over the dropdown button during the last frame.
+     */
+    public boolean isButtonHovered() {
+        return this.buttonHovered;
     }
 
     public void setEnabled(boolean enabled) {
@@ -219,10 +227,12 @@ public class SearchHistoryDropdown {
 
     public void draw(Rectangle guiBounds, int mouseX, int mouseY) {
         if (!this.enabled || !this.field.getVisible()) {
+            this.buttonHovered = false;
             return;
         }
 
         this.lastGuiBounds = guiBounds;
+        this.buttonHovered = getButtonBounds().contains(mouseX, mouseY);
 
         GlStateManager.pushMatrix();
         try {

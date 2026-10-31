@@ -606,6 +606,15 @@ public class AEConfig {
         this.save();
     }
 
+    public boolean isSearchHistoryEnabled() {
+        return SEARCH.searchHistory;
+    }
+
+    public void setSearchHistoryEnabled(boolean enabled) {
+        SEARCH.searchHistory = enabled;
+        this.save();
+    }
+
     public String[] getPatternImportPriorityOrder() {
         return CLIENT.patternImportPriorityOrder.clone();
     }
@@ -1037,6 +1046,10 @@ public class AEConfig {
         @Config.Name("autoFocusSearch")
         @Config.Comment("Automatically focuses the search field when the terminal opens.")
         public boolean autoFocusSearch;
+
+        @Config.Name("searchHistory")
+        @Config.Comment("Shows the most recent search terms in a dropdown next to search fields.")
+        public boolean searchHistory = true;
     }
 
     public static class WorldGen {

@@ -22,6 +22,7 @@ import ae2.client.Point;
 import ae2.client.gui.style.Blitter;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.PaletteColor;
+import ae2.core.localization.GuiText;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiTextField;
@@ -333,10 +334,16 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
 
     @Override
     public Rectangle getTooltipArea() {
+        int left = this.x - PADDING;
+        int width = this.width + 2 * PADDING + this.fontPad;
+        if (this.searchHistory.isEnabled()) {
+            left -= SearchHistoryDropdown.RESERVED_WIDTH;
+            width += SearchHistoryDropdown.RESERVED_WIDTH;
+        }
         return new Rectangle(
-            this.x - PADDING,
+            left,
             this.y - PADDING,
-            this.width + 2 * PADDING + this.fontPad,
+            width,
             this.height + 2 * PADDING);
     }
 
@@ -347,6 +354,9 @@ public class AETextField extends GuiTextField implements IResizableWidget, ITool
 
     @Override
     public @NotNull List<ITextComponent> getTooltipMessage() {
+        if (this.searchHistory.isButtonHovered()) {
+            return List.of(GuiText.SearchHistoryTooltip.text());
+        }
         return this.tooltipMessage;
     }
 
