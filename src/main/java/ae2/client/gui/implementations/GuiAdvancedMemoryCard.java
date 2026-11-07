@@ -882,9 +882,18 @@ public class GuiAdvancedMemoryCard extends AEBaseGui<ContainerAdvancedMemoryCard
     }
 
     private int getConfiguredRows() {
+        final int entryGap = this.entryGap();
+        final int entryPitch = this.entryPitch();
+        final int fixedHeight = this.fixedHeight();
+
+        final int toolbarHeight = this.getLeftToolbarMinimumHeight();
+        final int minimumRows = toolbarHeight <= 0
+            ? MIN_ROWS
+            : Math.max(MIN_ROWS, Math.ceilDiv(Math.max(0, toolbarHeight - fixedHeight + entryGap), entryPitch));
+
         int availableHeight = Math.max(this.height, this.ySize) - 2 * AEConfig.instance().getTerminalMargin();
-        int possibleRows = Math.max(MIN_ROWS, (availableHeight - fixedHeight() + entryGap()) / entryPitch());
-        return Math.max(MIN_ROWS, AEConfig.instance().getTerminalStyle().getRows(possibleRows));
+        int possibleRows = Math.max(minimumRows, (availableHeight - fixedHeight + entryGap) / entryPitch);
+        return Math.max(minimumRows, AEConfig.instance().getTerminalStyle().getRows(possibleRows));
     }
 
     private int getPreferredHeight() {

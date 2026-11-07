@@ -2,6 +2,7 @@ package ae2.client.gui.implementations;
 
 import ae2.api.config.ActionItems;
 import ae2.api.orientation.RelativeSide;
+import ae2.api.parts.IFacadePart;
 import ae2.api.parts.IPart;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.style.GuiStyle;
@@ -12,6 +13,8 @@ import ae2.container.implementations.ContainerOutputSides;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
 import ae2.tile.networking.TileCableBus;
+import net.minecraft.block.Block;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
@@ -48,7 +51,11 @@ public class GuiOutputSides extends AEBaseGui<ContainerOutputSides> {
         }
 
         AESubGui.addBackButton(container, "returnToParent", this.widgets);
-        this.widgets.add("clear", new ActionButton(ActionItems.OUTPUT_SIDES_CLEAR, this.container::clearSides));
+        ActionButton clear = new ActionButton(ActionItems.S_CLOSE, this.container::clearSides);
+        clear.setHalfSize(true);
+        clear.setDisableBackground(true);
+        clear.setMessage(ButtonToolTips.OutputSideClear.text());
+        this.widgets.add("clear", clear);
 
         for (RelativeSide side : RELATIVE_SIDES) {
             var button = new OutputSideSelectionButton(side, () -> getDisplayStack(side), () -> {
@@ -77,6 +84,7 @@ public class GuiOutputSides extends AEBaseGui<ContainerOutputSides> {
             boolean allowed = this.container.isSideAllowed(side);
             boolean enabled = this.container.isSideEnabled(side);
             button.setAllowed(allowed);
+            button.setOutputEnabled(enabled);
             button.enabled = allowed;
             if (!Boolean.valueOf(allowed).equals(this.lastAllowedStates.get(side))
                 || !Boolean.valueOf(enabled).equals(this.lastEnabledStates.get(side))) {
@@ -100,13 +108,23 @@ public class GuiOutputSides extends AEBaseGui<ContainerOutputSides> {
         var pos = tile.getPos().offset(facing);
         var adjacentTile = tile.getWorld().getTileEntity(pos);
         if (adjacentTile instanceof TileCableBus cableBus) {
+            IFacadePart facade = cableBus.getFacadeContainer().getFacade(facing.getOpposite());
+            if (facade != null) {
+                return facade.getItemStack();
+            }
             IPart part = cableBus.getPart(facing.getOpposite());
             if (part != null) {
                 return part.getPartItem().asItemStack();
             }
+            IPart center = cableBus.getPart(null);
+            if (center != null) {
+                return center.getPartItem().asItemStack();
+            }
         }
 
-        return new ItemStack(tile.getWorld().getBlockState(pos).getBlock());
+        IBlockState state = tile.getWorld().getBlockState(pos);
+        Block block = state.getBlock();
+        return new ItemStack(block, 1, block.getMetaFromState(state));
     }
 
     @Override
