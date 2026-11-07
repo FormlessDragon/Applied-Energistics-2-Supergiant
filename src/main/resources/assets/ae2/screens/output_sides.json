@@ -24,43 +24,43 @@
       "height": 20
     },
     "clear": {
-      "left": 74,
+      "left": 78,
       "top": 72,
       "width": 8,
       "height": 8
     },
     "side_top": {
-      "left": 34,
+      "left": 38,
       "top": 16,
       "width": 16,
       "height": 16
     },
     "side_left": {
-      "left": 54,
+      "left": 58,
       "top": 38,
       "width": 16,
       "height": 16
     },
     "side_front": {
-      "left": 34,
+      "left": 38,
       "top": 38,
       "width": 16,
       "height": 16
     },
     "side_right": {
-      "left": 14,
+      "left": 18,
       "top": 38,
       "width": 16,
       "height": 16
     },
     "side_bottom": {
-      "left": 34,
+      "left": 38,
       "top": 60,
       "width": 16,
       "height": 16
     },
     "side_back": {
-      "left": 54,
+      "left": 58,
       "top": 60,
       "width": 16,
       "height": 16
