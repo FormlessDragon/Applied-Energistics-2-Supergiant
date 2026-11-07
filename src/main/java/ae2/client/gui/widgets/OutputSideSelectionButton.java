@@ -12,10 +12,12 @@ import java.util.List;
 import java.util.function.Supplier;
 
 public class OutputSideSelectionButton extends IconButton {
+
     private final RelativeSide side;
     private final Supplier<ItemStack> stackSupplier;
     private List<ITextComponent> tooltip = Collections.emptyList();
     private boolean allowed = true;
+    private boolean outputEnabled;
 
     public OutputSideSelectionButton(RelativeSide side, Supplier<ItemStack> stackSupplier, Runnable onPress) {
         super(onPress);
@@ -33,6 +35,10 @@ public class OutputSideSelectionButton extends IconButton {
 
     public void setAllowed(boolean allowed) {
         this.allowed = allowed;
+    }
+
+    public void setOutputEnabled(boolean outputEnabled) {
+        this.outputEnabled = outputEnabled;
     }
 
     @Override
@@ -59,7 +65,13 @@ public class OutputSideSelectionButton extends IconButton {
     }
 
     @Override
-    public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
+    public boolean mousePressed(@NotNull Minecraft minecraft, int mouseX, int mouseY) {
         return this.allowed && super.mousePressed(minecraft, mouseX, mouseY);
+    }
+
+    @Override
+    public void drawButton(@NotNull Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
+        setFocused(outputEnabled);
+        super.drawButton(minecraft, mouseX, mouseY, partialTicks);
     }
 }

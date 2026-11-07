@@ -8,8 +8,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.toasts.GuiToast;
 import net.minecraft.client.gui.toasts.IToast;
 import net.minecraft.client.renderer.GlStateManager;
+import org.jetbrains.annotations.NotNull;
 
-import java.awt.Color;
 import java.util.List;
 
 /**
@@ -17,8 +17,8 @@ import java.util.List;
  */
 public class FinishedJobToast implements IToast {
     private static final long TIME_VISIBLE = 2500;
-    private static final int TITLE_COLOR = Color.blue.getRGB();
-    private static final int TEXT_COLOR = Color.green.getRGB();
+    private static final int TITLE_COLOR = 0xFF500050;
+    private static final int TEXT_COLOR = 0xFF000000;
 
     private final AEKey what;
     private final List<String> lines;
@@ -33,13 +33,14 @@ public class FinishedJobToast implements IToast {
         this.lines = minecraft.fontRenderer.listFormattedStringToWidth(text, 125);
     }
 
+    @NotNull
     @Override
     public Visibility draw(GuiToast toastGui, long delta) {
         var minecraft = toastGui.getMinecraft();
 
         minecraft.getTextureManager().bindTexture(TEXTURE_TOASTS);
         GlStateManager.color(1.0F, 1.0F, 1.0F);
-        toastGui.drawTexturedModalRect(0, 0, 0, 0, 160, 32);
+        toastGui.drawTexturedModalRect(0, 0, 0, 32, 160, 32);
         minecraft.fontRenderer.drawString(GuiText.ToastCraftingJobFinishedTitle.getLocal(), 30, 7,
             TITLE_COLOR);
 

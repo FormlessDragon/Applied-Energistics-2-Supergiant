@@ -2,8 +2,8 @@
   "$schema": "schema.json",
   "includes": ["common/common.json"],
   "background": {
-    "texture": "guis/priority.png",
-    "srcRect": [0, 0, 176, 125]
+    "texture": "guis/output_sides.png",
+    "srcRect": [0, 0, 93, 92]
   },
   "text": {
     "dialog_title": {
@@ -18,50 +18,50 @@
   },
   "widgets": {
     "returnToParent": {
-      "left": 152,
+      "left": 69,
       "top": -5,
       "width": 20,
       "height": 20
     },
     "clear": {
-      "left": 128,
-      "top": -5,
-      "width": 20,
-      "height": 20
+      "left": 74,
+      "top": 72,
+      "width": 8,
+      "height": 8
     },
     "side_top": {
-      "left": 80,
-      "top": 26,
+      "left": 34,
+      "top": 16,
       "width": 16,
       "height": 16
     },
     "side_left": {
       "left": 54,
-      "top": 50,
+      "top": 38,
       "width": 16,
       "height": 16
     },
     "side_front": {
-      "left": 80,
-      "top": 50,
+      "left": 34,
+      "top": 38,
       "width": 16,
       "height": 16
     },
     "side_right": {
-      "left": 106,
-      "top": 50,
+      "left": 14,
+      "top": 38,
       "width": 16,
       "height": 16
     },
     "side_bottom": {
-      "left": 80,
-      "top": 74,
+      "left": 34,
+      "top": 60,
       "width": 16,
       "height": 16
     },
     "side_back": {
-      "left": 80,
-      "top": 98,
+      "left": 54,
+      "top": 60,
       "width": 16,
       "height": 16
     }
