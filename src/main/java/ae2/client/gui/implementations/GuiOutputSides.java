@@ -2,37 +2,47 @@ package ae2.client.gui.implementations;
 
 import ae2.api.config.ActionItems;
 import ae2.api.orientation.RelativeSide;
-import ae2.api.parts.IFacadePart;
-import ae2.api.parts.IPart;
 import ae2.client.gui.AEBaseGui;
 import ae2.client.gui.style.GuiStyle;
 import ae2.client.gui.style.GuiStyleManager;
 import ae2.client.gui.widgets.ActionButton;
 import ae2.client.gui.widgets.OutputSideSelectionButton;
 import ae2.container.implementations.ContainerOutputSides;
+import ae2.core.AELog;
 import ae2.core.localization.ButtonToolTips;
 import ae2.core.localization.GuiText;
-import ae2.tile.networking.TileCableBus;
+import ae2.text.TextComponentItemStack;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
+import org.jetbrains.annotations.Nullable;
 
 import java.awt.Rectangle;
+import java.util.Arrays;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class GuiOutputSides extends AEBaseGui<ContainerOutputSides> {
     private static final String STYLE_PATH = "/screens/output_sides.json";
     private static final RelativeSide[] RELATIVE_SIDES = RelativeSide.values();
+    private static final Set<Block> PICK_BLOCK_FAILURES = new ReferenceOpenHashSet<>();
 
     private final Map<RelativeSide, OutputSideSelectionButton> sideButtons = new EnumMap<>(RelativeSide.class);
     private final Map<RelativeSide, Boolean> lastAllowedStates = new EnumMap<>(RelativeSide.class);
     private final Map<RelativeSide, Boolean> lastEnabledStates = new EnumMap<>(RelativeSide.class);
+    private final Map<RelativeSide, ItemStack> neighbor = new EnumMap<>(RelativeSide.class);
 
     public GuiOutputSides(ContainerOutputSides container, InventoryPlayer playerInventory) {
         this(container, playerInventory, GuiStyleManager.loadStyleDoc(STYLE_PATH));
@@ -88,8 +98,9 @@ public class GuiOutputSides extends AEBaseGui<ContainerOutputSides> {
             button.enabled = allowed;
             if (!Boolean.valueOf(allowed).equals(this.lastAllowedStates.get(side))
                 || !Boolean.valueOf(enabled).equals(this.lastEnabledStates.get(side))) {
-                button.setTooltipMessage(List.of(
+                button.setTooltipMessage(Arrays.asList(
                     ButtonToolTips.OutputSideConfig.text(),
+                    TextComponentItemStack.of(getDisplayStack(side)),
                     allowed ? GuiText.OutputSideToggleHint.text() : GuiText.OutputSideUnavailable.text(),
                     enabled ? GuiText.OutputSideEnabled.text() : GuiText.OutputSideDisabled.text()));
                 this.lastAllowedStates.put(side, allowed);
@@ -99,32 +110,57 @@ public class GuiOutputSides extends AEBaseGui<ContainerOutputSides> {
     }
 
     private ItemStack getDisplayStack(RelativeSide side) {
+        var stack = neighbor.get(side);
+        if (stack != null) return stack;
+
         var host = this.container.getHost();
         if (!(host instanceof TileEntity tile) || tile.getWorld() == null) {
             return ItemStack.EMPTY;
         }
 
         EnumFacing facing = host.getBlockOrientation().getSide(side);
-        var pos = tile.getPos().offset(facing);
-        var adjacentTile = tile.getWorld().getTileEntity(pos);
-        if (adjacentTile instanceof TileCableBus cableBus) {
-            IFacadePart facade = cableBus.getFacadeContainer().getFacade(facing.getOpposite());
-            if (facade != null) {
-                return facade.getItemStack();
+        World world = tile.getWorld();
+        BlockPos pos = tile.getPos().offset(facing);
+        IBlockState state = world.getBlockState(pos);
+        Block block = state.getBlock();
+        try {
+            RayTraceResult hit = getTargetHit(world, pos, facing.getOpposite());
+            if (hit != null && pos.equals(hit.getBlockPos())) {
+                ItemStack picked = block.getPickBlock(state, hit, world, pos, Minecraft.getMinecraft().player);
+                if (!picked.isEmpty()) {
+                    return picked;
+                }
             }
-            IPart part = cableBus.getPart(facing.getOpposite());
-            if (part != null) {
-                return part.getPartItem().asItemStack();
+        } catch (Throwable e) {
+            if (e instanceof VirtualMachineError fatal) {
+                throw fatal;
             }
-            IPart center = cableBus.getPart(null);
-            if (center != null) {
-                return center.getPartItem().asItemStack();
+            if (PICK_BLOCK_FAILURES.add(block)) {
+                AELog.warn(e, "Failed to get pick block stack for pattern provider target %s at %s", block, pos);
             }
         }
+        Item item = Item.getItemFromBlock(block);
+        int i = 0;
+        if (item.getHasSubtypes()) {
+            i = block.getMetaFromState(state);
+        }
+        stack = new ItemStack(item, 1, i);
+        neighbor.put(side, stack);
+        return stack;
+    }
 
-        IBlockState state = tile.getWorld().getBlockState(pos);
-        Block block = state.getBlock();
-        return new ItemStack(block, 1, block.getMetaFromState(state));
+    @Nullable
+    private static RayTraceResult getTargetHit(World level, BlockPos pos, EnumFacing targetSide) {
+        EnumFacing providerToTarget = targetSide.getOpposite();
+        Vec3d from = new Vec3d(
+            pos.getX() + 0.5D - providerToTarget.getXOffset() * 0.499D,
+            pos.getY() + 0.5D - providerToTarget.getYOffset() * 0.499D,
+            pos.getZ() + 0.5D - providerToTarget.getZOffset() * 0.499D);
+        Vec3d to = from.add(
+            providerToTarget.getXOffset(),
+            providerToTarget.getYOffset(),
+            providerToTarget.getZOffset());
+        return level.rayTraceBlocks(from, to, true);
     }
 
     @Override
