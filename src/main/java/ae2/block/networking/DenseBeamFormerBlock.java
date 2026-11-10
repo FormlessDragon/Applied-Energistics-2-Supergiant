@@ -72,11 +72,7 @@ public class DenseBeamFormerBlock extends AEBaseTileBlock<TileDenseBeamFormer> {
 
     @Override
     public int getLightValue(IBlockState state, IBlockAccess world, BlockPos pos) {
-        TileDenseBeamFormer tile = this.getTileEntity(world, pos);
-        if (tile != null) {
-            return tile.isBeamLinked() ? 15 : 9;
-        }
-        return super.getLightValue(state, world, pos);
+        return state.getValue(STATE) == State.HAS_CHANNEL ? 15 : 9;
     }
 
     @Override
