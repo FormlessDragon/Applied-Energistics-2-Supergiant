@@ -28,6 +28,7 @@ import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import java.util.EnumSet;
 
@@ -55,6 +56,7 @@ public class TileDenseBeamFormer extends AENetworkedTile implements BeamFormerEn
     private int clientFlags;
     private boolean beamVisible = true;
     private boolean beamLinked;
+    private boolean beamUpdatesEnabled = true;
 
     public TileDenseBeamFormer() {
         this.getMainNode()
@@ -85,7 +87,7 @@ public class TileDenseBeamFormer extends AENetworkedTile implements BeamFormerEn
 
     @Override
     public void onMainNodeStateChanged(IGridNodeListener.State reason) {
-        if (getCurrentClientFlags() != this.clientFlags) {
+        if (this.beamUpdatesEnabled && getCurrentClientFlags() != this.clientFlags) {
             this.markForUpdate();
         }
     }
@@ -103,6 +105,7 @@ public class TileDenseBeamFormer extends AENetworkedTile implements BeamFormerEn
 
     @Override
     public void onChunkUnloaded() {
+        this.beamUpdatesEnabled = false;
         BeamFormerLinkLogic.disconnect(this, this.connection);
         this.connection = null;
         super.onChunkUnloaded();
@@ -110,9 +113,16 @@ public class TileDenseBeamFormer extends AENetworkedTile implements BeamFormerEn
 
     @Override
     public void setRemoved() {
+        this.beamUpdatesEnabled = false;
         BeamFormerLinkLogic.disconnect(this, this.connection);
         this.connection = null;
         super.setRemoved();
+    }
+
+    @Override
+    public void clearRemoved() {
+        this.beamUpdatesEnabled = true;
+        super.clearRemoved();
     }
 
     @Override
@@ -323,12 +333,14 @@ public class TileDenseBeamFormer extends AENetworkedTile implements BeamFormerEn
     @Override
     public void onBeamChanged() {
         this.invalidateRenderBoundingBox();
-        this.markForUpdate();
-        this.saveChanges();
+        if (this.beamUpdatesEnabled) {
+            this.markForUpdate();
+            this.saveChanges();
+        }
     }
 
     @Override
-    public AxisAlignedBB getRenderBoundingBox() {
+    public @NonNull AxisAlignedBB getRenderBoundingBox() {
         if (this.cachedRenderBoundingBox == null) {
             this.cachedRenderBoundingBox = BeamFormerRenderGeometry.computeRenderBoundingBox(this);
         }

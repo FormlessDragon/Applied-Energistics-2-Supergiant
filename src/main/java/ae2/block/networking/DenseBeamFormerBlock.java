@@ -15,6 +15,7 @@ import net.minecraft.util.IStringSerializable;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Locale;
 
@@ -46,7 +47,7 @@ public class DenseBeamFormerBlock extends AEBaseTileBlock<TileDenseBeamFormer> {
     }
 
     @Override
-    protected BlockStateContainer createBlockState() {
+    protected @NonNull BlockStateContainer createBlockState() {
         return createBlockState(STATE);
     }
 
@@ -61,7 +62,7 @@ public class DenseBeamFormerBlock extends AEBaseTileBlock<TileDenseBeamFormer> {
     }
 
     @Override
-    public IBlockState getStateFromMeta(int meta) {
+    public @NonNull IBlockState getStateFromMeta(int meta) {
         return super.getStateFromMeta(meta).withProperty(STATE, State.OFF);
     }
 
@@ -71,13 +72,13 @@ public class DenseBeamFormerBlock extends AEBaseTileBlock<TileDenseBeamFormer> {
     }
 
     @Override
-    public int getLightValue(IBlockState state, IBlockAccess world, BlockPos pos) {
+    public int getLightValue(IBlockState state, @NonNull IBlockAccess world, @NonNull BlockPos pos) {
         return state.getValue(STATE) == State.HAS_CHANNEL ? 15 : 9;
     }
 
     @Override
     @SuppressWarnings("deprecation")
-    public IBlockState getActualState(IBlockState state, IBlockAccess world, BlockPos pos) {
+    public @NonNull IBlockState getActualState(@NonNull IBlockState state, @NonNull IBlockAccess world, @NonNull BlockPos pos) {
         TileDenseBeamFormer tile = this.getTileEntity(world, pos);
         if (tile == null) {
             return super.getActualState(state, world, pos).withProperty(STATE, State.OFF);
@@ -86,7 +87,7 @@ public class DenseBeamFormerBlock extends AEBaseTileBlock<TileDenseBeamFormer> {
     }
 
     @Override
-    public AxisAlignedBB getBoundingBox(IBlockState state, IBlockAccess source, BlockPos pos) {
+    public @NonNull AxisAlignedBB getBoundingBox(IBlockState state, IBlockAccess source, BlockPos pos) {
         return switch (this.getOrientationStrategy().getFacing(state)) {
             case DOWN -> DOWN_AABB;
             case EAST -> EAST_AABB;
@@ -98,11 +99,11 @@ public class DenseBeamFormerBlock extends AEBaseTileBlock<TileDenseBeamFormer> {
     }
 
     @Override
-    public BlockRenderLayer getRenderLayer() {
+    public @NonNull BlockRenderLayer getRenderLayer() {
         return BlockRenderLayer.CUTOUT;
     }
 
-    public boolean canRenderInLayer(IBlockState state, BlockRenderLayer layer) {
+    public boolean canRenderInLayer(@NonNull IBlockState state, @NonNull BlockRenderLayer layer) {
         return layer == BlockRenderLayer.CUTOUT;
     }
 
@@ -118,7 +119,7 @@ public class DenseBeamFormerBlock extends AEBaseTileBlock<TileDenseBeamFormer> {
 
     @Override
     @SuppressWarnings("deprecation")
-    public BlockFaceShape getBlockFaceShape(IBlockAccess worldIn, IBlockState state, BlockPos pos, EnumFacing face) {
+    public @NonNull BlockFaceShape getBlockFaceShape(@NonNull IBlockAccess worldIn, @NonNull IBlockState state, @NonNull BlockPos pos, @NonNull EnumFacing face) {
         return BlockFaceShape.UNDEFINED;
     }
 
@@ -127,7 +128,7 @@ public class DenseBeamFormerBlock extends AEBaseTileBlock<TileDenseBeamFormer> {
         HAS_CHANNEL;
 
         @Override
-        public String getName() {
+        public @NonNull String getName() {
             return this.name().toLowerCase(Locale.ROOT);
         }
     }
