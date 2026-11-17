@@ -76,6 +76,61 @@ class CraftingSubmissionPublicationTest {
     }
 
     @Test
+    void forcedMissingPreviewReachesTheCpuAndWaitsForItsIngredients() {
+        var fixture = new Fixture();
+        fixture.simulation = true;
+        fixture.missing.add(carrot, 7);
+        fixture.emitted.add(carrot, 2);
+        fixture.extractLimit = 3;
+        assertEquals(CraftingSubmitErrorCode.INCOMPLETE_PLAN,
+            fixture.crafting.submitJob(fixture.plan, fixture.requester, fixture.cluster, true,
+                IActionSource.empty(), false).errorCode());
+        assertFalse(fixture.logic.hasJob());
+        assertEquals(0, fixture.extracts);
+        var receipt = fixture.crafting.submitJob(fixture.plan, fixture.requester, fixture.cluster, true,
+            IActionSource.empty(), true);
+        assertTrue(receipt.successful());
+        assertTrue(fixture.logic.hasJob());
+        assertEquals(6, fixture.logic.getInventory().list.get(carrot));
+        assertEquals(8, fixture.logic.getWaitingFor(carrot));
+    }
+
+    @Test
+    void forcedStartStillRejectsPureSimulationAndMissingOutputWithoutAnyPattern() {
+        var fixture = new Fixture();
+        fixture.simulation = true;
+        assertEquals(CraftingSubmitErrorCode.INCOMPLETE_PLAN,
+            fixture.crafting.submitJob(fixture.plan, null, fixture.cluster, true,
+                IActionSource.empty(), true).errorCode());
+        fixture.missing.add(carrot, 7);
+        assertEquals(CraftingSubmitErrorCode.NO_CRAFTING_PATTERN,
+            fixture.crafting.submitJob(fixture.plan, null, fixture.cluster, true,
+                IActionSource.empty(), true).errorCode());
+        assertFalse(fixture.logic.hasJob());
+        assertEquals(0, fixture.extracts);
+    }
+
+    @Test
+    void aMissingPreviewCanMergeIntoTheSelectedCpuWhenForced() {
+        var fixture = new Fixture();
+        assertTrue(fixture.submit().successful());
+        fixture.simulation = true;
+        assertFalse(fixture.logic.canMergeJob(fixture.plan));
+        fixture.missing.add(carrot, 7);
+        fixture.emitted.add(carrot, 2);
+        fixture.extractLimit = 3;
+        assertTrue(fixture.logic.canMergeJob(fixture.plan));
+        assertEquals(CraftingSubmitErrorCode.INCOMPLETE_PLAN,
+            fixture.crafting.submitJob(fixture.plan, null, fixture.cluster, true,
+                IActionSource.empty(), false).errorCode());
+        var receipt = fixture.crafting.submitJob(fixture.plan, null, fixture.cluster, true,
+            IActionSource.empty(), true);
+        assertTrue(receipt.successful());
+        assertEquals(11, fixture.logic.getInventory().list.get(carrot));
+        assertEquals(8, fixture.logic.getWaitingFor(carrot));
+    }
+
+    @Test
     void committedLinksAndInputsSurviveOrdinaryDisplayAndSaveFailureWithASuccessfulReceipt() {
         var fixture = new Fixture();
         fixture.cluster.onDisplay = () -> {
@@ -636,6 +691,7 @@ class CraftingSubmissionPublicationTest {
         private int terminalCalls;
         private Runnable onTerminal;
         private boolean failRepeatedOutput;
+        private boolean simulation;
         private String failedGetter;
         private long extractLimit = Long.MAX_VALUE;
         private TestCraftingService crafting;
@@ -683,7 +739,8 @@ class CraftingSubmissionPublicationTest {
                         case "missingItems" -> missing;
                         case "patternTimes" -> patterns;
                         case "intermediateFinalOutputAmount" -> 0L;
-                        case "simulation", "multiplePaths" -> false;
+                        case "simulation" -> simulation;
+                        case "multiplePaths" -> false;
                         default -> throw new AssertionError(method.getName());
                     };
                 });

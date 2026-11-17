@@ -396,7 +396,8 @@ public class CraftingCpuLogic {
 
     public boolean canMergeJob(ICraftingPlan plan) {
         if (this.readingState || this.job == null || this.job.suspended || this.job.link.isDone()
-            || this.job.link.isCanceled() || this.hasUnconfirmedInventory() || plan.simulation()) {
+            || this.job.link.isCanceled() || this.hasUnconfirmedInventory()
+            || (plan.simulation() && plan.missingItems().isEmpty())) {
             return false;
         }
         if (!this.job.finalOutput.what().equals(plan.finalOutput().what())) {

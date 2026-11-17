@@ -1,9 +1,11 @@
 package ae2.container.implementations;
 
+import ae2.api.config.CpuSelectionMode;
 import ae2.api.implementations.guiobjects.ItemGuiHost;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.crafting.CraftingSubmitErrorCode;
+import ae2.api.networking.crafting.ICraftingCPU;
 import ae2.api.networking.crafting.ICraftingLink;
 import ae2.api.networking.crafting.ICraftingPlan;
 import ae2.api.networking.crafting.ICraftingService;
@@ -18,6 +20,7 @@ import ae2.container.AEBaseContainer;
 import ae2.container.ContainerConstants;
 import ae2.container.PendingGridFills;
 import ae2.container.interfaces.ICraftingGridContainer;
+import ae2.container.me.crafting.CraftingPlanSummary;
 import ae2.container.me.items.ContainerCraftingTerm;
 import ae2.core.AEConfig;
 import ae2.core.PlayerState;
@@ -324,6 +327,50 @@ class CraftConfirmCalculationCancellationTest {
         fixture.close();
         drain(fixture.player);
         assertNull(PendingGridFills.get(fixture.player));
+    }
+
+    @Test
+    void missingPreviewIsSubmittedOnlyWhenForced() throws Exception {
+        var fixture = new SubmissionFixture();
+        fixture.simulation = true;
+        fixture.missing.add(AEItemKey.of(Items.APPLE), 3);
+        fixture.container.startJob();
+        assertEquals(0, fixture.submissions);
+        assertNull(get(fixture.container, "submittedGeneration"));
+        fixture.container.startJob(true);
+        assertEquals(1, fixture.submissions);
+        assertTrue(fixture.forcedSubmission);
+        assertEquals(1, fixture.returns);
+    }
+
+    @Test
+    void aMissingPreviewKeepsABusyMergeTargetInTheCpuSelection() throws Exception {
+        var fixture = new SubmissionFixture();
+        fixture.simulation = true;
+        fixture.missing.add(AEItemKey.of(Items.APPLE), 3);
+        set(fixture.container, "plan", new CraftingPlanSummary(46, true, List.of()));
+        set(fixture.container, "cachedMergeableCpuResult", fixture.container.getResult());
+        set(fixture.container, "cachedMergeableCpus", new Reference2BooleanOpenHashMap<>());
+        var cpu = (ICraftingCPU) Proxy.newProxyInstance(ICraftingCPU.class.getClassLoader(),
+            new Class<?>[]{ICraftingCPU.class}, (_, method, _) -> switch (method.getName()) {
+                case "getSelectionMode" -> CpuSelectionMode.ANY;
+                case "getAvailableStorage" -> 1024L;
+                case "isBusy", "canMergeJob" -> true;
+                default -> throw new AssertionError(method.getName());
+            });
+        var matches = ContainerCraftConfirm.class.getDeclaredMethod("cpuMatches", ICraftingCPU.class);
+        matches.setAccessible(true);
+        assertEquals(true, matches.invoke(fixture.container, cpu));
+    }
+
+    @Test
+    void pureSimulationCannotBeForcedWithoutMissingIngredients() throws Exception {
+        var fixture = new SubmissionFixture();
+        fixture.simulation = true;
+        fixture.container.startJob(true);
+        assertEquals(0, fixture.submissions);
+        assertEquals(0, fixture.returns);
+        assertNull(get(fixture.container, "submittedGeneration"));
     }
 
     @Test
@@ -953,6 +1000,8 @@ class CraftConfirmCalculationCancellationTest {
         private Runnable onSubmit, onSuccess, onError, onDetail, onOutput;
         private CraftingSubmitErrorCode error;
         private int submissions, returns, errorReads, detailReads;
+        private boolean simulation, forcedSubmission;
+        private final KeyCounter missing = new KeyCounter();
         private ICraftingPlan replacement;
 
         SubmissionFixture() throws Exception {
@@ -963,9 +1012,10 @@ class CraftConfirmCalculationCancellationTest {
             player.inventory = container.inventory;
             var service = (ICraftingService) Proxy.newProxyInstance(
                 ICraftingService.class.getClassLoader(),
-                new Class<?>[]{ICraftingService.class}, (_, method, _) -> {
+                new Class<?>[]{ICraftingService.class}, (_, method, arguments) -> {
                     if (!method.getName().equals("submitJob")) throw new AssertionError(method.getName());
                     submissions++;
+                    forcedSubmission = (boolean) arguments[5];
                     if (onSubmit != null) onSubmit.run();
                     return new ICraftingSubmitResult() {
                         public boolean successful() {
@@ -1041,10 +1091,9 @@ class CraftConfirmCalculationCancellationTest {
 
         private ICraftingPlan newPlan() {
             var output = new GenericStack(AEItemKey.of(Items.APPLE), 1);
-            var missing = new KeyCounter();
             return (ICraftingPlan) Proxy.newProxyInstance(ICraftingPlan.class.getClassLoader(),
                 new Class<?>[]{ICraftingPlan.class}, (proxy, method, args) -> switch (method.getName()) {
-                    case "simulation" -> false;
+                    case "simulation" -> simulation;
                     case "missingItems" -> missing;
                     case "finalOutput" -> {
                         if (onOutput != null) onOutput.run();

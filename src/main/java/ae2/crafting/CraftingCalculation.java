@@ -969,7 +969,7 @@ public class CraftingCalculation {
     private CraftingPlan runLegacyGraphAttempt(CraftingGraph graph, long productionAmount) throws InterruptedException {
         var plan = runCraftAttempt(productionAmount, productionAmount);
         if (plan != null && graph.hasAlternatives() && !plan.missingItems().isEmpty() && !this.tryingAlternatives) {
-            return tryAlternatives(plan, productionAmount, graph.getNodeCount());
+            return tryAlternatives(plan, productionAmount, graph.getNodeCount(), true);
         }
         return plan;
     }
@@ -1012,7 +1012,7 @@ public class CraftingCalculation {
             return runCraftAttempt(productionAmount, productionAmount);
         }
         if (graph.hasAlternatives() && !this.missing.isEmpty() && !this.tryingAlternatives) {
-            return tryAlternatives(graphPlan, productionAmount, graph.getNodeCount());
+            return tryAlternatives(graphPlan, productionAmount, graph.getNodeCount(), false);
         }
         return graphPlan;
     }
@@ -1997,13 +1997,24 @@ public class CraftingCalculation {
     }
 
     /**
-     * The graph uses the pattern of highest priority of each key. With items missing, other patterns may need less of
-     * them: the graph is planned again with the patterns needing the least of what went missing, weighing each item by
-     * how often it did. The legacy tree, which splits a request between patterns in the order of their priorities, gets
-     * a few steps last and wins a tie.
+     * A native graph commits to one producer per key. First split shortages between producers in priority order,
+     * consuming each one's available materials before reporting missing inputs of the preferred producer. Alternative
+     * choices may still resolve competition for shared materials and produce a complete plan, but a smaller count of
+     * unrelated missing materials must never replace the priority-ordered shortage plan.
      */
-    private CraftingPlan tryAlternatives(CraftingPlan graphPlan, long productionAmount, int graphNodes)
+    private CraftingPlan tryAlternatives(CraftingPlan graphPlan, long productionAmount, int graphNodes,
+                                         boolean priorityOrdered)
         throws InterruptedException {
+        var priorityPlan = priorityOrdered ? graphPlan : tryPriorityOrderedAttempt(productionAmount);
+        if (priorityPlan == null) priorityPlan = graphPlan;
+        if (priorityPlan.missingItems().isEmpty()) {
+            return priorityPlan;
+        }
+        var priorityMarker = createCalculationMarker();
+        var priorityTree = this.tree;
+        var priorityGraph = this.graph;
+        // Exploratory legacy attempts must not reset the tree retained by the priority plan's display source.
+        this.tree = null;
         var best = graphPlan;
         var plan = best;
         var scarcity = new Object2DoubleOpenHashMap<AEKey>();
@@ -2064,25 +2075,48 @@ public class CraftingCalculation {
             this.tryingAlternatives = false;
         }
 
-        long limit = fallbackNanos();
-        if (limit <= 0 || (long) graphNodes * LEGACY_STEPS_PER_NODE > LEGACY_FALLBACK_STEPS) {
-            return best;
-        }
-        this.fallbackDeadline = LongMath.saturatedAdd(workerTime(), limit);
-        this.fallbackSteps = LEGACY_FALLBACK_STEPS;
-        try {
-            var legacyPlan = runCraftAttempt(productionAmount, productionAmount);
-            if (legacyPlan != null && totalAmount(legacyPlan.missingItems()) <= totalAmount(best.missingItems())) {
-                return legacyPlan;
-            }
-        } catch (FallbackTimeout ignored) {
-            // Keep the plan of the graph
-        } catch (CraftingCalculationFailure failure) {
-            if (this.limitExceeded) throw failure;
-        } finally {
-            this.fallbackDeadline = Long.MAX_VALUE;
+        if (!best.missingItems().isEmpty()) {
+            restoreCalculationMarker(priorityMarker);
+            this.tree = priorityTree;
+            this.graph = priorityGraph;
+            return priorityPlan;
         }
         return best;
+    }
+
+    /**
+     * Priority allocation is part of normal planning even when optional fallback search is disabled. Keep the tree's
+     * expansion bounded: a heavily shared graph can have exponentially more tree paths than graph nodes.
+     */
+    private @Nullable CraftingPlan tryPriorityOrderedAttempt(long productionAmount) throws InterruptedException {
+        var marker = createCalculationMarker();
+        var previousGraph = this.graph;
+        var previousTree = this.tree;
+        long previousDeadline = this.fallbackDeadline;
+        int previousSteps = this.fallbackSteps;
+        this.tree = null;
+        this.fallbackSteps = LEGACY_FALLBACK_STEPS;
+        long limit = fallbackNanos();
+        this.fallbackDeadline = limit > 0 ? LongMath.saturatedAdd(workerTime(), limit) : Long.MAX_VALUE - 1;
+        boolean planned = false;
+        try {
+            var plan = runCraftAttempt(productionAmount, productionAmount);
+            planned = plan != null;
+            return plan;
+        } catch (FallbackTimeout ignored) {
+            return null;
+        } catch (CraftingCalculationFailure failure) {
+            if (this.limitExceeded) throw failure;
+            return null;
+        } finally {
+            this.fallbackDeadline = previousDeadline;
+            this.fallbackSteps = previousSteps;
+            if (!planned) {
+                restoreCalculationMarker(marker);
+                this.graph = previousGraph;
+                this.tree = previousTree;
+            }
+        }
     }
 
     /**

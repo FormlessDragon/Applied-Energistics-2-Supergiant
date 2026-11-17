@@ -516,7 +516,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
     public ICraftingSubmitResult submitJob(ICraftingPlan job, @Nullable ICraftingRequester requestingMachine,
                                            @Nullable ICraftingCPU target, boolean prioritizePower, IActionSource src,
                                            boolean forceStart, boolean skipMerge, CraftingJobOptions options) {
-        if (job.simulation()) {
+        if (job.simulation() && (!forceStart || job.missingItems().isEmpty())) {
             return CraftingSubmitResult.INCOMPLETE_PLAN;
         }
         if (!forceStart && !job.missingItems().isEmpty()) {
@@ -789,7 +789,7 @@ public class CraftingService implements ICraftingService, IGridServiceProvider {
 
     @Nullable
     private CraftingCPUCluster findMergeableCraftingCPU(ICraftingPlan job, IActionSource src) {
-        if (job.simulation()) {
+        if (job.simulation() && job.missingItems().isEmpty()) {
             return null;
         }
 

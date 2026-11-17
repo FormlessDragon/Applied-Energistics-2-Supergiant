@@ -44,7 +44,7 @@ public interface ICraftingPlan {
     long bytes();
 
     /**
-     * True if this is a preview plan that cannot be submitted.
+     * True if this is a preview plan. A preview with missing ingredients can only be submitted with forced start.
      */
     boolean simulation();
 
@@ -65,7 +65,7 @@ public interface ICraftingPlan {
     KeyCounter emittedItems();
 
     /**
-     * List of missing items. A submit-capable plan may still carry missing items if it was calculated for forced start.
+     * List of missing items. Forced start submits the plan while the CPU waits for these ingredients.
      */
     KeyCounter missingItems();
 

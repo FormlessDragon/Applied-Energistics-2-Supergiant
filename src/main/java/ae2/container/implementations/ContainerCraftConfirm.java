@@ -782,7 +782,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
 
     private boolean isCachedMergeableCpu(ICraftingCPU cpu) {
         ICraftingPlan currentResult = this.cachedMergeableCpuResult;
-        if (currentResult == null || currentResult.simulation()) {
+        if (currentResult == null || (currentResult.simulation() && currentResult.missingItems().isEmpty())) {
             return false;
         }
         if (!this.cachedMergeableCpus.containsKey(cpu)) {
@@ -792,7 +792,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     }
 
     private boolean canMergeCurrentResult(IGrid grid) {
-        if (this.result == null || this.result.simulation()) {
+        if (this.result == null || (this.result.simulation() && this.result.missingItems().isEmpty())) {
             return false;
         }
         ICraftingService craftingService = grid.getCraftingService();
@@ -868,7 +868,7 @@ public class ContainerCraftConfirm extends AEBaseContainer implements ISubGui {
     private void startServerJob(boolean forceStart, boolean skipMerge, boolean subscribed) {
         var generation = this.calculationGeneration;
         var completed = this.result;
-        if (completed != null && !completed.simulation()) {
+        if (completed != null && (!completed.simulation() || (forceStart && !completed.missingItems().isEmpty()))) {
             if (!forceStart && !completed.missingItems().isEmpty()) {
                 return;
             }

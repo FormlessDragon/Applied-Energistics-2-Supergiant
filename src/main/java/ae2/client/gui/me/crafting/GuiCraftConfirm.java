@@ -244,7 +244,7 @@ public class GuiCraftConfirm extends AEBaseGui<ContainerCraftConfirm> implements
         this.selectCPU.setMessage(getNextCpuButtonLabel());
 
         CraftingPlanSummary plan = container.getPlan();
-        boolean planIsStartable = plan != null && !plan.simulation();
+        boolean planIsStartable = CraftConfirmStartButtonState.canSelectCpu(plan);
         boolean hasMissingEntries = plan != null && plan.hasMissingEntries();
         boolean shiftDown = isShiftKeyDown();
         boolean ctrlDown = isCtrlKeyDown();

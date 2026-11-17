@@ -827,7 +827,7 @@ public class AEConfig {
 
         @Config.Name("craftingCalculationFallbackSeconds")
         @Config.Comment({"Seconds of calculation time a plan with missing items may spend on trying alternative ",
-            "patterns one by one, after which the best plan found so far is kept. 0 never tries them."})
+            "patterns one by one. 0 disables extra fallback time; priority allocation still uses a bounded step budget."})
         @Config.RangeInt(min = 0)
         public int craftingCalculationFallbackSeconds = 5;
 

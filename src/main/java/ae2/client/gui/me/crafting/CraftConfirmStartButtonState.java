@@ -1,8 +1,14 @@
 package ae2.client.gui.me.crafting;
 
+import ae2.container.me.crafting.CraftingPlanSummary;
 import ae2.core.localization.GuiText;
+import org.jetbrains.annotations.Nullable;
 
 record CraftConfirmStartButtonState(GuiText label, boolean clickable, boolean highlighted) {
+
+    static boolean canSelectCpu(@Nullable CraftingPlanSummary plan) {
+        return plan != null && (!plan.simulation() || plan.hasMissingEntries());
+    }
 
     static CraftConfirmStartButtonState compute(boolean hasNoCpu, boolean planIsStartable, boolean hasMissingEntries,
                                                 boolean shiftDown, boolean mergeAvailable, boolean ctrlDown) {
